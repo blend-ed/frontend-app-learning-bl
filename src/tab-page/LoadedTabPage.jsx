@@ -120,8 +120,11 @@ const LoadedTabPage = ({
             </Helmet>
             {originalUserIsStaff && (
               <div
-                className="mt-4 mb-n4"
-                style={{ zIndex: 0 }}
+                className="mb-n4"
+                style={{
+                  zIndex: 0,
+                  marginTop: '5.3rem',
+                }}
               >
                 <InstructorToolbar
                   courseId={courseId}

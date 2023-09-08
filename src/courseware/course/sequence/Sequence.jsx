@@ -34,6 +34,23 @@ const Sequence = ({
   previousSequenceHandler,
   intl,
 }) => {
+  const [scrollY, setScrollY] = useState(0);
+
+  // Add an event listener to track the scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+
+    // Attach the event listener
+    window.addEventListener('scroll', handleScroll);
+
+    // Clean up the event listener when the component unmounts
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const course = useModel('coursewareMeta', courseId);
   const {
     isStaff,
@@ -205,18 +222,54 @@ const Sequence = ({
     </div>
   );
 
+  let topValue = '8em';
+
+  if (originalUserIsStaff) {
+    topValue = scrollY < 30 ? '11.3em' : '8em';
+  }
+
+  const sequenceExamWrapper = document.getElementById('sequence-exam-wrapper');
+
+  const isHeightGreaterThan120 = sequenceExamWrapper?.offsetHeight > 120;
+
+  let marginTopValue;
+
+  if (isHeightGreaterThan120) {
+    marginTopValue = originalUserIsStaff ? '10rem' : '14rem';
+  } else {
+    marginTopValue = originalUserIsStaff ? '6rem' : '10rem';
+  }
+
   if (sequenceStatus === 'loaded') {
     return (
       <div>
-        <SequenceExamWrapper
-          sequence={sequence}
-          courseId={courseId}
-          isStaff={isStaff}
-          originalUserIsStaff={originalUserIsStaff}
-          canAccessProctoredExams={course.canAccessProctoredExams}
+        <div
+          style={{
+            position: 'fixed',
+            top: topValue,
+            left: '15.8vw',
+            right: 0,
+            zIndex: 3,
+            marginLeft: '0.7em',
+            marginRight: '0.5em',
+          }}
+          id="sequence-exam-wrapper"
+        >
+          <SequenceExamWrapper
+            sequence={sequence}
+            courseId={courseId}
+            isStaff={isStaff}
+            originalUserIsStaff={originalUserIsStaff}
+            canAccessProctoredExams={course.canAccessProctoredExams}
+          />
+        </div>
+        <div
+          style={{
+            marginTop: marginTopValue,
+          }}
         >
           {defaultContent}
-        </SequenceExamWrapper>
+        </div>
       </div>
     );
   }
