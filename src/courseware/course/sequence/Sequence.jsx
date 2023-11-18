@@ -34,6 +34,23 @@ const Sequence = ({
   previousSequenceHandler,
   intl,
 }) => {
+  const [scrollY, setScrollY] = useState(0);
+
+  // Add an event listener to track the scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+
+    // Attach the event listener
+    window.addEventListener('scroll', handleScroll);
+
+    // Clean up the event listener when the component unmounts
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const course = useModel('coursewareMeta', courseId);
   const {
     isStaff,
@@ -143,7 +160,7 @@ const Sequence = ({
   };
 
   const defaultContent = (
-    <div className="sequence-container d-inline-flex flex-row mt-5">
+    <div className="sequence-container d-inline-flex flex-row mt-4">
       <div className={classNames('sequence w-100', { 'position-relative': shouldDisplayNotificationTriggerInSequence })}>
         <div
           style={{
@@ -205,18 +222,52 @@ const Sequence = ({
     </div>
   );
 
+  let topValue = '8em';
+
+  if (originalUserIsStaff) {
+    topValue = scrollY < 30 ? '11.3em' : '8em';
+  }
+
+  let marginTopValue;
+
+  if (sequence.isTimeLimited) {
+    marginTopValue = '6rem';
+  } else {
+    marginTopValue = '2rem';
+  }
+
   if (sequenceStatus === 'loaded') {
     return (
       <div>
-        <SequenceExamWrapper
-          sequence={sequence}
-          courseId={courseId}
-          isStaff={isStaff}
-          originalUserIsStaff={originalUserIsStaff}
-          canAccessProctoredExams={course.canAccessProctoredExams}
+        <div
+          style={{
+            position: 'fixed',
+            top: topValue,
+            left: '15.8vw',
+            right: 0,
+            zIndex: 3,
+            marginLeft: '0.7em',
+            marginRight: '0.5em',
+          }}
+          id="sequence-exam-wrapper"
+        >
+          <SequenceExamWrapper
+            sequence={sequence}
+            courseId={courseId}
+            isStaff={isStaff}
+            originalUserIsStaff={originalUserIsStaff}
+            canAccessProctoredExams={course.canAccessProctoredExams}
+          >
+            <div />
+          </SequenceExamWrapper>
+        </div>
+        <div
+          style={{
+            marginTop: marginTopValue,
+          }}
         >
           {defaultContent}
-        </SequenceExamWrapper>
+        </div>
       </div>
     );
   }

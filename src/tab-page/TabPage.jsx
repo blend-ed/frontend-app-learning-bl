@@ -95,8 +95,10 @@ const TabPage = ({ intl, ...props }) => {
         {metadataModel === 'courseHomeMeta' && (<LaunchCourseHomeTourButton srOnly />)}
         <div
           style={{
-            position: 'sticky',
+            position: 'fixed',
             top: 0,
+            left: 0,
+            right: 0,
             backgroundColor: 'white',
             zIndex: 5,
           }}
