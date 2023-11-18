@@ -5,6 +5,7 @@ import { Helmet } from 'react-helmet';
 import { getConfig } from '@edx/frontend-platform';
 import {
   Button,
+  Image,
   Layout,
   Scrollable,
   useToggle,
@@ -20,6 +21,8 @@ import StreakModal from '../shared/streak-celebration';
 
 import Section from '../course-home/outline-tab/Section';
 import ProductTours from '../product-tours/ProductTours';
+
+import PoweredByBlended from '../poweredbyblended.png';
 
 const LoadedTabPage = ({
   activeTabSlug,
@@ -105,6 +108,8 @@ const LoadedTabPage = ({
                     />
                   ))}
                 </ol>
+                <Image src={PoweredByBlended} fluid className="mt-4 text-inverse-gray" style={{ paddingLeft: '3.5rem', paddingRight: '3.5rem' }} />
+
               </Scrollable>
             )}
           </Layout.Element>
