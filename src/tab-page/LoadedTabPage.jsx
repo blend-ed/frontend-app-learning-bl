@@ -120,7 +120,7 @@ const LoadedTabPage = ({
             </Helmet>
             {originalUserIsStaff && (
               <div
-                className="mb-n4"
+                className="mt-7 mb-n4"
                 style={{
                   zIndex: 0,
                   marginTop: '5.3rem',

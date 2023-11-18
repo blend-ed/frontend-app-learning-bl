@@ -160,7 +160,7 @@ const Sequence = ({
   };
 
   const defaultContent = (
-    <div className="sequence-container d-inline-flex flex-row mt-5">
+    <div className="sequence-container d-inline-flex flex-row mt-4">
       <div className={classNames('sequence w-100', { 'position-relative': shouldDisplayNotificationTriggerInSequence })}>
         <div
           style={{
@@ -228,16 +228,12 @@ const Sequence = ({
     topValue = scrollY < 30 ? '11.3em' : '8em';
   }
 
-  const sequenceExamWrapper = document.getElementById('sequence-exam-wrapper');
-
-  const isHeightGreaterThan120 = sequenceExamWrapper?.offsetHeight > 120;
-
   let marginTopValue;
 
-  if (isHeightGreaterThan120) {
-    marginTopValue = originalUserIsStaff ? '10rem' : '14rem';
+  if (sequence.isTimeLimited) {
+    marginTopValue = '6rem';
   } else {
-    marginTopValue = originalUserIsStaff ? '6rem' : '10rem';
+    marginTopValue = '2rem';
   }
 
   if (sequenceStatus === 'loaded') {
@@ -261,7 +257,9 @@ const Sequence = ({
             isStaff={isStaff}
             originalUserIsStaff={originalUserIsStaff}
             canAccessProctoredExams={course.canAccessProctoredExams}
-          />
+          >
+            <div />
+          </SequenceExamWrapper>
         </div>
         <div
           style={{
