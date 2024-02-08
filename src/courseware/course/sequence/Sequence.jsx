@@ -160,13 +160,13 @@ const Sequence = ({
   };
 
   const defaultContent = (
-    <div className="sequence-container d-inline-flex flex-row mt-4">
+    <div className="sequence-container d-inline-flex flex-row mt-4 px-6">
       <div className={classNames('sequence w-100', { 'position-relative': shouldDisplayNotificationTriggerInSequence })}>
         <div
           style={{
             position: 'fixed',
             top: '5.53em',
-            left: '15.8vw',
+            left: '24vw',
             right: 0,
             backgroundColor: 'white',
             zIndex: 2,
@@ -202,19 +202,19 @@ const Sequence = ({
             unitLoadedHandler={handleUnitLoaded}
           />
           {unitHasLoaded && (
-          <UnitNavigation
-            sequenceId={sequenceId}
-            unitId={unitId}
-            onClickPrevious={() => {
-              logEvent('edx.ui.lms.sequence.previous_selected', 'bottom');
-              handlePrevious();
-            }}
-            onClickNext={() => {
-              logEvent('edx.ui.lms.sequence.next_selected', 'bottom');
-              handleNext();
-            }}
-            goToCourseExitPage={() => goToCourseExitPage()}
-          />
+            <UnitNavigation
+              sequenceId={sequenceId}
+              unitId={unitId}
+              onClickPrevious={() => {
+                logEvent('edx.ui.lms.sequence.previous_selected', 'bottom');
+                handlePrevious();
+              }}
+              onClickNext={() => {
+                logEvent('edx.ui.lms.sequence.next_selected', 'bottom');
+                handleNext();
+              }}
+              goToCourseExitPage={() => goToCourseExitPage()}
+            />
           )}
         </div>
       </div>
@@ -243,11 +243,11 @@ const Sequence = ({
           style={{
             position: 'fixed',
             top: topValue,
-            left: '15.8vw',
+            left: '24vw',
             right: 0,
             zIndex: 3,
-            marginLeft: '0.7em',
-            marginRight: '0.5em',
+            // marginLeft: '0.7em',
+            // marginRight: '0.5em',
           }}
           id="sequence-exam-wrapper"
         >

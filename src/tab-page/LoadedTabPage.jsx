@@ -56,17 +56,17 @@ const LoadedTabPage = ({
 
   const streakLengthToCelebrate = celebrations && celebrations.streakLengthToCelebrate;
   const streakDiscountCouponEnabled = celebrations && celebrations.streakDiscountEnabled && verifiedMode;
-  const [isStreakCelebrationOpen,, closeStreakCelebration] = useToggle(streakLengthToCelebrate);
+  const [isStreakCelebrationOpen, , closeStreakCelebration] = useToggle(streakLengthToCelebrate);
   const rootCourseId = courses && Object.keys(courses)[0];
 
   if (activeTabSlug === 'courseware') {
     return (
       <div style={{ overflow: 'hidden' }}>
         <Layout
-          md={[{ span: 2, offset: 0 }, { span: 10, offset: 0 }]}
+          md={[{ span: 3, offset: 0 }, { span: 9, offset: 0 }]}
         >
           <Layout.Element
-            className="bg-primary pr-0"
+            className="bg-white border"
             style={{
               zIndex: 4,
               minHeight: '100vh',
@@ -78,9 +78,10 @@ const LoadedTabPage = ({
                   bottom: '0',
                   top: '3.3em',
                   position: 'fixed',
-                  width: '16vw',
+                  width: '24.2vw',
                   overflowX: 'hidden',
                 }}
+                className="px-3"
               >
                 <div className="px-2">
                   <Button
@@ -155,7 +156,7 @@ const LoadedTabPage = ({
                 style={{
                   position: 'fixed',
                   top: '3.3em',
-                  left: '15.8vw',
+                  left: '24vw',
                   right: 0,
                   backgroundColor: 'white',
                   zIndex: 3,
@@ -163,7 +164,7 @@ const LoadedTabPage = ({
               >
                 <CourseTabsNavigation tabs={tabs} activeTabSlug="outline" />
               </div>
-              <div className="container-xl px-0">
+              <div className="container-xl">
                 {children}
               </div>
             </main>

@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import PropTypes from 'prop-types';
 import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
 import { Collapsible, Truncate } from '@edx/paragon';
-import { faCheckCircle as fasCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import { faCheckCircle as farCheckCircle } from '@fortawesome/free-regular-svg-icons';
+import { faCheckCircle as fasCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import PropTypes from 'prop-types';
+import React, { useEffect, useState } from 'react';
 
-import SequenceLink from './SequenceLink';
 import { useModel } from '../../generic/model-store';
+import SequenceLink from './SequenceLink';
 
 import messages from './messages';
 
@@ -38,7 +38,7 @@ const Section = ({
 
   useEffect(() => {
     setOpen(defaultOpen);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -46,13 +46,13 @@ const Section = ({
   }, [currentSequence, defaultOpen, sequenceIds]);
 
   const sectionTitle = (
-    <div className="d-flex ml-2">
+    <div className="d-flex">
       <div className="">
         {complete ? (
           <FontAwesomeIcon
             icon={fasCheckCircle}
             fixedWidth
-            className="float-left mt-1 text-success"
+            className="text-success"
             aria-hidden="true"
             title={intl.formatMessage(messages.completedSection)}
           />
@@ -60,14 +60,14 @@ const Section = ({
           <FontAwesomeIcon
             icon={farCheckCircle}
             fixedWidth
-            className="float-left mt-1 text-gray-400"
+            className="text-gray-400"
             aria-hidden="true"
             title={intl.formatMessage(messages.incompleteSection)}
           />
         )}
       </div>
-      <div className="ml-3 p-0 small text-dark-500">
-        <span className="align-middle text-white"><Truncate lines={3}>{title}</Truncate></span>
+      <div className="ml-2 small">
+        <span className="align-middle text-dark font-weight-bold"><Truncate lines={3}>{title}</Truncate></span>
       </div>
     </div>
   );
@@ -75,13 +75,13 @@ const Section = ({
   return (
     <li>
       <Collapsible
-        className="mb-2 text-white"
-        styling="basic"
+        className="mb-2 text-primary border-0"
+        // styling="basic"
         title={sectionTitle}
         open={sequenceIds.includes(currentSequence) ? true : open}
         onToggle={() => { setOpen(!open); }}
       >
-        <ol className="list-unstyled bg-primary-900 m-n2 py-2 px-2 mr-n1">
+        <ol className="list-unstyled bg-white py-2">
           {sequenceIds.map((sequenceId, index) => (
             <SequenceLink
               key={sequenceId}
