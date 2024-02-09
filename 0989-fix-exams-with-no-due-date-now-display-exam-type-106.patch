@@ -1,0 +1,106 @@
+From a4ea1b54a4d56b261c1e48814203a761f9080966 Mon Sep 17 00:00:00 2001
+From: Isaac Lee <124631592+ilee2u@users.noreply.github.com>
+Date: Thu, 16 Feb 2023 15:16:19 -0500
+Subject: [PATCH 0989/1021] fix: exams with no due date now display exam type
+ (#1064)
+
+* fix: exams with no due date now display exam type
+---
+ src/course-home/outline-tab/SequenceLink.jsx | 74 +++++++++++++-------
+ 1 file changed, 49 insertions(+), 25 deletions(-)
+
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index 5a02c7f..0530d53 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -39,6 +39,50 @@ const SequenceLink = ({
+   const coursewareUrl = <Link to={`/course/${courseId}/${id}`}>{title}</Link>;
+   const displayTitle = showLink ? coursewareUrl : title;
+ 
++  const dueDateMessage = (
++    <FormattedMessage
++      id="learning.outline.sequence-due-date-set"
++      defaultMessage="{description} due {assignmentDue}"
++      description="Used below an assignment title"
++      values={{
++        assignmentDue: (
++          <FormattedTime
++            key={`${id}-due`}
++            day="numeric"
++            month="short"
++            year="numeric"
++            timeZoneName="short"
++            value={due}
++            {...timezoneFormatArgs}
++          />
++        ),
++        description: description || '',
++      }}
++    />
++  );
++
++  const noDueDateMessage = (
++    <FormattedMessage
++      id="learning.outline.sequence-due-date-not-set"
++      defaultMessage="{description}"
++      description="Used below an assignment title"
++      values={{
++        assignmentDue: (
++          <FormattedTime
++            key={`${id}-due`}
++            day="numeric"
++            month="short"
++            year="numeric"
++            timeZoneName="short"
++            value={due}
++            {...timezoneFormatArgs}
++          />
++        ),
++        description: description || '',
++      }}
++    />
++  );
++
+   return (
+     <li>
+       <div className={classNames('', { 'mt-2 pt-2 border-top border-light': !first })}>
+@@ -70,31 +114,11 @@ const SequenceLink = ({
+             <EffortEstimate className="ml-3 align-middle" block={sequence} />
+           </div>
+         </div>
+-        {due && (
+-          <div className="row w-100 m-0 ml-3 pl-3">
+-            <small className="text-body pl-2">
+-              <FormattedMessage
+-                id="learning.outline.sequence-due"
+-                defaultMessage="{description} due {assignmentDue}"
+-                description="Used below an assignment title"
+-                values={{
+-                  assignmentDue: (
+-                    <FormattedTime
+-                      key={`${id}-due`}
+-                      day="numeric"
+-                      month="short"
+-                      year="numeric"
+-                      timeZoneName="short"
+-                      value={due}
+-                      {...timezoneFormatArgs}
+-                    />
+-                  ),
+-                  description: description || '',
+-                }}
+-              />
+-            </small>
+-          </div>
+-        )}
++        <div className="row w-100 m-0 ml-3 pl-3">
++          <small className="text-body pl-2">
++            {due ? dueDateMessage : noDueDateMessage}
++          </small>
++        </div>
+       </div>
+     </li>
+   );
+-- 
+2.34.1
+

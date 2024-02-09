@@ -1,0 +1,29 @@
+From e627fd6f279011608871f579a4a16c2f665cf061 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 17 Nov 2020 12:19:23 -0800
+Subject: [PATCH 0323/1021] Use common CI test target via Travis
+
+---
+ .travis.yml | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/.travis.yml b/.travis.yml
+index 136ca94..8b73eee 100755
+--- a/.travis.yml
++++ b/.travis.yml
+@@ -5,11 +5,6 @@ before_install:
+ install:
+ - npm ci
+ script:
+-- make validate-no-uncommitted-package-lock-changes
+-- npm run i18n_extract
+-- npm run lint -- --max-warnings 0
+-- npm run test
+-- npm run build
+-- npm run is-es5
++- make validate
+ after_success:
+ - codecov
+-- 
+2.34.1
+

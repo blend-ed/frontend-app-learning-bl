@@ -1,0 +1,623 @@
+From 8f4ff7935117974ff1ba831cffc73032afed070d Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 23 Mar 2020 17:26:33 -0400
+Subject: [PATCH 0086/1021] Rename courseUsageKey to courseId
+
+---
+ src/course-home/CourseHome.jsx                | 10 ++--
+ src/course-home/CourseHomeContainer.jsx       | 14 +++---
+ src/course-home/Section.jsx                   |  6 +--
+ src/course-home/SequenceLink.jsx              |  6 +--
+ src/courseware/CoursewareContainer.jsx        | 46 +++++++++----------
+ src/courseware/course/Course.jsx              |  2 +-
+ src/courseware/course/sequence/Sequence.jsx   |  6 +--
+ .../sequence/content-lock/ContentLock.jsx     |  6 +--
+ src/courseware/data/api.js                    | 10 ++--
+ src/courseware/data/selectors.js              |  4 +-
+ src/courseware/data/thunks.js                 |  8 ++--
+ src/data/api.js                               | 14 +++---
+ src/data/slice.js                             |  8 ++--
+ src/data/thunks.js                            | 12 ++---
+ src/index.jsx                                 |  8 ++--
+ 15 files changed, 80 insertions(+), 80 deletions(-)
+
+diff --git a/src/course-home/CourseHome.jsx b/src/course-home/CourseHome.jsx
+index 984c36a..c59faed 100644
+--- a/src/course-home/CourseHome.jsx
++++ b/src/course-home/CourseHome.jsx
+@@ -15,10 +15,10 @@ const EnrollmentAlert = React.lazy(() => import('../enrollment-alert'));
+ const LogistrationAlert = React.lazy(() => import('../logistration-alert'));
+ 
+ export default function CourseHome({
+-  courseUsageKey,
++  courseId,
+ }) {
+   useLogistrationAlert();
+-  useEnrollmentAlert(courseUsageKey);
++  useEnrollmentAlert(courseId);
+ 
+   const {
+     org,
+@@ -32,7 +32,7 @@ export default function CourseHome({
+     isEnrolled,
+     tabs,
+     sectionIds,
+-  } = useModel('courses', courseUsageKey);
++  } = useModel('courses', courseId);
+ 
+   return (
+     <>
+@@ -65,7 +65,7 @@ export default function CourseHome({
+                   <Section
+                     key={sectionId}
+                     id={sectionId}
+-                    courseUsageKey={courseUsageKey}
++                    courseId={courseId}
+                   />
+                 ))}
+               </div>
+@@ -88,5 +88,5 @@ export default function CourseHome({
+ }
+ 
+ CourseHome.propTypes = {
+-  courseUsageKey: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
+ };
+diff --git a/src/course-home/CourseHomeContainer.jsx b/src/course-home/CourseHomeContainer.jsx
+index c2a0b34..92b784b 100644
+--- a/src/course-home/CourseHomeContainer.jsx
++++ b/src/course-home/CourseHomeContainer.jsx
+@@ -16,14 +16,14 @@ function CourseHomeContainer(props) {
+ 
+   const dispatch = useDispatch();
+   useEffect(() => {
+-    // The courseUsageKey from the URL is the course we WANT to load.
+-    dispatch(fetchCourse(match.params.courseUsageKey));
+-  }, [match.params.courseUsageKey]);
++    // The courseId from the URL is the course we WANT to load.
++    dispatch(fetchCourse(match.params.courseId));
++  }, [match.params.courseId]);
+ 
+-  // The courseUsageKey from the store is the course we HAVE loaded.  If the URL changes,
++  // The courseId from the store is the course we HAVE loaded.  If the URL changes,
+   // we don't want the application to adjust to it until it has actually loaded the new data.
+   const {
+-    courseUsageKey,
++    courseId,
+     courseStatus,
+   } = useSelector(state => state.courseware);
+ 
+@@ -31,7 +31,7 @@ function CourseHomeContainer(props) {
+     <>
+       {courseStatus === 'loaded' ? (
+         <CourseHome
+-          courseUsageKey={courseUsageKey}
++          courseId={courseId}
+         />
+       ) : (
+         <PageLoading
+@@ -46,7 +46,7 @@ CourseHomeContainer.propTypes = {
+   intl: intlShape.isRequired,
+   match: PropTypes.shape({
+     params: PropTypes.shape({
+-      courseUsageKey: PropTypes.string.isRequired,
++      courseId: PropTypes.string.isRequired,
+     }).isRequired,
+   }).isRequired,
+ };
+diff --git a/src/course-home/Section.jsx b/src/course-home/Section.jsx
+index d6676fd..43d7f3f 100644
+--- a/src/course-home/Section.jsx
++++ b/src/course-home/Section.jsx
+@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import SequenceLink from './SequenceLink';
+ import { useModel } from '../model-store';
+ 
+-export default function Section({ id, courseUsageKey }) {
++export default function Section({ id, courseId }) {
+   const section = useModel('sections', id);
+   const { title, sequenceIds } = section;
+   return (
+@@ -30,7 +30,7 @@ export default function Section({ id, courseUsageKey }) {
+           <SequenceLink
+             key={sequenceId}
+             id={sequenceId}
+-            courseUsageKey={courseUsageKey}
++            courseId={courseId}
+           />
+         ))}
+       </Collapsible.Body>
+@@ -40,5 +40,5 @@ export default function Section({ id, courseUsageKey }) {
+ 
+ Section.propTypes = {
+   id: PropTypes.string.isRequired,
+-  courseUsageKey: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
+ };
+diff --git a/src/course-home/SequenceLink.jsx b/src/course-home/SequenceLink.jsx
+index 7ae7ccb..b8a5fdb 100644
+--- a/src/course-home/SequenceLink.jsx
++++ b/src/course-home/SequenceLink.jsx
+@@ -3,16 +3,16 @@ import PropTypes from 'prop-types';
+ import { Link } from 'react-router-dom';
+ import { useModel } from '../model-store';
+ 
+-export default function SequenceLink({ id, courseUsageKey }) {
++export default function SequenceLink({ id, courseId }) {
+   const sequence = useModel('sequences', id);
+   return (
+     <div className="ml-4">
+-      <Link to={`/course/${courseUsageKey}/${id}`}>{sequence.title}</Link>
++      <Link to={`/course/${courseId}/${id}`}>{sequence.title}</Link>
+     </div>
+   );
+ }
+ 
+ SequenceLink.propTypes = {
+   id: PropTypes.string.isRequired,
+-  courseUsageKey: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
+ };
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 4c2fb1b..bec5c60 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -18,12 +18,12 @@ import Course from './course';
+ 
+ import { sequenceIdsSelector, firstSequenceIdSelector } from './data/selectors';
+ 
+-function useUnitNavigationHandler(courseUsageKey, sequenceId, unitId) {
++function useUnitNavigationHandler(courseId, sequenceId, unitId) {
+   const dispatch = useDispatch();
+   return useCallback((nextUnitId) => {
+-    dispatch(checkBlockCompletion(courseUsageKey, sequenceId, unitId));
+-    history.replace(`/course/${courseUsageKey}/${sequenceId}/${nextUnitId}`);
+-  }, [courseUsageKey, sequenceId]);
++    dispatch(checkBlockCompletion(courseId, sequenceId, unitId));
++    history.replace(`/course/${courseId}/${sequenceId}/${nextUnitId}`);
++  }, [courseId, sequenceId]);
+ }
+ 
+ function usePreviousSequence(sequenceId) {
+@@ -49,26 +49,26 @@ function useNextSequence(sequenceId) {
+ }
+ 
+ 
+-function useNextSequenceHandler(courseUsageKey, sequenceId) {
++function useNextSequenceHandler(courseId, sequenceId) {
+   const nextSequence = useNextSequence(sequenceId);
+   const courseStatus = useSelector(state => state.courseware.courseStatus);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+   return useCallback(() => {
+     if (nextSequence !== null) {
+       const nextUnitId = nextSequence.unitIds[0];
+-      history.replace(`/course/${courseUsageKey}/${nextSequence.id}/${nextUnitId}`);
++      history.replace(`/course/${courseId}/${nextSequence.id}/${nextUnitId}`);
+     }
+   }, [courseStatus, sequenceStatus, sequenceId]);
+ }
+ 
+-function usePreviousSequenceHandler(courseUsageKey, sequenceId) {
++function usePreviousSequenceHandler(courseId, sequenceId) {
+   const previousSequence = usePreviousSequence(sequenceId);
+   const courseStatus = useSelector(state => state.courseware.courseStatus);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+   return useCallback(() => {
+     if (previousSequence !== null) {
+       const previousUnitId = previousSequence.unitIds[previousSequence.unitIds.length - 1];
+-      history.replace(`/course/${courseUsageKey}/${previousSequence.id}/${previousUnitId}`);
++      history.replace(`/course/${courseId}/${previousSequence.id}/${previousUnitId}`);
+     }
+   }, [courseStatus, sequenceStatus, sequenceId]);
+ }
+@@ -85,12 +85,12 @@ function useExamRedirect(sequenceId) {
+ 
+ function useContentRedirect(courseStatus, sequenceStatus) {
+   const match = useRouteMatch();
+-  const { courseUsageKey, sequenceId, unitId } = match.params;
++  const { courseId, sequenceId, unitId } = match.params;
+   const sequence = useModel('sequences', sequenceId);
+   const firstSequenceId = useSelector(firstSequenceIdSelector);
+   useEffect(() => {
+     if (courseStatus === 'loaded' && !sequenceId) {
+-      history.replace(`/course/${courseUsageKey}/${firstSequenceId}`);
++      history.replace(`/course/${courseId}/${firstSequenceId}`);
+     }
+   }, [courseStatus, sequenceId]);
+ 
+@@ -100,20 +100,20 @@ function useContentRedirect(courseStatus, sequenceStatus) {
+       if (sequence.unitIds !== undefined && sequence.unitIds.length > 0) {
+         const unitIndex = sequence.position || 0;
+         const nextUnitId = sequence.unitIds[unitIndex];
+-        history.replace(`/course/${courseUsageKey}/${sequence.id}/${nextUnitId}`);
++        history.replace(`/course/${courseId}/${sequence.id}/${nextUnitId}`);
+       }
+     }
+   }, [sequenceStatus, sequenceId, unitId]);
+ }
+ 
+-function useSavedSequencePosition(courseUsageKey, sequenceId, unitId) {
++function useSavedSequencePosition(courseId, sequenceId, unitId) {
+   const dispatch = useDispatch();
+   const sequence = useModel('sequences', sequenceId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+   useEffect(() => {
+     if (sequenceStatus === 'loaded' && sequence.savePosition) {
+       const activeUnitIndex = sequence.unitIds.indexOf(unitId);
+-      dispatch(saveSequencePosition(courseUsageKey, sequenceId, activeUnitIndex));
++      dispatch(saveSequencePosition(courseId, sequenceId, activeUnitIndex));
+     }
+   }, [unitId]);
+ }
+@@ -136,7 +136,7 @@ function useAccessDeniedRedirect(courseStatus, courseId) {
+ export default function CoursewareContainer() {
+   const { params } = useRouteMatch();
+   const {
+-    courseUsageKey: routeCourseUsageKey,
++    courseId: routeCourseUsageKey,
+     sequenceId: routeSequenceId,
+     unitId: routeUnitId,
+   } = params;
+@@ -152,7 +152,7 @@ export default function CoursewareContainer() {
+     }
+   }, [routeSequenceId]);
+ 
+-  // The courseUsageKey and sequenceId in the store are the entities we currently have loaded.
++  // The courseId and sequenceId in the store are the entities we currently have loaded.
+   // We get these two IDs from the store because until fetchCourse and fetchSequence below have
+   // finished their work, the IDs in the URL are not representative of what we should actually show.
+   // This is important particularly when switching sequences.  Until a new sequence is fully loaded,
+@@ -161,25 +161,25 @@ export default function CoursewareContainer() {
+   // the sequenceStatus flag has even switched back to "loading", which will put our app into an
+   // invalid state.
+   const {
+-    courseUsageKey,
++    courseId,
+     sequenceId,
+     courseStatus,
+     sequenceStatus,
+   } = useSelector(state => state.courseware);
+ 
+-  const nextSequenceHandler = useNextSequenceHandler(courseUsageKey, sequenceId);
+-  const previousSequenceHandler = usePreviousSequenceHandler(courseUsageKey, sequenceId);
+-  const unitNavigationHandler = useUnitNavigationHandler(courseUsageKey, sequenceId, routeUnitId);
++  const nextSequenceHandler = useNextSequenceHandler(courseId, sequenceId);
++  const previousSequenceHandler = usePreviousSequenceHandler(courseId, sequenceId);
++  const unitNavigationHandler = useUnitNavigationHandler(courseId, sequenceId, routeUnitId);
+ 
+-  useAccessDeniedRedirect(courseStatus, courseUsageKey);
++  useAccessDeniedRedirect(courseStatus, courseId);
+   useContentRedirect(courseStatus, sequenceStatus);
+   useExamRedirect(sequenceId);
+-  useSavedSequencePosition(courseUsageKey, sequenceId, routeUnitId);
++  useSavedSequencePosition(courseId, sequenceId, routeUnitId);
+ 
+   return (
+     <main className="flex-grow-1 d-flex flex-column">
+       <Course
+-        courseId={courseUsageKey}
++        courseId={courseId}
+         sequenceId={sequenceId}
+         unitId={routeUnitId}
+         nextSequenceHandler={nextSequenceHandler}
+@@ -193,7 +193,7 @@ export default function CoursewareContainer() {
+ CoursewareContainer.propTypes = {
+   match: PropTypes.shape({
+     params: PropTypes.shape({
+-      courseUsageKey: PropTypes.string.isRequired,
++      courseId: PropTypes.string.isRequired,
+       sequenceId: PropTypes.string,
+       unitId: PropTypes.string,
+     }).isRequired,
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index bd39629..9dced10 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -83,7 +83,7 @@ function Course({
+           <Sequence
+             unitId={unitId}
+             sequenceId={sequenceId}
+-            courseUsageKey={courseId}
++            courseId={courseId}
+             unitNavigationHandler={unitNavigationHandler}
+             nextSequenceHandler={nextSequenceHandler}
+             previousSequenceHandler={previousSequenceHandler}
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 14a62ff..2f9eccd 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -19,7 +19,7 @@ const ContentLock = React.lazy(() => import('./content-lock'));
+ function Sequence({
+   unitId,
+   sequenceId,
+-  courseUsageKey,
++  courseId,
+   unitNavigationHandler,
+   nextSequenceHandler,
+   previousSequenceHandler,
+@@ -140,7 +140,7 @@ function Sequence({
+               )}
+             >
+               <ContentLock
+-                courseUsageKey={courseUsageKey}
++                courseId={courseId}
+                 sequenceTitle={sequence.title}
+                 prereqSectionName={sequence.gatedContent.gatedSectionName}
+                 prereqId={sequence.gatedContent.prereqId}
+@@ -184,7 +184,7 @@ function Sequence({
+ Sequence.propTypes = {
+   unitId: PropTypes.string,
+   sequenceId: PropTypes.string,
+-  courseUsageKey: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
+   unitNavigationHandler: PropTypes.func.isRequired,
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+diff --git a/src/courseware/course/sequence/content-lock/ContentLock.jsx b/src/courseware/course/sequence/content-lock/ContentLock.jsx
+index 01d80fd..09f58c3 100644
+--- a/src/courseware/course/sequence/content-lock/ContentLock.jsx
++++ b/src/courseware/course/sequence/content-lock/ContentLock.jsx
+@@ -9,10 +9,10 @@ import { Button } from '@edx/paragon';
+ import messages from './messages';
+ 
+ function ContentLock({
+-  intl, courseUsageKey, prereqSectionName, prereqId, sequenceTitle,
++  intl, courseId, prereqSectionName, prereqId, sequenceTitle,
+ }) {
+   const handleClick = useCallback(() => {
+-    history.replace(`/course/${courseUsageKey}/${prereqId}`);
++    history.replace(`/course/${courseId}/${prereqId}`);
+   });
+ 
+   return (
+@@ -36,7 +36,7 @@ function ContentLock({
+ }
+ ContentLock.propTypes = {
+   intl: intlShape.isRequired,
+-  courseUsageKey: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
+   prereqSectionName: PropTypes.string.isRequired,
+   prereqId: PropTypes.string.isRequired,
+   sequenceTitle: PropTypes.string.isRequired,
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index eefbdd7..a2940f8 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -1,9 +1,9 @@
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ 
+-const getSequenceXModuleHandlerUrl = (courseUsageKey, sequenceId) => `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/xblock/${sequenceId}/handler/xmodule_handler`;
++const getSequenceXModuleHandlerUrl = (courseId, sequenceId) => `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/xmodule_handler`;
+ 
+-export async function getBlockCompletion(courseUsageKey, sequenceId, usageKey) {
++export async function getBlockCompletion(courseId, sequenceId, usageKey) {
+   // Post data sent to this endpoint must be url encoded
+   // TODO: Remove the need for this to be the case.
+   // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+@@ -14,7 +14,7 @@ export async function getBlockCompletion(courseUsageKey, sequenceId, usageKey) {
+   };
+ 
+   const { data } = await getAuthenticatedHttpClient().post(
+-    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/get_completion`,
++    `${getSequenceXModuleHandlerUrl(courseId, sequenceId)}/get_completion`,
+     urlEncoded.toString(),
+     requestConfig,
+   );
+@@ -26,7 +26,7 @@ export async function getBlockCompletion(courseUsageKey, sequenceId, usageKey) {
+   return false;
+ }
+ 
+-export async function updateSequencePosition(courseUsageKey, sequenceId, position) {
++export async function updateSequencePosition(courseId, sequenceId, position) {
+   // Post data sent to this endpoint must be url encoded
+   // TODO: Remove the need for this to be the case.
+   // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+@@ -38,7 +38,7 @@ export async function updateSequencePosition(courseUsageKey, sequenceId, positio
+   };
+ 
+   const { data } = await getAuthenticatedHttpClient().post(
+-    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/goto_position`,
++    `${getSequenceXModuleHandlerUrl(courseId, sequenceId)}/goto_position`,
+     urlEncoded.toString(),
+     requestConfig,
+   );
+diff --git a/src/courseware/data/selectors.js b/src/courseware/data/selectors.js
+index 70dd004..50eebc6 100644
+--- a/src/courseware/data/selectors.js
++++ b/src/courseware/data/selectors.js
+@@ -3,7 +3,7 @@ export function sequenceIdsSelector(state) {
+   if (state.courseware.courseStatus !== 'loaded') {
+     return [];
+   }
+-  const { sectionIds } = state.models.courses[state.courseware.courseUsageKey];
++  const { sectionIds } = state.models.courses[state.courseware.courseId];
+   let sequenceIds = [];
+   sectionIds.forEach(sectionId => {
+     sequenceIds = [...sequenceIds, ...state.models.sections[sectionId].sequenceIds];
+@@ -15,6 +15,6 @@ export function firstSequenceIdSelector(state) {
+   if (state.courseware.courseStatus !== 'loaded') {
+     return null;
+   }
+-  const sectionId = state.models.courses[state.courseware.courseUsageKey].sectionIds[0];
++  const sectionId = state.models.courses[state.courseware.courseId].sectionIds[0];
+   return state.models.sections[sectionId].sequenceIds[0];
+ }
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 6dd5654..2885247 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -7,7 +7,7 @@ import {
+   updateModel,
+ } from '../../model-store';
+ 
+-export function checkBlockCompletion(courseUsageKey, sequenceId, unitId) {
++export function checkBlockCompletion(courseId, sequenceId, unitId) {
+   return async (dispatch, getState) => {
+     const { models } = getState();
+     if (models.units[unitId].complete) {
+@@ -15,7 +15,7 @@ export function checkBlockCompletion(courseUsageKey, sequenceId, unitId) {
+     }
+ 
+     try {
+-      const isComplete = await getBlockCompletion(courseUsageKey, sequenceId, unitId);
++      const isComplete = await getBlockCompletion(courseId, sequenceId, unitId);
+       dispatch(updateModel({
+         modelType: 'units',
+         model: {
+@@ -29,7 +29,7 @@ export function checkBlockCompletion(courseUsageKey, sequenceId, unitId) {
+   };
+ }
+ 
+-export function saveSequencePosition(courseUsageKey, sequenceId, position) {
++export function saveSequencePosition(courseId, sequenceId, position) {
+   return async (dispatch, getState) => {
+     const { models } = getState();
+     const initialPosition = models.sequences[sequenceId].position;
+@@ -42,7 +42,7 @@ export function saveSequencePosition(courseUsageKey, sequenceId, position) {
+       },
+     }));
+     try {
+-      await updateSequencePosition(courseUsageKey, sequenceId, position);
++      await updateSequencePosition(courseId, sequenceId, position);
+       // Update again under the assumption that the above call succeeded, since it doesn't return a
+       // meaningful response.
+       dispatch(updateModel({
+diff --git a/src/data/api.js b/src/data/api.js
+index f4137e3..7de9e8a 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -22,13 +22,13 @@ function normalizeMetadata(metadata) {
+   };
+ }
+ 
+-export async function getCourseMetadata(courseUsageKey) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseUsageKey}`;
++export async function getCourseMetadata(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
+   const { data } = await getAuthenticatedHttpClient().get(url);
+   return normalizeMetadata(data);
+ }
+ 
+-function normalizeBlocks(courseUsageKey, blocks) {
++function normalizeBlocks(courseId, blocks) {
+   const models = {
+     courses: {},
+     sections: {},
+@@ -39,7 +39,7 @@ function normalizeBlocks(courseUsageKey, blocks) {
+     switch (block.type) {
+       case 'course':
+         models.courses[block.id] = {
+-          id: courseUsageKey,
++          id: courseId,
+           title: block.display_name,
+           sectionIds: block.children || [],
+         };
+@@ -101,16 +101,16 @@ function normalizeBlocks(courseUsageKey, blocks) {
+   return models;
+ }
+ 
+-export async function getCourseBlocks(courseUsageKey) {
++export async function getCourseBlocks(courseId) {
+   const { username } = getAuthenticatedUser();
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+-  url.searchParams.append('course_id', courseUsageKey);
++  url.searchParams.append('course_id', courseId);
+   url.searchParams.append('username', username);
+   url.searchParams.append('depth', 3);
+   url.searchParams.append('requested_fields', 'children,show_gated_sections');
+ 
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+-  return normalizeBlocks(courseUsageKey, data.blocks);
++  return normalizeBlocks(courseId, data.blocks);
+ }
+ 
+ function normalizeSequenceMetadata(sequence) {
+diff --git a/src/data/slice.js b/src/data/slice.js
+index 1254cb0..8166b1b 100644
+--- a/src/data/slice.js
++++ b/src/data/slice.js
+@@ -9,21 +9,21 @@ const slice = createSlice({
+   name: 'courseware',
+   initialState: {
+     courseStatus: 'loading',
+-    courseUsageKey: null,
++    courseId: null,
+     sequenceStatus: 'loading',
+     sequenceId: null,
+   },
+   reducers: {
+     fetchCourseRequest: (state, { payload }) => {
+-      state.courseUsageKey = payload.courseUsageKey;
++      state.courseId = payload.courseId;
+       state.courseStatus = LOADING;
+     },
+     fetchCourseSuccess: (state, { payload }) => {
+-      state.courseUsageKey = payload.courseUsageKey;
++      state.courseId = payload.courseId;
+       state.courseStatus = LOADED;
+     },
+     fetchCourseFailure: (state, { payload }) => {
+-      state.courseUsageKey = payload.courseUsageKey;
++      state.courseId = payload.courseId;
+       state.courseStatus = FAILED;
+     },
+     fetchSequenceRequest: (state, { payload }) => {
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index f8ae61f..6a82ca6 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -16,12 +16,12 @@ import {
+   fetchSequenceFailure,
+ } from './slice';
+ 
+-export function fetchCourse(courseUsageKey) {
++export function fetchCourse(courseId) {
+   return async (dispatch) => {
+-    dispatch(fetchCourseRequest({ courseUsageKey }));
++    dispatch(fetchCourseRequest({ courseId }));
+     Promise.all([
+-      getCourseBlocks(courseUsageKey),
+-      getCourseMetadata(courseUsageKey),
++      getCourseBlocks(courseId),
++      getCourseMetadata(courseId),
+     ]).then(([
+       {
+         courses, sections, sequences, units,
+@@ -49,10 +49,10 @@ export function fetchCourse(courseUsageKey) {
+         modelType: 'units',
+         modelsMap: units,
+       }));
+-      dispatch(fetchCourseSuccess({ courseUsageKey }));
++      dispatch(fetchCourseSuccess({ courseId }));
+     }).catch((error) => {
+       logError(error);
+-      dispatch(fetchCourseFailure({ courseUsageKey }));
++      dispatch(fetchCourseFailure({ courseId }));
+     });
+   };
+ }
+diff --git a/src/index.jsx b/src/index.jsx
+index a12dd08..cffa86a 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -27,12 +27,12 @@ subscribe(APP_READY, () => {
+     <AppProvider store={store}>
+       <UserMessagesProvider>
+         <Switch>
+-          <Route path="/course/:courseUsageKey/home" component={CourseHomeContainer} />
++          <Route path="/course/:courseId/home" component={CourseHomeContainer} />
+           <Route
+             path={[
+-              '/course/:courseUsageKey/:sequenceId/:unitId',
+-              '/course/:courseUsageKey/:sequenceId',
+-              '/course/:courseUsageKey',
++              '/course/:courseId/:sequenceId/:unitId',
++              '/course/:courseId/:sequenceId',
++              '/course/:courseId',
+             ]}
+             component={CoursewareContainer}
+           />
+-- 
+2.34.1
+

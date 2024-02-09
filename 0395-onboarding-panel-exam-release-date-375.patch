@@ -1,0 +1,206 @@
+From 28773ce4c2b69906cc5c30b74f2398b6ad38be80 Mon Sep 17 00:00:00 2001
+From: Zachary Hancock <zhancock@edx.org>
+Date: Tue, 2 Mar 2021 13:04:20 -0500
+Subject: [PATCH 0395/1021] onboarding panel exam release date (#375)
+
+* disable onboarding link for unreleased exam
+---
+ .../outline-tab/OutlineTab.test.jsx           | 44 +++++++++++++++++++
+ src/course-home/outline-tab/messages.js       |  4 ++
+ .../widgets/ProctoringInfoPanel.jsx           | 34 ++++++++++++--
+ 3 files changed, 79 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 40ad5ba..dcd0079 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -510,6 +510,8 @@ describe('Outline Tab', () => {
+   });
+ 
+   describe('Proctoring Info Panel', () => {
++    const onboardingReleaseDate = new Date();
++    onboardingReleaseDate.setDate(new Date().getDate() - 7);
+     it('appears', async () => {
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+@@ -521,6 +523,7 @@ describe('Outline Tab', () => {
+         onboarding_status: 'verified',
+         onboarding_link: 'test',
+         expiration_date: null,
++        onboarding_release_date: onboardingReleaseDate.toISOString(),
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+@@ -535,6 +538,7 @@ describe('Outline Tab', () => {
+         onboarding_status: 'rejected',
+         onboarding_link: 'test',
+         expiration_date: null,
++        onboarding_release_date: onboardingReleaseDate.toISOString(),
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+@@ -549,6 +553,7 @@ describe('Outline Tab', () => {
+         onboarding_status: 'submitted',
+         onboarding_link: 'test',
+         expiration_date: null,
++        onboarding_release_date: onboardingReleaseDate.toISOString(),
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+@@ -561,6 +566,7 @@ describe('Outline Tab', () => {
+         onboarding_status: 'second_review_required',
+         onboarding_link: 'test',
+         expiration_date: null,
++        onboarding_release_date: onboardingReleaseDate.toISOString(),
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+@@ -576,6 +582,7 @@ describe('Outline Tab', () => {
+         onboarding_status: 'other_course_approved',
+         onboarding_link: 'test',
+         expiration_date: expirationDate.toString(),
++        onboarding_release_date: onboardingReleaseDate.toISOString(),
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+@@ -591,6 +598,7 @@ describe('Outline Tab', () => {
+         onboarding_status: 'other_course_approved',
+         onboarding_link: 'test',
+         expiration_date: expirationDate.toString(),
++        onboarding_release_date: onboardingReleaseDate.toISOString(),
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+@@ -603,6 +611,7 @@ describe('Outline Tab', () => {
+         onboarding_status: '',
+         onboarding_link: 'test',
+         expiration_date: null,
++        onboarding_release_date: onboardingReleaseDate.toISOString(),
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+@@ -616,5 +625,40 @@ describe('Outline Tab', () => {
+       axiosMock.onGet(proctoringInfoUrl).reply(404);
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).not.toBeInTheDocument();
+     });
++
++    it('appears with a disabled link if onboarding not yet released', async () => {
++      const futureReleaseDate = new Date();
++      futureReleaseDate.setDate(new Date().getDate() + 7);
++      const expectedDateStr = new Intl.DateTimeFormat('en-US', {
++        day: 'numeric',
++        month: 'short',
++        year: 'numeric',
++      }).format(futureReleaseDate);
++
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: '',
++        onboarding_link: 'test',
++        expiration_date: null,
++        onboarding_release_date: futureReleaseDate.toISOString(),
++      });
++      await fetchAndRender();
++      await screen.findByText('This course contains proctored exams');
++      expect(screen.queryByText(`Onboarding Opens: ${expectedDateStr}`)).toBeInTheDocument();
++    });
++
++    it('appears and ignores a missing release date', async () => {
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: 'verified',
++        onboarding_link: 'test',
++        expiration_date: null,
++        onboarding_release_date: onboardingReleaseDate.toISOString(),
++      });
++      await fetchAndRender();
++      await screen.findByText('This course contains proctored exams');
++      expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).not.toBeInTheDocument();
++      expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).toBeInTheDocument();
++      expect(screen.queryByText('You must complete the onboarding process prior to taking any proctored exam.')).not.toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).not.toBeInTheDocument();
++    });
+   });
+ });
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index 0fb24ab..051ac1d 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -200,6 +200,10 @@ const messages = defineMessages({
+     id: 'learning.proctoringPanel.onboardingButton',
+     defaultMessage: 'Complete Onboarding',
+   },
++  proctoringOnboardingButtonNotOpen: {
++    id: 'learning.proctoringPanel.onboardingButtonNotOpen',
++    defaultMessage: 'Onboarding Opens: {releaseDate}',
++  },
+   proctoringReviewRequirementsButton: {
+     id: 'learning.proctoringPanel.reviewRequirementsButton',
+     defaultMessage: 'Review instructions and system requirements',
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index 3a01c91..134c8a9 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -12,6 +12,7 @@ import { getProctoringInfoData } from '../../data/api';
+ function ProctoringInfoPanel({ courseId, intl }) {
+   const [status, setStatus] = useState('');
+   const [link, setLink] = useState('');
++  const [releaseDate, setReleaseDate] = useState(null);
+   const [readableStatus, setReadableStatus] = useState('');
+ 
+   const readableStatuses = {
+@@ -47,6 +48,14 @@ function ProctoringInfoPanel({ courseId, intl }) {
+     return !NO_SHOW_STATES.includes(examStatus);
+   }
+ 
++  function isNotYetReleased(examReleaseDate) {
++    if (!examReleaseDate) {
++      return false;
++    }
++    const now = new Date();
++    return now < examReleaseDate;
++  }
++
+   function getBorderClass() {
+     let borderClass = '';
+     if (readableStatus === readableStatuses.submitted) {
+@@ -77,6 +86,7 @@ function ProctoringInfoPanel({ courseId, intl }) {
+             } else {
+               setReadableStatus(getReadableStatusClass(response.onboarding_status));
+             }
++            setReleaseDate(new Date(response.onboarding_release_date));
+           }
+         },
+       );
+@@ -116,9 +126,27 @@ function ProctoringInfoPanel({ courseId, intl }) {
+               </>
+             )}
+             {isNotYetSubmitted(status) && (
+-              <Button variant="primary" block href={`${getConfig().LMS_BASE_URL}${link}`}>
+-                {intl.formatMessage(messages.proctoringOnboardingButton)}
+-              </Button>
++              <>
++                {!isNotYetReleased(releaseDate) && (
++                  <Button variant="primary" block href={`${getConfig().LMS_BASE_URL}${link}`}>
++                    {intl.formatMessage(messages.proctoringOnboardingButton)}
++                  </Button>
++                )}
++                {isNotYetReleased(releaseDate) && (
++                  <Button variant="secondary" block disabled aria-disabled="true">
++                    {intl.formatMessage(
++                      messages.proctoringOnboardingButtonNotOpen,
++                      {
++                        releaseDate: intl.formatDate(releaseDate, {
++                          day: 'numeric',
++                          month: 'short',
++                          year: 'numeric',
++                        }),
++                      },
++                    )}
++                  </Button>
++                )}
++              </>
+             )}
+             <Button variant="outline-primary" block href="https://support.edx.org/hc/en-us/sections/115004169247-Taking-Timed-and-Proctored-Exams">
+               {intl.formatMessage(messages.proctoringReviewRequirementsButton)}
+-- 
+2.34.1
+

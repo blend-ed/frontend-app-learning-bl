@@ -1,0 +1,2835 @@
+From 70e2aa02039cb728f0e6eb0bfe6862abb9c640f9 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Fri, 3 Sep 2021 09:47:39 -0400
+Subject: [PATCH 0637/1021] feat: add page banner to masquerade (AA-877) (#606)
+
+---
+ package-lock.json                             | 1103 +++++++----------
+ .../AccessExpirationAlert.jsx                 |    8 -
+ .../AccessExpirationAlertMasquerade.jsx       |   60 -
+ .../AccessExpirationMasqueradeBanner.jsx      |   38 +
+ src/alerts/access-expiration-alert/hooks.js   |   25 +-
+ src/alerts/access-expiration-alert/index.js   |    2 +-
+ .../course-start-alert/CourseStartAlert.jsx   |   13 +-
+ .../CourseStartMasqueradeBanner.jsx           |   43 +
+ src/alerts/course-start-alert/hooks.js        |   62 +
+ src/alerts/course-start-alert/index.js        |    1 +
+ .../courseHomeMetadata.factory.js             |    1 +
+ .../__factories__/datesTabData.factory.js     |    1 -
+ .../__factories__/outlineTabData.factory.js   |    1 -
+ .../__factories__/progressTabData.factory.js  |    1 +
+ .../data/__snapshots__/redux.test.js.snap     |    9 +-
+ src/course-home/data/api.js                   |    1 +
+ .../data/pact-tests/lmsPact.test.jsx          |    1 +
+ src/course-home/dates-tab/DatesTab.test.jsx   |    2 +-
+ src/course-home/dates-tab/timeline/Day.jsx    |    4 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |    7 +-
+ .../outline-tab/OutlineTab.test.jsx           |   52 +-
+ src/course-home/outline-tab/SequenceLink.jsx  |    4 +-
+ .../alerts/certificate-status-alert/hooks.js  |    2 +-
+ .../alerts/course-end-alert/hooks.js          |    2 +-
+ .../alerts/course-start-alert/hooks.js        |   37 -
+ .../alerts/course-start-alert/index.js        |    1 -
+ .../outline-tab/widgets/CourseDates.jsx       |    4 +-
+ .../progress-tab/ProgressTab.test.jsx         |   61 +
+ src/instructor-toolbar/InstructorToolbar.jsx  |   20 +-
+ src/tab-page/LoadedTabPage.jsx                |    1 +
+ 30 files changed, 772 insertions(+), 795 deletions(-)
+ delete mode 100644 src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
+ create mode 100644 src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
+ rename src/{course-home/outline-tab => }/alerts/course-start-alert/CourseStartAlert.jsx (93%)
+ create mode 100644 src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
+ create mode 100644 src/alerts/course-start-alert/hooks.js
+ create mode 100644 src/alerts/course-start-alert/index.js
+ delete mode 100644 src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+ delete mode 100644 src/course-home/outline-tab/alerts/course-start-alert/index.js
+
+diff --git a/package-lock.json b/package-lock.json
+index 9ce1614..3bb285e 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -13606,49 +13606,49 @@
+       },
+       "dependencies": {
+         "@jest/console": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/console/-/console-27.0.6.tgz",
+-          "integrity": "sha512-fMlIBocSHPZ3JxgWiDNW/KPj6s+YRd0hicb33IrmelCcjXo/pXPwvuiKFmZz+XuqI/1u7nbUK10zSsWL/1aegg==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/console/-/console-27.1.0.tgz",
++          "integrity": "sha512-+Vl+xmLwAXLNlqT61gmHEixeRbS4L8MUzAjtpBCOPWH+izNI/dR16IeXjkXJdRtIVWVSf9DO1gdp67B1XorZhQ==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+             "chalk": "^4.0.0",
+-            "jest-message-util": "^27.0.6",
+-            "jest-util": "^27.0.6",
++            "jest-message-util": "^27.1.0",
++            "jest-util": "^27.1.0",
+             "slash": "^3.0.0"
+           }
+         },
+         "@jest/core": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/core/-/core-27.0.6.tgz",
+-          "integrity": "sha512-SsYBm3yhqOn5ZLJCtccaBcvD/ccTLCeuDv8U41WJH/V1MW5eKUkeMHT9U+Pw/v1m1AIWlnIW/eM2XzQr0rEmow==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/core/-/core-27.1.0.tgz",
++          "integrity": "sha512-3l9qmoknrlCFKfGdrmiQiPne+pUR4ALhKwFTYyOeKw6egfDwJkO21RJ1xf41rN8ZNFLg5W+w6+P4fUqq4EMRWA==",
+           "dev": true,
+           "requires": {
+-            "@jest/console": "^27.0.6",
+-            "@jest/reporters": "^27.0.6",
+-            "@jest/test-result": "^27.0.6",
+-            "@jest/transform": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/console": "^27.1.0",
++            "@jest/reporters": "^27.1.0",
++            "@jest/test-result": "^27.1.0",
++            "@jest/transform": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+             "ansi-escapes": "^4.2.1",
+             "chalk": "^4.0.0",
+             "emittery": "^0.8.1",
+             "exit": "^0.1.2",
+             "graceful-fs": "^4.2.4",
+-            "jest-changed-files": "^27.0.6",
+-            "jest-config": "^27.0.6",
+-            "jest-haste-map": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
++            "jest-changed-files": "^27.1.0",
++            "jest-config": "^27.1.0",
++            "jest-haste-map": "^27.1.0",
++            "jest-message-util": "^27.1.0",
+             "jest-regex-util": "^27.0.6",
+-            "jest-resolve": "^27.0.6",
+-            "jest-resolve-dependencies": "^27.0.6",
+-            "jest-runner": "^27.0.6",
+-            "jest-runtime": "^27.0.6",
+-            "jest-snapshot": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-validate": "^27.0.6",
+-            "jest-watcher": "^27.0.6",
++            "jest-resolve": "^27.1.0",
++            "jest-resolve-dependencies": "^27.1.0",
++            "jest-runner": "^27.1.0",
++            "jest-runtime": "^27.1.0",
++            "jest-snapshot": "^27.1.0",
++            "jest-util": "^27.1.0",
++            "jest-validate": "^27.1.0",
++            "jest-watcher": "^27.1.0",
+             "micromatch": "^4.0.4",
+             "p-each-series": "^2.1.0",
+             "rimraf": "^3.0.0",
+@@ -13657,53 +13657,53 @@
+           }
+         },
+         "@jest/environment": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/environment/-/environment-27.0.6.tgz",
+-          "integrity": "sha512-4XywtdhwZwCpPJ/qfAkqExRsERW+UaoSRStSHCCiQTUpoYdLukj+YJbQSFrZjhlUDRZeNiU9SFH0u7iNimdiIg==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/environment/-/environment-27.1.0.tgz",
++          "integrity": "sha512-wRp50aAMY2w1U2jP1G32d6FUVBNYqmk8WaGkiIEisU48qyDV0WPtw3IBLnl7orBeggveommAkuijY+RzVnNDOQ==",
+           "dev": true,
+           "requires": {
+-            "@jest/fake-timers": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/fake-timers": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+-            "jest-mock": "^27.0.6"
++            "jest-mock": "^27.1.0"
+           }
+         },
+         "@jest/fake-timers": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/fake-timers/-/fake-timers-27.0.6.tgz",
+-          "integrity": "sha512-sqd+xTWtZ94l3yWDKnRTdvTeZ+A/V7SSKrxsrOKSqdyddb9CeNRF8fbhAU0D7ZJBpTTW2nbp6MftmKJDZfW2LQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/fake-timers/-/fake-timers-27.1.0.tgz",
++          "integrity": "sha512-22Zyn8il8DzpS+30jJNVbTlm7vAtnfy1aYvNeOEHloMlGy1PCYLHa4PWlSws0hvNsMM5bON6GISjkLoQUV3oMA==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@sinonjs/fake-timers": "^7.0.2",
+             "@types/node": "*",
+-            "jest-message-util": "^27.0.6",
+-            "jest-mock": "^27.0.6",
+-            "jest-util": "^27.0.6"
++            "jest-message-util": "^27.1.0",
++            "jest-mock": "^27.1.0",
++            "jest-util": "^27.1.0"
+           }
+         },
+         "@jest/globals": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/globals/-/globals-27.0.6.tgz",
+-          "integrity": "sha512-DdTGCP606rh9bjkdQ7VvChV18iS7q0IMJVP1piwTWyWskol4iqcVwthZmoJEf7obE1nc34OpIyoVGPeqLC+ryw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/globals/-/globals-27.1.0.tgz",
++          "integrity": "sha512-73vLV4aNHAlAgjk0/QcSIzzCZSqVIPbmFROJJv9D3QUR7BI4f517gVdJpSrCHxuRH3VZFhe0yGG/tmttlMll9g==",
+           "dev": true,
+           "requires": {
+-            "@jest/environment": "^27.0.6",
+-            "@jest/types": "^27.0.6",
+-            "expect": "^27.0.6"
++            "@jest/environment": "^27.1.0",
++            "@jest/types": "^27.1.0",
++            "expect": "^27.1.0"
+           }
+         },
+         "@jest/reporters": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/reporters/-/reporters-27.0.6.tgz",
+-          "integrity": "sha512-TIkBt09Cb2gptji3yJXb3EE+eVltW6BjO7frO7NEfjI9vSIYoISi5R3aI3KpEDXlB1xwB+97NXIqz84qYeYsfA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/reporters/-/reporters-27.1.0.tgz",
++          "integrity": "sha512-5T/zlPkN2HnK3Sboeg64L5eC8iiaZueLpttdktWTJsvALEtP2YMkC5BQxwjRWQACG9SwDmz+XjjkoxXUDMDgdw==",
+           "dev": true,
+           "requires": {
+             "@bcoe/v8-coverage": "^0.2.3",
+-            "@jest/console": "^27.0.6",
+-            "@jest/test-result": "^27.0.6",
+-            "@jest/transform": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/console": "^27.1.0",
++            "@jest/test-result": "^27.1.0",
++            "@jest/transform": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "chalk": "^4.0.0",
+             "collect-v8-coverage": "^1.0.0",
+             "exit": "^0.1.2",
+@@ -13714,10 +13714,10 @@
+             "istanbul-lib-report": "^3.0.0",
+             "istanbul-lib-source-maps": "^4.0.0",
+             "istanbul-reports": "^3.0.2",
+-            "jest-haste-map": "^27.0.6",
+-            "jest-resolve": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-worker": "^27.0.6",
++            "jest-haste-map": "^27.1.0",
++            "jest-resolve": "^27.1.0",
++            "jest-util": "^27.1.0",
++            "jest-worker": "^27.1.0",
+             "slash": "^3.0.0",
+             "source-map": "^0.6.0",
+             "string-length": "^4.0.1",
+@@ -13737,45 +13737,45 @@
+           }
+         },
+         "@jest/test-result": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/test-result/-/test-result-27.0.6.tgz",
+-          "integrity": "sha512-ja/pBOMTufjX4JLEauLxE3LQBPaI2YjGFtXexRAjt1I/MbfNlMx0sytSX3tn5hSLzQsR3Qy2rd0hc1BWojtj9w==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/test-result/-/test-result-27.1.0.tgz",
++          "integrity": "sha512-Aoz00gpDL528ODLghat3QSy6UBTD5EmmpjrhZZMK/v1Q2/rRRqTGnFxHuEkrD4z/Py96ZdOHxIWkkCKRpmnE1A==",
+           "dev": true,
+           "requires": {
+-            "@jest/console": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/console": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/istanbul-lib-coverage": "^2.0.0",
+             "collect-v8-coverage": "^1.0.0"
+           }
+         },
+         "@jest/test-sequencer": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/test-sequencer/-/test-sequencer-27.0.6.tgz",
+-          "integrity": "sha512-bISzNIApazYOlTHDum9PwW22NOyDa6VI31n6JucpjTVM0jD6JDgqEZ9+yn575nDdPF0+4csYDxNNW13NvFQGZA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/test-sequencer/-/test-sequencer-27.1.0.tgz",
++          "integrity": "sha512-lnCWawDr6Z1DAAK9l25o3AjmKGgcutq1iIbp+hC10s/HxnB8ZkUsYq1FzjOoxxZ5hW+1+AthBtvS4x9yno3V1A==",
+           "dev": true,
+           "requires": {
+-            "@jest/test-result": "^27.0.6",
++            "@jest/test-result": "^27.1.0",
+             "graceful-fs": "^4.2.4",
+-            "jest-haste-map": "^27.0.6",
+-            "jest-runtime": "^27.0.6"
++            "jest-haste-map": "^27.1.0",
++            "jest-runtime": "^27.1.0"
+           }
+         },
+         "@jest/transform": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/transform/-/transform-27.0.6.tgz",
+-          "integrity": "sha512-rj5Dw+mtIcntAUnMlW/Vju5mr73u8yg+irnHwzgtgoeI6cCPOvUwQ0D1uQtc/APmWgvRweEb1g05pkUpxH3iCA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/transform/-/transform-27.1.0.tgz",
++          "integrity": "sha512-ZRGCA2ZEVJ00ubrhkTG87kyLbN6n55g1Ilq0X9nJb5bX3MhMp3O6M7KG+LvYu+nZRqG5cXsQnJEdZbdpTAV8pQ==",
+           "dev": true,
+           "requires": {
+             "@babel/core": "^7.1.0",
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "babel-plugin-istanbul": "^6.0.0",
+             "chalk": "^4.0.0",
+             "convert-source-map": "^1.4.0",
+             "fast-json-stable-stringify": "^2.0.0",
+             "graceful-fs": "^4.2.4",
+-            "jest-haste-map": "^27.0.6",
++            "jest-haste-map": "^27.1.0",
+             "jest-regex-util": "^27.0.6",
+-            "jest-util": "^27.0.6",
++            "jest-util": "^27.1.0",
+             "micromatch": "^4.0.4",
+             "pirates": "^4.0.1",
+             "slash": "^3.0.0",
+@@ -13784,9 +13784,9 @@
+           }
+         },
+         "@jest/types": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/types/-/types-27.0.6.tgz",
+-          "integrity": "sha512-aSquT1qa9Pik26JK5/3rvnYb4bGtm1VFNesHKmNTwmPIgOrixvhL2ghIvFRNEpzy3gU+rUgjIF/KodbkFAl++g==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/types/-/types-27.1.0.tgz",
++          "integrity": "sha512-pRP5cLIzN7I7Vp6mHKRSaZD7YpBTK7hawx5si8trMKqk4+WOdK8NEKOTO2G8PKWD1HbKMVckVB6/XHh/olhf2g==",
+           "dev": true,
+           "requires": {
+             "@types/istanbul-lib-coverage": "^2.0.0",
+@@ -13814,12 +13814,6 @@
+             "@types/yargs-parser": "*"
+           }
+         },
+-        "acorn": {
+-          "version": "8.4.1",
+-          "resolved": "https://registry.npmjs.org/acorn/-/acorn-8.4.1.tgz",
+-          "integrity": "sha512-asabaBSkEKosYKMITunzX177CXxQ4Q8BSSzMTKD+FefUhipQC70gfW5SiUDhYQ3vk8G+81HqQk7Fv9OXwwn9KA==",
+-          "dev": true
+-        },
+         "ansi-styles": {
+           "version": "4.3.0",
+           "resolved": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz",
+@@ -13840,13 +13834,13 @@
+           }
+         },
+         "babel-jest": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/babel-jest/-/babel-jest-27.0.6.tgz",
+-          "integrity": "sha512-iTJyYLNc4wRofASmofpOc5NK9QunwMk+TLFgGXsTFS8uEqmd8wdI7sga0FPe2oVH3b5Agt/EAK1QjPEuKL8VfA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/babel-jest/-/babel-jest-27.1.0.tgz",
++          "integrity": "sha512-6NrdqzaYemALGCuR97QkC/FkFIEBWP5pw5TMJoUHZTVXyOgocujp6A0JE2V6gE0HtqAAv6VKU/nI+OCR1Z4gHA==",
+           "dev": true,
+           "requires": {
+-            "@jest/transform": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/transform": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/babel__core": "^7.1.14",
+             "babel-plugin-istanbul": "^6.0.0",
+             "babel-preset-jest": "^27.0.6",
+@@ -13908,17 +13902,6 @@
+           "integrity": "sha512-cOU9usZw8/dXIXKtwa8pM0OTJQuJkxMN6w30csNRUerHfeQ5R6U3kkU/FtJeIf3M202OHfY2U8ccInBG7/xogA==",
+           "dev": true
+         },
+-        "cliui": {
+-          "version": "7.0.4",
+-          "resolved": "https://registry.npmjs.org/cliui/-/cliui-7.0.4.tgz",
+-          "integrity": "sha512-OcRE68cOsVMXp1Yvonl/fzkQOyjLSu/8bhPDfQt0e0/Eb283TKP20Fs2MqoPsr9SwA595rRCA+QMzYc9nBP+JQ==",
+-          "dev": true,
+-          "requires": {
+-            "string-width": "^4.2.0",
+-            "strip-ansi": "^6.0.0",
+-            "wrap-ansi": "^7.0.0"
+-          }
+-        },
+         "color-convert": {
+           "version": "2.0.1",
+           "resolved": "https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz",
+@@ -13975,16 +13958,16 @@
+           }
+         },
+         "expect": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/expect/-/expect-27.0.6.tgz",
+-          "integrity": "sha512-psNLt8j2kwg42jGBDSfAlU49CEZxejN1f1PlANWDZqIhBOVU/c2Pm888FcjWJzFewhIsNWfZJeLjUjtKGiPuSw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/expect/-/expect-27.1.0.tgz",
++          "integrity": "sha512-9kJngV5hOJgkFil4F/uXm3hVBubUK2nERVfvqNNwxxuW8ZOUwSTTSysgfzckYtv/LBzj/LJXbiAF7okHCXgdug==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "ansi-styles": "^5.0.0",
+             "jest-get-type": "^27.0.6",
+-            "jest-matcher-utils": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
++            "jest-matcher-utils": "^27.1.0",
++            "jest-message-util": "^27.1.0",
+             "jest-regex-util": "^27.0.6"
+           },
+           "dependencies": {
+@@ -14005,17 +13988,6 @@
+             "to-regex-range": "^5.0.1"
+           }
+         },
+-        "form-data": {
+-          "version": "3.0.1",
+-          "resolved": "https://registry.npmjs.org/form-data/-/form-data-3.0.1.tgz",
+-          "integrity": "sha512-RHkBKtLWUVwd7SqRIvCZMEvAMoGUp0XU+seQiZejj0COz3RI3hWP4sCv3gZWWLjJTd7rGwcsF5eKZGii0r/hbg==",
+-          "dev": true,
+-          "requires": {
+-            "asynckit": "^0.4.0",
+-            "combined-stream": "^1.0.8",
+-            "mime-types": "^2.1.12"
+-          }
+-        },
+         "fsevents": {
+           "version": "2.3.2",
+           "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.2.tgz",
+@@ -14035,12 +14007,6 @@
+           "integrity": "sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==",
+           "dev": true
+         },
+-        "human-signals": {
+-          "version": "2.1.0",
+-          "resolved": "https://registry.npmjs.org/human-signals/-/human-signals-2.1.0.tgz",
+-          "integrity": "sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==",
+-          "dev": true
+-        },
+         "is-ci": {
+           "version": "3.0.0",
+           "resolved": "https://registry.npmjs.org/is-ci/-/is-ci-3.0.0.tgz",
+@@ -14063,75 +14029,75 @@
+           "dev": true
+         },
+         "jest-changed-files": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-changed-files/-/jest-changed-files-27.0.6.tgz",
+-          "integrity": "sha512-BuL/ZDauaq5dumYh5y20sn4IISnf1P9A0TDswTxUi84ORGtVa86ApuBHqICL0vepqAnZiY6a7xeSPWv2/yy4eA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-changed-files/-/jest-changed-files-27.1.0.tgz",
++          "integrity": "sha512-eRcb13TfQw0xiV2E98EmiEgs9a5uaBIqJChyl0G7jR9fCIvGjXovnDS6Zbku3joij4tXYcSK4SE1AXqOlUxjWg==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "execa": "^5.0.0",
+             "throat": "^6.0.1"
+           }
+         },
+         "jest-cli": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-cli/-/jest-cli-27.0.6.tgz",
+-          "integrity": "sha512-qUUVlGb9fdKir3RDE+B10ULI+LQrz+MCflEH2UJyoUjoHHCbxDrMxSzjQAPUMsic4SncI62ofYCcAvW6+6rhhg==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-cli/-/jest-cli-27.1.0.tgz",
++          "integrity": "sha512-h6zPUOUu+6oLDrXz0yOWY2YXvBLk8gQinx4HbZ7SF4V3HzasQf+ncoIbKENUMwXyf54/6dBkYXvXJos+gOHYZw==",
+           "dev": true,
+           "requires": {
+-            "@jest/core": "^27.0.6",
+-            "@jest/test-result": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/core": "^27.1.0",
++            "@jest/test-result": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "chalk": "^4.0.0",
+             "exit": "^0.1.2",
+             "graceful-fs": "^4.2.4",
+             "import-local": "^3.0.2",
+-            "jest-config": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-validate": "^27.0.6",
++            "jest-config": "^27.1.0",
++            "jest-util": "^27.1.0",
++            "jest-validate": "^27.1.0",
+             "prompts": "^2.0.1",
+             "yargs": "^16.0.3"
+           }
+         },
+         "jest-config": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-config/-/jest-config-27.0.6.tgz",
+-          "integrity": "sha512-JZRR3I1Plr2YxPBhgqRspDE2S5zprbga3swYNrvY3HfQGu7p/GjyLOqwrYad97tX3U3mzT53TPHVmozacfP/3w==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-config/-/jest-config-27.1.0.tgz",
++          "integrity": "sha512-GMo7f76vMYUA3b3xOdlcKeKQhKcBIgurjERO2hojo0eLkKPGcw7fyIoanH+m6KOP2bLad+fGnF8aWOJYxzNPeg==",
+           "dev": true,
+           "requires": {
+             "@babel/core": "^7.1.0",
+-            "@jest/test-sequencer": "^27.0.6",
+-            "@jest/types": "^27.0.6",
+-            "babel-jest": "^27.0.6",
++            "@jest/test-sequencer": "^27.1.0",
++            "@jest/types": "^27.1.0",
++            "babel-jest": "^27.1.0",
+             "chalk": "^4.0.0",
+             "deepmerge": "^4.2.2",
+             "glob": "^7.1.1",
+             "graceful-fs": "^4.2.4",
+             "is-ci": "^3.0.0",
+-            "jest-circus": "^27.0.6",
+-            "jest-environment-jsdom": "^27.0.6",
+-            "jest-environment-node": "^27.0.6",
++            "jest-circus": "^27.1.0",
++            "jest-environment-jsdom": "^27.1.0",
++            "jest-environment-node": "^27.1.0",
+             "jest-get-type": "^27.0.6",
+-            "jest-jasmine2": "^27.0.6",
++            "jest-jasmine2": "^27.1.0",
+             "jest-regex-util": "^27.0.6",
+-            "jest-resolve": "^27.0.6",
+-            "jest-runner": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-validate": "^27.0.6",
++            "jest-resolve": "^27.1.0",
++            "jest-runner": "^27.1.0",
++            "jest-util": "^27.1.0",
++            "jest-validate": "^27.1.0",
+             "micromatch": "^4.0.4",
+-            "pretty-format": "^27.0.6"
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-diff": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-diff/-/jest-diff-27.0.6.tgz",
+-          "integrity": "sha512-Z1mqgkTCSYaFgwTlP/NUiRzdqgxmmhzHY1Tq17zL94morOHfHu3K4bgSgl+CR4GLhpV8VxkuOYuIWnQ9LnFqmg==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-diff/-/jest-diff-27.1.0.tgz",
++          "integrity": "sha512-rjfopEYl58g/SZTsQFmspBODvMSytL16I+cirnScWTLkQVXYVZfxm78DFfdIIXc05RCYuGjxJqrdyG4PIFzcJg==",
+           "dev": true,
+           "requires": {
+             "chalk": "^4.0.0",
+             "diff-sequences": "^27.0.6",
+             "jest-get-type": "^27.0.6",
+-            "pretty-format": "^27.0.6"
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-docblock": {
+@@ -14144,45 +14110,45 @@
+           }
+         },
+         "jest-each": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-each/-/jest-each-27.0.6.tgz",
+-          "integrity": "sha512-m6yKcV3bkSWrUIjxkE9OC0mhBZZdhovIW5ergBYirqnkLXkyEn3oUUF/QZgyecA1cF1QFyTE8bRRl8Tfg1pfLA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-each/-/jest-each-27.1.0.tgz",
++          "integrity": "sha512-K/cNvQlmDqQMRHF8CaQ0XPzCfjP5HMJc2bIJglrIqI9fjwpNqITle63IWE+wq4p+3v+iBgh7Wq0IdGpLx5xjDg==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "chalk": "^4.0.0",
+             "jest-get-type": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "pretty-format": "^27.0.6"
++            "jest-util": "^27.1.0",
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-environment-jsdom": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-environment-jsdom/-/jest-environment-jsdom-27.0.6.tgz",
+-          "integrity": "sha512-FvetXg7lnXL9+78H+xUAsra3IeZRTiegA3An01cWeXBspKXUhAwMM9ycIJ4yBaR0L7HkoMPaZsozCLHh4T8fuw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-environment-jsdom/-/jest-environment-jsdom-27.1.0.tgz",
++          "integrity": "sha512-JbwOcOxh/HOtsj56ljeXQCUJr3ivnaIlM45F5NBezFLVYdT91N5UofB1ux2B1CATsQiudcHdgTaeuqGXJqjJYQ==",
+           "dev": true,
+           "requires": {
+-            "@jest/environment": "^27.0.6",
+-            "@jest/fake-timers": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/environment": "^27.1.0",
++            "@jest/fake-timers": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+-            "jest-mock": "^27.0.6",
+-            "jest-util": "^27.0.6",
++            "jest-mock": "^27.1.0",
++            "jest-util": "^27.1.0",
+             "jsdom": "^16.6.0"
+           }
+         },
+         "jest-environment-node": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-environment-node/-/jest-environment-node-27.0.6.tgz",
+-          "integrity": "sha512-+Vi6yLrPg/qC81jfXx3IBlVnDTI6kmRr08iVa2hFCWmJt4zha0XW7ucQltCAPhSR0FEKEoJ3i+W4E6T0s9is0w==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-environment-node/-/jest-environment-node-27.1.0.tgz",
++          "integrity": "sha512-JIyJ8H3wVyM4YCXp7njbjs0dIT87yhGlrXCXhDKNIg1OjurXr6X38yocnnbXvvNyqVTqSI4M9l+YfPKueqL1lw==",
+           "dev": true,
+           "requires": {
+-            "@jest/environment": "^27.0.6",
+-            "@jest/fake-timers": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/environment": "^27.1.0",
++            "@jest/fake-timers": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+-            "jest-mock": "^27.0.6",
+-            "jest-util": "^27.0.6"
++            "jest-mock": "^27.1.0",
++            "jest-util": "^27.1.0"
+           }
+         },
+         "jest-get-type": {
+@@ -14192,12 +14158,12 @@
+           "dev": true
+         },
+         "jest-haste-map": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-haste-map/-/jest-haste-map-27.0.6.tgz",
+-          "integrity": "sha512-4ldjPXX9h8doB2JlRzg9oAZ2p6/GpQUNAeiYXqcpmrKbP0Qev0wdZlxSMOmz8mPOEnt4h6qIzXFLDi8RScX/1w==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-haste-map/-/jest-haste-map-27.1.0.tgz",
++          "integrity": "sha512-7mz6LopSe+eA6cTFMf10OfLLqRoIPvmMyz5/OnSXnHO7hB0aDP1iIeLWCXzAcYU5eIJVpHr12Bk9yyq2fTW9vg==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/graceful-fs": "^4.1.2",
+             "@types/node": "*",
+             "anymatch": "^3.0.3",
+@@ -14206,84 +14172,84 @@
+             "graceful-fs": "^4.2.4",
+             "jest-regex-util": "^27.0.6",
+             "jest-serializer": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-worker": "^27.0.6",
++            "jest-util": "^27.1.0",
++            "jest-worker": "^27.1.0",
+             "micromatch": "^4.0.4",
+             "walker": "^1.0.7"
+           }
+         },
+         "jest-jasmine2": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-jasmine2/-/jest-jasmine2-27.0.6.tgz",
+-          "integrity": "sha512-cjpH2sBy+t6dvCeKBsHpW41mjHzXgsavaFMp+VWRf0eR4EW8xASk1acqmljFtK2DgyIECMv2yCdY41r2l1+4iA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-jasmine2/-/jest-jasmine2-27.1.0.tgz",
++          "integrity": "sha512-Z/NIt0wBDg3przOW2FCWtYjMn3Ip68t0SL60agD/e67jlhTyV3PIF8IzT9ecwqFbeuUSO2OT8WeJgHcalDGFzQ==",
+           "dev": true,
+           "requires": {
+             "@babel/traverse": "^7.1.0",
+-            "@jest/environment": "^27.0.6",
++            "@jest/environment": "^27.1.0",
+             "@jest/source-map": "^27.0.6",
+-            "@jest/test-result": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/test-result": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+             "chalk": "^4.0.0",
+             "co": "^4.6.0",
+-            "expect": "^27.0.6",
++            "expect": "^27.1.0",
+             "is-generator-fn": "^2.0.0",
+-            "jest-each": "^27.0.6",
+-            "jest-matcher-utils": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
+-            "jest-runtime": "^27.0.6",
+-            "jest-snapshot": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "pretty-format": "^27.0.6",
++            "jest-each": "^27.1.0",
++            "jest-matcher-utils": "^27.1.0",
++            "jest-message-util": "^27.1.0",
++            "jest-runtime": "^27.1.0",
++            "jest-snapshot": "^27.1.0",
++            "jest-util": "^27.1.0",
++            "pretty-format": "^27.1.0",
+             "throat": "^6.0.1"
+           }
+         },
+         "jest-leak-detector": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-leak-detector/-/jest-leak-detector-27.0.6.tgz",
+-          "integrity": "sha512-2/d6n2wlH5zEcdctX4zdbgX8oM61tb67PQt4Xh8JFAIy6LRKUnX528HulkaG6nD5qDl5vRV1NXejCe1XRCH5gQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-leak-detector/-/jest-leak-detector-27.1.0.tgz",
++          "integrity": "sha512-oHvSkz1E80VyeTKBvZNnw576qU+cVqRXUD3/wKXh1zpaki47Qty2xeHg2HKie9Hqcd2l4XwircgNOWb/NiGqdA==",
+           "dev": true,
+           "requires": {
+             "jest-get-type": "^27.0.6",
+-            "pretty-format": "^27.0.6"
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-matcher-utils": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-matcher-utils/-/jest-matcher-utils-27.0.6.tgz",
+-          "integrity": "sha512-OFgF2VCQx9vdPSYTHWJ9MzFCehs20TsyFi6bIHbk5V1u52zJOnvF0Y/65z3GLZHKRuTgVPY4Z6LVePNahaQ+tA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-matcher-utils/-/jest-matcher-utils-27.1.0.tgz",
++          "integrity": "sha512-VmAudus2P6Yt/JVBRdTPFhUzlIN8DYJd+et5Rd9QDsO/Z82Z4iwGjo43U8Z+PTiz8CBvKvlb6Fh3oKy39hykkQ==",
+           "dev": true,
+           "requires": {
+             "chalk": "^4.0.0",
+-            "jest-diff": "^27.0.6",
++            "jest-diff": "^27.1.0",
+             "jest-get-type": "^27.0.6",
+-            "pretty-format": "^27.0.6"
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-message-util": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-message-util/-/jest-message-util-27.0.6.tgz",
+-          "integrity": "sha512-rBxIs2XK7rGy+zGxgi+UJKP6WqQ+KrBbD1YMj517HYN3v2BG66t3Xan3FWqYHKZwjdB700KiAJ+iES9a0M+ixw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-message-util/-/jest-message-util-27.1.0.tgz",
++          "integrity": "sha512-Eck8NFnJ5Sg36R9XguD65cf2D5+McC+NF5GIdEninoabcuoOfWrID5qJhufq5FB0DRKoiyxB61hS7MKoMD0trQ==",
+           "dev": true,
+           "requires": {
+             "@babel/code-frame": "^7.12.13",
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/stack-utils": "^2.0.0",
+             "chalk": "^4.0.0",
+             "graceful-fs": "^4.2.4",
+             "micromatch": "^4.0.4",
+-            "pretty-format": "^27.0.6",
++            "pretty-format": "^27.1.0",
+             "slash": "^3.0.0",
+             "stack-utils": "^2.0.3"
+           }
+         },
+         "jest-mock": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-mock/-/jest-mock-27.0.6.tgz",
+-          "integrity": "sha512-lzBETUoK8cSxts2NYXSBWT+EJNzmUVtVVwS1sU9GwE1DLCfGsngg+ZVSIe0yd0ZSm+y791esiuo+WSwpXJQ5Bw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-mock/-/jest-mock-27.1.0.tgz",
++          "integrity": "sha512-iT3/Yhu7DwAg/0HvvLCqLvrTKTRMyJlrrfJYWzuLSf9RCAxBoIXN3HoymZxMnYsC3eD8ewGbUa9jUknwBenx2w==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*"
+           }
+         },
+@@ -14294,92 +14260,94 @@
+           "dev": true
+         },
+         "jest-resolve": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-resolve/-/jest-resolve-27.0.6.tgz",
+-          "integrity": "sha512-yKmIgw2LgTh7uAJtzv8UFHGF7Dm7XfvOe/LQ3Txv101fLM8cx2h1QVwtSJ51Q/SCxpIiKfVn6G2jYYMDNHZteA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-resolve/-/jest-resolve-27.1.0.tgz",
++          "integrity": "sha512-TXvzrLyPg0vLOwcWX38ZGYeEztSEmW+cQQKqc4HKDUwun31wsBXwotRlUz4/AYU/Fq4GhbMd/ileIWZEtcdmIA==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "chalk": "^4.0.0",
+             "escalade": "^3.1.1",
+             "graceful-fs": "^4.2.4",
++            "jest-haste-map": "^27.1.0",
+             "jest-pnp-resolver": "^1.2.2",
+-            "jest-util": "^27.0.6",
+-            "jest-validate": "^27.0.6",
++            "jest-util": "^27.1.0",
++            "jest-validate": "^27.1.0",
+             "resolve": "^1.20.0",
+             "slash": "^3.0.0"
+           }
+         },
+         "jest-resolve-dependencies": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-resolve-dependencies/-/jest-resolve-dependencies-27.0.6.tgz",
+-          "integrity": "sha512-mg9x9DS3BPAREWKCAoyg3QucCr0n6S8HEEsqRCKSPjPcu9HzRILzhdzY3imsLoZWeosEbJZz6TKasveczzpJZA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-resolve-dependencies/-/jest-resolve-dependencies-27.1.0.tgz",
++          "integrity": "sha512-Kq5XuDAELuBnrERrjFYEzu/A+i2W7l9HnPWqZEeKGEQ7m1R+6ndMbdXCVCx29Se1qwLZLgvoXwinB3SPIaitMQ==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "jest-regex-util": "^27.0.6",
+-            "jest-snapshot": "^27.0.6"
++            "jest-snapshot": "^27.1.0"
+           }
+         },
+         "jest-runner": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-runner/-/jest-runner-27.0.6.tgz",
+-          "integrity": "sha512-W3Bz5qAgaSChuivLn+nKOgjqNxM7O/9JOJoKDCqThPIg2sH/d4A/lzyiaFgnb9V1/w29Le11NpzTJSzga1vyYQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-runner/-/jest-runner-27.1.0.tgz",
++          "integrity": "sha512-ZWPKr9M5w5gDplz1KsJ6iRmQaDT/yyAFLf18fKbb/+BLWsR1sCNC2wMT0H7pP3gDcBz0qZ6aJraSYUNAGSJGaw==",
+           "dev": true,
+           "requires": {
+-            "@jest/console": "^27.0.6",
+-            "@jest/environment": "^27.0.6",
+-            "@jest/test-result": "^27.0.6",
+-            "@jest/transform": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/console": "^27.1.0",
++            "@jest/environment": "^27.1.0",
++            "@jest/test-result": "^27.1.0",
++            "@jest/transform": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+             "chalk": "^4.0.0",
+             "emittery": "^0.8.1",
+             "exit": "^0.1.2",
+             "graceful-fs": "^4.2.4",
+             "jest-docblock": "^27.0.6",
+-            "jest-environment-jsdom": "^27.0.6",
+-            "jest-environment-node": "^27.0.6",
+-            "jest-haste-map": "^27.0.6",
+-            "jest-leak-detector": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
+-            "jest-resolve": "^27.0.6",
+-            "jest-runtime": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-worker": "^27.0.6",
++            "jest-environment-jsdom": "^27.1.0",
++            "jest-environment-node": "^27.1.0",
++            "jest-haste-map": "^27.1.0",
++            "jest-leak-detector": "^27.1.0",
++            "jest-message-util": "^27.1.0",
++            "jest-resolve": "^27.1.0",
++            "jest-runtime": "^27.1.0",
++            "jest-util": "^27.1.0",
++            "jest-worker": "^27.1.0",
+             "source-map-support": "^0.5.6",
+             "throat": "^6.0.1"
+           }
+         },
+         "jest-runtime": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-runtime/-/jest-runtime-27.0.6.tgz",
+-          "integrity": "sha512-BhvHLRVfKibYyqqEFkybsznKwhrsu7AWx2F3y9G9L95VSIN3/ZZ9vBpm/XCS2bS+BWz3sSeNGLzI3TVQ0uL85Q==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-runtime/-/jest-runtime-27.1.0.tgz",
++          "integrity": "sha512-okiR2cpGjY0RkWmUGGado6ETpFOi9oG3yV0CioYdoktkVxy5Hv0WRLWnJFuArSYS8cHMCNcceUUMGiIfgxCO9A==",
+           "dev": true,
+           "requires": {
+-            "@jest/console": "^27.0.6",
+-            "@jest/environment": "^27.0.6",
+-            "@jest/fake-timers": "^27.0.6",
+-            "@jest/globals": "^27.0.6",
++            "@jest/console": "^27.1.0",
++            "@jest/environment": "^27.1.0",
++            "@jest/fake-timers": "^27.1.0",
++            "@jest/globals": "^27.1.0",
+             "@jest/source-map": "^27.0.6",
+-            "@jest/test-result": "^27.0.6",
+-            "@jest/transform": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/test-result": "^27.1.0",
++            "@jest/transform": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/yargs": "^16.0.0",
+             "chalk": "^4.0.0",
+             "cjs-module-lexer": "^1.0.0",
+             "collect-v8-coverage": "^1.0.0",
++            "execa": "^5.0.0",
+             "exit": "^0.1.2",
+             "glob": "^7.1.3",
+             "graceful-fs": "^4.2.4",
+-            "jest-haste-map": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
+-            "jest-mock": "^27.0.6",
++            "jest-haste-map": "^27.1.0",
++            "jest-message-util": "^27.1.0",
++            "jest-mock": "^27.1.0",
+             "jest-regex-util": "^27.0.6",
+-            "jest-resolve": "^27.0.6",
+-            "jest-snapshot": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-validate": "^27.0.6",
++            "jest-resolve": "^27.1.0",
++            "jest-snapshot": "^27.1.0",
++            "jest-util": "^27.1.0",
++            "jest-validate": "^27.1.0",
+             "slash": "^3.0.0",
+             "strip-bom": "^4.0.0",
+             "yargs": "^16.0.3"
+@@ -14396,9 +14364,9 @@
+           }
+         },
+         "jest-snapshot": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-snapshot/-/jest-snapshot-27.0.6.tgz",
+-          "integrity": "sha512-NTHaz8He+ATUagUgE7C/UtFcRoHqR2Gc+KDfhQIyx+VFgwbeEMjeP+ILpUTLosZn/ZtbNdCF5LkVnN/l+V751A==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-snapshot/-/jest-snapshot-27.1.0.tgz",
++          "integrity": "sha512-eaeUBoEjuuRwmiRI51oTldUsKOohB1F6fPqWKKILuDi/CStxzp2IWekVUXbuHHoz5ik33ioJhshiHpgPFbYgcA==",
+           "dev": true,
+           "requires": {
+             "@babel/core": "^7.7.2",
+@@ -14407,33 +14375,33 @@
+             "@babel/plugin-syntax-typescript": "^7.7.2",
+             "@babel/traverse": "^7.7.2",
+             "@babel/types": "^7.0.0",
+-            "@jest/transform": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/transform": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/babel__traverse": "^7.0.4",
+             "@types/prettier": "^2.1.5",
+             "babel-preset-current-node-syntax": "^1.0.0",
+             "chalk": "^4.0.0",
+-            "expect": "^27.0.6",
++            "expect": "^27.1.0",
+             "graceful-fs": "^4.2.4",
+-            "jest-diff": "^27.0.6",
++            "jest-diff": "^27.1.0",
+             "jest-get-type": "^27.0.6",
+-            "jest-haste-map": "^27.0.6",
+-            "jest-matcher-utils": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
+-            "jest-resolve": "^27.0.6",
+-            "jest-util": "^27.0.6",
++            "jest-haste-map": "^27.1.0",
++            "jest-matcher-utils": "^27.1.0",
++            "jest-message-util": "^27.1.0",
++            "jest-resolve": "^27.1.0",
++            "jest-util": "^27.1.0",
+             "natural-compare": "^1.4.0",
+-            "pretty-format": "^27.0.6",
++            "pretty-format": "^27.1.0",
+             "semver": "^7.3.2"
+           }
+         },
+         "jest-util": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-util/-/jest-util-27.0.6.tgz",
+-          "integrity": "sha512-1JjlaIh+C65H/F7D11GNkGDDZtDfMEM8EBXsvd+l/cxtgQ6QhxuloOaiayt89DxUvDarbVhqI98HhgrM1yliFQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-util/-/jest-util-27.1.0.tgz",
++          "integrity": "sha512-edSLD2OneYDKC6gZM1yc+wY/877s/fuJNoM1k3sOEpzFyeptSmke3SLnk1dDHk9CgTA+58mnfx3ew3J11Kes/w==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+             "chalk": "^4.0.0",
+             "graceful-fs": "^4.2.4",
+@@ -14442,38 +14410,38 @@
+           }
+         },
+         "jest-validate": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-validate/-/jest-validate-27.0.6.tgz",
+-          "integrity": "sha512-yhZZOaMH3Zg6DC83n60pLmdU1DQE46DW+KLozPiPbSbPhlXXaiUTDlhHQhHFpaqIFRrInko1FHXjTRpjWRuWfA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-validate/-/jest-validate-27.1.0.tgz",
++          "integrity": "sha512-QiJ+4XuSuMsfPi9zvdO//IrSRSlG6ybJhOpuqYSsuuaABaNT84h0IoD6vvQhThBOKT+DIKvl5sTM0l6is9+SRA==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "camelcase": "^6.2.0",
+             "chalk": "^4.0.0",
+             "jest-get-type": "^27.0.6",
+             "leven": "^3.1.0",
+-            "pretty-format": "^27.0.6"
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-watcher": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-watcher/-/jest-watcher-27.0.6.tgz",
+-          "integrity": "sha512-/jIoKBhAP00/iMGnTwUBLgvxkn7vsOweDrOTSPzc7X9uOyUtJIDthQBTI1EXz90bdkrxorUZVhJwiB69gcHtYQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-watcher/-/jest-watcher-27.1.0.tgz",
++          "integrity": "sha512-ivaWTrA46aHWdgPDgPypSHiNQjyKnLBpUIHeBaGg11U+pDzZpkffGlcB1l1a014phmG0mHgkOHtOgiqJQM6yKQ==",
+           "dev": true,
+           "requires": {
+-            "@jest/test-result": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/test-result": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+             "ansi-escapes": "^4.2.1",
+             "chalk": "^4.0.0",
+-            "jest-util": "^27.0.6",
++            "jest-util": "^27.1.0",
+             "string-length": "^4.0.1"
+           }
+         },
+         "jest-worker": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-worker/-/jest-worker-27.0.6.tgz",
+-          "integrity": "sha512-qupxcj/dRuA3xHPMUd40gr2EaAurFbkwzOh7wfPaeE9id7hyjURRQoqNfHifHK3XjJU6YJJUQKILGUnwGPEOCA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-worker/-/jest-worker-27.1.0.tgz",
++          "integrity": "sha512-mO4PHb2QWLn9yRXGp7rkvXLAYuxwhq1ZYUo0LoDhg8wqvv4QizP1ZWEJOeolgbEgAWZLIEU0wsku8J+lGWfBhg==",
+           "dev": true,
+           "requires": {
+             "@types/node": "*",
+@@ -14492,50 +14460,6 @@
+             }
+           }
+         },
+-        "jsdom": {
+-          "version": "16.7.0",
+-          "resolved": "https://registry.npmjs.org/jsdom/-/jsdom-16.7.0.tgz",
+-          "integrity": "sha512-u9Smc2G1USStM+s/x1ru5Sxrl6mPYCbByG1U/hUmqaVsm4tbNyS7CicOSRyuGQYZhTu0h84qkZZQ/I+dzizSVw==",
+-          "dev": true,
+-          "requires": {
+-            "abab": "^2.0.5",
+-            "acorn": "^8.2.4",
+-            "acorn-globals": "^6.0.0",
+-            "cssom": "^0.4.4",
+-            "cssstyle": "^2.3.0",
+-            "data-urls": "^2.0.0",
+-            "decimal.js": "^10.2.1",
+-            "domexception": "^2.0.1",
+-            "escodegen": "^2.0.0",
+-            "form-data": "^3.0.0",
+-            "html-encoding-sniffer": "^2.0.1",
+-            "http-proxy-agent": "^4.0.1",
+-            "https-proxy-agent": "^5.0.0",
+-            "is-potential-custom-element-name": "^1.0.1",
+-            "nwsapi": "^2.2.0",
+-            "parse5": "6.0.1",
+-            "saxes": "^5.0.1",
+-            "symbol-tree": "^3.2.4",
+-            "tough-cookie": "^4.0.0",
+-            "w3c-hr-time": "^1.0.2",
+-            "w3c-xmlserializer": "^2.0.0",
+-            "webidl-conversions": "^6.1.0",
+-            "whatwg-encoding": "^1.0.5",
+-            "whatwg-mimetype": "^2.3.0",
+-            "whatwg-url": "^8.5.0",
+-            "ws": "^7.4.6",
+-            "xml-name-validator": "^3.0.0"
+-          }
+-        },
+-        "lru-cache": {
+-          "version": "6.0.0",
+-          "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-6.0.0.tgz",
+-          "integrity": "sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==",
+-          "dev": true,
+-          "requires": {
+-            "yallist": "^4.0.0"
+-          }
+-        },
+         "micromatch": {
+           "version": "4.0.4",
+           "resolved": "https://registry.npmjs.org/micromatch/-/micromatch-4.0.4.tgz",
+@@ -14562,12 +14486,12 @@
+           "dev": true
+         },
+         "pretty-format": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/pretty-format/-/pretty-format-27.0.6.tgz",
+-          "integrity": "sha512-8tGD7gBIENgzqA+UBzObyWqQ5B778VIFZA/S66cclyd5YkFLYs2Js7gxDKf0MXtTc9zcS7t1xhdfcElJ3YIvkQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/pretty-format/-/pretty-format-27.1.0.tgz",
++          "integrity": "sha512-4aGaud3w3rxAO6OXmK3fwBFQ0bctIOG3/if+jYEFGNGIs0EvuidQm3bZ9mlP2/t9epLNC/12czabfy7TZNSwVA==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "ansi-regex": "^5.0.0",
+             "ansi-styles": "^5.0.0",
+             "react-is": "^17.0.1"
+@@ -14626,30 +14550,12 @@
+           "integrity": "sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==",
+           "dev": true
+         },
+-        "strip-ansi": {
+-          "version": "6.0.0",
+-          "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.0.tgz",
+-          "integrity": "sha512-AuvKTrTfQNYNIctbR1K/YGTR1756GycPsg7b9bdV9Duqur4gv6aKqHXah67Z8ImS7WEz5QVcOtlfW2rZEugt6w==",
+-          "dev": true,
+-          "requires": {
+-            "ansi-regex": "^5.0.0"
+-          }
+-        },
+         "strip-bom": {
+           "version": "4.0.0",
+           "resolved": "https://registry.npmjs.org/strip-bom/-/strip-bom-4.0.0.tgz",
+           "integrity": "sha512-3xurFv5tEgii33Zi8Jtp55wEIILR9eh34FAW00PZf+JnSsTmV/ioewSgQl97JHvgjoRGwPShsWm+IdrxB35d0w==",
+           "dev": true
+         },
+-        "supports-color": {
+-          "version": "7.2.0",
+-          "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-7.2.0.tgz",
+-          "integrity": "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==",
+-          "dev": true,
+-          "requires": {
+-            "has-flag": "^4.0.0"
+-          }
+-        },
+         "throat": {
+           "version": "6.0.1",
+           "resolved": "https://registry.npmjs.org/throat/-/throat-6.0.1.tgz",
+@@ -14692,56 +14598,6 @@
+           "requires": {
+             "isexe": "^2.0.0"
+           }
+-        },
+-        "wrap-ansi": {
+-          "version": "7.0.0",
+-          "resolved": "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz",
+-          "integrity": "sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==",
+-          "dev": true,
+-          "requires": {
+-            "ansi-styles": "^4.0.0",
+-            "string-width": "^4.1.0",
+-            "strip-ansi": "^6.0.0"
+-          }
+-        },
+-        "ws": {
+-          "version": "7.5.3",
+-          "resolved": "https://registry.npmjs.org/ws/-/ws-7.5.3.tgz",
+-          "integrity": "sha512-kQ/dHIzuLrS6Je9+uv81ueZomEwH0qVYstcAQ4/Z93K8zeko9gtAbttJWzoC5ukqXY1PpoouV3+VSOqEAFt5wg==",
+-          "dev": true
+-        },
+-        "y18n": {
+-          "version": "5.0.8",
+-          "resolved": "https://registry.npmjs.org/y18n/-/y18n-5.0.8.tgz",
+-          "integrity": "sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==",
+-          "dev": true
+-        },
+-        "yallist": {
+-          "version": "4.0.0",
+-          "resolved": "https://registry.npmjs.org/yallist/-/yallist-4.0.0.tgz",
+-          "integrity": "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==",
+-          "dev": true
+-        },
+-        "yargs": {
+-          "version": "16.2.0",
+-          "resolved": "https://registry.npmjs.org/yargs/-/yargs-16.2.0.tgz",
+-          "integrity": "sha512-D1mvvtDG0L5ft/jGWkLpG1+m0eQxOfaBvTNELraWj22wSVUMWxZUvYgJYcKh6jGGIkJFhH4IZPQhR4TKpc8mBw==",
+-          "dev": true,
+-          "requires": {
+-            "cliui": "^7.0.2",
+-            "escalade": "^3.1.1",
+-            "get-caller-file": "^2.0.5",
+-            "require-directory": "^2.1.1",
+-            "string-width": "^4.2.0",
+-            "y18n": "^5.0.5",
+-            "yargs-parser": "^20.2.2"
+-          }
+-        },
+-        "yargs-parser": {
+-          "version": "20.2.9",
+-          "resolved": "https://registry.npmjs.org/yargs-parser/-/yargs-parser-20.2.9.tgz",
+-          "integrity": "sha512-y11nGElTIV+CT3Zv9t7VKl+Q3hTQoT9a1Qzezhhl6Rp21gJ/IVTW7Z3y9EWXhuUBC2Shnf+DX0antecpAwSP8w==",
+-          "dev": true
+         }
+       }
+     },
+@@ -14853,81 +14709,81 @@
+       }
+     },
+     "jest-circus": {
+-      "version": "27.0.6",
+-      "resolved": "https://registry.npmjs.org/jest-circus/-/jest-circus-27.0.6.tgz",
+-      "integrity": "sha512-OJlsz6BBeX9qR+7O9lXefWoc2m9ZqcZ5Ohlzz0pTEAG4xMiZUJoacY8f4YDHxgk0oKYxj277AfOk9w6hZYvi1Q==",
++      "version": "27.1.0",
++      "resolved": "https://registry.npmjs.org/jest-circus/-/jest-circus-27.1.0.tgz",
++      "integrity": "sha512-6FWtHs3nZyZlMBhRf1wvAC5CirnflbGJAY1xssSAnERLiiXQRH+wY2ptBVtXjX4gz4AA2EwRV57b038LmifRbA==",
+       "dev": true,
+       "requires": {
+-        "@jest/environment": "^27.0.6",
+-        "@jest/test-result": "^27.0.6",
+-        "@jest/types": "^27.0.6",
++        "@jest/environment": "^27.1.0",
++        "@jest/test-result": "^27.1.0",
++        "@jest/types": "^27.1.0",
+         "@types/node": "*",
+         "chalk": "^4.0.0",
+         "co": "^4.6.0",
+         "dedent": "^0.7.0",
+-        "expect": "^27.0.6",
++        "expect": "^27.1.0",
+         "is-generator-fn": "^2.0.0",
+-        "jest-each": "^27.0.6",
+-        "jest-matcher-utils": "^27.0.6",
+-        "jest-message-util": "^27.0.6",
+-        "jest-runtime": "^27.0.6",
+-        "jest-snapshot": "^27.0.6",
+-        "jest-util": "^27.0.6",
+-        "pretty-format": "^27.0.6",
++        "jest-each": "^27.1.0",
++        "jest-matcher-utils": "^27.1.0",
++        "jest-message-util": "^27.1.0",
++        "jest-runtime": "^27.1.0",
++        "jest-snapshot": "^27.1.0",
++        "jest-util": "^27.1.0",
++        "pretty-format": "^27.1.0",
+         "slash": "^3.0.0",
+         "stack-utils": "^2.0.3",
+         "throat": "^6.0.1"
+       },
+       "dependencies": {
+         "@jest/console": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/console/-/console-27.0.6.tgz",
+-          "integrity": "sha512-fMlIBocSHPZ3JxgWiDNW/KPj6s+YRd0hicb33IrmelCcjXo/pXPwvuiKFmZz+XuqI/1u7nbUK10zSsWL/1aegg==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/console/-/console-27.1.0.tgz",
++          "integrity": "sha512-+Vl+xmLwAXLNlqT61gmHEixeRbS4L8MUzAjtpBCOPWH+izNI/dR16IeXjkXJdRtIVWVSf9DO1gdp67B1XorZhQ==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+             "chalk": "^4.0.0",
+-            "jest-message-util": "^27.0.6",
+-            "jest-util": "^27.0.6",
++            "jest-message-util": "^27.1.0",
++            "jest-util": "^27.1.0",
+             "slash": "^3.0.0"
+           }
+         },
+         "@jest/environment": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/environment/-/environment-27.0.6.tgz",
+-          "integrity": "sha512-4XywtdhwZwCpPJ/qfAkqExRsERW+UaoSRStSHCCiQTUpoYdLukj+YJbQSFrZjhlUDRZeNiU9SFH0u7iNimdiIg==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/environment/-/environment-27.1.0.tgz",
++          "integrity": "sha512-wRp50aAMY2w1U2jP1G32d6FUVBNYqmk8WaGkiIEisU48qyDV0WPtw3IBLnl7orBeggveommAkuijY+RzVnNDOQ==",
+           "dev": true,
+           "requires": {
+-            "@jest/fake-timers": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/fake-timers": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+-            "jest-mock": "^27.0.6"
++            "jest-mock": "^27.1.0"
+           }
+         },
+         "@jest/fake-timers": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/fake-timers/-/fake-timers-27.0.6.tgz",
+-          "integrity": "sha512-sqd+xTWtZ94l3yWDKnRTdvTeZ+A/V7SSKrxsrOKSqdyddb9CeNRF8fbhAU0D7ZJBpTTW2nbp6MftmKJDZfW2LQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/fake-timers/-/fake-timers-27.1.0.tgz",
++          "integrity": "sha512-22Zyn8il8DzpS+30jJNVbTlm7vAtnfy1aYvNeOEHloMlGy1PCYLHa4PWlSws0hvNsMM5bON6GISjkLoQUV3oMA==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@sinonjs/fake-timers": "^7.0.2",
+             "@types/node": "*",
+-            "jest-message-util": "^27.0.6",
+-            "jest-mock": "^27.0.6",
+-            "jest-util": "^27.0.6"
++            "jest-message-util": "^27.1.0",
++            "jest-mock": "^27.1.0",
++            "jest-util": "^27.1.0"
+           }
+         },
+         "@jest/globals": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/globals/-/globals-27.0.6.tgz",
+-          "integrity": "sha512-DdTGCP606rh9bjkdQ7VvChV18iS7q0IMJVP1piwTWyWskol4iqcVwthZmoJEf7obE1nc34OpIyoVGPeqLC+ryw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/globals/-/globals-27.1.0.tgz",
++          "integrity": "sha512-73vLV4aNHAlAgjk0/QcSIzzCZSqVIPbmFROJJv9D3QUR7BI4f517gVdJpSrCHxuRH3VZFhe0yGG/tmttlMll9g==",
+           "dev": true,
+           "requires": {
+-            "@jest/environment": "^27.0.6",
+-            "@jest/types": "^27.0.6",
+-            "expect": "^27.0.6"
++            "@jest/environment": "^27.1.0",
++            "@jest/types": "^27.1.0",
++            "expect": "^27.1.0"
+           }
+         },
+         "@jest/source-map": {
+@@ -14942,33 +14798,33 @@
+           }
+         },
+         "@jest/test-result": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/test-result/-/test-result-27.0.6.tgz",
+-          "integrity": "sha512-ja/pBOMTufjX4JLEauLxE3LQBPaI2YjGFtXexRAjt1I/MbfNlMx0sytSX3tn5hSLzQsR3Qy2rd0hc1BWojtj9w==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/test-result/-/test-result-27.1.0.tgz",
++          "integrity": "sha512-Aoz00gpDL528ODLghat3QSy6UBTD5EmmpjrhZZMK/v1Q2/rRRqTGnFxHuEkrD4z/Py96ZdOHxIWkkCKRpmnE1A==",
+           "dev": true,
+           "requires": {
+-            "@jest/console": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/console": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/istanbul-lib-coverage": "^2.0.0",
+             "collect-v8-coverage": "^1.0.0"
+           }
+         },
+         "@jest/transform": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/transform/-/transform-27.0.6.tgz",
+-          "integrity": "sha512-rj5Dw+mtIcntAUnMlW/Vju5mr73u8yg+irnHwzgtgoeI6cCPOvUwQ0D1uQtc/APmWgvRweEb1g05pkUpxH3iCA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/transform/-/transform-27.1.0.tgz",
++          "integrity": "sha512-ZRGCA2ZEVJ00ubrhkTG87kyLbN6n55g1Ilq0X9nJb5bX3MhMp3O6M7KG+LvYu+nZRqG5cXsQnJEdZbdpTAV8pQ==",
+           "dev": true,
+           "requires": {
+             "@babel/core": "^7.1.0",
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "babel-plugin-istanbul": "^6.0.0",
+             "chalk": "^4.0.0",
+             "convert-source-map": "^1.4.0",
+             "fast-json-stable-stringify": "^2.0.0",
+             "graceful-fs": "^4.2.4",
+-            "jest-haste-map": "^27.0.6",
++            "jest-haste-map": "^27.1.0",
+             "jest-regex-util": "^27.0.6",
+-            "jest-util": "^27.0.6",
++            "jest-util": "^27.1.0",
+             "micromatch": "^4.0.4",
+             "pirates": "^4.0.1",
+             "slash": "^3.0.0",
+@@ -14977,9 +14833,9 @@
+           }
+         },
+         "@jest/types": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/@jest/types/-/types-27.0.6.tgz",
+-          "integrity": "sha512-aSquT1qa9Pik26JK5/3rvnYb4bGtm1VFNesHKmNTwmPIgOrixvhL2ghIvFRNEpzy3gU+rUgjIF/KodbkFAl++g==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/@jest/types/-/types-27.1.0.tgz",
++          "integrity": "sha512-pRP5cLIzN7I7Vp6mHKRSaZD7YpBTK7hawx5si8trMKqk4+WOdK8NEKOTO2G8PKWD1HbKMVckVB6/XHh/olhf2g==",
+           "dev": true,
+           "requires": {
+             "@types/istanbul-lib-coverage": "^2.0.0",
+@@ -15057,17 +14913,6 @@
+           "integrity": "sha512-cOU9usZw8/dXIXKtwa8pM0OTJQuJkxMN6w30csNRUerHfeQ5R6U3kkU/FtJeIf3M202OHfY2U8ccInBG7/xogA==",
+           "dev": true
+         },
+-        "cliui": {
+-          "version": "7.0.4",
+-          "resolved": "https://registry.npmjs.org/cliui/-/cliui-7.0.4.tgz",
+-          "integrity": "sha512-OcRE68cOsVMXp1Yvonl/fzkQOyjLSu/8bhPDfQt0e0/Eb283TKP20Fs2MqoPsr9SwA595rRCA+QMzYc9nBP+JQ==",
+-          "dev": true,
+-          "requires": {
+-            "string-width": "^4.2.0",
+-            "strip-ansi": "^6.0.0",
+-            "wrap-ansi": "^7.0.0"
+-          }
+-        },
+         "color-convert": {
+           "version": "2.0.1",
+           "resolved": "https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz",
+@@ -15083,23 +14928,51 @@
+           "integrity": "sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==",
+           "dev": true
+         },
++        "cross-spawn": {
++          "version": "7.0.3",
++          "resolved": "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.3.tgz",
++          "integrity": "sha512-iRDPJKUPVEND7dHPO8rkbOnPpyDygcDFtWjpeWNCgy8WP2rXcxXL8TskReQl6OrB2G7+UJrags1q15Fudc7G6w==",
++          "dev": true,
++          "requires": {
++            "path-key": "^3.1.0",
++            "shebang-command": "^2.0.0",
++            "which": "^2.0.1"
++          }
++        },
+         "diff-sequences": {
+           "version": "27.0.6",
+           "resolved": "https://registry.npmjs.org/diff-sequences/-/diff-sequences-27.0.6.tgz",
+           "integrity": "sha512-ag6wfpBFyNXZ0p8pcuIDS//D8H062ZQJ3fzYxjpmeKjnz8W4pekL3AI8VohmyZmsWW2PWaHgjsmqR6L13101VQ==",
+           "dev": true
+         },
++        "execa": {
++          "version": "5.1.1",
++          "resolved": "https://registry.npmjs.org/execa/-/execa-5.1.1.tgz",
++          "integrity": "sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg==",
++          "dev": true,
++          "requires": {
++            "cross-spawn": "^7.0.3",
++            "get-stream": "^6.0.0",
++            "human-signals": "^2.1.0",
++            "is-stream": "^2.0.0",
++            "merge-stream": "^2.0.0",
++            "npm-run-path": "^4.0.1",
++            "onetime": "^5.1.2",
++            "signal-exit": "^3.0.3",
++            "strip-final-newline": "^2.0.0"
++          }
++        },
+         "expect": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/expect/-/expect-27.0.6.tgz",
+-          "integrity": "sha512-psNLt8j2kwg42jGBDSfAlU49CEZxejN1f1PlANWDZqIhBOVU/c2Pm888FcjWJzFewhIsNWfZJeLjUjtKGiPuSw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/expect/-/expect-27.1.0.tgz",
++          "integrity": "sha512-9kJngV5hOJgkFil4F/uXm3hVBubUK2nERVfvqNNwxxuW8ZOUwSTTSysgfzckYtv/LBzj/LJXbiAF7okHCXgdug==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "ansi-styles": "^5.0.0",
+             "jest-get-type": "^27.0.6",
+-            "jest-matcher-utils": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
++            "jest-matcher-utils": "^27.1.0",
++            "jest-message-util": "^27.1.0",
+             "jest-regex-util": "^27.0.6"
+           },
+           "dependencies": {
+@@ -15127,6 +15000,12 @@
+           "dev": true,
+           "optional": true
+         },
++        "get-stream": {
++          "version": "6.0.1",
++          "resolved": "https://registry.npmjs.org/get-stream/-/get-stream-6.0.1.tgz",
++          "integrity": "sha512-ts6Wi+2j3jQjqi70w5AlN8DFnkSwC+MqmxEzdEALB2qXZYV3X/b1CTfgPLGJNMeAWxdPfU8FO1ms3NUfaHCPYg==",
++          "dev": true
++        },
+         "has-flag": {
+           "version": "4.0.0",
+           "resolved": "https://registry.npmjs.org/has-flag/-/has-flag-4.0.0.tgz",
+@@ -15148,29 +15027,35 @@
+           "integrity": "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==",
+           "dev": true
+         },
++        "is-stream": {
++          "version": "2.0.1",
++          "resolved": "https://registry.npmjs.org/is-stream/-/is-stream-2.0.1.tgz",
++          "integrity": "sha512-hFoiJiTl63nn+kstHGBtewWSKnQLpyb155KHheA1l39uvtO9nWIop1p3udqPcUd/xbF1VLMO4n7OI6p7RbngDg==",
++          "dev": true
++        },
+         "jest-diff": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-diff/-/jest-diff-27.0.6.tgz",
+-          "integrity": "sha512-Z1mqgkTCSYaFgwTlP/NUiRzdqgxmmhzHY1Tq17zL94morOHfHu3K4bgSgl+CR4GLhpV8VxkuOYuIWnQ9LnFqmg==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-diff/-/jest-diff-27.1.0.tgz",
++          "integrity": "sha512-rjfopEYl58g/SZTsQFmspBODvMSytL16I+cirnScWTLkQVXYVZfxm78DFfdIIXc05RCYuGjxJqrdyG4PIFzcJg==",
+           "dev": true,
+           "requires": {
+             "chalk": "^4.0.0",
+             "diff-sequences": "^27.0.6",
+             "jest-get-type": "^27.0.6",
+-            "pretty-format": "^27.0.6"
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-each": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-each/-/jest-each-27.0.6.tgz",
+-          "integrity": "sha512-m6yKcV3bkSWrUIjxkE9OC0mhBZZdhovIW5ergBYirqnkLXkyEn3oUUF/QZgyecA1cF1QFyTE8bRRl8Tfg1pfLA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-each/-/jest-each-27.1.0.tgz",
++          "integrity": "sha512-K/cNvQlmDqQMRHF8CaQ0XPzCfjP5HMJc2bIJglrIqI9fjwpNqITle63IWE+wq4p+3v+iBgh7Wq0IdGpLx5xjDg==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "chalk": "^4.0.0",
+             "jest-get-type": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "pretty-format": "^27.0.6"
++            "jest-util": "^27.1.0",
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-get-type": {
+@@ -15180,12 +15065,12 @@
+           "dev": true
+         },
+         "jest-haste-map": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-haste-map/-/jest-haste-map-27.0.6.tgz",
+-          "integrity": "sha512-4ldjPXX9h8doB2JlRzg9oAZ2p6/GpQUNAeiYXqcpmrKbP0Qev0wdZlxSMOmz8mPOEnt4h6qIzXFLDi8RScX/1w==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-haste-map/-/jest-haste-map-27.1.0.tgz",
++          "integrity": "sha512-7mz6LopSe+eA6cTFMf10OfLLqRoIPvmMyz5/OnSXnHO7hB0aDP1iIeLWCXzAcYU5eIJVpHr12Bk9yyq2fTW9vg==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/graceful-fs": "^4.1.2",
+             "@types/node": "*",
+             "anymatch": "^3.0.3",
+@@ -15194,48 +15079,48 @@
+             "graceful-fs": "^4.2.4",
+             "jest-regex-util": "^27.0.6",
+             "jest-serializer": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-worker": "^27.0.6",
++            "jest-util": "^27.1.0",
++            "jest-worker": "^27.1.0",
+             "micromatch": "^4.0.4",
+             "walker": "^1.0.7"
+           }
+         },
+         "jest-matcher-utils": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-matcher-utils/-/jest-matcher-utils-27.0.6.tgz",
+-          "integrity": "sha512-OFgF2VCQx9vdPSYTHWJ9MzFCehs20TsyFi6bIHbk5V1u52zJOnvF0Y/65z3GLZHKRuTgVPY4Z6LVePNahaQ+tA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-matcher-utils/-/jest-matcher-utils-27.1.0.tgz",
++          "integrity": "sha512-VmAudus2P6Yt/JVBRdTPFhUzlIN8DYJd+et5Rd9QDsO/Z82Z4iwGjo43U8Z+PTiz8CBvKvlb6Fh3oKy39hykkQ==",
+           "dev": true,
+           "requires": {
+             "chalk": "^4.0.0",
+-            "jest-diff": "^27.0.6",
++            "jest-diff": "^27.1.0",
+             "jest-get-type": "^27.0.6",
+-            "pretty-format": "^27.0.6"
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-message-util": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-message-util/-/jest-message-util-27.0.6.tgz",
+-          "integrity": "sha512-rBxIs2XK7rGy+zGxgi+UJKP6WqQ+KrBbD1YMj517HYN3v2BG66t3Xan3FWqYHKZwjdB700KiAJ+iES9a0M+ixw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-message-util/-/jest-message-util-27.1.0.tgz",
++          "integrity": "sha512-Eck8NFnJ5Sg36R9XguD65cf2D5+McC+NF5GIdEninoabcuoOfWrID5qJhufq5FB0DRKoiyxB61hS7MKoMD0trQ==",
+           "dev": true,
+           "requires": {
+             "@babel/code-frame": "^7.12.13",
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/stack-utils": "^2.0.0",
+             "chalk": "^4.0.0",
+             "graceful-fs": "^4.2.4",
+             "micromatch": "^4.0.4",
+-            "pretty-format": "^27.0.6",
++            "pretty-format": "^27.1.0",
+             "slash": "^3.0.0",
+             "stack-utils": "^2.0.3"
+           }
+         },
+         "jest-mock": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-mock/-/jest-mock-27.0.6.tgz",
+-          "integrity": "sha512-lzBETUoK8cSxts2NYXSBWT+EJNzmUVtVVwS1sU9GwE1DLCfGsngg+ZVSIe0yd0ZSm+y791esiuo+WSwpXJQ5Bw==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-mock/-/jest-mock-27.1.0.tgz",
++          "integrity": "sha512-iT3/Yhu7DwAg/0HvvLCqLvrTKTRMyJlrrfJYWzuLSf9RCAxBoIXN3HoymZxMnYsC3eD8ewGbUa9jUknwBenx2w==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*"
+           }
+         },
+@@ -15246,51 +15131,53 @@
+           "dev": true
+         },
+         "jest-resolve": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-resolve/-/jest-resolve-27.0.6.tgz",
+-          "integrity": "sha512-yKmIgw2LgTh7uAJtzv8UFHGF7Dm7XfvOe/LQ3Txv101fLM8cx2h1QVwtSJ51Q/SCxpIiKfVn6G2jYYMDNHZteA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-resolve/-/jest-resolve-27.1.0.tgz",
++          "integrity": "sha512-TXvzrLyPg0vLOwcWX38ZGYeEztSEmW+cQQKqc4HKDUwun31wsBXwotRlUz4/AYU/Fq4GhbMd/ileIWZEtcdmIA==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "chalk": "^4.0.0",
+             "escalade": "^3.1.1",
+             "graceful-fs": "^4.2.4",
++            "jest-haste-map": "^27.1.0",
+             "jest-pnp-resolver": "^1.2.2",
+-            "jest-util": "^27.0.6",
+-            "jest-validate": "^27.0.6",
++            "jest-util": "^27.1.0",
++            "jest-validate": "^27.1.0",
+             "resolve": "^1.20.0",
+             "slash": "^3.0.0"
+           }
+         },
+         "jest-runtime": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-runtime/-/jest-runtime-27.0.6.tgz",
+-          "integrity": "sha512-BhvHLRVfKibYyqqEFkybsznKwhrsu7AWx2F3y9G9L95VSIN3/ZZ9vBpm/XCS2bS+BWz3sSeNGLzI3TVQ0uL85Q==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-runtime/-/jest-runtime-27.1.0.tgz",
++          "integrity": "sha512-okiR2cpGjY0RkWmUGGado6ETpFOi9oG3yV0CioYdoktkVxy5Hv0WRLWnJFuArSYS8cHMCNcceUUMGiIfgxCO9A==",
+           "dev": true,
+           "requires": {
+-            "@jest/console": "^27.0.6",
+-            "@jest/environment": "^27.0.6",
+-            "@jest/fake-timers": "^27.0.6",
+-            "@jest/globals": "^27.0.6",
++            "@jest/console": "^27.1.0",
++            "@jest/environment": "^27.1.0",
++            "@jest/fake-timers": "^27.1.0",
++            "@jest/globals": "^27.1.0",
+             "@jest/source-map": "^27.0.6",
+-            "@jest/test-result": "^27.0.6",
+-            "@jest/transform": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/test-result": "^27.1.0",
++            "@jest/transform": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/yargs": "^16.0.0",
+             "chalk": "^4.0.0",
+             "cjs-module-lexer": "^1.0.0",
+             "collect-v8-coverage": "^1.0.0",
++            "execa": "^5.0.0",
+             "exit": "^0.1.2",
+             "glob": "^7.1.3",
+             "graceful-fs": "^4.2.4",
+-            "jest-haste-map": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
+-            "jest-mock": "^27.0.6",
++            "jest-haste-map": "^27.1.0",
++            "jest-message-util": "^27.1.0",
++            "jest-mock": "^27.1.0",
+             "jest-regex-util": "^27.0.6",
+-            "jest-resolve": "^27.0.6",
+-            "jest-snapshot": "^27.0.6",
+-            "jest-util": "^27.0.6",
+-            "jest-validate": "^27.0.6",
++            "jest-resolve": "^27.1.0",
++            "jest-snapshot": "^27.1.0",
++            "jest-util": "^27.1.0",
++            "jest-validate": "^27.1.0",
+             "slash": "^3.0.0",
+             "strip-bom": "^4.0.0",
+             "yargs": "^16.0.3"
+@@ -15307,9 +15194,9 @@
+           }
+         },
+         "jest-snapshot": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-snapshot/-/jest-snapshot-27.0.6.tgz",
+-          "integrity": "sha512-NTHaz8He+ATUagUgE7C/UtFcRoHqR2Gc+KDfhQIyx+VFgwbeEMjeP+ILpUTLosZn/ZtbNdCF5LkVnN/l+V751A==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-snapshot/-/jest-snapshot-27.1.0.tgz",
++          "integrity": "sha512-eaeUBoEjuuRwmiRI51oTldUsKOohB1F6fPqWKKILuDi/CStxzp2IWekVUXbuHHoz5ik33ioJhshiHpgPFbYgcA==",
+           "dev": true,
+           "requires": {
+             "@babel/core": "^7.7.2",
+@@ -15318,33 +15205,33 @@
+             "@babel/plugin-syntax-typescript": "^7.7.2",
+             "@babel/traverse": "^7.7.2",
+             "@babel/types": "^7.0.0",
+-            "@jest/transform": "^27.0.6",
+-            "@jest/types": "^27.0.6",
++            "@jest/transform": "^27.1.0",
++            "@jest/types": "^27.1.0",
+             "@types/babel__traverse": "^7.0.4",
+             "@types/prettier": "^2.1.5",
+             "babel-preset-current-node-syntax": "^1.0.0",
+             "chalk": "^4.0.0",
+-            "expect": "^27.0.6",
++            "expect": "^27.1.0",
+             "graceful-fs": "^4.2.4",
+-            "jest-diff": "^27.0.6",
++            "jest-diff": "^27.1.0",
+             "jest-get-type": "^27.0.6",
+-            "jest-haste-map": "^27.0.6",
+-            "jest-matcher-utils": "^27.0.6",
+-            "jest-message-util": "^27.0.6",
+-            "jest-resolve": "^27.0.6",
+-            "jest-util": "^27.0.6",
++            "jest-haste-map": "^27.1.0",
++            "jest-matcher-utils": "^27.1.0",
++            "jest-message-util": "^27.1.0",
++            "jest-resolve": "^27.1.0",
++            "jest-util": "^27.1.0",
+             "natural-compare": "^1.4.0",
+-            "pretty-format": "^27.0.6",
++            "pretty-format": "^27.1.0",
+             "semver": "^7.3.2"
+           }
+         },
+         "jest-util": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-util/-/jest-util-27.0.6.tgz",
+-          "integrity": "sha512-1JjlaIh+C65H/F7D11GNkGDDZtDfMEM8EBXsvd+l/cxtgQ6QhxuloOaiayt89DxUvDarbVhqI98HhgrM1yliFQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-util/-/jest-util-27.1.0.tgz",
++          "integrity": "sha512-edSLD2OneYDKC6gZM1yc+wY/877s/fuJNoM1k3sOEpzFyeptSmke3SLnk1dDHk9CgTA+58mnfx3ew3J11Kes/w==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "@types/node": "*",
+             "chalk": "^4.0.0",
+             "graceful-fs": "^4.2.4",
+@@ -15353,23 +15240,23 @@
+           }
+         },
+         "jest-validate": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-validate/-/jest-validate-27.0.6.tgz",
+-          "integrity": "sha512-yhZZOaMH3Zg6DC83n60pLmdU1DQE46DW+KLozPiPbSbPhlXXaiUTDlhHQhHFpaqIFRrInko1FHXjTRpjWRuWfA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-validate/-/jest-validate-27.1.0.tgz",
++          "integrity": "sha512-QiJ+4XuSuMsfPi9zvdO//IrSRSlG6ybJhOpuqYSsuuaABaNT84h0IoD6vvQhThBOKT+DIKvl5sTM0l6is9+SRA==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "camelcase": "^6.2.0",
+             "chalk": "^4.0.0",
+             "jest-get-type": "^27.0.6",
+             "leven": "^3.1.0",
+-            "pretty-format": "^27.0.6"
++            "pretty-format": "^27.1.0"
+           }
+         },
+         "jest-worker": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/jest-worker/-/jest-worker-27.0.6.tgz",
+-          "integrity": "sha512-qupxcj/dRuA3xHPMUd40gr2EaAurFbkwzOh7wfPaeE9id7hyjURRQoqNfHifHK3XjJU6YJJUQKILGUnwGPEOCA==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/jest-worker/-/jest-worker-27.1.0.tgz",
++          "integrity": "sha512-mO4PHb2QWLn9yRXGp7rkvXLAYuxwhq1ZYUo0LoDhg8wqvv4QizP1ZWEJOeolgbEgAWZLIEU0wsku8J+lGWfBhg==",
+           "dev": true,
+           "requires": {
+             "@types/node": "*",
+@@ -15388,15 +15275,6 @@
+             }
+           }
+         },
+-        "lru-cache": {
+-          "version": "6.0.0",
+-          "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-6.0.0.tgz",
+-          "integrity": "sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==",
+-          "dev": true,
+-          "requires": {
+-            "yallist": "^4.0.0"
+-          }
+-        },
+         "micromatch": {
+           "version": "4.0.4",
+           "resolved": "https://registry.npmjs.org/micromatch/-/micromatch-4.0.4.tgz",
+@@ -15407,13 +15285,28 @@
+             "picomatch": "^2.2.3"
+           }
+         },
++        "npm-run-path": {
++          "version": "4.0.1",
++          "resolved": "https://registry.npmjs.org/npm-run-path/-/npm-run-path-4.0.1.tgz",
++          "integrity": "sha512-S48WzZW777zhNIrn7gxOlISNAqi9ZC/uQFnRdbeIHhZhCA6UqpkOT8T1G7BvfdgP4Er8gF4sUbaS0i7QvIfCWw==",
++          "dev": true,
++          "requires": {
++            "path-key": "^3.0.0"
++          }
++        },
++        "path-key": {
++          "version": "3.1.1",
++          "resolved": "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
++          "integrity": "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q==",
++          "dev": true
++        },
+         "pretty-format": {
+-          "version": "27.0.6",
+-          "resolved": "https://registry.npmjs.org/pretty-format/-/pretty-format-27.0.6.tgz",
+-          "integrity": "sha512-8tGD7gBIENgzqA+UBzObyWqQ5B778VIFZA/S66cclyd5YkFLYs2Js7gxDKf0MXtTc9zcS7t1xhdfcElJ3YIvkQ==",
++          "version": "27.1.0",
++          "resolved": "https://registry.npmjs.org/pretty-format/-/pretty-format-27.1.0.tgz",
++          "integrity": "sha512-4aGaud3w3rxAO6OXmK3fwBFQ0bctIOG3/if+jYEFGNGIs0EvuidQm3bZ9mlP2/t9epLNC/12czabfy7TZNSwVA==",
+           "dev": true,
+           "requires": {
+-            "@jest/types": "^27.0.6",
++            "@jest/types": "^27.1.0",
+             "ansi-regex": "^5.0.0",
+             "ansi-styles": "^5.0.0",
+             "react-is": "^17.0.1"
+@@ -15442,36 +15335,33 @@
+             "lru-cache": "^6.0.0"
+           }
+         },
++        "shebang-command": {
++          "version": "2.0.0",
++          "resolved": "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
++          "integrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
++          "dev": true,
++          "requires": {
++            "shebang-regex": "^3.0.0"
++          }
++        },
++        "shebang-regex": {
++          "version": "3.0.0",
++          "resolved": "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
++          "integrity": "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==",
++          "dev": true
++        },
+         "slash": {
+           "version": "3.0.0",
+           "resolved": "https://registry.npmjs.org/slash/-/slash-3.0.0.tgz",
+           "integrity": "sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==",
+           "dev": true
+         },
+-        "strip-ansi": {
+-          "version": "6.0.0",
+-          "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.0.tgz",
+-          "integrity": "sha512-AuvKTrTfQNYNIctbR1K/YGTR1756GycPsg7b9bdV9Duqur4gv6aKqHXah67Z8ImS7WEz5QVcOtlfW2rZEugt6w==",
+-          "dev": true,
+-          "requires": {
+-            "ansi-regex": "^5.0.0"
+-          }
+-        },
+         "strip-bom": {
+           "version": "4.0.0",
+           "resolved": "https://registry.npmjs.org/strip-bom/-/strip-bom-4.0.0.tgz",
+           "integrity": "sha512-3xurFv5tEgii33Zi8Jtp55wEIILR9eh34FAW00PZf+JnSsTmV/ioewSgQl97JHvgjoRGwPShsWm+IdrxB35d0w==",
+           "dev": true
+         },
+-        "supports-color": {
+-          "version": "7.2.0",
+-          "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-7.2.0.tgz",
+-          "integrity": "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==",
+-          "dev": true,
+-          "requires": {
+-            "has-flag": "^4.0.0"
+-          }
+-        },
+         "throat": {
+           "version": "6.0.1",
+           "resolved": "https://registry.npmjs.org/throat/-/throat-6.0.1.tgz",
+@@ -15487,49 +15377,14 @@
+             "is-number": "^7.0.0"
+           }
+         },
+-        "wrap-ansi": {
+-          "version": "7.0.0",
+-          "resolved": "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz",
+-          "integrity": "sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==",
+-          "dev": true,
+-          "requires": {
+-            "ansi-styles": "^4.0.0",
+-            "string-width": "^4.1.0",
+-            "strip-ansi": "^6.0.0"
+-          }
+-        },
+-        "y18n": {
+-          "version": "5.0.8",
+-          "resolved": "https://registry.npmjs.org/y18n/-/y18n-5.0.8.tgz",
+-          "integrity": "sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==",
+-          "dev": true
+-        },
+-        "yallist": {
+-          "version": "4.0.0",
+-          "resolved": "https://registry.npmjs.org/yallist/-/yallist-4.0.0.tgz",
+-          "integrity": "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==",
+-          "dev": true
+-        },
+-        "yargs": {
+-          "version": "16.2.0",
+-          "resolved": "https://registry.npmjs.org/yargs/-/yargs-16.2.0.tgz",
+-          "integrity": "sha512-D1mvvtDG0L5ft/jGWkLpG1+m0eQxOfaBvTNELraWj22wSVUMWxZUvYgJYcKh6jGGIkJFhH4IZPQhR4TKpc8mBw==",
++        "which": {
++          "version": "2.0.2",
++          "resolved": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
++          "integrity": "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==",
+           "dev": true,
+           "requires": {
+-            "cliui": "^7.0.2",
+-            "escalade": "^3.1.1",
+-            "get-caller-file": "^2.0.5",
+-            "require-directory": "^2.1.1",
+-            "string-width": "^4.2.0",
+-            "y18n": "^5.0.5",
+-            "yargs-parser": "^20.2.2"
++            "isexe": "^2.0.0"
+           }
+-        },
+-        "yargs-parser": {
+-          "version": "20.2.9",
+-          "resolved": "https://registry.npmjs.org/yargs-parser/-/yargs-parser-20.2.9.tgz",
+-          "integrity": "sha512-y11nGElTIV+CT3Zv9t7VKl+Q3hTQoT9a1Qzezhhl6Rp21gJ/IVTW7Z3y9EWXhuUBC2Shnf+DX0antecpAwSP8w==",
+-          "dev": true
+         }
+       }
+     },
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index d40d28f..8fc8327 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -9,7 +9,6 @@ import { Info } from '@edx/paragon/icons';
+ 
+ import messages from './messages';
+ import AccessExpirationAlertMMP2P from './AccessExpirationAlertMMP2P';
+-import AccessExpirationAlertMasquerade from './AccessExpirationAlertMasquerade';
+ 
+ function AccessExpirationAlert({ intl, payload }) {
+   /** [MM-P2P] Experiment */
+@@ -36,17 +35,10 @@ function AccessExpirationAlert({ intl, payload }) {
+ 
+   const {
+     expirationDate,
+-    masqueradingExpiredCourse,
+     upgradeDeadline,
+     upgradeUrl,
+   } = accessExpiration;
+ 
+-  if (masqueradingExpiredCourse) {
+-    return (
+-      <AccessExpirationAlertMasquerade payload={payload} />
+-    );
+-  }
+-
+   /** [MM-P2P] Experiment */
+   if (showMMP2P) {
+     return (
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
+deleted file mode 100644
+index a71df84..0000000
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
++++ /dev/null
+@@ -1,60 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { FormattedMessage, FormattedDate } from '@edx/frontend-platform/i18n';
+-import { Alert } from '@edx/paragon';
+-import { Info } from '@edx/paragon/icons';
+-
+-function AccessExpirationAlertMasquerade({ payload }) {
+-  const {
+-    accessExpiration,
+-    userTimezone,
+-  } = payload;
+-
+-  if (!accessExpiration) {
+-    return null;
+-  }
+-
+-  const {
+-    expirationDate,
+-    masqueradingExpiredCourse,
+-  } = accessExpiration;
+-
+-  if (!masqueradingExpiredCourse) {
+-    return null;
+-  }
+-
+-  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+-
+-  return (
+-    <Alert variant="info" icon={Info}>
+-      <FormattedMessage
+-        id="learning.accessExpiration.expired"
+-        defaultMessage="This learner does not have access to this course. Their access expired on {date}."
+-        values={{
+-          date: (
+-            <FormattedDate
+-              key="accessExpirationExpiredDate"
+-              day="numeric"
+-              month="short"
+-              year="numeric"
+-              value={expirationDate}
+-              {...timezoneFormatArgs}
+-            />
+-          ),
+-        }}
+-      />
+-    </Alert>
+-  );
+-}
+-
+-AccessExpirationAlertMasquerade.propTypes = {
+-  payload: PropTypes.shape({
+-    accessExpiration: PropTypes.shape({
+-      expirationDate: PropTypes.string.isRequired,
+-      masqueradingExpiredCourse: PropTypes.bool.isRequired,
+-    }).isRequired,
+-    userTimezone: PropTypes.string.isRequired,
+-  }).isRequired,
+-};
+-
+-export default AccessExpirationAlertMasquerade;
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx b/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
+new file mode 100644
+index 0000000..3e64c07
+--- /dev/null
++++ b/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
+@@ -0,0 +1,38 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FormattedMessage, FormattedDate } from '@edx/frontend-platform/i18n';
++import { PageBanner } from '@edx/paragon';
++
++function AccessExpirationMasqueradeBanner({ payload }) {
++  const {
++    expirationDate,
++    userTimezone,
++  } = payload;
++
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  return (
++    <PageBanner variant="warning">
++      <FormattedMessage
++        id="instructorToolbar.pageBanner.courseHasExpired"
++        defaultMessage="This learner no longer has access to this course. Their access expired on {date}."
++        values={{
++          date: <FormattedDate
++            key="instructorToolbar.pageBanner.accessExpirationDate"
++            value={expirationDate}
++            {...timezoneFormatArgs}
++          />,
++        }}
++      />
++    </PageBanner>
++  );
++}
++
++AccessExpirationMasqueradeBanner.propTypes = {
++  payload: PropTypes.shape({
++    expirationDate: PropTypes.string.isRequired,
++    userTimezone: PropTypes.string.isRequired,
++  }).isRequired,
++};
++
++export default AccessExpirationMasqueradeBanner;
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+index d650f02..3dfebc6 100644
+--- a/src/alerts/access-expiration-alert/hooks.js
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -1,11 +1,12 @@
+ import React, { useMemo } from 'react';
+ import { useAlert } from '../../generic/user-messages';
++import { useModel } from '../../generic/model-store';
+ 
+ const AccessExpirationAlert = React.lazy(() => import('./AccessExpirationAlert'));
+-const AccessExpirationAlertMasquerade = React.lazy(() => import('./AccessExpirationAlertMasquerade'));
++const AccessExpirationMasqueradeBanner = React.lazy(() => import('./AccessExpirationMasqueradeBanner'));
+ 
+ function useAccessExpirationAlert(accessExpiration, courseId, org, userTimezone, topic, analyticsPageName) {
+-  const isVisible = !!accessExpiration; // If it exists, show it.
++  const isVisible = accessExpiration && !accessExpiration.masqueradingExpiredCourse; // If it exists, show it.
+   const payload = {
+     accessExpiration,
+     courseId,
+@@ -23,20 +24,28 @@ function useAccessExpirationAlert(accessExpiration, courseId, org, userTimezone,
+   return { clientAccessExpirationAlert: AccessExpirationAlert };
+ }
+ 
+-export function useAccessExpirationAlertMasquerade(accessExpiration, userTimezone, topic) {
+-  const isVisible = !!accessExpiration; // If it exists, show it.
+-  const payload = {
++export function useAccessExpirationMasqueradeBanner(courseId, tab) {
++  const {
++    userTimezone,
++  } = useModel('courseHomeMeta', courseId);
++  const {
+     accessExpiration,
++  } = useModel(tab, courseId);
++
++  const isVisible = accessExpiration && accessExpiration.masqueradingExpiredCourse;
++  const expirationDate = accessExpiration && accessExpiration.expirationDate;
++  const payload = {
++    expirationDate,
+     userTimezone,
+   };
+ 
+   useAlert(isVisible, {
+-    code: 'clientAccessExpirationAlertMasquerade',
++    code: 'clientAccessExpirationMasqueradeBanner',
+     payload: useMemo(() => payload, Object.values(payload).sort()),
+-    topic,
++    topic: 'instructor-toolbar-alerts',
+   });
+ 
+-  return { clientAccessExpirationAlertMasquerade: AccessExpirationAlertMasquerade };
++  return { clientAccessExpirationMasqueradeBanner: AccessExpirationMasqueradeBanner };
+ }
+ 
+ export default useAccessExpirationAlert;
+diff --git a/src/alerts/access-expiration-alert/index.js b/src/alerts/access-expiration-alert/index.js
+index 3b93c9f..0126bb4 100644
+--- a/src/alerts/access-expiration-alert/index.js
++++ b/src/alerts/access-expiration-alert/index.js
+@@ -1 +1 @@
+-export { default, useAccessExpirationAlertMasquerade } from './hooks';
++export { default, useAccessExpirationMasqueradeBanner } from './hooks';
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx b/src/alerts/course-start-alert/CourseStartAlert.jsx
+similarity index 93%
+rename from src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+rename to src/alerts/course-start-alert/CourseStartAlert.jsx
+index 5304d5f..036676f 100644
+--- a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
++++ b/src/alerts/course-start-alert/CourseStartAlert.jsx
+@@ -9,14 +9,20 @@ import {
+ import { Alert } from '@edx/paragon';
+ import { Info } from '@edx/paragon/icons';
+ 
++import { useModel } from '../../generic/model-store';
++
+ const DAY_MS = 24 * 60 * 60 * 1000; // in ms
+ 
+ function CourseStartAlert({ payload }) {
+   const {
+-    startDate,
+-    userTimezone,
++    courseId,
+   } = payload;
+ 
++  const {
++    start: startDate,
++    userTimezone,
++  } = useModel('courseHomeMeta', courseId);
++
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+   const timeRemaining = (
+@@ -87,8 +93,7 @@ function CourseStartAlert({ payload }) {
+ 
+ CourseStartAlert.propTypes = {
+   payload: PropTypes.shape({
+-    startDate: PropTypes.string,
+-    userTimezone: PropTypes.string,
++    courseId: PropTypes.string,
+   }).isRequired,
+ };
+ 
+diff --git a/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx b/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
+new file mode 100644
+index 0000000..deb2277
+--- /dev/null
++++ b/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
+@@ -0,0 +1,43 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FormattedMessage, FormattedDate } from '@edx/frontend-platform/i18n';
++import { PageBanner } from '@edx/paragon';
++
++import { useModel } from '../../generic/model-store';
++
++function CourseStartMasqueradeBanner({ payload }) {
++  const {
++    courseId,
++  } = payload;
++
++  const {
++    start,
++    userTimezone,
++  } = useModel('courseHomeMeta', courseId);
++
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  return (
++    <PageBanner variant="warning">
++      <FormattedMessage
++        id="instructorToolbar.pageBanner.courseHasNotStarted"
++        defaultMessage="This learner does not yet have access to this course. The course starts on {date}."
++        values={{
++          date: <FormattedDate
++            key="instructorToolbar.pageBanner.courseStartDate"
++            value={start}
++            {...timezoneFormatArgs}
++          />,
++        }}
++      />
++    </PageBanner>
++  );
++}
++
++CourseStartMasqueradeBanner.propTypes = {
++  payload: PropTypes.shape({
++    courseId: PropTypes.string.isRequired,
++  }).isRequired,
++};
++
++export default CourseStartMasqueradeBanner;
+diff --git a/src/alerts/course-start-alert/hooks.js b/src/alerts/course-start-alert/hooks.js
+new file mode 100644
+index 0000000..f8ab567
+--- /dev/null
++++ b/src/alerts/course-start-alert/hooks.js
+@@ -0,0 +1,62 @@
++import React, { useMemo } from 'react';
++import { useAlert } from '../../generic/user-messages';
++import { useModel } from '../../generic/model-store';
++
++const CourseStartAlert = React.lazy(() => import('./CourseStartAlert'));
++const CourseStartMasqueradeBanner = React.lazy(() => import('./CourseStartMasqueradeBanner'));
++
++function isStartDateInFuture(courseId) {
++  const {
++    start,
++  } = useModel('courseHomeMeta', courseId);
++
++  const today = new Date();
++  const startDate = new Date(start);
++  return startDate > today;
++}
++
++function useCourseStartAlert(courseId) {
++  const {
++    isEnrolled,
++  } = useModel('courseHomeMeta', courseId);
++
++  const isVisible = isEnrolled && isStartDateInFuture(courseId);
++
++  const payload = {
++    courseId,
++  };
++
++  useAlert(isVisible, {
++    code: 'clientCourseStartAlert',
++    payload: useMemo(() => payload, Object.values(payload).sort()),
++    topic: 'outline-course-alerts',
++  });
++
++  return {
++    clientCourseStartAlert: CourseStartAlert,
++  };
++}
++
++export function useCourseStartMasqueradeBanner(courseId, tab) {
++  const {
++    isMasquerading,
++  } = useModel('courseHomeMeta', courseId);
++
++  const isVisible = isMasquerading && tab === 'progress' && isStartDateInFuture(courseId);
++
++  const payload = {
++    courseId,
++  };
++
++  useAlert(isVisible, {
++    code: 'clientCourseStartMasqueradeBanner',
++    payload: useMemo(() => payload, Object.values(payload).sort()),
++    topic: 'instructor-toolbar-alerts',
++  });
++
++  return {
++    clientCourseStartMasqueradeBanner: CourseStartMasqueradeBanner,
++  };
++}
++
++export default useCourseStartAlert;
+diff --git a/src/alerts/course-start-alert/index.js b/src/alerts/course-start-alert/index.js
+new file mode 100644
+index 0000000..bc3250b
+--- /dev/null
++++ b/src/alerts/course-start-alert/index.js
+@@ -0,0 +1 @@
++export { default, useCourseStartMasqueradeBanner } from './hooks';
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 43539ca..f6fe95b 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -19,4 +19,5 @@ Factory.define('courseHomeMetadata')
+       user_message: null,
+     },
+     start: '2013-02-05T05:00:00Z',
++    user_timezone: 'UTC',
+   });
+diff --git a/src/course-home/data/__factories__/datesTabData.factory.js b/src/course-home/data/__factories__/datesTabData.factory.js
+index fe35a51..9ece9a2 100644
+--- a/src/course-home/data/__factories__/datesTabData.factory.js
++++ b/src/course-home/data/__factories__/datesTabData.factory.js
+@@ -219,5 +219,4 @@ Factory.define('datesTabData')
+     ],
+     has_ended: false,
+     learner_is_full_access: true,
+-    user_timezone: 'America/New_York',
+   });
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 132ba42..ee50116 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -14,7 +14,6 @@ Factory.define('outlineTabData')
+   })
+   .attr('dates_widget', ['date_blocks'], (dateBlocks) => ({
+     course_date_blocks: dateBlocks,
+-    user_timezone: 'UTC',
+   }))
+   .attr('resume_course', ['host', 'courseId'], (host, courseId) => ({
+     has_visited_course: false,
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+index ab21a13..aa555ed 100644
+--- a/src/course-home/data/__factories__/progressTabData.factory.js
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -4,6 +4,7 @@ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dep
+ // This set of data may not be realistic, but it is intended to demonstrate many UI results.
+ Factory.define('progressTabData')
+   .attrs({
++    access_expiration: null,
+     end: '3027-03-31T00:00:00Z',
+     certificate_data: {},
+     completion_summary: {
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 590239a..a8c9a75 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -32,6 +32,7 @@ Object {
+         },
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "isEnrolled": false,
++        "isMasquerading": false,
+         "isSelfPaced": false,
+         "isStaff": false,
+         "number": "DemoX",
+@@ -71,6 +72,7 @@ Object {
+           },
+         ],
+         "title": "Demonstration Course",
++        "userTimezone": "UTC",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+@@ -295,7 +297,6 @@ Object {
+         "hasEnded": false,
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "learnerIsFullAccess": true,
+-        "userTimezone": "America/New_York",
+       },
+     },
+   },
+@@ -337,6 +338,7 @@ Object {
+         },
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "isEnrolled": false,
++        "isMasquerading": false,
+         "isSelfPaced": false,
+         "isStaff": false,
+         "number": "DemoX",
+@@ -376,6 +378,7 @@ Object {
+           },
+         ],
+         "title": "Demonstration Course",
++        "userTimezone": "UTC",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+@@ -450,7 +453,6 @@ Object {
+         },
+         "datesWidget": Object {
+           "courseDateBlocks": Array [],
+-          "userTimezone": "UTC",
+         },
+         "enrollAlert": Object {
+           "canEnroll": true,
+@@ -518,6 +520,7 @@ Object {
+         },
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "isEnrolled": false,
++        "isMasquerading": false,
+         "isSelfPaced": false,
+         "isStaff": false,
+         "number": "DemoX",
+@@ -557,6 +560,7 @@ Object {
+           },
+         ],
+         "title": "Demonstration Course",
++        "userTimezone": "UTC",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+@@ -566,6 +570,7 @@ Object {
+     },
+     "progress": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "accessExpiration": null,
+         "certificateData": Object {},
+         "completionSummary": Object {
+           "completeCount": 1,
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 8c56df3..6680b42 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -98,6 +98,7 @@ function normalizeCourseHomeCourseMetadata(metadata) {
+       title: tab.title,
+       url: tab.url,
+     })),
++    isMasquerading: data.originalUserIsStaff && !data.isStaff,
+   };
+ }
+ 
+diff --git a/src/course-home/data/pact-tests/lmsPact.test.jsx b/src/course-home/data/pact-tests/lmsPact.test.jsx
+index 3563444..205c920 100644
+--- a/src/course-home/data/pact-tests/lmsPact.test.jsx
++++ b/src/course-home/data/pact-tests/lmsPact.test.jsx
+@@ -122,6 +122,7 @@ describe('Course Home Service', () => {
+         },
+         courseId: 'course-v1:edX+DemoX+Demo_Course',
+         isEnrolled: true,
++        isMasquerading: false,
+         isSelfPaced: false,
+         isStaff: true,
+         number: 'DemoX',
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index 46dd49d..d9c00dd 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -43,7 +43,7 @@ describe('DatesTab', () => {
+   });
+ 
+   const datesTabData = Factory.build('datesTabData');
+-  let courseMetadata = Factory.build('courseHomeMetadata');
++  let courseMetadata = Factory.build('courseHomeMetadata', { user_timezone: 'America/New_York' });
+   const { id: courseId } = courseMetadata;
+ 
+   const datesUrl = `${getConfig().LMS_BASE_URL}/api/course_home/dates/${courseId}`;
+diff --git a/src/course-home/dates-tab/timeline/Day.jsx b/src/course-home/dates-tab/timeline/Day.jsx
+index 83ef53b..c68080b 100644
+--- a/src/course-home/dates-tab/timeline/Day.jsx
++++ b/src/course-home/dates-tab/timeline/Day.jsx
+@@ -29,10 +29,10 @@ function Day({
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+-
+   const {
+     userTimezone,
+-  } = useModel('dates', courseId);
++  } = useModel('courseHomeMeta', courseId);
++
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+   const { color, badges } = getBadgeListAndColor(date, intl, null, items);
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 3b14199..1d70631 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -17,11 +17,10 @@ import Section from './Section';
+ import ShiftDatesAlert from '../suggested-schedule-messaging/ShiftDatesAlert';
+ import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+ import UpgradeNotification from '../../generic/upgrade-notification/UpgradeNotification';
+-import { useAccessExpirationAlertMasquerade } from '../../alerts/access-expiration-alert';
+ import UpgradeToShiftDatesAlert from '../suggested-schedule-messaging/UpgradeToShiftDatesAlert';
+ import useCertificateAvailableAlert from './alerts/certificate-status-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+-import useCourseStartAlert from './alerts/course-start-alert';
++import useCourseStartAlert from '../../alerts/course-start-alert';
+ import usePrivateCourseAlert from './alerts/private-course-alert';
+ import useScheduledContentAlert from './alerts/scheduled-content-alert';
+ import { useModel } from '../../generic/model-store';
+@@ -42,6 +41,7 @@ function OutlineTab({ intl }) {
+     org,
+     title,
+     username,
++    userTimezone,
+   } = useModel('courseHomeMeta', courseId);
+ 
+   const {
+@@ -57,7 +57,6 @@ function OutlineTab({ intl }) {
+     datesBannerInfo,
+     datesWidget: {
+       courseDateBlocks,
+-      userTimezone,
+     },
+     resumeCourse: {
+       hasVisitedCourse,
+@@ -86,7 +85,6 @@ function OutlineTab({ intl }) {
+   };
+ 
+   // Below the course title alerts (appearing in the order listed here)
+-  const accessExpirationAlertMasquerade = useAccessExpirationAlertMasquerade(accessExpiration, userTimezone, 'outline-course-alerts');
+   const courseStartAlert = useCourseStartAlert(courseId);
+   const courseEndAlert = useCourseEndAlert(courseId);
+   const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
+@@ -150,7 +148,6 @@ function OutlineTab({ intl }) {
+               topic="outline-course-alerts"
+               className="mb-3"
+               customAlerts={{
+-                ...accessExpirationAlertMasquerade,
+                 ...certificateAvailableAlert,
+                 ...courseEndAlert,
+                 ...courseStartAlert,
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 1fb00eb..98a31da 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -16,6 +16,7 @@ import * as thunks from '../data/thunks';
+ import initializeStore from '../../store';
+ import { CERT_STATUS_TYPE } from './alerts/certificate-status-alert/CertificateStatusAlert';
+ import OutlineTab from './OutlineTab';
++import LoadedTabPage from '../../tab-page/LoadedTabPage';
+ 
+ initializeMockApp();
+ jest.mock('@edx/frontend-platform/analytics');
+@@ -28,6 +29,7 @@ describe('Outline Tab', () => {
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+   const enrollmentUrl = `${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`;
+   const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
++  const masqueradeUrl = `${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`;
+   const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+   const proctoringInfoUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=${encodeURIComponent(courseId)}`;
+ 
+@@ -57,6 +59,7 @@ describe('Outline Tab', () => {
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
+     axiosMock.onPost(enrollmentUrl).reply(200, {});
+     axiosMock.onPost(goalUrl).reply(200, { header: 'Success' });
++    axiosMock.onGet(masqueradeUrl).reply(200, { success: true });
+     axiosMock.onGet(outlineUrl).reply(200, defaultTabData);
+     axiosMock.onGet(proctoringInfoUrl).reply(200, {
+       onboarding_status: 'created',
+@@ -492,32 +495,35 @@ describe('Outline Tab', () => {
+     });
+ 
+     describe('Access Expiration Alert', () => {
+-      it('has special masquerade text', async () => {
++      it('renders page banner on masquerade', async () => {
++        setMetadata({ is_enrolled: true, original_user_is_staff: true });
+         setTabData({
+           access_expiration: {
+             expiration_date: '2020-01-01T12:00:00Z',
+             masquerading_expired_course: true,
+-            upgrade_deadline: null,
+-            upgrade_url: null,
+           },
+         });
+-        await fetchAndRender();
+-        const check = await screen.queryByText('This learner does not have access to this course.', { exact: false });
+-        expect(check).toBeInTheDocument();
++        await executeThunk(thunks.fetchOutlineTab(courseId), store.dispatch);
++        await act(async () => render(<LoadedTabPage courseId={courseId} activeTabSlug="outline">...</LoadedTabPage>, { store }));
++        const instructorToolbar = await screen.getByTestId('instructor-toolbar');
++        expect(instructorToolbar).toBeInTheDocument();
++        expect(screen.getByText('This learner no longer has access to this course. Their access expired on', { exact: false })).toBeInTheDocument();
++        expect(screen.getByText('1/1/2020')).toBeInTheDocument();
+       });
+ 
+-      it('does not have special masquerade text', async () => {
++      it('does not render banner when not masquerading', async () => {
++        setMetadata({ is_enrolled: true, original_user_is_staff: true });
+         setTabData({
+           access_expiration: {
+             expiration_date: '2020-01-01T12:00:00Z',
+             masquerading_expired_course: false,
+-            upgrade_deadline: null,
+-            upgrade_url: null,
+           },
+         });
+-        await fetchAndRender();
+-        const check = await screen.queryByText('This learner does not have access to this course.', { exact: false });
+-        expect(check).not.toBeInTheDocument();
++        await executeThunk(thunks.fetchOutlineTab(courseId), store.dispatch);
++        await act(async () => render(<LoadedTabPage courseId={courseId} activeTabSlug="outline">...</LoadedTabPage>, { store }));
++        const instructorToolbar = await screen.getByTestId('instructor-toolbar');
++        expect(instructorToolbar).toBeInTheDocument();
++        expect(screen.queryByText('This learner no longer has access to this course. Their access expired on', { exact: false })).not.toBeInTheDocument();
+       });
+     });
+ 
+@@ -526,16 +532,7 @@ describe('Outline Tab', () => {
+       it('appears several days out', async () => {
+         const startDate = new Date();
+         startDate.setDate(startDate.getDate() + 100);
+-        setMetadata({ is_enrolled: true });
+-        setTabData({}, {
+-          date_blocks: [
+-            {
+-              date_type: 'course-start-date',
+-              date: startDate.toISOString(),
+-              title: 'Start',
+-            },
+-          ],
+-        });
++        setMetadata({ is_enrolled: true, start: '2999-01-01T00:00:00Z' });
+         await fetchAndRender();
+         const node = await screen.findByText('Course starts', { exact: false });
+         expect(node.textContent).toMatch(/.* on .*/); // several days away uses "on" before date
+@@ -544,16 +541,7 @@ describe('Outline Tab', () => {
+       it('appears today', async () => {
+         const startDate = new Date();
+         startDate.setHours(startDate.getHours() + 1);
+-        setMetadata({ is_enrolled: true });
+-        setTabData({}, {
+-          date_blocks: [
+-            {
+-              date_type: 'course-start-date',
+-              date: startDate.toISOString(),
+-              title: 'Start',
+-            },
+-          ],
+-        });
++        setMetadata({ is_enrolled: true, start: startDate });
+         await fetchAndRender();
+         const node = await screen.findByText('Course starts', { exact: false });
+         expect(node.textContent).toMatch(/.* at .*/); // same day uses "at" before date
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index 0aa5d5a..b0effb5 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -33,9 +33,7 @@ function SequenceLink({
+     title,
+   } = sequence;
+   const {
+-    datesWidget: {
+-      userTimezone,
+-    },
++    userTimezone,
+   } = useModel('outline', courseId);
+   const {
+     canLoadCourseware,
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+index 4564ff3..693a457 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+@@ -39,11 +39,11 @@ function useCertificateStatusAlert(courseId) {
+   const {
+     datesWidget: {
+       courseDateBlocks,
+-      userTimezone,
+     },
+     certData,
+     hasEnded,
+     userHasPassingGrade,
++    userTimezone,
+     enrollmentMode,
+   } = useModel('outline', courseId);
+ 
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/hooks.js b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+index 4423bad..c39e6da 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+@@ -15,8 +15,8 @@ export function useCourseEndAlert(courseId) {
+   const {
+     datesWidget: {
+       courseDateBlocks,
+-      userTimezone,
+     },
++    userTimezone,
+   } = useModel('outline', courseId);
+ 
+   const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/hooks.js b/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+deleted file mode 100644
+index 3d27531..0000000
+--- a/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
++++ /dev/null
+@@ -1,37 +0,0 @@
+-import React, { useMemo } from 'react';
+-import { useAlert } from '../../../../generic/user-messages';
+-import { useModel } from '../../../../generic/model-store';
+-
+-const CourseStartAlert = React.lazy(() => import('./CourseStartAlert'));
+-
+-function useCourseStartAlert(courseId) {
+-  const {
+-    isEnrolled,
+-  } = useModel('courseHomeMeta', courseId);
+-  const {
+-    datesWidget: {
+-      courseDateBlocks,
+-      userTimezone,
+-    },
+-  } = useModel('outline', courseId);
+-
+-  const startBlock = courseDateBlocks.find(b => b.dateType === 'course-start-date');
+-  const delta = startBlock ? new Date(startBlock.date) - new Date() : 0;
+-  const isVisible = isEnrolled && startBlock && delta > 0;
+-  const payload = {
+-    startDate: startBlock && startBlock.date,
+-    userTimezone,
+-  };
+-
+-  useAlert(isVisible, {
+-    code: 'clientCourseStartAlert',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
+-    topic: 'outline-course-alerts',
+-  });
+-
+-  return {
+-    clientCourseStartAlert: CourseStartAlert,
+-  };
+-}
+-
+-export default useCourseStartAlert;
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/index.js b/src/course-home/outline-tab/alerts/course-start-alert/index.js
+deleted file mode 100644
+index ed12eb0..0000000
+--- a/src/course-home/outline-tab/alerts/course-start-alert/index.js
++++ /dev/null
+@@ -1 +0,0 @@
+-export { default } from './hooks';
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index afc4aa7..e4e0fdc 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -13,11 +13,13 @@ function CourseDates({
+   /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
++  const {
++    userTimezone,
++  } = useModel('courseHomeMeta', courseId);
+   const {
+     datesWidget: {
+       courseDateBlocks,
+       datesTabLink,
+-      userTimezone,
+     },
+   } = useModel('outline', courseId);
+ 
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index bdcd8df..9bf7432 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -12,6 +12,7 @@ import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
+ import * as thunks from '../data/thunks';
+ import initializeStore from '../../store';
+ import ProgressTab from './ProgressTab';
++import LoadedTabPage from '../../tab-page/LoadedTabPage';
+ 
+ initializeMockApp();
+ jest.mock('@edx/frontend-platform/analytics');
+@@ -23,6 +24,7 @@ describe('Progress Tab', () => {
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+   const progressUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/course_home/progress/*`);
++  const masqueradeUrl = `${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`;
+ 
+   const store = initializeStore();
+   const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+@@ -49,6 +51,7 @@ describe('Progress Tab', () => {
+     // Set defaults for network requests
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
+     axiosMock.onGet(progressUrl).reply(200, defaultTabData);
++    axiosMock.onGet(masqueradeUrl).reply(200, { success: true });
+ 
+     logUnhandledRequests(axiosMock);
+   });
+@@ -1186,6 +1189,64 @@ describe('Progress Tab', () => {
+     });
+   });
+ 
++  describe('Access expiration masquerade banner', () => {
++    it('renders banner when masquerading as a user', async () => {
++      setMetadata({ is_enrolled: true, original_user_is_staff: true });
++      setTabData({
++        access_expiration: {
++          expiration_date: '2020-01-01T12:00:00Z',
++          masquerading_expired_course: true,
++        },
++      });
++      await executeThunk(thunks.fetchProgressTab(courseId), store.dispatch);
++      await act(async () => render(<LoadedTabPage courseId={courseId} activeTabSlug="progress">...</LoadedTabPage>, { store }));
++      expect(screen.getByTestId('instructor-toolbar')).toBeInTheDocument();
++      expect(screen.getByText('This learner no longer has access to this course. Their access expired on', { exact: false })).toBeInTheDocument();
++      expect(screen.getByText('1/1/2020')).toBeInTheDocument();
++    });
++    it('does not render banner when not masquerading', async () => {
++      setMetadata({ is_enrolled: true, original_user_is_staff: true });
++      setTabData({
++        access_expiration: {
++          expiration_date: '2020-01-01T12:00:00Z',
++          masquerading_expired_course: false,
++        },
++      });
++      await executeThunk(thunks.fetchProgressTab(courseId), store.dispatch);
++      await act(async () => render(<LoadedTabPage courseId={courseId} activeTabSlug="progress">...</LoadedTabPage>, { store }));
++      expect(screen.queryByText('This learner no longer has access to this course. Their access expired on', { exact: false })).not.toBeInTheDocument();
++      expect(screen.queryByText('1/1/2020')).not.toBeInTheDocument();
++    });
++  });
++
++  describe('Course start masquerade banner', () => {
++    it('renders banner when masquerading as a user', async () => {
++      setMetadata({
++        is_enrolled: true,
++        original_user_is_staff: true,
++        is_staff: false,
++        start: '2999-01-01T00:00:00Z',
++      });
++      await executeThunk(thunks.fetchProgressTab(courseId), store.dispatch);
++      await act(async () => render(<LoadedTabPage courseId={courseId} activeTabSlug="progress">...</LoadedTabPage>, { store }));
++      expect(screen.getByTestId('instructor-toolbar')).toBeInTheDocument();
++      expect(screen.getByText('This learner does not yet have access to this course. The course starts on', { exact: false })).toBeInTheDocument();
++      expect(screen.getByText('1/1/2999')).toBeInTheDocument();
++    });
++    it('does not render banner when not masquerading', async () => {
++      setMetadata({
++        is_enrolled: true,
++        original_user_is_staff: true,
++        is_staff: true,
++        start: '2999-01-01T00:00:00Z',
++      });
++      await executeThunk(thunks.fetchProgressTab(courseId), store.dispatch);
++      await act(async () => render(<LoadedTabPage courseId={courseId} activeTabSlug="progress">...</LoadedTabPage>, { store }));
++      expect(screen.queryByText('This learner does not yet have access to this course. The course starts on', { exact: false })).not.toBeInTheDocument();
++      expect(screen.queryByText('1/1/2999')).not.toBeInTheDocument();
++    });
++  });
++
+   describe('Viewing progress page of other students by changing url', () => {
+     it('Changing the url changes the header', async () => {
+       setMetadata({ is_enrolled: true });
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 797c622..81643d0 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -3,9 +3,11 @@ import PropTypes from 'prop-types';
+ import { useSelector } from 'react-redux';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+-import { ALERT_TYPES } from '../generic/user-messages';
++import { ALERT_TYPES, AlertList } from '../generic/user-messages';
+ import Alert from '../generic/user-messages/Alert';
+ import MasqueradeWidget from './masquerade-widget';
++import { useAccessExpirationMasqueradeBanner } from '../alerts/access-expiration-alert';
++import { useCourseStartMasqueradeBanner } from '../alerts/course-start-alert';
+ 
+ function getInsightsUrl(courseId) {
+   const urlBase = getConfig().INSIGHTS_BASE_URL;
+@@ -54,7 +56,9 @@ export default function InstructorToolbar(props) {
+     courseId,
+     unitId,
+     canViewLegacyCourseware,
++    tab,
+   } = props;
++
+   const urlInsights = getInsightsUrl(courseId);
+   const urlLegacy = useSelector((state) => {
+     if (!canViewLegacyCourseware) {
+@@ -71,8 +75,11 @@ export default function InstructorToolbar(props) {
+   const urlStudio = getStudioUrl(courseId, unitId);
+   const [masqueradeErrorMessage, showMasqueradeError] = useState(null);
+ 
++  const accessExpirationMasqueradeBanner = useAccessExpirationMasqueradeBanner(courseId, tab);
++  const courseStartDateMasqueradeBanner = useCourseStartMasqueradeBanner(courseId, tab);
++
+   return (!didMount ? null : (
+-    <div>
++    <div data-testid="instructor-toolbar">
+       <div className="bg-primary text-white">
+         <div className="container-xl py-3 d-md-flex justify-content-end align-items-start">
+           <div className="align-items-center flex-grow-1 d-md-flex mx-1 my-1">
+@@ -111,6 +118,13 @@ export default function InstructorToolbar(props) {
+           </Alert>
+         </div>
+       )}
++      <AlertList
++        topic="instructor-toolbar-alerts"
++        customAlerts={{
++          ...accessExpirationMasqueradeBanner,
++          ...courseStartDateMasqueradeBanner,
++        }}
++      />
+     </div>
+   ));
+ }
+@@ -119,10 +133,12 @@ InstructorToolbar.propTypes = {
+   courseId: PropTypes.string,
+   unitId: PropTypes.string,
+   canViewLegacyCourseware: PropTypes.bool,
++  tab: PropTypes.string,
+ };
+ 
+ InstructorToolbar.defaultProps = {
+   courseId: undefined,
+   unitId: undefined,
+   canViewLegacyCourseware: undefined,
++  tab: '',
+ };
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index e64e7f6..d3df7d2 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -50,6 +50,7 @@ function LoadedTabPage({
+           courseId={courseId}
+           unitId={unitId}
+           canViewLegacyCourseware={canViewLegacyCourseware}
++          tab={activeTabSlug}
+         />
+       )}
+       <StreakModal
+-- 
+2.34.1
+

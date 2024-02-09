@@ -1,0 +1,159 @@
+From edef36becb92bed056b851a0956e69353297274e Mon Sep 17 00:00:00 2001
+From: Zachary Hancock <zhancock@edx.org>
+Date: Fri, 26 Mar 2021 13:33:37 -0400
+Subject: [PATCH 0411/1021] update other course approved messaging (#398)
+
+---
+ .../outline-tab/OutlineTab.test.jsx            | 18 +++++++++---------
+ src/course-home/outline-tab/messages.js        | 12 ++++++++++--
+ .../widgets/ProctoringInfoPanel.jsx            | 14 +++++++++++++-
+ 3 files changed, 32 insertions(+), 12 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index f1c5948..38336cc 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -759,7 +759,7 @@ describe('Outline Tab', () => {
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).not.toBeInTheDocument();
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).toBeInTheDocument();
+       expect(screen.queryByText('You must complete the onboarding process prior to taking any proctored exam.')).not.toBeInTheDocument();
+-      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).not.toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).not.toBeInTheDocument();
+     });
+ 
+     it('appears for rejected', async () => {
+@@ -774,7 +774,7 @@ describe('Outline Tab', () => {
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).toBeInTheDocument();
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).toBeInTheDocument();
+       expect(screen.queryByText('You must complete the onboarding process prior to taking any proctored exam.')).toBeInTheDocument();
+-      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
+     it('appears for submitted', async () => {
+@@ -787,7 +787,7 @@ describe('Outline Tab', () => {
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByText('Your submitted profile is in review.')).toBeInTheDocument();
+-      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
+     it('appears for second_review_required', async () => {
+@@ -800,7 +800,7 @@ describe('Outline Tab', () => {
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByText('Your submitted profile is in review.')).toBeInTheDocument();
+-      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
+     it('appears for other_course_approved if not expiring soon', async () => {
+@@ -815,8 +815,8 @@ describe('Outline Tab', () => {
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+-      expect(screen.queryByText('Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, it is highly recommended that you complete this course’s onboarding exam in order to ensure that your device still meets the requirements for proctoring.')).toBeInTheDocument();
+-      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).not.toBeInTheDocument();
++      expect(screen.queryByText('You are eligible to take proctored exams in this course.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).not.toBeInTheDocument();
+     });
+ 
+     it('displays expiration warning', async () => {
+@@ -832,7 +832,7 @@ describe('Outline Tab', () => {
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByText('Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.')).toBeInTheDocument();
+-      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
+     it('appears for no status', async () => {
+@@ -847,7 +847,7 @@ describe('Outline Tab', () => {
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).toBeInTheDocument();
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).toBeInTheDocument();
+       expect(screen.queryByText('You must complete the onboarding process prior to taking any proctored exam.')).toBeInTheDocument();
+-      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
+     it('does not appear for 404', async () => {
+@@ -887,7 +887,7 @@ describe('Outline Tab', () => {
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).not.toBeInTheDocument();
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).toBeInTheDocument();
+       expect(screen.queryByText('You must complete the onboarding process prior to taking any proctored exam.')).not.toBeInTheDocument();
+-      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).not.toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).not.toBeInTheDocument();
+     });
+   });
+ 
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index 051ac1d..774844b 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -178,7 +178,11 @@ const messages = defineMessages({
+   },
+   otherCourseApprovedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.otherCourseApproved',
+-    defaultMessage: 'Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, it is highly recommended that you complete this course’s onboarding exam in order to ensure that your device still meets the requirements for proctoring.',
++    defaultMessage: 'You are eligible to take proctored exams in this course.',
++  },
++  otherCourseApprovedProctoringDetail: {
++    id: 'learning.proctoringPanel.detail.otherCourseApproved',
++    defaultMessage: 'If your device has changed, we recommend that you complete this course\'s onboarding exam in order to ensure that your setup still meets the requirements for proctoring.',
+   },
+   expiringSoonProctoringMessage: {
+     id: 'learning.proctoringPanel.message.expiringSoon',
+@@ -194,12 +198,16 @@ const messages = defineMessages({
+   },
+   proctoringPanelGeneralTime: {
+     id: 'learning.proctoringPanel.generalTime',
+-    defaultMessage: 'Onboarding profile review, including identity verification, can take 2+ business days.',
++    defaultMessage: 'Onboarding profile review can take 2+ business days.',
+   },
+   proctoringOnboardingButton: {
+     id: 'learning.proctoringPanel.onboardingButton',
+     defaultMessage: 'Complete Onboarding',
+   },
++  proctoringOnboardingPracticeButton: {
++    id: 'learning.proctoringPanel.onboardingPracticeButton',
++    defaultMessage: 'View Onboarding Exam',
++  },
+   proctoringOnboardingButtonNotOpen: {
+     id: 'learning.proctoringPanel.onboardingButtonNotOpen',
+     defaultMessage: 'Onboarding Opens: {releaseDate}',
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index 134c8a9..212e85a 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -106,6 +106,9 @@ function ProctoringInfoPanel({ courseId, intl }) {
+                 <p>
+                   {intl.formatMessage(messages[`${readableStatus}ProctoringMessage`])}
+                 </p>
++                <p>
++                  {readableStatus === readableStatuses.otherCourseApproved && intl.formatMessage(messages[`${readableStatus}ProctoringDetail`])}
++                </p>
+               </>
+             )}
+             {![readableStatuses.verified, readableStatuses.otherCourseApproved].includes(readableStatus) && (
+@@ -129,7 +132,16 @@ function ProctoringInfoPanel({ courseId, intl }) {
+               <>
+                 {!isNotYetReleased(releaseDate) && (
+                   <Button variant="primary" block href={`${getConfig().LMS_BASE_URL}${link}`}>
+-                    {intl.formatMessage(messages.proctoringOnboardingButton)}
++                    {readableStatus === readableStatuses.otherCourseApproved && (
++                      <>
++                        {intl.formatMessage(messages.proctoringOnboardingPracticeButton)}
++                      </>
++                    )}
++                    {readableStatus !== readableStatuses.otherCourseApproved && (
++                      <>
++                        {intl.formatMessage(messages.proctoringOnboardingButton)}
++                      </>
++                    )}
+                   </Button>
+                 )}
+                 {isNotYetReleased(releaseDate) && (
+-- 
+2.34.1
+

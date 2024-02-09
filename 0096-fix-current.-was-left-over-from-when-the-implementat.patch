@@ -1,0 +1,30 @@
+From b4fbd1cf83ad7d9a14d3640687b6f41eee2d5179 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Thu, 2 Apr 2020 15:58:58 -0400
+Subject: [PATCH 0096/1021] =?UTF-8?q?fix:=20=E2=80=9Ccurrent.=E2=80=9D=20w?=
+ =?UTF-8?q?as=20left=20over=20from=20when=20the=20implementation=20used=20?=
+ =?UTF-8?q?refs=20(#42)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ src/user-messages/UserMessagesProvider.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/user-messages/UserMessagesProvider.jsx b/src/user-messages/UserMessagesProvider.jsx
+index 2f72bc9..e7191c7 100644
+--- a/src/user-messages/UserMessagesProvider.jsx
++++ b/src/user-messages/UserMessagesProvider.jsx
+@@ -33,7 +33,7 @@ export default function UserMessagesProvider({ children }) {
+   };
+ 
+   const remove = id => {
+-    setMessages(currentMessages => currentMessages.current.filter(message => message.id !== id));
++    setMessages(currentMessages => currentMessages.filter(message => message.id !== id));
+   };
+ 
+   const clear = (topic = null) => {
+-- 
+2.34.1
+

@@ -1,0 +1,594 @@
+From 37a4dcce183dc2ba574ff585a72035226b32d30a Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 17 Dec 2020 10:18:57 -0500
+Subject: [PATCH 0345/1021] AA-449: Show discounted price in upgrade buttons &
+ course exit (#311)
+
+If an offer is active for the user, show the discounted price (and
+a struck-out original price) on upgrade buttons in the course sock
+and outline sidebar.
+
+Also show the discount code and price in the course exit upgrade
+screen.
+---
+ src/alerts/offer-alert/OfferAlert.jsx         | 17 +---
+ src/alerts/offer-alert/messages.js            |  4 -
+ src/course-home/outline-tab/OutlineTab.jsx    |  2 +-
+ .../outline-tab/widgets/UpgradeCard.jsx       | 15 ++-
+ src/courseware/course/Course.jsx              |  2 +-
+ .../course/course-exit/CourseCelebration.jsx  | 93 ++++++++++++-------
+ src/generic/course-sock/CourseSock.jsx        | 37 +++-----
+ src/generic/course-sock/CourseSock.test.jsx   |  4 +-
+ .../upgrade-button/FormattedPricing.jsx       | 80 ++++++++++++++++
+ src/generic/upgrade-button/UpgradeButton.jsx  | 59 ++++++++++++
+ src/generic/upgrade-button/index.js           |  7 ++
+ src/generic/upgrade-button/messages.js        | 14 +++
+ 12 files changed, 244 insertions(+), 90 deletions(-)
+ create mode 100644 src/generic/upgrade-button/FormattedPricing.jsx
+ create mode 100644 src/generic/upgrade-button/UpgradeButton.jsx
+ create mode 100644 src/generic/upgrade-button/index.js
+ create mode 100644 src/generic/upgrade-button/messages.js
+
+diff --git a/src/alerts/offer-alert/OfferAlert.jsx b/src/alerts/offer-alert/OfferAlert.jsx
+index 89644ef..f271e11 100644
+--- a/src/alerts/offer-alert/OfferAlert.jsx
++++ b/src/alerts/offer-alert/OfferAlert.jsx
+@@ -6,6 +6,7 @@ import {
+ import { Hyperlink } from '@edx/paragon';
+ 
+ import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++import { FormattedPricing } from '../../generic/upgrade-button';
+ import messages from './messages';
+ 
+ function OfferAlert({ intl, payload }) {
+@@ -20,26 +21,12 @@ function OfferAlert({ intl, payload }) {
+ 
+   const {
+     code,
+-    discountedPrice,
+     expirationDate,
+-    originalPrice,
+     percentage,
+     upgradeUrl,
+   } = offer;
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+-  const fullPricing = (
+-    <>
+-      <span className="sr-only">
+-        {intl.formatMessage(messages.srPrices, { discountedPrice, originalPrice })}
+-      </span>
+-      <span aria-hidden="true">
+-        {/* the price discount and price original classes can be removed post REV-1512 experiment */}
+-        <span className="price discount">{discountedPrice}</span> <del className="price original">{originalPrice}</del>
+-      </span>
+-    </>
+-  );
+-
+   return (
+     <Alert type={ALERT_TYPES.INFO}>
+       {/* the first-purchase-offer-banner class can be removed post REV-1512 experiment */}
+@@ -57,7 +44,7 @@ function OfferAlert({ intl, payload }) {
+                 {...timezoneFormatArgs}
+               />
+             ),
+-            fullPricing,
++            fullPricing: <FormattedPricing offer={offer} />,
+             percentage,
+           }}
+         />
+diff --git a/src/alerts/offer-alert/messages.js b/src/alerts/offer-alert/messages.js
+index f3e4612..149c0d0 100644
+--- a/src/alerts/offer-alert/messages.js
++++ b/src/alerts/offer-alert/messages.js
+@@ -1,10 +1,6 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  srPrices: {
+-    id: 'learning.offer.screenReaderPrices',
+-    defaultMessage: 'Original price: {originalPrice}, discount price: {discountedPrice}',
+-  },
+   upgradeNow: {
+     id: 'learning.offer.upgradeNow',
+     defaultMessage: 'Upgrade now',
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index f79e62c..58ce676 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -185,7 +185,7 @@ function OutlineTab({ intl }) {
+           </div>
+         )}
+       </div>
+-      {canShowUpgradeSock && <CourseSock ref={courseSock} verifiedMode={verifiedMode} />}
++      {canShowUpgradeSock && <CourseSock ref={courseSock} offer={offer} verifiedMode={verifiedMode} />}
+     </>
+   );
+ }
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+index 0fa9dd2..8fa715f 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+@@ -7,11 +7,13 @@ import { Button } from '@edx/paragon';
+ 
+ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
++import { UpgradeButton } from '../../../generic/upgrade-button';
+ import VerifiedCert from '../../../generic/assets/edX_certificate.png';
+ 
+ function UpgradeCard({ courseId, intl, onLearnMore }) {
+   const { org } = useModel('courses', courseId);
+   const {
++    offer,
+     verifiedMode,
+   } = useModel('outline', courseId);
+ 
+@@ -44,16 +46,11 @@ function UpgradeCard({ courseId, intl, onLearnMore }) {
+         style={{ width: '124px' }}
+       />
+       <div className="float-right d-flex flex-column align-items-center">
+-        <Button
+-          variant="success"
+-          href={verifiedMode.upgradeUrl}
++        <UpgradeButton
++          offer={offer}
+           onClick={logClick}
+-        >
+-          {intl.formatMessage(messages.upgradeButton, {
+-            price: verifiedMode.price,
+-            symbol: verifiedMode.currencySymbol,
+-          })}
+-        </Button>
++          verifiedMode={verifiedMode}
++        />
+         {onLearnMore && (
+           <Button
+             variant="link"
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index a5250dc..6e940f0 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -114,7 +114,7 @@ function Course({
+           open
+         />
+       )}
+-      {canShowUpgradeSock && <CourseSock verifiedMode={verifiedMode} />}
++      {canShowUpgradeSock && <CourseSock offer={offer} verifiedMode={verifiedMode} />}
+       <ContentTools course={course} />
+     </>
+   );
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 0191ed3..9e9f192 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -17,6 +17,7 @@ import CelebrationMobile from './assets/celebration_456x328.gif';
+ import CelebrationDesktop from './assets/celebration_750x540.gif';
+ import certificate from '../../../generic/assets/edX_certificate.png';
+ import certificateLocked from '../../../generic/assets/edX_locked_certificate.png';
++import { FormattedPricing } from '../../../generic/upgrade-button';
+ import messages from './messages';
+ import { useModel } from '../../../generic/model-store';
+ import { requestCert } from '../../../course-home/data/thunks';
+@@ -43,6 +44,7 @@ function CourseCelebration({ intl }) {
+     certificateData,
+     end,
+     linkedinAddToProfileUrl,
++    offer,
+     org,
+     relatedPrograms,
+     verifiedMode,
+@@ -86,10 +88,12 @@ function CourseCelebration({ intl }) {
+     </Hyperlink>
+   );
+ 
++  let buttonPrefix = null;
+   let buttonLocation;
+   let buttonText;
+   let buttonVariant = 'outline-primary';
+   let buttonEvent = null;
++  let buttonSuffix = null;
+   let certificateImage = certificate;
+   let footnote;
+   let message;
+@@ -118,6 +122,19 @@ function CourseCelebration({ intl }) {
+         buttonLocation = downloadUrl;
+         buttonText = intl.formatMessage(messages.downloadButton);
+       }
++      if (linkedinAddToProfileUrl) {
++        buttonPrefix = (
++          <Button
++            className="mr-3"
++            href={linkedinAddToProfileUrl}
++            onClick={() => logClick(org, courseId, administrator, 'linkedin_add_to_profile')}
++            style={{ backgroundColor: LINKEDIN_BLUE, border: 'none' }}
++          >
++            <FontAwesomeIcon icon={faLinkedinIn} className="mr-3" />
++            {`${intl.formatMessage(messages.linkedinAddToProfileButton)}`}
++          </Button>
++        );
++      }
+       buttonEvent = 'view_cert';
+       visitEvent = 'celebration_with_cert';
+       footnote = <DashboardFootnote variant={visitEvent} />;
+@@ -151,8 +168,20 @@ function CourseCelebration({ intl }) {
+       break;
+     }
+     case 'requesting':
+-      buttonText = intl.formatMessage(messages.requestCertificateButton);
++      // The requesting status needs a different button because it does a POST instead of a GET.
++      // So we don't set buttonLocation and instead define a custom button as a buttonPrefix.
+       buttonEvent = 'request_cert';
++      buttonPrefix = (
++        <Button
++          variant={buttonVariant}
++          onClick={() => {
++            logClick(org, courseId, administrator, buttonEvent);
++            dispatch(requestCert(courseId));
++          }}
++        >
++          {intl.formatMessage(messages.requestCertificateButton)}
++        </Button>
++      );
+       certHeader = intl.formatMessage(messages.certificateHeaderRequestable);
+       message = (<p>{intl.formatMessage(messages.requestCertificateBodyText)}</p>);
+       visitEvent = 'celebration_with_requestable_cert';
+@@ -193,7 +222,7 @@ function CourseCelebration({ intl }) {
+                 assignments in this course. Upon completion, you will receive a verified certificate which is a
+                 valuable credential to improve your job prospects and advance your career, or highlight your
+                 certificate in school applications."
+-              values={{ price: verifiedMode.currencySymbol + verifiedMode.price }}
++              values={{ price: <FormattedPricing inline offer={offer} verifiedMode={verifiedMode} /> }}
+             />
+             <br />
+             {getConfig().SUPPORT_URL_VERIFIED_CERTIFICATE && (
+@@ -211,6 +240,20 @@ function CourseCelebration({ intl }) {
+         buttonEvent = 'upgrade';
+         buttonLocation = verifiedMode.upgradeUrl;
+         buttonVariant = 'primary';
++        if (offer) {
++          buttonSuffix = (
++            <span className="ml-2 align-middle">
++              <FormattedMessage
++                id="courseCelebration.upgradeDiscountCodePrompt"
++                defaultMessage="Use code {code} at checkout for {percent}% off!"
++                values={{
++                  code: (<b>{offer.code}</b>),
++                  percent: offer.percentage,
++                }}
++              />
++            </span>
++          );
++        }
+         certificateImage = certificateLocked;
+         visitEvent = 'celebration_upgrade';
+         if (verifiedMode.accessExpirationDate) {
+@@ -270,39 +313,19 @@ function CourseCelebration({ intl }) {
+             <div className="col order-1 order-md-0 pl-0 pr-0 pr-md-5">
+               <div className="h4">{certHeader}</div>
+               {message}
+-              {/* The requesting status needs a different button because it does a POST instead of a GET */}
+-              {certStatus === 'requesting' && (
+-                <Button
+-                  variant={buttonVariant}
+-                  onClick={() => {
+-                    logClick(org, courseId, administrator, buttonEvent);
+-                    dispatch(requestCert(courseId));
+-                  }}
+-                >
+-                  {buttonText}
+-                </Button>
+-              )}
+-              {certStatus === 'downloadable' && linkedinAddToProfileUrl && (
+-                <Button
+-                  className="mr-3 mt-2"
+-                  href={linkedinAddToProfileUrl}
+-                  onClick={() => logClick(org, courseId, administrator, 'linkedin_add_to_profile')}
+-                  style={{ backgroundColor: LINKEDIN_BLUE, border: 'none' }}
+-                >
+-                  <FontAwesomeIcon icon={faLinkedinIn} className="mr-3" />
+-                  {`${intl.formatMessage(messages.linkedinAddToProfileButton)}`}
+-                </Button>
+-              )}
+-              {buttonLocation && (
+-                <Button
+-                  className="mt-2"
+-                  variant={buttonVariant}
+-                  href={buttonLocation}
+-                  onClick={() => logClick(org, courseId, administrator, buttonEvent)}
+-                >
+-                  {buttonText}
+-                </Button>
+-              )}
++              <div className="mt-2">
++                {buttonPrefix}
++                {buttonLocation && (
++                  <Button
++                    variant={buttonVariant}
++                    href={buttonLocation}
++                    onClick={() => logClick(org, courseId, administrator, buttonEvent)}
++                  >
++                    {buttonText}
++                  </Button>
++                )}
++                {buttonSuffix}
++              </div>
+             </div>
+             {certStatus !== 'unverified' && (
+               <div className="col-12 order-0 col-md-3 order-md-1 w-100 mb-3 p-0 text-center">
+diff --git a/src/generic/course-sock/CourseSock.jsx b/src/generic/course-sock/CourseSock.jsx
+index ef39968..18a576f 100644
+--- a/src/generic/course-sock/CourseSock.jsx
++++ b/src/generic/course-sock/CourseSock.jsx
+@@ -4,12 +4,12 @@ import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import LearnerQuote1 from './assets/learner-quote.png';
+ import LearnerQuote2 from './assets/learner-quote2.png';
++import { UpgradeButton } from '../upgrade-button';
+ import VerifiedCert from '../assets/edX_certificate.png';
+ 
+ export default class CourseSock extends Component {
+   constructor(props) {
+     super(props);
+-    this.verifiedMode = props.verifiedMode;
+     this.state = { showUpsell: false };
+     this.sockElement = React.createRef();
+   }
+@@ -31,7 +31,7 @@ export default class CourseSock extends Component {
+   }
+ 
+   render() {
+-    if (!this.verifiedMode) {
++    if (!this.props.verifiedMode) {
+       return null;
+     }
+ 
+@@ -65,22 +65,14 @@ export default class CourseSock extends Component {
+                 </div>
+                 <div className="position-relative flex-grow-1 d-flex flex-column justify-content-end align-items-md-end">
+                   <div style={{ position: 'sticky', bottom: '4rem' }}>
+-                    <a
+-                      href={this.verifiedMode.upgradeUrl}
+-                      className="btn btn-success btn-lg btn-upgrade focusable mb-3"
++                    <UpgradeButton
++                      size="lg"
++                      offer={this.props.offer}
++                      verifiedMode={this.props.verifiedMode}
++                      className="mb-3"
+                       data-creative="original_sock"
+                       data-position="sock"
+-                    >
+-                      <FormattedMessage
+-                        id="coursesock.upsell.upgrade"
+-                        defaultMessage="Upgrade ({symbol}{price} {currency})"
+-                        values={{
+-                          symbol: this.verifiedMode.currencySymbol,
+-                          price: this.verifiedMode.price,
+-                          currency: this.verifiedMode.currency,
+-                        }}
+-                      />
+-                    </a>
++                    />
+                   </div>
+                 </div>
+               </div>
+@@ -215,12 +207,11 @@ export default class CourseSock extends Component {
+   }
+ }
+ 
++CourseSock.defaultProps = {
++  offer: null,
++};
++
+ CourseSock.propTypes = {
+-  verifiedMode: PropTypes.shape({
+-    price: PropTypes.number,
+-    currency: PropTypes.string,
+-    currencySymbol: PropTypes.string,
+-    sku: PropTypes.string,
+-    upgradeUrl: PropTypes.string,
+-  }).isRequired,
++  offer: PropTypes.shape({}),
++  verifiedMode: PropTypes.shape({}).isRequired,
+ };
+diff --git a/src/generic/course-sock/CourseSock.test.jsx b/src/generic/course-sock/CourseSock.test.jsx
+index 5ee1197..65e6808 100644
+--- a/src/generic/course-sock/CourseSock.test.jsx
++++ b/src/generic/course-sock/CourseSock.test.jsx
+@@ -32,8 +32,8 @@ describe('Course Sock', () => {
+     fireEvent.click(upsellButton);
+ 
+     expect(screen.getByText('edX Verified Certificate')).toBeInTheDocument();
+-    const { currencySymbol, price, currency } = mockData.verifiedMode;
+-    expect(screen.getByText(`Upgrade (${currencySymbol}${price} ${currency})`)).toBeInTheDocument();
++    const { currencySymbol, price } = mockData.verifiedMode;
++    expect(screen.getByText(`Upgrade (${currencySymbol}${price})`)).toBeInTheDocument();
+ 
+     fireEvent.click(upsellButton);
+     expect(screen.queryByText('edX Verified Certificate')).not.toBeInTheDocument();
+diff --git a/src/generic/upgrade-button/FormattedPricing.jsx b/src/generic/upgrade-button/FormattedPricing.jsx
+new file mode 100644
+index 0000000..50efc1d
+--- /dev/null
++++ b/src/generic/upgrade-button/FormattedPricing.jsx
+@@ -0,0 +1,80 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from './messages';
++
++function FormattedPricing(props) {
++  const {
++    inline,
++    intl,
++    offer,
++    verifiedMode,
++  } = props;
++
++  if (!offer) {
++    const {
++      currencySymbol,
++      price,
++    } = verifiedMode;
++    return `${currencySymbol}${price}`;
++  }
++
++  const {
++    discountedPrice,
++    originalPrice,
++  } = offer;
++
++  // The inline style is meant for being embedded in a sentence - it bolds the discount and leaves the original price
++  // as a parenthetical. The normal styling is more suited for a button, where the price and discount are side by side.
++  if (inline) {
++    return (
++      <>
++        <span className="font-weight-bold">{discountedPrice}</span>
++        &nbsp;(
++        <span className="sr-only">
++          {intl.formatMessage(messages.srInlinePrices, { originalPrice })}
++        </span>
++        <span aria-hidden="true">
++          <del>{originalPrice}</del>
++        </span>
++        )
++      </>
++    );
++  }
++
++  return (
++    <>
++      <span className="sr-only">
++        {intl.formatMessage(messages.srPrices, { discountedPrice, originalPrice })}
++      </span>
++      <span aria-hidden="true">
++        {/* the price discount and price original classes can be removed post REV-1512 experiment */}
++        <span className="price discount">{discountedPrice}</span> <del className="price original">{originalPrice}</del>
++      </span>
++    </>
++  );
++}
++
++FormattedPricing.defaultProps = {
++  inline: false,
++  offer: null,
++  verifiedMode: null,
++};
++
++FormattedPricing.propTypes = {
++  inline: PropTypes.bool,
++  intl: intlShape.isRequired,
++  offer: PropTypes.shape({
++    discountedPrice: PropTypes.string.isRequired,
++    originalPrice: PropTypes.string.isRequired,
++    upgradeUrl: PropTypes.string.isRequired,
++  }),
++  verifiedMode: PropTypes.shape({
++    currencySymbol: PropTypes.string.isRequired,
++    price: PropTypes.number.isRequired,
++    upgradeUrl: PropTypes.string.isRequired,
++  }),
++};
++
++export default injectIntl(FormattedPricing);
+diff --git a/src/generic/upgrade-button/UpgradeButton.jsx b/src/generic/upgrade-button/UpgradeButton.jsx
+new file mode 100644
+index 0000000..c9d67e8
+--- /dev/null
++++ b/src/generic/upgrade-button/UpgradeButton.jsx
+@@ -0,0 +1,59 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button } from '@edx/paragon';
++
++import FormattedPricing from './FormattedPricing';
++
++function UpgradeButton(props) {
++  const {
++    intl,
++    offer,
++    onClick,
++    verifiedMode,
++    ...rest
++  } = props;
++
++  // Prefer offer's url in case it is ever different (though it is not at time of this writing)
++  const url = offer ? offer.upgradeUrl : verifiedMode.upgradeUrl;
++
++  return (
++    <Button
++      variant="success"
++      href={url}
++      onClick={onClick}
++      {...rest}
++    >
++      <FormattedMessage
++        id="learning.upgradeButton.buttonText"
++        defaultMessage="Upgrade ({pricing})"
++        values={{
++          pricing: (
++            <FormattedPricing
++              offer={offer}
++              verifiedMode={verifiedMode}
++            />
++          ),
++        }}
++      />
++    </Button>
++  );
++}
++
++UpgradeButton.defaultProps = {
++  offer: null,
++  onClick: null,
++};
++
++UpgradeButton.propTypes = {
++  intl: intlShape.isRequired,
++  offer: PropTypes.shape({
++    upgradeUrl: PropTypes.string.isRequired,
++  }),
++  onClick: PropTypes.func,
++  verifiedMode: PropTypes.shape({
++    upgradeUrl: PropTypes.string.isRequired,
++  }).isRequired,
++};
++
++export default injectIntl(UpgradeButton);
+diff --git a/src/generic/upgrade-button/index.js b/src/generic/upgrade-button/index.js
+new file mode 100644
+index 0000000..845dc5c
+--- /dev/null
++++ b/src/generic/upgrade-button/index.js
+@@ -0,0 +1,7 @@
++import FormattedPricing from './FormattedPricing';
++import UpgradeButton from './UpgradeButton';
++
++export {
++  FormattedPricing,
++  UpgradeButton,
++};
+diff --git a/src/generic/upgrade-button/messages.js b/src/generic/upgrade-button/messages.js
+new file mode 100644
+index 0000000..efb0f29
+--- /dev/null
++++ b/src/generic/upgrade-button/messages.js
+@@ -0,0 +1,14 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  srPrices: {
++    id: 'learning.offer.screenReaderPrices', // historic id
++    defaultMessage: 'Original price: {originalPrice}, discount price: {discountedPrice}',
++  },
++  srInlinePrices: {
++    id: 'learning.upgradeButton.screenReaderInlinePrices',
++    defaultMessage: 'Original price: {originalPrice}',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

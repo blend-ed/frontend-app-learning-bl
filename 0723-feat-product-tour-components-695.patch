@@ -1,0 +1,1791 @@
+From f7428db3c314adec9948da6bd986cfa5ab581dda Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Fri, 5 Nov 2021 07:57:15 -0600
+Subject: [PATCH 0723/1021] feat: product tour components (#695)
+
+---
+ package-lock.json                  | 486 +++++++++++++++++++++++++++++
+ package.json                       |   3 +
+ src/tour/Checkpoint.jsx            |  69 ++++
+ src/tour/Checkpoint.scss           |  62 ++++
+ src/tour/CheckpointActionRow.jsx   |  56 ++++
+ src/tour/CheckpointBody.jsx        |  22 ++
+ src/tour/CheckpointBreadcrumbs.jsx |  28 ++
+ src/tour/CheckpointTitle.jsx       |  18 ++
+ src/tour/README.md                 | 101 ++++++
+ src/tour/Tour.jsx                  | 189 +++++++++++
+ src/tour/tests/Checkpoint.test.jsx | 124 ++++++++
+ src/tour/tests/Tour.test.jsx       | 378 ++++++++++++++++++++++
+ 12 files changed, 1536 insertions(+)
+ create mode 100644 src/tour/Checkpoint.jsx
+ create mode 100644 src/tour/Checkpoint.scss
+ create mode 100644 src/tour/CheckpointActionRow.jsx
+ create mode 100644 src/tour/CheckpointBody.jsx
+ create mode 100644 src/tour/CheckpointBreadcrumbs.jsx
+ create mode 100644 src/tour/CheckpointTitle.jsx
+ create mode 100644 src/tour/README.md
+ create mode 100644 src/tour/Tour.jsx
+ create mode 100644 src/tour/tests/Checkpoint.test.jsx
+ create mode 100644 src/tour/tests/Tour.test.jsx
+
+diff --git a/package-lock.json b/package-lock.json
+index 56a3d9e..83012b9 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -6428,6 +6428,43 @@
+       "integrity": "sha512-ZkVeqEmRpBV2GHvjjUZqEai2PpUbuq8Bqd//vEYsp63J8WyexI8ppCqVS3Zs0QADf6aWuPdU+0XsPI647PVlQA==",
+       "dev": true
+     },
++    "@wojtekmaj/enzyme-adapter-react-17": {
++      "version": "0.6.5",
++      "resolved": "https://registry.npmjs.org/@wojtekmaj/enzyme-adapter-react-17/-/enzyme-adapter-react-17-0.6.5.tgz",
++      "integrity": "sha512-ChIObUiXXYUiqzXPqOai+p6KF5dlbItpDDYsftUOQiAiygbMDlLeJIjynC6ZrJIa2U2MpRp4YJmtR2GQyIHjgA==",
++      "dev": true,
++      "requires": {
++        "@wojtekmaj/enzyme-adapter-utils": "^0.1.1",
++        "enzyme-shallow-equal": "^1.0.0",
++        "has": "^1.0.0",
++        "object.assign": "^4.1.0",
++        "object.values": "^1.1.0",
++        "prop-types": "^15.7.0",
++        "react-is": "^17.0.2",
++        "react-test-renderer": "^17.0.0"
++      },
++      "dependencies": {
++        "react-is": {
++          "version": "17.0.2",
++          "resolved": "https://registry.npmjs.org/react-is/-/react-is-17.0.2.tgz",
++          "integrity": "sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==",
++          "dev": true
++        }
++      }
++    },
++    "@wojtekmaj/enzyme-adapter-utils": {
++      "version": "0.1.1",
++      "resolved": "https://registry.npmjs.org/@wojtekmaj/enzyme-adapter-utils/-/enzyme-adapter-utils-0.1.1.tgz",
++      "integrity": "sha512-bNPWtN/d8huKOkC6j1E3EkSamnRrHHT7YuR6f9JppAQqtoAm3v4/vERe4J14jQKmHLCyEBHXrlgb7H6l817hVg==",
++      "dev": true,
++      "requires": {
++        "function.prototype.name": "^1.1.0",
++        "has": "^1.0.0",
++        "object.assign": "^4.1.0",
++        "object.fromentries": "^2.0.0",
++        "prop-types": "^15.7.0"
++      }
++    },
+     "@xtuc/ieee754": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/@xtuc/ieee754/-/ieee754-1.2.0.tgz",
+@@ -6915,6 +6952,80 @@
+       "integrity": "sha1-qJS3XUvE9s1nnvMkSp/Y9Gri1Cg=",
+       "dev": true
+     },
++    "array.prototype.filter": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/array.prototype.filter/-/array.prototype.filter-1.0.1.tgz",
++      "integrity": "sha512-Dk3Ty7N42Odk7PjU/Ci3zT4pLj20YvuVnneG/58ICM6bt4Ij5kZaJTVQ9TSaWaIECX2sFyz4KItkVZqHNnciqw==",
++      "dev": true,
++      "requires": {
++        "call-bind": "^1.0.2",
++        "define-properties": "^1.1.3",
++        "es-abstract": "^1.19.0",
++        "es-array-method-boxes-properly": "^1.0.0",
++        "is-string": "^1.0.7"
++      },
++      "dependencies": {
++        "es-abstract": {
++          "version": "1.19.1",
++          "resolved": "https://registry.npmjs.org/es-abstract/-/es-abstract-1.19.1.tgz",
++          "integrity": "sha512-2vJ6tjA/UfqLm2MPs7jxVybLoB8i1t1Jd9R3kISld20sIxPcTbLuggQOUxeWeAvIUkduv/CfMjuh4WmiXr2v9w==",
++          "dev": true,
++          "requires": {
++            "call-bind": "^1.0.2",
++            "es-to-primitive": "^1.2.1",
++            "function-bind": "^1.1.1",
++            "get-intrinsic": "^1.1.1",
++            "get-symbol-description": "^1.0.0",
++            "has": "^1.0.3",
++            "has-symbols": "^1.0.2",
++            "internal-slot": "^1.0.3",
++            "is-callable": "^1.2.4",
++            "is-negative-zero": "^2.0.1",
++            "is-regex": "^1.1.4",
++            "is-shared-array-buffer": "^1.0.1",
++            "is-string": "^1.0.7",
++            "is-weakref": "^1.0.1",
++            "object-inspect": "^1.11.0",
++            "object-keys": "^1.1.1",
++            "object.assign": "^4.1.2",
++            "string.prototype.trimend": "^1.0.4",
++            "string.prototype.trimstart": "^1.0.4",
++            "unbox-primitive": "^1.0.1"
++          }
++        },
++        "is-callable": {
++          "version": "1.2.4",
++          "resolved": "https://registry.npmjs.org/is-callable/-/is-callable-1.2.4.tgz",
++          "integrity": "sha512-nsuwtxZfMX67Oryl9LCQ+upnC0Z0BgpwntpS89m1H/TLF0zNfzfLMV/9Wa/6MZsj0acpEjAO0KF1xT6ZdLl95w==",
++          "dev": true
++        },
++        "is-regex": {
++          "version": "1.1.4",
++          "resolved": "https://registry.npmjs.org/is-regex/-/is-regex-1.1.4.tgz",
++          "integrity": "sha512-kvRdxDsxZjhzUX07ZnLydzS1TU/TJlTUHHY4YLL87e37oUA49DfkLqgy+VjFocowy29cKvcSiu+kIv728jTTVg==",
++          "dev": true,
++          "requires": {
++            "call-bind": "^1.0.2",
++            "has-tostringtag": "^1.0.0"
++          }
++        },
++        "is-string": {
++          "version": "1.0.7",
++          "resolved": "https://registry.npmjs.org/is-string/-/is-string-1.0.7.tgz",
++          "integrity": "sha512-tE2UXzivje6ofPW7l23cjDOMa09gb7xlAqG6jG5ej6uPV32TlWP3NKPigtaGeHNu9fohccRYvIiZMfOOnOYUtg==",
++          "dev": true,
++          "requires": {
++            "has-tostringtag": "^1.0.0"
++          }
++        },
++        "object-inspect": {
++          "version": "1.11.0",
++          "resolved": "https://registry.npmjs.org/object-inspect/-/object-inspect-1.11.0.tgz",
++          "integrity": "sha512-jp7ikS6Sd3GxQfZJPyH3cjcbJF6GZPClgdV+EFygjFLQ5FmW/dRUnTd9PQ9k0JhoNDabWFbpF1yCdSWCC6gexg==",
++          "dev": true
++        }
++      }
++    },
+     "array.prototype.find": {
+       "version": "2.1.2",
+       "resolved": "https://registry.npmjs.org/array.prototype.find/-/array.prototype.find-2.1.2.tgz",
+@@ -8515,6 +8626,77 @@
+         }
+       }
+     },
++    "cheerio-select": {
++      "version": "1.5.0",
++      "resolved": "https://registry.npmjs.org/cheerio-select/-/cheerio-select-1.5.0.tgz",
++      "integrity": "sha512-qocaHPv5ypefh6YNxvnbABM07KMxExbtbfuJoIie3iZXX1ERwYmJcIiRrr9H05ucQP1k28dav8rpdDgjQd8drg==",
++      "dev": true,
++      "requires": {
++        "css-select": "^4.1.3",
++        "css-what": "^5.0.1",
++        "domelementtype": "^2.2.0",
++        "domhandler": "^4.2.0",
++        "domutils": "^2.7.0"
++      },
++      "dependencies": {
++        "css-select": {
++          "version": "4.1.3",
++          "resolved": "https://registry.npmjs.org/css-select/-/css-select-4.1.3.tgz",
++          "integrity": "sha512-gT3wBNd9Nj49rAbmtFHj1cljIAOLYSX1nZ8CB7TBO3INYckygm5B7LISU/szY//YmdiSLbJvDLOx9VnMVpMBxA==",
++          "dev": true,
++          "requires": {
++            "boolbase": "^1.0.0",
++            "css-what": "^5.0.0",
++            "domhandler": "^4.2.0",
++            "domutils": "^2.6.0",
++            "nth-check": "^2.0.0"
++          }
++        },
++        "css-what": {
++          "version": "5.1.0",
++          "resolved": "https://registry.npmjs.org/css-what/-/css-what-5.1.0.tgz",
++          "integrity": "sha512-arSMRWIIFY0hV8pIxZMEfmMI47Wj3R/aWpZDDxWYCPEiOMv6tfOrnpDtgxBYPEQD4V0Y/958+1TdC3iWTFcUPw==",
++          "dev": true
++        },
++        "dom-serializer": {
++          "version": "1.3.2",
++          "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-1.3.2.tgz",
++          "integrity": "sha512-5c54Bk5Dw4qAxNOI1pFEizPSjVsx5+bpJKmL2kPn8JhBUq2q09tTCa3mjijun2NfK78NMouDYNMBkOrPZiS+ig==",
++          "dev": true,
++          "requires": {
++            "domelementtype": "^2.0.1",
++            "domhandler": "^4.2.0",
++            "entities": "^2.0.0"
++          }
++        },
++        "domelementtype": {
++          "version": "2.2.0",
++          "resolved": "https://registry.npmjs.org/domelementtype/-/domelementtype-2.2.0.tgz",
++          "integrity": "sha512-DtBMo82pv1dFtUmHyr48beiuq792Sxohr+8Hm9zoxklYPfa6n0Z3Byjj2IV7bmr2IyqClnqEQhfgHJJ5QF0R5A==",
++          "dev": true
++        },
++        "domutils": {
++          "version": "2.8.0",
++          "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.8.0.tgz",
++          "integrity": "sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==",
++          "dev": true,
++          "requires": {
++            "dom-serializer": "^1.0.1",
++            "domelementtype": "^2.2.0",
++            "domhandler": "^4.2.0"
++          }
++        },
++        "nth-check": {
++          "version": "2.0.1",
++          "resolved": "https://registry.npmjs.org/nth-check/-/nth-check-2.0.1.tgz",
++          "integrity": "sha512-it1vE95zF6dTT9lBsYbxvqh0Soy4SPowchj0UBGj/V6cTPnXXtQOPUbhZ6CmGzAD/rW22LQK6E96pcdJXk4A4w==",
++          "dev": true,
++          "requires": {
++            "boolbase": "^1.0.0"
++          }
++        }
++      }
++    },
+     "chokidar": {
+       "version": "2.1.8",
+       "resolved": "https://registry.npmjs.org/chokidar/-/chokidar-2.1.8.tgz",
+@@ -9800,6 +9982,12 @@
+         "path-type": "^4.0.0"
+       }
+     },
++    "discontinuous-range": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/discontinuous-range/-/discontinuous-range-1.0.0.tgz",
++      "integrity": "sha1-44Mx8IRLukm5qctxx3FYWqsbxlo=",
++      "dev": true
++    },
+     "dns-equal": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/dns-equal/-/dns-equal-1.0.0.tgz",
+@@ -10154,6 +10342,86 @@
+       "integrity": "sha512-/o+BXHmB7ocbHEAs6F2EnG0ogybVVUdkRunTT2glZU9XAaGmhqskrvKwqXuDfNjEO0LZKWdejEEpnq8aM0tOaw==",
+       "dev": true
+     },
++    "enzyme": {
++      "version": "3.11.0",
++      "resolved": "https://registry.npmjs.org/enzyme/-/enzyme-3.11.0.tgz",
++      "integrity": "sha512-Dw8/Gs4vRjxY6/6i9wU0V+utmQO9kvh9XLnz3LIudviOnVYDEe2ec+0k+NQoMamn1VrjKgCUOWj5jG/5M5M0Qw==",
++      "dev": true,
++      "requires": {
++        "array.prototype.flat": "^1.2.3",
++        "cheerio": "^1.0.0-rc.3",
++        "enzyme-shallow-equal": "^1.0.1",
++        "function.prototype.name": "^1.1.2",
++        "has": "^1.0.3",
++        "html-element-map": "^1.2.0",
++        "is-boolean-object": "^1.0.1",
++        "is-callable": "^1.1.5",
++        "is-number-object": "^1.0.4",
++        "is-regex": "^1.0.5",
++        "is-string": "^1.0.5",
++        "is-subset": "^0.1.1",
++        "lodash.escape": "^4.0.1",
++        "lodash.isequal": "^4.5.0",
++        "object-inspect": "^1.7.0",
++        "object-is": "^1.0.2",
++        "object.assign": "^4.1.0",
++        "object.entries": "^1.1.1",
++        "object.values": "^1.1.1",
++        "raf": "^3.4.1",
++        "rst-selector-parser": "^2.2.3",
++        "string.prototype.trim": "^1.2.1"
++      },
++      "dependencies": {
++        "cheerio": {
++          "version": "1.0.0-rc.10",
++          "resolved": "https://registry.npmjs.org/cheerio/-/cheerio-1.0.0-rc.10.tgz",
++          "integrity": "sha512-g0J0q/O6mW8z5zxQ3A8E8J1hUgp4SMOvEoW/x84OwyHKe/Zccz83PVT4y5Crcr530FV6NgmKI1qvGTKVl9XXVw==",
++          "dev": true,
++          "requires": {
++            "cheerio-select": "^1.5.0",
++            "dom-serializer": "^1.3.2",
++            "domhandler": "^4.2.0",
++            "htmlparser2": "^6.1.0",
++            "parse5": "^6.0.1",
++            "parse5-htmlparser2-tree-adapter": "^6.0.1",
++            "tslib": "^2.2.0"
++          }
++        },
++        "dom-serializer": {
++          "version": "1.3.2",
++          "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-1.3.2.tgz",
++          "integrity": "sha512-5c54Bk5Dw4qAxNOI1pFEizPSjVsx5+bpJKmL2kPn8JhBUq2q09tTCa3mjijun2NfK78NMouDYNMBkOrPZiS+ig==",
++          "dev": true,
++          "requires": {
++            "domelementtype": "^2.0.1",
++            "domhandler": "^4.2.0",
++            "entities": "^2.0.0"
++          }
++        },
++        "domelementtype": {
++          "version": "2.2.0",
++          "resolved": "https://registry.npmjs.org/domelementtype/-/domelementtype-2.2.0.tgz",
++          "integrity": "sha512-DtBMo82pv1dFtUmHyr48beiuq792Sxohr+8Hm9zoxklYPfa6n0Z3Byjj2IV7bmr2IyqClnqEQhfgHJJ5QF0R5A==",
++          "dev": true
++        },
++        "tslib": {
++          "version": "2.3.1",
++          "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.3.1.tgz",
++          "integrity": "sha512-77EbyPPpMz+FRFRuAFlWMtmgUWGe9UOG2Z25NqCwiIjRhOf5iKGuzSe5P2w1laq+FkRy4p+PCuVkJSGkzTEKVw==",
++          "dev": true
++        }
++      }
++    },
++    "enzyme-shallow-equal": {
++      "version": "1.0.4",
++      "resolved": "https://registry.npmjs.org/enzyme-shallow-equal/-/enzyme-shallow-equal-1.0.4.tgz",
++      "integrity": "sha512-MttIwB8kKxypwHvRynuC3ahyNc+cFbR8mjVIltnmzQ0uKGqmsfO4bfBuLxb0beLNPhjblUEYvEbsg+VSygvF1Q==",
++      "dev": true,
++      "requires": {
++        "has": "^1.0.3",
++        "object-is": "^1.1.2"
++      }
++    },
+     "error-ex": {
+       "version": "1.3.2",
+       "resolved": "https://registry.npmjs.org/error-ex/-/error-ex-1.3.2.tgz",
+@@ -10195,6 +10463,12 @@
+         "unbox-primitive": "^1.0.0"
+       }
+     },
++    "es-array-method-boxes-properly": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/es-array-method-boxes-properly/-/es-array-method-boxes-properly-1.0.0.tgz",
++      "integrity": "sha512-wd6JXUmyHmt8T5a2xreUwKcGPq6f1f+WwIJkijUqiGcJz1qqnZgP6XIK+QyIWU5lT7imeNxUll48bziG+TSYcA==",
++      "dev": true
++    },
+     "es-check": {
+       "version": "6.0.0",
+       "resolved": "https://registry.npmjs.org/es-check/-/es-check-6.0.0.tgz",
+@@ -12386,6 +12660,16 @@
+         }
+       }
+     },
++    "html-element-map": {
++      "version": "1.3.1",
++      "resolved": "https://registry.npmjs.org/html-element-map/-/html-element-map-1.3.1.tgz",
++      "integrity": "sha512-6XMlxrAFX4UEEGxctfFnmrFaaZFNf9i5fNuV5wZ3WWQ4FVaNP1aX1LkX9j2mfEx1NpjeE/rL3nmgEn23GdFmrg==",
++      "dev": true,
++      "requires": {
++        "array.prototype.filter": "^1.0.0",
++        "call-bind": "^1.0.2"
++      }
++    },
+     "html-encoding-sniffer": {
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/html-encoding-sniffer/-/html-encoding-sniffer-2.0.1.tgz",
+@@ -13761,6 +14045,12 @@
+       "resolved": "https://registry.npmjs.org/is-string/-/is-string-1.0.6.tgz",
+       "integrity": "sha512-2gdzbKUuqtQ3lYNrUTQYoClPhm7oQu4UdpSZMp1/DGgkHBT8E2Z1l0yMdb6D4zNAxwDiMv8MdulKROJGNl0Q0w=="
+     },
++    "is-subset": {
++      "version": "0.1.1",
++      "resolved": "https://registry.npmjs.org/is-subset/-/is-subset-0.1.1.tgz",
++      "integrity": "sha1-ilkRfZMt4d4A8kX83TnOQ/HpOaY=",
++      "dev": true
++    },
+     "is-svg": {
+       "version": "4.3.1",
+       "resolved": "https://registry.npmjs.org/is-svg/-/is-svg-4.3.1.tgz",
+@@ -17414,6 +17704,12 @@
+       "integrity": "sha1-nMtOUF1Ia5FlE0V3KIWi3yf9AXw=",
+       "dev": true
+     },
++    "lodash.escape": {
++      "version": "4.0.1",
++      "resolved": "https://registry.npmjs.org/lodash.escape/-/lodash.escape-4.0.1.tgz",
++      "integrity": "sha1-yQRGkMIeBClL6qUXcS/e0fqI3pg=",
++      "dev": true
++    },
+     "lodash.filter": {
+       "version": "4.6.0",
+       "resolved": "https://registry.npmjs.org/lodash.filter/-/lodash.filter-4.6.0.tgz",
+@@ -17424,11 +17720,23 @@
+       "resolved": "https://registry.npmjs.org/lodash.flatten/-/lodash.flatten-4.4.0.tgz",
+       "integrity": "sha1-8xwiIlqWMtK7+OSt2+8kCqdlph8="
+     },
++    "lodash.flattendeep": {
++      "version": "4.4.0",
++      "resolved": "https://registry.npmjs.org/lodash.flattendeep/-/lodash.flattendeep-4.4.0.tgz",
++      "integrity": "sha1-+wMJF/hqMTTlvJvsDWngAT3f7bI=",
++      "dev": true
++    },
+     "lodash.foreach": {
+       "version": "4.5.0",
+       "resolved": "https://registry.npmjs.org/lodash.foreach/-/lodash.foreach-4.5.0.tgz",
+       "integrity": "sha1-Gmo16s5AEoDH8G3d7DUWWrJ+PlM="
+     },
++    "lodash.isequal": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/lodash.isequal/-/lodash.isequal-4.5.0.tgz",
++      "integrity": "sha1-QVxEePK8wwEgwizhDtMib30+GOA=",
++      "dev": true
++    },
+     "lodash.isfunction": {
+       "version": "3.0.8",
+       "resolved": "https://registry.npmjs.org/lodash.isfunction/-/lodash.isfunction-3.0.8.tgz",
+@@ -18065,6 +18373,12 @@
+         "minimist": "^1.2.5"
+       }
+     },
++    "moo": {
++      "version": "0.5.1",
++      "resolved": "https://registry.npmjs.org/moo/-/moo-0.5.1.tgz",
++      "integrity": "sha512-I1mnb5xn4fO80BH9BLcF0yLypy2UKl+Cb01Fu0hJRkJjlCRtxZMWkTdAtDd5ZqCOxtCkhmRwyI57vWT+1iZ67w==",
++      "dev": true
++    },
+     "mozjpeg": {
+       "version": "7.1.1",
+       "resolved": "https://registry.npmjs.org/mozjpeg/-/mozjpeg-7.1.1.tgz",
+@@ -18152,6 +18466,26 @@
+       "integrity": "sha1-Sr6/7tdUHywnrPspvbvRXI1bpPc=",
+       "dev": true
+     },
++    "nearley": {
++      "version": "2.20.1",
++      "resolved": "https://registry.npmjs.org/nearley/-/nearley-2.20.1.tgz",
++      "integrity": "sha512-+Mc8UaAebFzgV+KpI5n7DasuuQCHA89dmwm7JXw3TV43ukfNQ9DnBH3Mdb2g/I4Fdxc26pwimBWvjIw0UAILSQ==",
++      "dev": true,
++      "requires": {
++        "commander": "^2.19.0",
++        "moo": "^0.5.0",
++        "railroad-diagrams": "^1.0.0",
++        "randexp": "0.4.6"
++      },
++      "dependencies": {
++        "commander": {
++          "version": "2.20.3",
++          "resolved": "https://registry.npmjs.org/commander/-/commander-2.20.3.tgz",
++          "integrity": "sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==",
++          "dev": true
++        }
++      }
++    },
+     "needle": {
+       "version": "2.9.1",
+       "resolved": "https://registry.npmjs.org/needle/-/needle-2.9.1.tgz",
+@@ -18968,6 +19302,15 @@
+       "integrity": "sha512-Ofn/CTFzRGTTxwpNEs9PP93gXShHcTq255nzRYSKe8AkVpZY7e1fpmTfOyoIvjP5HG7Z2ZM7VS9PPhQGW2pOpw==",
+       "dev": true
+     },
++    "parse5-htmlparser2-tree-adapter": {
++      "version": "6.0.1",
++      "resolved": "https://registry.npmjs.org/parse5-htmlparser2-tree-adapter/-/parse5-htmlparser2-tree-adapter-6.0.1.tgz",
++      "integrity": "sha512-qPuWvbLgvDGilKc5BoicRovlT4MtYT6JfJyBOMDsKoiT+GiuP5qyrPCnR9HcPECIJJmZh5jRndyNThnhhb/vlA==",
++      "dev": true,
++      "requires": {
++        "parse5": "^6.0.1"
++      }
++    },
+     "parseurl": {
+       "version": "1.3.3",
+       "resolved": "https://registry.npmjs.org/parseurl/-/parseurl-1.3.3.tgz",
+@@ -19053,6 +19396,12 @@
+       "dev": true,
+       "optional": true
+     },
++    "performance-now": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/performance-now/-/performance-now-2.1.0.tgz",
++      "integrity": "sha1-Ywn04OX6kT7BxpMHrjZLSzd8nns=",
++      "dev": true
++    },
+     "picocolors": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/picocolors/-/picocolors-1.0.0.tgz",
+@@ -20094,6 +20443,31 @@
+       "resolved": "https://registry.npmjs.org/quick-format-unescaped/-/quick-format-unescaped-4.0.4.tgz",
+       "integrity": "sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg=="
+     },
++    "raf": {
++      "version": "3.4.1",
++      "resolved": "https://registry.npmjs.org/raf/-/raf-3.4.1.tgz",
++      "integrity": "sha512-Sq4CW4QhwOHE8ucn6J34MqtZCeWFP2aQSmrlroYgqAV1PjStIhJXxYuTgUIfkEk7zTLjmIjLmU5q+fbD1NnOJA==",
++      "dev": true,
++      "requires": {
++        "performance-now": "^2.1.0"
++      }
++    },
++    "railroad-diagrams": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/railroad-diagrams/-/railroad-diagrams-1.0.0.tgz",
++      "integrity": "sha1-635iZ1SN3t+4mcG5Dlc3RVnN234=",
++      "dev": true
++    },
++    "randexp": {
++      "version": "0.4.6",
++      "resolved": "https://registry.npmjs.org/randexp/-/randexp-0.4.6.tgz",
++      "integrity": "sha512-80WNmd9DA0tmZrw9qQa62GPPWfuXJknrmVmLcxvq4uZBdYqb1wYoKTmnlGUchvVWe0XiLupYkBoXVOxz3C8DYQ==",
++      "dev": true,
++      "requires": {
++        "discontinuous-range": "1.0.0",
++        "ret": "~0.1.10"
++      }
++    },
+     "randombytes": {
+       "version": "2.1.0",
+       "resolved": "https://registry.npmjs.org/randombytes/-/randombytes-2.1.0.tgz",
+@@ -20532,6 +20906,16 @@
+         "tiny-warning": "^1.0.0"
+       }
+     },
++    "react-shallow-renderer": {
++      "version": "16.14.1",
++      "resolved": "https://registry.npmjs.org/react-shallow-renderer/-/react-shallow-renderer-16.14.1.tgz",
++      "integrity": "sha512-rkIMcQi01/+kxiTE9D3fdS959U1g7gs+/rborw++42m1O9FAQiNI/UNRZExVUoAOprn4umcXf+pFRou8i4zuBg==",
++      "dev": true,
++      "requires": {
++        "object-assign": "^4.1.1",
++        "react-is": "^16.12.0 || ^17.0.0"
++      }
++    },
+     "react-share": {
+       "version": "4.4.0",
+       "resolved": "https://registry.npmjs.org/react-share/-/react-share-4.4.0.tgz",
+@@ -20561,6 +20945,26 @@
+       "resolved": "https://registry.npmjs.org/react-table/-/react-table-7.7.0.tgz",
+       "integrity": "sha512-jBlj70iBwOTvvImsU9t01LjFjy4sXEtclBovl3mTiqjz23Reu0DKnRza4zlLtOPACx6j2/7MrQIthIK1Wi+LIA=="
+     },
++    "react-test-renderer": {
++      "version": "17.0.2",
++      "resolved": "https://registry.npmjs.org/react-test-renderer/-/react-test-renderer-17.0.2.tgz",
++      "integrity": "sha512-yaQ9cB89c17PUb0x6UfWRs7kQCorVdHlutU1boVPEsB8IDZH6n9tHxMacc3y0JoXOJUsZb/t/Mb8FUWMKaM7iQ==",
++      "dev": true,
++      "requires": {
++        "object-assign": "^4.1.1",
++        "react-is": "^17.0.2",
++        "react-shallow-renderer": "^16.13.1",
++        "scheduler": "^0.20.2"
++      },
++      "dependencies": {
++        "react-is": {
++          "version": "17.0.2",
++          "resolved": "https://registry.npmjs.org/react-is/-/react-is-17.0.2.tgz",
++          "integrity": "sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==",
++          "dev": true
++        }
++      }
++    },
+     "react-transition-group": {
+       "version": "4.4.2",
+       "resolved": "https://registry.npmjs.org/react-transition-group/-/react-transition-group-4.4.2.tgz",
+@@ -21132,6 +21536,16 @@
+       "integrity": "sha512-Dbzdc+prLXZuB/suRptDnBUY29SdGvND3bLg6cll8n7PNqzuyCxSlRfrkn8PqjS9n4QVsiM7RCvxCkKAkTQRjA==",
+       "dev": true
+     },
++    "rst-selector-parser": {
++      "version": "2.2.3",
++      "resolved": "https://registry.npmjs.org/rst-selector-parser/-/rst-selector-parser-2.2.3.tgz",
++      "integrity": "sha1-gbIw6i/MYGbInjRy3nlChdmwPZE=",
++      "dev": true,
++      "requires": {
++        "lodash.flattendeep": "^4.4.0",
++        "nearley": "^2.7.10"
++      }
++    },
+     "rsvp": {
+       "version": "4.8.5",
+       "resolved": "https://registry.npmjs.org/rsvp/-/rsvp-4.8.5.tgz",
+@@ -22247,6 +22661,78 @@
+         }
+       }
+     },
++    "string.prototype.trim": {
++      "version": "1.2.5",
++      "resolved": "https://registry.npmjs.org/string.prototype.trim/-/string.prototype.trim-1.2.5.tgz",
++      "integrity": "sha512-Lnh17webJVsD6ECeovpVN17RlAKjmz4rF9S+8Y45CkMc/ufVpTkU3vZIyIC7sllQ1FCvObZnnCdNs/HXTUOTlg==",
++      "dev": true,
++      "requires": {
++        "call-bind": "^1.0.2",
++        "define-properties": "^1.1.3",
++        "es-abstract": "^1.19.1"
++      },
++      "dependencies": {
++        "es-abstract": {
++          "version": "1.19.1",
++          "resolved": "https://registry.npmjs.org/es-abstract/-/es-abstract-1.19.1.tgz",
++          "integrity": "sha512-2vJ6tjA/UfqLm2MPs7jxVybLoB8i1t1Jd9R3kISld20sIxPcTbLuggQOUxeWeAvIUkduv/CfMjuh4WmiXr2v9w==",
++          "dev": true,
++          "requires": {
++            "call-bind": "^1.0.2",
++            "es-to-primitive": "^1.2.1",
++            "function-bind": "^1.1.1",
++            "get-intrinsic": "^1.1.1",
++            "get-symbol-description": "^1.0.0",
++            "has": "^1.0.3",
++            "has-symbols": "^1.0.2",
++            "internal-slot": "^1.0.3",
++            "is-callable": "^1.2.4",
++            "is-negative-zero": "^2.0.1",
++            "is-regex": "^1.1.4",
++            "is-shared-array-buffer": "^1.0.1",
++            "is-string": "^1.0.7",
++            "is-weakref": "^1.0.1",
++            "object-inspect": "^1.11.0",
++            "object-keys": "^1.1.1",
++            "object.assign": "^4.1.2",
++            "string.prototype.trimend": "^1.0.4",
++            "string.prototype.trimstart": "^1.0.4",
++            "unbox-primitive": "^1.0.1"
++          }
++        },
++        "is-callable": {
++          "version": "1.2.4",
++          "resolved": "https://registry.npmjs.org/is-callable/-/is-callable-1.2.4.tgz",
++          "integrity": "sha512-nsuwtxZfMX67Oryl9LCQ+upnC0Z0BgpwntpS89m1H/TLF0zNfzfLMV/9Wa/6MZsj0acpEjAO0KF1xT6ZdLl95w==",
++          "dev": true
++        },
++        "is-regex": {
++          "version": "1.1.4",
++          "resolved": "https://registry.npmjs.org/is-regex/-/is-regex-1.1.4.tgz",
++          "integrity": "sha512-kvRdxDsxZjhzUX07ZnLydzS1TU/TJlTUHHY4YLL87e37oUA49DfkLqgy+VjFocowy29cKvcSiu+kIv728jTTVg==",
++          "dev": true,
++          "requires": {
++            "call-bind": "^1.0.2",
++            "has-tostringtag": "^1.0.0"
++          }
++        },
++        "is-string": {
++          "version": "1.0.7",
++          "resolved": "https://registry.npmjs.org/is-string/-/is-string-1.0.7.tgz",
++          "integrity": "sha512-tE2UXzivje6ofPW7l23cjDOMa09gb7xlAqG6jG5ej6uPV32TlWP3NKPigtaGeHNu9fohccRYvIiZMfOOnOYUtg==",
++          "dev": true,
++          "requires": {
++            "has-tostringtag": "^1.0.0"
++          }
++        },
++        "object-inspect": {
++          "version": "1.11.0",
++          "resolved": "https://registry.npmjs.org/object-inspect/-/object-inspect-1.11.0.tgz",
++          "integrity": "sha512-jp7ikS6Sd3GxQfZJPyH3cjcbJF6GZPClgdV+EFygjFLQ5FmW/dRUnTd9PQ9k0JhoNDabWFbpF1yCdSWCC6gexg==",
++          "dev": true
++        }
++      }
++    },
+     "string.prototype.trimend": {
+       "version": "1.0.4",
+       "resolved": "https://registry.npmjs.org/string.prototype.trimend/-/string.prototype.trimend-1.0.4.tgz",
+diff --git a/package.json b/package.json
+index e732dff..b9b5621 100644
+--- a/package.json
++++ b/package.json
+@@ -43,6 +43,7 @@
+     "@fortawesome/free-solid-svg-icons": "5.15.4",
+     "@fortawesome/react-fontawesome": "0.1.16",
+     "@pact-foundation/pact": "9.16.5",
++    "@popperjs/core": "2.10.2",
+     "@reduxjs/toolkit": "1.6.2",
+     "classnames": "2.3.1",
+     "core-js": "3.18.3",
+@@ -70,8 +71,10 @@
+     "@testing-library/jest-dom": "5.14.1",
+     "@testing-library/react": "10.3.0",
+     "@testing-library/user-event": "13.4.1",
++    "@wojtekmaj/enzyme-adapter-react-17": "^0.6.5",
+     "axios-mock-adapter": "1.20.0",
+     "codecov": "3.8.3",
++    "enzyme": "^3.11.0",
+     "es-check": "6.0.0",
+     "glob": "7.2.0",
+     "husky": "7.0.4",
+diff --git a/src/tour/Checkpoint.jsx b/src/tour/Checkpoint.jsx
+new file mode 100644
+index 0000000..a4db2fb
+--- /dev/null
++++ b/src/tour/Checkpoint.jsx
+@@ -0,0 +1,69 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import CheckpointActionRow from './CheckpointActionRow';
++import CheckpointBody from './CheckpointBody';
++import CheckpointBreadcrumbs from './CheckpointBreadcrumbs';
++import CheckpointTitle from './CheckpointTitle';
++
++function Checkpoint({
++  body,
++  hideCheckpoint,
++  index,
++  title,
++  totalCheckpoints,
++  ...props
++}) {
++  const isLastCheckpoint = index + 1 === totalCheckpoints;
++  const isOnlyCheckpoint = totalCheckpoints === 1;
++  return (
++    <div
++      id="checkpoint"
++      className="checkpoint-popover p-4 bg-light-300"
++      aria-labelledby="checkpoint-title"
++      role="dialog"
++      style={{ display: hideCheckpoint ? 'none' : 'block' }}
++    >
++      {/* This text is not translated due to Paragon's lack of i18n support */}
++      <span className="sr-only">Top of step {index + 1}</span>
++      {(title || !isOnlyCheckpoint) && (
++        <div className="d-flex justify-content-between mb-2.5" style={{ overflowX: 'scroll' }}>
++          <CheckpointTitle>{title}</CheckpointTitle>
++          <CheckpointBreadcrumbs currentIndex={index} totalCheckpoints={totalCheckpoints} />
++        </div>
++      )}
++      <CheckpointBody>{body}</CheckpointBody>
++      <CheckpointActionRow
++        isLastCheckpoint={isLastCheckpoint}
++        {...props}
++      />
++      <div id="checkpoint-arrow" data-popper-arrow />
++      {/* This text is not translated due to Paragon's lack of i18n support */}
++      <span className="sr-only">Bottom of step {index + 1}</span>
++    </div>
++  );
++}
++
++Checkpoint.defaultProps = {
++  advanceButtonText: null,
++  body: null,
++  dismissButtonText: null,
++  endButtonText: null,
++  title: null,
++};
++
++Checkpoint.propTypes = {
++  advanceButtonText: PropTypes.string,
++  body: PropTypes.string,
++  dismissButtonText: PropTypes.string,
++  endButtonText: PropTypes.string,
++  hideCheckpoint: PropTypes.bool.isRequired,
++  index: PropTypes.number.isRequired,
++  onAdvance: PropTypes.func.isRequired,
++  onDismiss: PropTypes.func.isRequired,
++  onEnd: PropTypes.func.isRequired,
++  title: PropTypes.string,
++  totalCheckpoints: PropTypes.number.isRequired,
++};
++
++export default Checkpoint;
+diff --git a/src/tour/Checkpoint.scss b/src/tour/Checkpoint.scss
+new file mode 100644
+index 0000000..036b087
+--- /dev/null
++++ b/src/tour/Checkpoint.scss
+@@ -0,0 +1,62 @@
++.checkpoint-popover {
++  border-top: 8px solid $brand;
++  border-radius: $border-radius;
++  box-shadow: $popover-box-shadow;
++  z-index: 1060;
++  max-width: $popover-max-width;
++  @media (max-width: map-get($grid-breakpoints, 'md')) {
++    min-width: 90%;
++    max-width: 90%;
++  }
++
++  #checkpoint-arrow,
++  #checkpoint-arrow::before {
++    position: absolute;
++    width: .65em;
++    height: .65em;
++    background: inherit;
++  }
++
++  #checkpoint-arrow {
++    visibility: hidden;
++  }
++
++  #checkpoint-arrow::before {
++    visibility: visible;
++    content: '';
++    transform: rotate(45deg);
++  }
++
++  .checkpoint-popover_breadcrumb_active {
++    fill: $primary;
++  }
++
++  .checkpoint-popover_breadcrumb_inactive {
++    fill: transparent;
++    stroke: $primary;
++    stroke-width: 1px;
++  }
++
++  .checkpoint-popover_breadcrumb:not(:first-child) {
++    margin-left: 4px;
++  }
++}
++
++.checkpoint-popover[data-popper-placement^='top'] > #checkpoint-arrow {
++  bottom: -6px;
++}
++
++.checkpoint-popover[data-popper-placement^='bottom'] > #checkpoint-arrow {
++  top: -14px;
++  &::before {
++    background: $brand;
++  }
++}
++
++.checkpoint-popover[data-popper-placement^='left'] > #checkpoint-arrow {
++  right: -6px;
++}
++
++.checkpoint-popover[data-popper-placement^='right'] > #checkpoint-arrow {
++  left: -6px;
++}
+diff --git a/src/tour/CheckpointActionRow.jsx b/src/tour/CheckpointActionRow.jsx
+new file mode 100644
+index 0000000..a7af35b
+--- /dev/null
++++ b/src/tour/CheckpointActionRow.jsx
+@@ -0,0 +1,56 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { Button } from '@edx/paragon';
++
++export default function CheckpointActionRow({
++  advanceButtonText,
++  dismissButtonText,
++  endButtonText,
++  isLastCheckpoint,
++  onAdvance,
++  onDismiss,
++  onEnd,
++}) {
++  return (
++    <div className="d-flex justify-content-end">
++      {!isLastCheckpoint && (
++        <Button
++          variant="tertiary"
++          size="sm"
++          className="mr-2"
++          onClick={onDismiss}
++        >
++          {dismissButtonText}
++        </Button>
++      )}
++      <Button
++        autoFocus
++        variant="primary"
++        size="sm"
++        onClick={isLastCheckpoint ? onEnd : onAdvance}
++      >
++        {isLastCheckpoint ? endButtonText : advanceButtonText}
++      </Button>
++    </div>
++  );
++}
++
++CheckpointActionRow.defaultProps = {
++  advanceButtonText: '',
++  dismissButtonText: '',
++  endButtonText: '',
++  isLastCheckpoint: false,
++  onAdvance: () => {},
++  onDismiss: () => {},
++  onEnd: () => {},
++};
++
++CheckpointActionRow.propTypes = {
++  advanceButtonText: PropTypes.string,
++  dismissButtonText: PropTypes.string,
++  endButtonText: PropTypes.string,
++  isLastCheckpoint: PropTypes.bool,
++  onAdvance: PropTypes.func,
++  onDismiss: PropTypes.func,
++  onEnd: PropTypes.func,
++};
+diff --git a/src/tour/CheckpointBody.jsx b/src/tour/CheckpointBody.jsx
+new file mode 100644
+index 0000000..ae27d35
+--- /dev/null
++++ b/src/tour/CheckpointBody.jsx
+@@ -0,0 +1,22 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++export default function CheckpointBody({ children }) {
++  if (!children) {
++    return null;
++  }
++
++  return (
++    <div className="text-gray-700 mb-3.5">
++      {children}
++    </div>
++  );
++}
++
++CheckpointBody.defaultProps = {
++  children: null,
++};
++
++CheckpointBody.propTypes = {
++  children: PropTypes.node,
++};
+diff --git a/src/tour/CheckpointBreadcrumbs.jsx b/src/tour/CheckpointBreadcrumbs.jsx
+new file mode 100644
+index 0000000..3898229
+--- /dev/null
++++ b/src/tour/CheckpointBreadcrumbs.jsx
+@@ -0,0 +1,28 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++export default function CheckpointBreadcrumbs({ currentIndex, totalCheckpoints }) {
++  if (totalCheckpoints === 1) {
++    return null;
++  }
++  return (
++    <span className="d-flex align-items-center" aria-hidden focusable={false}>
++      {new Array(totalCheckpoints).fill(0).map((v, i) => (
++        <svg key={Math.random().toString(36).substr(2, 9)} aria-hidden focusable={false} role="img" width="14px" height="14px" viewBox="0 0 14 14">
++          {i === currentIndex ? <circle className="checkpoint-popover_breadcrumb checkpoint-popover_breadcrumb_active" cx="7" cy="7" r="3px" />
++            : <circle className="checkpoint-popover_breadcrumb checkpoint-popover_breadcrumb_inactive" cx="7" cy="7" r="2.5px" />}
++        </svg>
++      ))}
++    </span>
++  );
++}
++
++CheckpointBreadcrumbs.defaultProps = {
++  currentIndex: null,
++  totalCheckpoints: null,
++};
++
++CheckpointBreadcrumbs.propTypes = {
++  currentIndex: PropTypes.number,
++  totalCheckpoints: PropTypes.number,
++};
+diff --git a/src/tour/CheckpointTitle.jsx b/src/tour/CheckpointTitle.jsx
+new file mode 100644
+index 0000000..d90ec64
+--- /dev/null
++++ b/src/tour/CheckpointTitle.jsx
+@@ -0,0 +1,18 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++export default function CheckpointTitle({ children }) {
++  return (
++    <h2 id="checkpoint-title" className="h3 mb-0 mr-2.5">
++      {children}
++    </h2>
++  );
++}
++
++CheckpointTitle.defaultProps = {
++  children: null,
++};
++
++CheckpointTitle.propTypes = {
++  children: PropTypes.node,
++};
+diff --git a/src/tour/README.md b/src/tour/README.md
+new file mode 100644
+index 0000000..ea98a7d
+--- /dev/null
++++ b/src/tour/README.md
+@@ -0,0 +1,101 @@
++Tour
++=========================
++
++Basic Usage
++------------
++
++A `Tour` takes a list of tour objects. `Tour` will only support one enabled tour at a time. If multiple
++tours are enabled, Tour will only render the first enabled in the `tours` list.
++
++`Checkpoints` are rendered in the order they're listed in the checkpoint array.
++The checkpoint objects themselves have additional props that can override the props defined in a `Tour`.
++
++```$xslt
++const [isTourEnabled, setIsTourEnabled] = useState(false);
++const myFirstTour = {
++  tourId: 'myFirstTour',
++  advanceButtonText: 'Next',
++  dismissButtonText: 'Dismiss',
++  endButtonText: 'Okay',
++  enabled: isTourEnabled,
++  onDismiss: () => setIsTourEnabled(false),
++  onEnd: () => setIsTourEnabled(false),
++  checkpoints: [
++    {
++      body: 'Here's the first stop!',
++      placement: 'top',
++      target: '#checkpoint-1',
++      title: 'First checkpoint',
++    },
++    {
++      body: 'Here's the second stop!',
++      onDismiss: () => console.log('Dismissed the second checkpoint'),
++      placement: 'right',
++      target: '#checkpoint-2',
++      title: 'Second checkpoint',
++    },
++    {
++      body: 'Here's the third stop!',
++      placement: 'bottom',
++      target: '#checkpoint-3',
++      title: 'Third checkpoint',
++    }
++  ],
++};
++
++return (
++  <>
++    <Tour
++      tours={[myFirstTour]}
++    />
++    <Container>
++      <Button onClick={() => setIsTourEnabled(true)}>Start tour</Button>
++      <div id="checkpoint-1">...</div>
++      <Row>
++        <div id="checkpoint-2">...</div>
++        <div id="checkpoint-3">...</div>
++      </Row>
++    <Container>
++  </>
++);
++```
++
++Tour Props API
++------------
++
++tours `array`  
++: comprised of objects with the following values:  
++
++- **advanceButtonText** `string`:  
++The text displayed on all buttons used to advance the tour.  
++- **checkpoints** `array`:
++An array comprised of checkpoint objects supporting the following values:  
++  - **advanceButtonText** `string`:
++  The text displayed on the button used to advance the tour for the given Checkpoint (overrides the `advanceButtonText` defined in the parent tour object).  
++  - **body** `string`  
++  - **dismissButtonText** `string`:
++ The text displayed on the button used to dismiss the tour for the given Checkpoint (overrides the `dismissButtonText` defined in the parent tour object).  
++  - **endButtonText** `string`:
++  The text displayed on the button used to end the tour for the given Checkpoint (overrides the `endButtonText` defined in the parent tour object).  
++  - **onAdvance** `func`:
++  A function that would be triggered when triggering the `onClick` event of the advance button for the given Checkpoint.  
++  - **onDismiss** `func`:
++  A function that would be triggered when triggering the `onClick` event of the dismiss button for the given Checkpoint (overrides the `onDismiss` function defined in the parent tour object).  
++  - **placement** `string`:
++  A string that dictates the alignment of the Checkpoint around its target.  
++  - **target** `string` *required*:
++  The CSS selector for the Checkpoint's desired target.  
++  - **title** `string`
++- **dismissButtonText** `string`:
++The text displayed on the button used to dismiss the tour.  
++- **enabled** `bool` *required*:
++Whether the tour is enabled. If there are multiple tours defined, only one should be enabled at a time.  
++- **endButtonText** `string`:
++The text displayed on the button used to end the tour.  
++- **onDismiss** `func`:
++A function that would be triggered when triggering the `onClick` event of the dismiss button.  
++- **onEnd** `func`:
++A function that would be triggered when triggering the `onClick` event of the end button.  
++- **startingIndex** `number`:
++The index of the desired `Checkpoint` to render when the tour starts.  
++- **tourId** `string` *required*
+diff --git a/src/tour/Tour.jsx b/src/tour/Tour.jsx
+new file mode 100644
+index 0000000..9db9b2e
+--- /dev/null
++++ b/src/tour/Tour.jsx
+@@ -0,0 +1,189 @@
++import React, { useEffect, useState } from 'react';
++import PropTypes from 'prop-types';
++import { useMediaQuery } from 'react-responsive';
++import { createPopper } from '@popperjs/core';
++
++import Checkpoint from './Checkpoint';
++
++function Tour({
++  tours,
++}) {
++  const tourValue = tours.filter((tour) => tour.enabled)[0];
++  const [index, setIndex] = useState(0);
++  const [checkpointData, setCheckpointData] = useState(null);
++  const [isEnabled, setIsEnabled] = useState(tourValue && tourValue.enabled);
++  const [hideCheckpoint, setHideCheckpoint] = useState(false);
++
++  useEffect(() => {
++    if (tourValue) {
++      setCheckpointData(tourValue.checkpoints[index]);
++      setIndex(tourValue.startingIndex || 0);
++    }
++  }, []);
++
++  useEffect(() => {
++    setIsEnabled(tourValue && tourValue.enabled);
++  }, [tourValue]);
++
++  useEffect(() => {
++    if (tourValue) {
++      setCheckpointData(tourValue.checkpoints[index]);
++    }
++  }, [index, isEnabled]);
++
++  const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
++
++  useEffect(() => {
++    if (checkpointData && isEnabled) {
++      const targetElement = document.querySelector(checkpointData.target);
++      const checkpoint = document.querySelector('#checkpoint');
++      if (!targetElement) {
++        setHideCheckpoint(true);
++      } else {
++        setHideCheckpoint(false);
++        createPopper(targetElement, checkpoint, {
++          placement: isMobile ? 'top' : checkpointData.placement,
++          modifiers: [
++            {
++              name: 'offset',
++              options: {
++                offset: [0, 8],
++              },
++            },
++            {
++              name: 'arrow',
++              options: {
++                padding: 5,
++              },
++            },
++          ],
++        });
++
++        let targetOffset = targetElement.getBoundingClientRect().top;
++        if (checkpointData.placement && checkpointData.placement.includes('top')) {
++          if (targetOffset < 0) {
++            targetOffset *= -1;
++          }
++          targetOffset -= 280;
++        } else {
++          targetOffset -= 80;
++        }
++
++        window.scrollTo({
++          top: targetOffset, behavior: 'smooth',
++        });
++      }
++    }
++  }, [checkpointData, index, isMobile]);
++
++  useEffect(() => {
++    const handleEsc = (event) => {
++      if (isEnabled && event.keyCode === 27) {
++        setIsEnabled(false);
++        if (tourValue.onEnd) {
++          tourValue.onEnd();
++        }
++      }
++    };
++    window.addEventListener('keydown', handleEsc);
++
++    return () => {
++      window.removeEventListener('keydown', handleEsc);
++    };
++  }, [tourValue]);
++
++  if (!tourValue || !checkpointData || !isEnabled) {
++    return null;
++  }
++
++  const handleAdvance = () => {
++    setIndex(index + 1);
++    if (checkpointData.onAdvance) {
++      checkpointData.onAdvance();
++    }
++  };
++
++  const handleDismiss = () => {
++    setIndex(0);
++    setIsEnabled(false);
++    if (checkpointData.onDismiss) {
++      checkpointData.onDismiss();
++    } else {
++      tourValue.onDismiss();
++    }
++  };
++
++  const handleEnd = () => {
++    setIndex(0);
++    setIsEnabled(false);
++    if (tourValue.onEnd) {
++      tourValue.onEnd();
++    }
++  };
++
++  return (
++    <Checkpoint
++      advanceButtonText={checkpointData.advanceButtonText || tourValue.advanceButtonText}
++      body={checkpointData.body}
++      dismissButtonText={checkpointData.dismissButtonText || tourValue.dismissButtonText}
++      endButtonText={checkpointData.endButtonText || tourValue.endButtonText}
++      hideCheckpoint={hideCheckpoint}
++      index={index}
++      onAdvance={handleAdvance}
++      onDismiss={handleDismiss}
++      onEnd={handleEnd}
++      title={checkpointData.title}
++      totalCheckpoints={tourValue.checkpoints.length}
++    />
++  );
++}
++
++Tour.defaultProps = {
++  tours: {
++    advanceButtonText: '',
++    checkpoints: {
++      advanceButtonText: '',
++      body: '',
++      dismissButtonText: '',
++      endButtonText: '',
++      onAdvance: () => {},
++      onDismiss: () => {},
++      placement: 'top',
++      title: '',
++    },
++    dismissButtonText: '',
++    endButtonText: '',
++    onDismiss: () => {},
++    onEnd: () => {},
++    startingIndex: 0,
++  },
++};
++
++Tour.propTypes = {
++  tours: PropTypes.arrayOf(PropTypes.shape({
++    advanceButtonText: PropTypes.node,
++    checkpoints: PropTypes.arrayOf(PropTypes.shape({
++      advanceButtonText: PropTypes.string,
++      body: PropTypes.string,
++      dismissButtonText: PropTypes.string,
++      endButtonText: PropTypes.string,
++      onAdvance: PropTypes.func,
++      onDismiss: PropTypes.func,
++      placement: PropTypes.oneOf([
++        'top', 'top-start', 'top-end', 'right-start', 'right', 'right-end',
++        'left-start', 'left', 'left-end', 'bottom', 'bottom-start', 'bottom-end',
++      ]),
++      target: PropTypes.string.isRequired,
++      title: PropTypes.string,
++    })),
++    dismissButtonText: PropTypes.node,
++    enabled: PropTypes.bool.isRequired,
++    endButtonText: PropTypes.node,
++    onDismiss: PropTypes.func,
++    onEnd: PropTypes.func,
++    startingIndex: PropTypes.number,
++    tourId: PropTypes.string.isRequired,
++  })),
++};
++
++export default Tour;
+diff --git a/src/tour/tests/Checkpoint.test.jsx b/src/tour/tests/Checkpoint.test.jsx
+new file mode 100644
+index 0000000..4aa320b
+--- /dev/null
++++ b/src/tour/tests/Checkpoint.test.jsx
+@@ -0,0 +1,124 @@
++/**
++ * @jest-environment jsdom
++ */
++import Enzyme, { mount } from 'enzyme';
++import Adapter from '@wojtekmaj/enzyme-adapter-react-17';
++import React from 'react';
++
++import Checkpoint from '../Checkpoint';
++
++Enzyme.configure({ adapter: new Adapter() });
++
++describe('Checkpoint', () => {
++  const handleAdvance = jest.fn();
++  const handleDismiss = jest.fn();
++  const handleEnd = jest.fn();
++
++  describe('second Checkpoint in Tour', () => {
++    const secondCheckpointWrapper = mount((
++      <Checkpoint
++        advanceButtonText="Next"
++        body="Lorem ipsum checkpoint body"
++        dismissButtonText="Dismiss"
++        endButtonText="End"
++        index={1}
++        onAdvance={handleAdvance}
++        onDismiss={handleDismiss}
++        onEnd={handleEnd}
++        title="Checkpoint title"
++        totalCheckpoints={5}
++      />
++    ));
++
++    it('renders correct active breadcrumb', () => {
++      const breadcrumbs = secondCheckpointWrapper.find('svg');
++      expect(breadcrumbs.length).toEqual(5);
++      expect(breadcrumbs.at(0).exists('.checkpoint-popover_breadcrumb_inactive')).toBe(true);
++      expect(breadcrumbs.at(1).exists('.checkpoint-popover_breadcrumb_active')).toBe(true);
++      expect(breadcrumbs.at(2).exists('.checkpoint-popover_breadcrumb_inactive')).toBe(true);
++      expect(breadcrumbs.at(3).exists('.checkpoint-popover_breadcrumb_inactive')).toBe(true);
++      expect(breadcrumbs.at(4).exists('.checkpoint-popover_breadcrumb_inactive')).toBe(true);
++    });
++
++    it('only renders advance and dismiss buttons (i.e. does not render end button)', () => {
++      const buttons = secondCheckpointWrapper.find('button');
++      expect(buttons.length).toEqual(2);
++
++      const dismissButton = buttons.at(0);
++      expect(dismissButton.text()).toEqual('Dismiss');
++
++      const advanceButton = buttons.at(1);
++      expect(advanceButton.text()).toEqual('Next');
++    });
++
++    it('dismiss button onClick calls handleDismiss', () => {
++      const dismissButton = secondCheckpointWrapper.find('button').at(0);
++      dismissButton.simulate('click');
++      expect(handleDismiss).toHaveBeenCalledTimes(1);
++    });
++
++    it('advance button onClick calls handleAdvance', () => {
++      const advanceButton = secondCheckpointWrapper.find('button').at(1);
++      advanceButton.simulate('click');
++      expect(handleAdvance).toHaveBeenCalledTimes(1);
++    });
++  });
++
++  describe('last Checkpoint in Tour', () => {
++    const lastCheckpointWrapper = mount((
++      <Checkpoint
++        advanceButtonText="Next"
++        body="Lorem ipsum checkpoint body"
++        dismissButtonText="Dismiss"
++        endButtonText="End"
++        index={4}
++        onAdvance={handleAdvance}
++        onDismiss={handleDismiss}
++        onEnd={handleEnd}
++        title="Checkpoint title"
++        totalCheckpoints={5}
++      />
++    ));
++
++    it('only renders end button (i.e. neither advance nor dismiss buttons)', () => {
++      const endButton = lastCheckpointWrapper.find('button');
++      expect(endButton.exists()).toBe(true);
++      expect(endButton.text()).toEqual('End');
++    });
++
++    it('end button onClick calls handleEnd', () => {
++      const endButton = lastCheckpointWrapper.find('button');
++      endButton.simulate('click');
++      expect(handleEnd).toHaveBeenCalledTimes(1);
++    });
++  });
++
++  describe('only one Checkpoint in Tour', () => {
++    const singleCheckpointWrapper = mount((
++      <Checkpoint
++        advanceButtonText="Next"
++        body="Lorem ipsum checkpoint body"
++        dismissButtonText="Dismiss"
++        endButtonText="End"
++        index={0}
++        onAdvance={handleAdvance}
++        onDismiss={handleDismiss}
++        onEnd={handleEnd}
++        title="Checkpoint title"
++        totalCheckpoints={1}
++      />
++    ));
++
++    it('only renders end button (i.e. neither advance nor dismiss buttons)', () => {
++      const endButton = singleCheckpointWrapper.find('button');
++      expect(endButton.length).toEqual(1);
++      expect(endButton.exists()).toBe(true);
++      expect(endButton.text()).toEqual('End');
++    });
++
++    it('does not render breadcrumbs', () => {
++      expect(singleCheckpointWrapper.exists('.checkpoint-popover_breadcrumb_inactive')).toBe(false);
++      expect(singleCheckpointWrapper.exists('.checkpoint-popover_breadcrumb_active')).toBe(false);
++    });
++  });
++});
+diff --git a/src/tour/tests/Tour.test.jsx b/src/tour/tests/Tour.test.jsx
+new file mode 100644
+index 0000000..626ad4d
+--- /dev/null
++++ b/src/tour/tests/Tour.test.jsx
+@@ -0,0 +1,378 @@
++/**
++ * @jest-environment jsdom
++ */
++import Enzyme, { mount } from 'enzyme';
++import React from 'react';
++import Adapter from '@wojtekmaj/enzyme-adapter-react-17';
++import { fireEvent, render, screen } from '@testing-library/react';
++import * as popper from '@popperjs/core';
++
++import Tour from '../Tour';
++
++// This can be removed once the component is ported over to Paragon
++Enzyme.configure({ adapter: new Adapter() });
++
++describe('Tour', () => {
++  const targets = (
++    <>
++      <div id="target-1">...</div>
++      <div id="target-2">...</div>
++      <div id="target-3">...</div>
++    </>
++  );
++  const handleDismiss = jest.fn();
++  const handleEnd = jest.fn();
++  const customOnDismiss = jest.fn();
++
++  const disabledTourData = {
++    advanceButtonText: 'Next',
++    dismissButtonText: 'Dismiss',
++    enabled: false,
++    endButtonText: 'Okay',
++    onDismiss: handleDismiss,
++    onEnd: handleEnd,
++    tourId: 'disabledTour',
++    checkpoints: [
++      {
++        body: 'Lorem ipsum body',
++        target: '#target-1',
++        title: 'Disabled tour',
++      },
++    ],
++  };
++
++  const tourData = {
++    advanceButtonText: 'Next',
++    dismissButtonText: 'Dismiss',
++    enabled: true,
++    endButtonText: 'Okay',
++    onDismiss: handleDismiss,
++    onEnd: handleEnd,
++    tourId: 'enabledTour',
++    checkpoints: [
++      {
++        body: 'Lorem ipsum body',
++        target: '#target-1',
++        title: 'Checkpoint 1',
++      },
++      {
++        body: 'Lorem ipsum body',
++        target: '#target-2',
++        title: 'Checkpoint 2',
++      },
++      {
++        body: 'Lorem ipsum body',
++        target: '#target-3',
++        title: 'Checkpoint 3',
++        onDismiss: customOnDismiss,
++        advanceButtonText: 'Override advance',
++        dismissButtonText: 'Override dismiss',
++
++      },
++      {
++        target: '#target-3',
++        title: 'Checkpoint 4',
++        endButtonText: 'Override end',
++      },
++    ],
++  };
++
++  describe('multiple enabled tours', () => {
++    it('renders first enabled tour', () => {
++      const secondEnabledTourData = {
++        advanceButtonText: 'Next',
++        dismissButtonText: 'Dismiss',
++        enabled: true,
++        endButtonText: 'Okay',
++        onDismiss: handleDismiss,
++        onEnd: handleEnd,
++        tourId: 'secondEnabledTour',
++        checkpoints: [
++          {
++            body: 'Lorem ipsum body',
++            target: '#target-1',
++            title: 'Second enabled tour',
++          },
++        ],
++      };
++
++      const tourWrapper = mount(
++        <>
++          <Tour
++            tours={[disabledTourData, tourData, secondEnabledTourData]}
++          />
++          {targets}
++        </>,
++      );
++
++      const checkpointTitle = tourWrapper.find('h2');
++      expect(checkpointTitle.text()).toEqual('Checkpoint 1');
++      expect(checkpointTitle.text()).not.toEqual('Second enabled tour');
++    });
++  });
++
++  describe('enabled tour', () => {
++    describe('with default settings', () => {
++      it('renders checkpoint with correct title, body, and breadcrumbs', () => {
++        const tourWrapper = mount(
++          <>
++            <Tour
++              tours={[tourData]}
++            />
++            {targets}
++          </>,
++        );
++        const checkpoint = tourWrapper.find('#checkpoint');
++        const checkpointTitle = checkpoint.find('h2');
++        expect(checkpointTitle.text()).toEqual('Checkpoint 1');
++        expect(checkpoint.find('svg').at(0).exists('.checkpoint-popover_breadcrumb_active')).toBe(true);
++      });
++
++      it('onClick of advance button advances to next checkpoint', () => {
++        const tourWrapper = mount(
++          <>
++            <Tour
++              tours={[tourData]}
++            />
++            {targets}
++          </>,
++        );
++
++        // Verify the first Checkpoint has rendered
++        const firstCheckpoint = tourWrapper.find('#checkpoint');
++        const firstCheckpointTitle = firstCheckpoint.find('h2');
++        expect(firstCheckpointTitle.text()).toEqual('Checkpoint 1');
++
++        // Click the advance button
++        const advanceButton = tourWrapper.find('button').at(1);
++        expect(advanceButton.text()).toEqual('Next');
++
++        advanceButton.simulate('click');
++
++        // Verify the second Checkpoint has rendered
++        const secondCheckpoint = tourWrapper.find('#checkpoint');
++        const secondCheckpointTitle = secondCheckpoint.find('h2');
++        expect(secondCheckpointTitle.text()).toEqual('Checkpoint 2');
++      });
++
++      it('onClick of dismiss button disables tour', () => {
++        const tourWrapper = mount(
++          <>
++            <Tour
++              tours={[tourData]}
++            />
++            {targets}
++          </>,
++        );
++
++        // Verify a Checkpoint has rendered
++        expect(tourWrapper.exists('#checkpoint')).toBe(true);
++
++        // Click the dismiss button
++        const dismissButton = tourWrapper.find('button').at(0);
++        expect(dismissButton.text()).toEqual('Dismiss');
++
++        dismissButton.simulate('click');
++
++        // Verify no Checkpoints have rendered
++        expect(tourWrapper.exists('#checkpoint')).toBe(false);
++      });
++
++      it('onClick of end button disables tour', () => {
++        const tourWrapper = mount(
++          <>
++            <Tour
++              tours={[tourData]}
++            />
++            {targets}
++          </>,
++        );
++
++        // Verify a Checkpoint has rendered
++        expect(tourWrapper.exists('#checkpoint')).toBe(true);
++
++        // Advance the Tour to the last Checkpoint
++        const advanceButton = tourWrapper.find('button').at(1);
++        advanceButton.simulate('click');
++        const advanceButton1 = tourWrapper.find('button').at(1);
++        advanceButton1.simulate('click');
++        const advanceButton2 = tourWrapper.find('button').at(1);
++        advanceButton2.simulate('click');
++
++        // Click the end button
++        const endButton = tourWrapper.find('button');
++        expect(endButton.text()).toEqual('Override end');
++
++        endButton.simulate('click');
++
++        // Verify no Checkpoints have rendered
++        expect(tourWrapper.exists('#checkpoint')).toBe(false);
++      });
++
++      it('onClick of escape key disables tour', () => {
++        // React Testing Library would not play nice with createPopper
++        // due to the order in which the Checkpoint renders. We'll mock
++        // out the function here so this test can proceed as expected.
++        const mock = jest.spyOn(popper, 'createPopper');
++        mock.mockImplementation(jest.fn());
++
++        render(
++          <div>
++            <Tour
++              tours={[tourData]}
++            />
++            {targets}
++          </div>,
++        );
++
++        // Verify a Checkpoint has rendered
++        expect(screen.getByRole('dialog')).toBeInTheDocument();
++
++        // Click Escape key
++        fireEvent.keyDown(screen.getByRole('dialog'), {
++          key: 'Escape',
++          code: 'Escape',
++          keyCode: 27,
++          charCode: 27,
++        });
++
++        // Verify no Checkpoints have been rendered
++        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
++        mock.mockRestore();
++      });
++    });
++
++    describe('with Checkpoint override settings', () => {
++      it('renders correct checkpoint on index override', () => {
++        const overrideTourData = tourData;
++        overrideTourData.startingIndex = 2;
++        const tourWrapper = mount((
++          <>
++            <Tour
++              tours={[overrideTourData]}
++            />
++            {targets}
++          </>
++        ));
++        expect(tourWrapper.exists('#checkpoint')).toBe(true);
++        const checkpointTitle = tourWrapper.find('h2');
++        expect(checkpointTitle.text()).toEqual('Checkpoint 3');
++        expect(tourWrapper.find('svg').at(2).exists('.checkpoint-popover_breadcrumb_active'));
++      });
++
++      it('applies override for advanceButtonText', () => {
++        const overrideTourData = tourData;
++        overrideTourData.startingIndex = 2;
++        const tourWrapper = mount((
++          <>
++            <Tour
++              tours={[overrideTourData]}
++            />
++            {targets}
++          </>
++        ));
++        const advanceButton = tourWrapper.find('button').at(1);
++        expect(advanceButton.text()).toEqual('Override advance');
++      });
++
++      it('applies override for dismissButtonText', () => {
++        const overrideTourData = tourData;
++        overrideTourData.startingIndex = 2;
++        const tourWrapper = mount((
++          <>
++            <Tour
++              tours={[overrideTourData]}
++            />
++            {targets}
++          </>
++        ));
++        const dismissButton = tourWrapper.find('button').at(0);
++        expect(dismissButton.text()).toEqual('Override dismiss');
++      });
++
++      it('applies override for endButtonText', () => {
++        const overrideTourData = tourData;
++        overrideTourData.startingIndex = 3;
++        const tourWrapper = mount((
++          <>
++            <Tour
++              tours={[overrideTourData]}
++            />
++            {targets}
++          </>
++        ));
++
++        const endButton = tourWrapper.find('button');
++        expect(endButton.text()).toEqual('Override end');
++      });
++
++      it('calls customHandleDismiss onClick of dismiss button', () => {
++        const overrideTourData = tourData;
++        overrideTourData.startingIndex = 2;
++        const tourWrapper = mount((
++          <>
++            <Tour
++              tours={[overrideTourData]}
++            />
++            {targets}
++          </>
++        ));
++        const dismissButton = tourWrapper.find('button').at(0);
++        expect(dismissButton.text()).toEqual('Override dismiss');
++        dismissButton.simulate('click');
++
++        expect(customOnDismiss).toHaveBeenCalledTimes(1);
++        expect(tourWrapper.exists('#checkpoint')).toBe(false);
++      });
++    });
++
++    describe('with invalid Checkpoint', () => {
++      it('does not render', () => {
++        const badTourData = {
++          advanceButtonText: 'Next',
++          dismissButtonText: 'Dismiss',
++          enabled: true,
++          endButtonText: 'Okay',
++          onDismiss: handleDismiss,
++          onEnd: handleEnd,
++          tourId: 'badTour',
++          checkpoints: [
++            {
++              body: 'Lorem ipsum body',
++              target: 'bad-target-data',
++              title: 'Checkpoint 1',
++            },
++          ],
++        };
++
++        const tourWrapper = mount((
++          <>
++            <Tour
++              tours={[badTourData]}
++            />
++            {targets}
++          </>
++        ));
++
++        const checkpoint = tourWrapper.find('#checkpoint');
++
++        expect(checkpoint.props().style.display).toEqual('none');
++      });
++    });
++  });
++
++  describe('disabled tour', () => {
++    it('does not render', () => {
++      const tourWrapper = mount((
++        <>
++          <Tour
++            tours={[disabledTourData]}
++          />
++          {targets}
++        </>
++      ));
++
++      expect(tourWrapper.exists('#checkpoint')).toBe(false);
++    });
++  });
++});
+-- 
+2.34.1
+

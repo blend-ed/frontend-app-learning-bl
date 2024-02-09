@@ -1,0 +1,307 @@
+From 2bf4f2a0b5c1d56fc241337ad4f90ce5720cdfd2 Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Tue, 21 Dec 2021 13:50:07 -0500
+Subject: [PATCH 0767/1021] feat: Add NotificationTray persistence by course
+ (#772)
+
+REV-2424
+---
+ src/courseware/course/Course.jsx              | 28 +++++++--
+ src/courseware/course/Course.test.jsx         | 59 +++++++++++++++++++
+ src/courseware/course/sequence/Sequence.jsx   |  6 +-
+ .../course/sequence/Sequence.test.jsx         | 15 +++++
+ .../SequenceNavigation.jsx                    |  8 +--
+ src/data/sessionStorage.js                    | 34 +++++++++++
+ 6 files changed, 138 insertions(+), 12 deletions(-)
+ create mode 100644 src/data/sessionStorage.js
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 6a0310b..7da85b5 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -16,6 +16,7 @@ import NotificationTrigger from './NotificationTrigger';
+ import { useModel } from '../../generic/model-store';
+ import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWindowSize';
+ import { getLocalStorage, setLocalStorage } from '../../data/localStorage';
++import { getSessionStorage, setSessionStorage } from '../../data/sessionStorage';
+ 
+ /** [MM-P2P] Experiment */
+ import { initCoursewareMMP2P, MMP2PBlockModal } from '../../experiments/mm-p2p';
+@@ -50,15 +51,32 @@ function Course({
+     courseId, sequenceId, unitId, celebrateFirstSection, dispatch, celebrations,
+   );
+ 
+-  const shouldDisplayNotificationTrigger = useWindowSize().width >= responsiveBreakpoints.small.minWidth;
+-
+-  const shouldDisplayNotificationTrayOpen = useWindowSize().width > responsiveBreakpoints.medium.minWidth;
++  // Responsive breakpoints for showing the notification button/tray
++  const shouldDisplayNotificationTriggerInCourse = useWindowSize().width >= responsiveBreakpoints.small.minWidth;
++  const shouldDisplayNotificationTrayOpenOnLoad = useWindowSize().width > responsiveBreakpoints.medium.minWidth;
++
++  // Course specific notification tray open/closed persistance by browser session
++  if (!getSessionStorage(`notificationTrayStatus.${courseId}`)) {
++    if (shouldDisplayNotificationTrayOpenOnLoad) {
++      setSessionStorage(`notificationTrayStatus.${courseId}`, 'open');
++    } else {
++      // responsive version displays the tray closed on initial load, set the sessionStorage to closed
++      setSessionStorage(`notificationTrayStatus.${courseId}`, 'closed');
++    }
++  }
+ 
+   const [notificationTrayVisible, setNotificationTray] = verifiedMode
+-    && shouldDisplayNotificationTrayOpen ? useState(true) : useState(false);
++    && shouldDisplayNotificationTrayOpenOnLoad && getSessionStorage(`notificationTrayStatus.${courseId}`) !== 'closed' ? useState(true) : useState(false);
++
+   const isNotificationTrayVisible = () => notificationTrayVisible && setNotificationTray;
++
+   const toggleNotificationTray = () => {
+     if (notificationTrayVisible) { setNotificationTray(false); } else { setNotificationTray(true); }
++    if (getSessionStorage(`notificationTrayStatus.${courseId}`) === 'open') {
++      setSessionStorage(`notificationTrayStatus.${courseId}`, 'closed');
++    } else {
++      setSessionStorage(`notificationTrayStatus.${courseId}`, 'open');
++    }
+   };
+ 
+   if (!getLocalStorage(`notificationStatus.${courseId}`)) {
+@@ -96,7 +114,7 @@ function Course({
+           mmp2p={MMP2P}
+         />
+ 
+-        { shouldDisplayNotificationTrigger ? (
++        { shouldDisplayNotificationTriggerInCourse ? (
+           <NotificationTrigger
+             courseId={courseId}
+             toggleNotificationTray={toggleNotificationTray}
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 26512c8..2f44ff3 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -9,6 +9,7 @@ import * as celebrationUtils from './celebration/utils';
+ import useWindowSize from '../../generic/tabs/useWindowSize';
+ 
+ jest.mock('@edx/frontend-platform/analytics');
++jest.mock('./NotificationTray', () => () => <div data-testid="NotificationTray" />);
+ jest.mock('../../generic/tabs/useWindowSize');
+ useWindowSize.mockReturnValue({ width: 1200 });
+ 
+@@ -17,6 +18,8 @@ celebrationUtils.recordFirstSectionCelebration = recordFirstSectionCelebration;
+ 
+ describe('Course', () => {
+   let store;
++  let getItemSpy;
++  let setItemSpy;
+   const mockData = {
+     nextSequenceHandler: () => {},
+     previousSequenceHandler: () => {},
+@@ -32,6 +35,13 @@ describe('Course', () => {
+       sequenceId,
+       unitId: Object.values(models.units)[0].id,
+     });
++    getItemSpy = jest.spyOn(Object.getPrototypeOf(window.sessionStorage), 'getItem');
++    setItemSpy = jest.spyOn(Object.getPrototypeOf(window.sessionStorage), 'setItem');
++  });
++
++  afterAll(() => {
++    getItemSpy.mockRestore();
++    setItemSpy.mockRestore();
+   });
+ 
+   it('loads learning sequence', async () => {
+@@ -91,6 +101,55 @@ describe('Course', () => {
+     expect(notificationTrigger).not.toHaveClass('trigger-active');
+   });
+ 
++  it('handles click to open/close notification tray', async () => {
++    sessionStorage.clear();
++    render(<Course {...mockData} />);
++    expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"open"');
++    const notificationShowButton = await screen.findByRole('button', { name: /Show notification tray/i });
++    expect(screen.queryByTestId('NotificationTray')).toBeInTheDocument();
++    fireEvent.click(notificationShowButton);
++    expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"closed"');
++    expect(screen.queryByTestId('NotificationTray')).not.toBeInTheDocument();
++  });
++
++  it('handles reload persisting notification tray status', async () => {
++    sessionStorage.clear();
++    render(<Course {...mockData} />);
++    const notificationShowButton = await screen.findByRole('button', { name: /Show notification tray/i });
++    fireEvent.click(notificationShowButton);
++    expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"closed"');
++
++    // Mock reload window, this doesn't happen in the Course component,
++    // calling the reload to check if the tray remains closed
++    const { location } = window;
++    delete window.location;
++    window.location = { reload: jest.fn() };
++    window.location.reload();
++    expect(window.location.reload).toHaveBeenCalled();
++    window.location = location;
++    expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"closed"');
++    expect(screen.queryByTestId('NotificationTray')).not.toBeInTheDocument();
++  });
++
++  it('handles sessionStorage from a different course for the notification tray', async () => {
++    sessionStorage.clear();
++    const courseMetadataSecondCourse = Factory.build('courseMetadata');
++
++    // set sessionStorage for a different course before rendering Course
++    sessionStorage.setItem(`notificationTrayStatus.${courseMetadataSecondCourse.id}`, '"open"');
++
++    render(<Course {...mockData} />);
++    expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"open"');
++    const notificationShowButton = await screen.findByRole('button', { name: /Show notification tray/i });
++    fireEvent.click(notificationShowButton);
++
++    // Verify sessionStorage was updated for the original course
++    expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"closed"');
++
++    // Verify the second course sessionStorage was not changed
++    expect(sessionStorage.getItem(`notificationTrayStatus.${courseMetadataSecondCourse.id}`)).toBe('"open"');
++  });
++
+   it('renders course breadcrumbs as expected', async () => {
+     const courseMetadata = Factory.build('courseMetadata');
+     const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index df13404..fcf461f 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -52,7 +52,7 @@ function Sequence({
+   const sequence = useModel('sequences', sequenceId);
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+-  const shouldDisplayNotificationTrigger = useWindowSize().width < responsiveBreakpoints.small.minWidth;
++  const shouldDisplayNotificationTriggerInSequence = useWindowSize().width < responsiveBreakpoints.small.minWidth;
+ 
+   const handleNext = () => {
+     const nextIndex = sequence.unitIds.indexOf(unitId) + 1;
+@@ -156,7 +156,7 @@ function Sequence({
+ 
+   const defaultContent = (
+     <div className="sequence-container" style={{ display: 'inline-flex', flexDirection: 'row' }}>
+-      <div className={classNames('sequence', { 'position-relative': shouldDisplayNotificationTrigger })} style={{ width: '100%' }}>
++      <div className={classNames('sequence', { 'position-relative': shouldDisplayNotificationTriggerInSequence })} style={{ width: '100%' }}>
+         <SequenceNavigation
+           sequenceId={sequenceId}
+           unitId={unitId}
+@@ -180,7 +180,7 @@ function Sequence({
+           goToCourseExitPage={() => goToCourseExitPage()}
+         />
+ 
+-        {shouldDisplayNotificationTrigger ? (
++        {shouldDisplayNotificationTriggerInSequence ? (
+           <NotificationTrigger
+             courseId={courseId}
+             toggleNotificationTray={toggleNotificationTray}
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 44c508a..7e89e82 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -31,6 +31,8 @@ describe('Sequence', () => {
+       unitNavigationHandler: () => {},
+       nextSequenceHandler: () => {},
+       previousSequenceHandler: () => {},
++      toggleNotificationTray: () => {},
++      setNotificationStatus: () => {},
+     };
+   });
+ 
+@@ -390,6 +392,19 @@ describe('Sequence', () => {
+       expect(await screen.findByText('Notifications')).toBeInTheDocument();
+     });
+ 
++    it('handles click on notification tray close button', async () => {
++      const toggleNotificationTray = jest.fn();
++      const testData = {
++        ...mockData,
++        toggleNotificationTray,
++        notificationTrayVisible: true,
++      };
++      render(<Sequence {...testData} />);
++      const notificationCloseIconButton = await screen.findByRole('button', { name: /Close notification tray/i });
++      fireEvent.click(notificationCloseIconButton);
++      expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
++    });
++
+     it('does not render notification tray in sequence by default if in responsive view', async () => {
+       useWindowSize.mockReturnValue({ width: 991 });
+       const { container } = render(<Sequence {...mockData} />);
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 337e921..3ce8394 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -44,7 +44,7 @@ function SequenceNavigation({
+     sequence.gatedContent !== undefined && sequence.gatedContent.gated
+   ) : undefined;
+ 
+-  const shouldDisplayNotificationTrigger = useWindowSize().width < responsiveBreakpoints.small.minWidth;
++  const shouldDisplayNotificationTriggerInSequence = useWindowSize().width < responsiveBreakpoints.small.minWidth;
+ 
+   const renderUnitButtons = () => {
+     if (isLocked) {
+@@ -76,7 +76,7 @@ function SequenceNavigation({
+ 
+     return (
+       <Button variant="link" className="next-btn" onClick={buttonOnClick} disabled={disabled} iconAfter={nextArrow}>
+-        {shouldDisplayNotificationTrigger ? null : buttonText}
++        {shouldDisplayNotificationTriggerInSequence ? null : buttonText}
+       </Button>
+     );
+   };
+@@ -84,9 +84,9 @@ function SequenceNavigation({
+   const prevArrow = isRtl(getLocale()) ? ChevronRight : ChevronLeft;
+ 
+   return sequenceStatus === LOADED && (
+-    <nav id="courseware-sequenceNavigation" className={classNames('sequence-navigation', className)} style={{ width: shouldDisplayNotificationTrigger ? '90%' : null }}>
++    <nav id="courseware-sequenceNavigation" className={classNames('sequence-navigation', className)} style={{ width: shouldDisplayNotificationTriggerInSequence ? '90%' : null }}>
+       <Button variant="link" className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit} iconBefore={prevArrow}>
+-        {shouldDisplayNotificationTrigger ? null : intl.formatMessage(messages.previousButton)}
++        {shouldDisplayNotificationTriggerInSequence ? null : intl.formatMessage(messages.previousButton)}
+       </Button>
+       {renderUnitButtons()}
+       {renderNextButton()}
+diff --git a/src/data/sessionStorage.js b/src/data/sessionStorage.js
+new file mode 100644
+index 0000000..fe86b57
+--- /dev/null
++++ b/src/data/sessionStorage.js
+@@ -0,0 +1,34 @@
++// This file holds some convenience methods for dealing with sessionStorage. Unlike localStorage that never expires,
++// sessionStorage is cleared when the browser tab is closed since the page session ends
++//
++// NOTE: These storage keys are not namespaced.  That means that it's shared for the current fully
++// qualified domain.  Namespacing could be added, but we'll cross that bridge when we need it.
++
++function getSessionStorage(key) {
++  try {
++    if (global.sessionStorage) {
++      const rawItem = global.sessionStorage.getItem(key);
++      if (rawItem) {
++        return JSON.parse(rawItem);
++      }
++    }
++  } catch (e) {
++    // If this fails for some reason, just return null.
++  }
++  return null;
++}
++
++function setSessionStorage(key, value) {
++  try {
++    if (global.sessionStorage) {
++      global.sessionStorage.setItem(key, JSON.stringify(value));
++    }
++  } catch (e) {
++    // If this fails, just bail.
++  }
++}
++
++export {
++  getSessionStorage,
++  setSessionStorage,
++};
+-- 
+2.34.1
+

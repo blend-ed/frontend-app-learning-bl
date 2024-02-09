@@ -1,0 +1,37 @@
+From d7f41fd02a269cd5e09e795c75f6d6f463acc8b9 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 27 Jul 2020 10:01:18 -0400
+Subject: [PATCH 0181/1021] Enable handouts on outline page (#125)
+
+---
+ src/course-home/outline-tab/OutlineTab.jsx | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 1bb2376..0016d10 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -6,7 +6,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { AlertList } from '../../generic/user-messages';
+ 
+ import CourseDates from './widgets/CourseDates';
+-// import CourseHandouts from './widgets/CourseHandouts';
++import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
+ import messages from './messages';
+ import Section from './Section';
+@@ -85,11 +85,9 @@ function OutlineTab({ intl }) {
+             isEnrolled={isEnrolled}
+             courseId={courseId}
+           />
+-          {/* Disabled until we decide whether iframes are the best solution for handouts
+           <CourseHandouts
+             courseId={courseId}
+           />
+-          */}
+         </div>
+       </div>
+     </>
+-- 
+2.34.1
+

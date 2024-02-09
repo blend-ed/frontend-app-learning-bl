@@ -1,0 +1,1442 @@
+From d4dc75c5a0fa72cba1915a3cea3194878e8fb75c Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Fri, 2 Jul 2021 10:11:49 -0400
+Subject: [PATCH 0519/1021] feat: updating shift dates banners (#512)
+
+---
+ package-lock.json                             | 114 ++++++++++--------
+ package.json                                  |   2 +-
+ src/course-home/dates-banner/DatesBanner.jsx  |  46 -------
+ .../dates-banner/DatesBannerContainer.jsx     | 100 ---------------
+ src/course-home/dates-banner/index.js         |   3 -
+ src/course-home/dates-banner/messages.js      |  66 ----------
+ src/course-home/dates-tab/Badge.jsx           |  25 ----
+ src/course-home/dates-tab/Badge.scss          |   4 -
+ src/course-home/dates-tab/DatesTab.jsx        |  30 ++---
+ src/course-home/dates-tab/DatesTab.test.jsx   |  67 +++++-----
+ .../dates-tab/{ => timeline}/Day.jsx          |  28 ++---
+ .../dates-tab/{ => timeline}/Day.scss         |   0
+ .../dates-tab/{ => timeline}/Timeline.jsx     |   6 +-
+ .../dates-tab/{ => timeline}/badgelist.jsx    |  17 ++-
+ src/course-home/outline-tab/OutlineTab.jsx    |  25 ++--
+ .../outline-tab/OutlineTab.test.jsx           |  12 +-
+ .../ShiftDatesAlert.jsx                       |  66 ++++++++++
+ .../SuggestedScheduleHeader.jsx               |  18 +++
+ .../UpgradeToCompleteAlert.jsx                |  69 +++++++++++
+ .../UpgradeToShiftDatesAlert.jsx              |  72 +++++++++++
+ .../suggested-schedule-messaging/index.js     |  11 ++
+ .../suggested-schedule-messaging/messages.js  |  51 ++++++++
+ .../SequenceNavigation.test.jsx               |   2 +-
+ src/index.scss                                |   3 +-
+ 24 files changed, 442 insertions(+), 395 deletions(-)
+ delete mode 100644 src/course-home/dates-banner/DatesBanner.jsx
+ delete mode 100644 src/course-home/dates-banner/DatesBannerContainer.jsx
+ delete mode 100644 src/course-home/dates-banner/index.js
+ delete mode 100644 src/course-home/dates-banner/messages.js
+ delete mode 100644 src/course-home/dates-tab/Badge.jsx
+ delete mode 100644 src/course-home/dates-tab/Badge.scss
+ rename src/course-home/dates-tab/{ => timeline}/Day.jsx (89%)
+ rename src/course-home/dates-tab/{ => timeline}/Day.scss (100%)
+ rename src/course-home/dates-tab/{ => timeline}/Timeline.jsx (92%)
+ rename src/course-home/dates-tab/{ => timeline}/badgelist.jsx (88%)
+ create mode 100644 src/course-home/suggested-schedule-messaging/ShiftDatesAlert.jsx
+ create mode 100644 src/course-home/suggested-schedule-messaging/SuggestedScheduleHeader.jsx
+ create mode 100644 src/course-home/suggested-schedule-messaging/UpgradeToCompleteAlert.jsx
+ create mode 100644 src/course-home/suggested-schedule-messaging/UpgradeToShiftDatesAlert.jsx
+ create mode 100644 src/course-home/suggested-schedule-messaging/index.js
+ create mode 100644 src/course-home/suggested-schedule-messaging/messages.js
+
+diff --git a/package-lock.json b/package-lock.json
+index 19b5010..c02d7dd 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1447,9 +1447,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "14.8.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-14.8.0.tgz",
+-      "integrity": "sha512-ZCT4bur0ZlwI+UrzYcSRU0Vo9rBbSszbXrCrCeA5aZV9/xiwjoVJcMGxhWAMEfk5n9/R/bXBakcxc2Z+PjBEaQ==",
++      "version": "15.2.2",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-15.2.2.tgz",
++      "integrity": "sha512-C4YMd4zjRalS8pPglpAvDnribrA/3x8XXcbyTq0Xwwotp9HSld2yndASczZGdjNcqG0b1gpmPdxkzx2kaogCiw==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+@@ -1460,6 +1460,7 @@
+         "classnames": "^2.2.6",
+         "email-prop-type": "^3.0.0",
+         "font-awesome": "^4.7.0",
++        "lodash.uniqby": "^4.7.0",
+         "mailto-link": "^1.0.0",
+         "prop-types": "^15.7.2",
+         "react-bootstrap": "^1.3.0",
+@@ -1469,7 +1470,7 @@
+         "react-responsive": "^6.1.1",
+         "react-table": "^7.6.1",
+         "react-transition-group": "^4.0.0",
+-        "sanitize-html": "^1.20.0",
++        "sanitize-html": "^1.27.5",
+         "tabbable": "^4.0.0",
+         "uncontrollable": "7.2.1"
+       },
+@@ -2362,12 +2363,11 @@
+       "integrity": "sha512-INJYZQJP7g+IoDUh/475NlGiTeMfwTXUEr3tmRneckHIxNolGOW9CTq83S8cxq0CgJwwcMzMJFchxvlwe7Rk8Q=="
+     },
+     "@restart/hooks": {
+-      "version": "0.3.26",
+-      "resolved": "https://registry.npmjs.org/@restart/hooks/-/hooks-0.3.26.tgz",
+-      "integrity": "sha512-7Hwk2ZMYm+JLWcb7R9qIXk1OoUg1Z+saKWqZXlrvFwT3w6UArVNWgxYOzf+PJoK9zZejp8okPAKTctthhXLt5g==",
++      "version": "0.3.27",
++      "resolved": "https://registry.npmjs.org/@restart/hooks/-/hooks-0.3.27.tgz",
++      "integrity": "sha512-s984xV/EapUIfkjlf8wz9weP2O9TNKR96C68FfMEy2bE69+H4cNv3RD4Mf97lW7Htt7PjZrYTjSC8f3SB9VCXw==",
+       "requires": {
+-        "lodash": "^4.17.20",
+-        "lodash-es": "^4.17.20"
++        "dequal": "^2.0.2"
+       }
+     },
+     "@sindresorhus/is": {
+@@ -2920,14 +2920,6 @@
+         "@types/node": "*"
+       }
+     },
+-    "@types/classnames": {
+-      "version": "2.3.1",
+-      "resolved": "https://registry.npmjs.org/@types/classnames/-/classnames-2.3.1.tgz",
+-      "integrity": "sha512-zeOWb0JGBoVmlQoznvqXbE0tEC/HONsnoUNH19Hc96NFsTAwTXbTqb8FMYkru1F/iqp7a18Ws3nWJvtA1sHD1A==",
+-      "requires": {
+-        "classnames": "*"
+-      }
+-    },
+     "@types/cookie": {
+       "version": "0.3.3",
+       "resolved": "https://registry.npmjs.org/@types/cookie/-/cookie-0.3.3.tgz",
+@@ -6941,6 +6933,11 @@
+       "integrity": "sha1-m81S4UwJd2PnSbJ0xDRu0uVgtak=",
+       "dev": true
+     },
++    "dequal": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/dequal/-/dequal-2.0.2.tgz",
++      "integrity": "sha512-q9K8BlJVxK7hQYqa6XISGmBZbtQQWVXSrRrWreHC94rMt1QL/Impruc+7p2CYSYuVIUr+YCt6hjrs1kkdJRTug=="
++    },
+     "des.js": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/des.js/-/des.js-1.0.1.tgz",
+@@ -7088,12 +7085,12 @@
+       }
+     },
+     "dom-serializer": {
+-      "version": "1.3.1",
+-      "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-1.3.1.tgz",
+-      "integrity": "sha512-Pv2ZluG5ife96udGgEDovOOOA5UELkltfJpnIExPrAk1LTvecolUGn6lIaoLh86d83GiB86CjzciMd9BuRB71Q==",
++      "version": "1.3.2",
++      "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-1.3.2.tgz",
++      "integrity": "sha512-5c54Bk5Dw4qAxNOI1pFEizPSjVsx5+bpJKmL2kPn8JhBUq2q09tTCa3mjijun2NfK78NMouDYNMBkOrPZiS+ig==",
+       "requires": {
+         "domelementtype": "^2.0.1",
+-        "domhandler": "^4.0.0",
++        "domhandler": "^4.2.0",
+         "entities": "^2.0.0"
+       },
+       "dependencies": {
+@@ -7144,9 +7141,9 @@
+       }
+     },
+     "domutils": {
+-      "version": "2.6.0",
+-      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.6.0.tgz",
+-      "integrity": "sha512-y0BezHuy4MDYxh6OvolXYsH+1EMGmFbwv5FKW7ovwMG6zTPWqNPq3WF9ayZssFq+UlKdffGLbOEaghNdaOm1WA==",
++      "version": "2.7.0",
++      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.7.0.tgz",
++      "integrity": "sha512-8eaHa17IwJUPAiB+SoTYBo5mCdeMgdcAoXJ59m6DT1vw+5iLS3gNoqYaRowaBKtGVrOF1Jz4yDTgYKLK2kvfJg==",
+       "requires": {
+         "dom-serializer": "^1.0.1",
+         "domelementtype": "^2.2.0",
+@@ -8857,11 +8854,18 @@
+       }
+     },
+     "focus-lock": {
+-      "version": "0.8.1",
+-      "resolved": "https://registry.npmjs.org/focus-lock/-/focus-lock-0.8.1.tgz",
+-      "integrity": "sha512-/LFZOIo82WDsyyv7h7oc0MJF9ACOvDRdx9rWPZ2pgMfNWu/z8hQDBtOchuB/0BVLmuFOZjV02YwUVzNsWx/EzA==",
++      "version": "0.9.1",
++      "resolved": "https://registry.npmjs.org/focus-lock/-/focus-lock-0.9.1.tgz",
++      "integrity": "sha512-/2Nj60Cps6yOLSO+CkVbeSKfwfns5XbX6HOedIK9PdzODP04N9c3xqOcPXayN0WsT9YjJvAnXmI0NdqNIDf5Kw==",
+       "requires": {
+-        "tslib": "^1.9.3"
++        "tslib": "^2.0.3"
++      },
++      "dependencies": {
++        "tslib": {
++          "version": "2.3.0",
++          "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.3.0.tgz",
++          "integrity": "sha512-N82ooyxVNm6h1riLCoyS9e3fuJ3AMG2zIZs2Gd1ATcSFjSA23Q0fzjjZeh0jbJvWVDZ0cJT8yaNNaaXHzueNjg=="
++        }
+       }
+     },
+     "follow-redirects": {
+@@ -14182,11 +14186,6 @@
+       "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz",
+       "integrity": "sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg=="
+     },
+-    "lodash-es": {
+-      "version": "4.17.21",
+-      "resolved": "https://registry.npmjs.org/lodash-es/-/lodash-es-4.17.21.tgz",
+-      "integrity": "sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw=="
+-    },
+     "lodash.assignin": {
+       "version": "4.2.0",
+       "resolved": "https://registry.npmjs.org/lodash.assignin/-/lodash.assignin-4.2.0.tgz",
+@@ -14298,6 +14297,11 @@
+       "integrity": "sha1-0CJTc662Uq3BvILklFM5qEJ1R3M=",
+       "dev": true
+     },
++    "lodash.uniqby": {
++      "version": "4.7.0",
++      "resolved": "https://registry.npmjs.org/lodash.uniqby/-/lodash.uniqby-4.7.0.tgz",
++      "integrity": "sha1-2ZwHpmnp5tJOE2Lf4mbGdhavEwI="
++    },
+     "logalot": {
+       "version": "2.1.0",
+       "resolved": "https://registry.npmjs.org/logalot/-/logalot-2.1.0.tgz",
+@@ -17238,28 +17242,34 @@
+       }
+     },
+     "react-bootstrap": {
+-      "version": "1.6.0",
+-      "resolved": "https://registry.npmjs.org/react-bootstrap/-/react-bootstrap-1.6.0.tgz",
+-      "integrity": "sha512-PaeOGeRC2+JH9Uf1PukJgXcIpfGlrKKHEBZIArymjenYzSJ/RhO2UdNX+e7nalsCFFZLRRgQ0/FKkscW2LmmRg==",
++      "version": "1.6.1",
++      "resolved": "https://registry.npmjs.org/react-bootstrap/-/react-bootstrap-1.6.1.tgz",
++      "integrity": "sha512-ojEPQ6OtyIMdLg0Smofk+85PKN6MLKQX3bU0Vwmok/4yNa8DQ2vCGhO2IgHJvT+ERQZ4X+gAQcdn6msAHSwLBg==",
+       "requires": {
+-        "@babel/runtime": "^7.13.8",
++        "@babel/runtime": "^7.14.0",
+         "@restart/context": "^2.1.4",
+         "@restart/hooks": "^0.3.26",
+-        "@types/classnames": "^2.2.10",
+         "@types/invariant": "^2.2.33",
+         "@types/prop-types": "^15.7.3",
+-        "@types/react": ">=16.9.35",
++        "@types/react": ">=16.14.8",
+         "@types/react-transition-group": "^4.4.1",
+         "@types/warning": "^3.0.0",
+-        "classnames": "^2.2.6",
+-        "dom-helpers": "^5.1.2",
++        "classnames": "^2.3.1",
++        "dom-helpers": "^5.2.1",
+         "invariant": "^2.2.4",
+         "prop-types": "^15.7.2",
+         "prop-types-extra": "^1.1.0",
+-        "react-overlays": "^5.0.0",
++        "react-overlays": "^5.0.1",
+         "react-transition-group": "^4.4.1",
+         "uncontrollable": "^7.2.1",
+         "warning": "^4.0.3"
++      },
++      "dependencies": {
++        "classnames": {
++          "version": "2.3.1",
++          "resolved": "https://registry.npmjs.org/classnames/-/classnames-2.3.1.tgz",
++          "integrity": "sha512-OlQdbZ7gLfGarSqxesMesDa5uz7KFbID8Kpq/SxIoNGDqY8lSYs0D+hhtBXhcdB3rcbXArFr7vlHheLk1voeNA=="
++        }
+       }
+     },
+     "react-break": {
+@@ -17611,12 +17621,12 @@
+       "integrity": "sha512-rtGImPZ0YyLrscKI9xTpV8psd6I8VAtjKCzQDlzyDvqJA8XOW78TXYQwNRNd8g8JZnDu8q9Fu/1v4HPAVwVdHA=="
+     },
+     "react-focus-lock": {
+-      "version": "2.5.0",
+-      "resolved": "https://registry.npmjs.org/react-focus-lock/-/react-focus-lock-2.5.0.tgz",
+-      "integrity": "sha512-XLxj6uTXgz0US8TmqNU2jMfnXwZG0mH2r/afQqvPEaX6nyEll5LHVcEXk2XDUQ34RVeLPkO/xK5x6c/qiuSq/A==",
++      "version": "2.5.1",
++      "resolved": "https://registry.npmjs.org/react-focus-lock/-/react-focus-lock-2.5.1.tgz",
++      "integrity": "sha512-gOToRZKVEymGEjFaTRUKgJsdYQrNosoiK7yZnXnnd8bYew4vMzk3Rxb0Q4nyrGwsFuUmgQiSAulQirA0J+v4hA==",
+       "requires": {
+         "@babel/runtime": "^7.0.0",
+-        "focus-lock": "^0.8.1",
++        "focus-lock": "^0.9.1",
+         "prop-types": "^15.6.2",
+         "react-clientside-effect": "^1.2.2",
+         "use-callback-ref": "^1.2.1",
+@@ -17677,9 +17687,9 @@
+       "integrity": "sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA=="
+     },
+     "react-overlays": {
+-      "version": "5.0.1",
+-      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-5.0.1.tgz",
+-      "integrity": "sha512-plwUJieTBbLSrgvQ4OkkbTD/deXgxiJdNuKzo6n1RWE3OVnQIU5hffCGS/nvIuu6LpXFs2majbzaXY8rcUVdWA==",
++      "version": "5.1.0",
++      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-5.1.0.tgz",
++      "integrity": "sha512-Qp8dqDIIYgQoHxOGVKHwvQUkDe70/Ja/6dn8iCQAXyPvvpks3+T8scLTZLK8MPBBu+X8ustas6y4U6M6zdmCjA==",
+       "requires": {
+         "@babel/runtime": "^7.13.8",
+         "@popperjs/core": "^2.8.6",
+@@ -17810,9 +17820,9 @@
+       "integrity": "sha512-jBlj70iBwOTvvImsU9t01LjFjy4sXEtclBovl3mTiqjz23Reu0DKnRza4zlLtOPACx6j2/7MrQIthIK1Wi+LIA=="
+     },
+     "react-transition-group": {
+-      "version": "4.4.1",
+-      "resolved": "https://registry.npmjs.org/react-transition-group/-/react-transition-group-4.4.1.tgz",
+-      "integrity": "sha512-Djqr7OQ2aPUiYurhPalTrVy9ddmFCCzwhqQmtN+J3+3DzLO209Fdr70QrN8Z3DsglWql6iY1lDWAfpFiBtuKGw==",
++      "version": "4.4.2",
++      "resolved": "https://registry.npmjs.org/react-transition-group/-/react-transition-group-4.4.2.tgz",
++      "integrity": "sha512-/RNYfRAMlZwDSr6z4zNKV6xu53/e2BuaBbGhbyYIXTrmgu/bGHzmqOs7mJSJBHy9Ud+ApHx3QjrkKSp1pxvlFg==",
+       "requires": {
+         "@babel/runtime": "^7.5.5",
+         "dom-helpers": "^5.0.1",
+diff --git a/package.json b/package.json
+index bde02e2..b3d8062 100644
+--- a/package.json
++++ b/package.json
+@@ -40,7 +40,7 @@
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-lib-special-exams": "1.7.1",
+     "@edx/frontend-platform": "1.11.0",
+-    "@edx/paragon": "14.8.0",
++    "@edx/paragon": "15.2.2",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/course-home/dates-banner/DatesBanner.jsx b/src/course-home/dates-banner/DatesBanner.jsx
+deleted file mode 100644
+index 26df788..0000000
+--- a/src/course-home/dates-banner/DatesBanner.jsx
++++ /dev/null
+@@ -1,46 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Button } from '@edx/paragon';
+-
+-import messages from './messages';
+-
+-function DatesBanner(props) {
+-  const {
+-    intl,
+-    name,
+-    bannerClickHandler,
+-  } = props;
+-
+-  return (
+-    <div className="banner rounded my-4 p-4 container-fluid border border-primary-200 bg-info-100">
+-      <div className="row w-100 m-0 justify-content-start justify-content-sm-between">
+-        <div className={name === 'datesTabInfoBanner' ? 'col-12' : 'col-12 col-lg-9'}>
+-          <strong>
+-            {intl.formatMessage(messages[`datesBanner.${name}.header`])}
+-          </strong>
+-          {intl.formatMessage(messages[`datesBanner.${name}.body`])}
+-        </div>
+-        {bannerClickHandler && (
+-          <div className="col-auto col-lg-3 p-lg-0 d-inline-flex align-items-center justify-content-start justify-content-lg-center">
+-            <Button variant="outline-primary" className="align-self-center mt-3 mt-lg-0" onClick={bannerClickHandler}>
+-              {intl.formatMessage(messages[`datesBanner.${name}.button`])}
+-            </Button>
+-          </div>
+-        )}
+-      </div>
+-    </div>
+-  );
+-}
+-
+-DatesBanner.propTypes = {
+-  intl: intlShape.isRequired,
+-  name: PropTypes.string.isRequired,
+-  bannerClickHandler: PropTypes.func,
+-};
+-
+-DatesBanner.defaultProps = {
+-  bannerClickHandler: null,
+-};
+-
+-export default injectIntl(DatesBanner);
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+deleted file mode 100644
+index d9b0ea8..0000000
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ /dev/null
+@@ -1,100 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { useDispatch, useSelector } from 'react-redux';
+-
+-import { useModel } from '../../generic/model-store';
+-
+-import DatesBanner from './DatesBanner';
+-import { resetDeadlines } from '../data';
+-
+-function DatesBannerContainer({
+-  courseDateBlocks,
+-  datesBannerInfo,
+-  hasEnded,
+-  logUpgradeLinkClick,
+-  model,
+-  tabFetch,
+-}) {
+-  const {
+-    courseId,
+-  } = useSelector(state => state.courseHome);
+-
+-  const {
+-    contentTypeGatingEnabled,
+-    missedDeadlines,
+-    missedGatedContent,
+-    verifiedUpgradeLink,
+-  } = datesBannerInfo;
+-
+-  const {
+-    isSelfPaced,
+-  } = useModel('courseHomeMeta', courseId);
+-
+-  const dispatch = useDispatch();
+-  const hasDeadlines = courseDateBlocks.some(x => x.dateType === 'assignment-due-date');
+-  const upgradeToCompleteGraded = model === 'dates' && contentTypeGatingEnabled && !missedDeadlines;
+-  const upgradeToReset = !upgradeToCompleteGraded && missedDeadlines && missedGatedContent;
+-  const resetDates = !upgradeToCompleteGraded && missedDeadlines && !missedGatedContent;
+-  const datesBanners = [
+-    {
+-      name: 'datesTabInfoBanner',
+-      shouldDisplay: model === 'dates' && hasDeadlines && !missedDeadlines && isSelfPaced,
+-    },
+-    {
+-      name: 'upgradeToCompleteGradedBanner',
+-      // verifiedUpgradeLink can be null if we've passed the upgrade deadline
+-      shouldDisplay: upgradeToCompleteGraded && verifiedUpgradeLink,
+-      clickHandler: () => {
+-        logUpgradeLinkClick();
+-        global.location.replace(verifiedUpgradeLink);
+-      },
+-    },
+-    {
+-      name: 'upgradeToResetBanner',
+-      // verifiedUpgradeLink can be null if we've passed the upgrade deadline
+-      shouldDisplay: upgradeToReset && verifiedUpgradeLink,
+-      clickHandler: () => {
+-        logUpgradeLinkClick();
+-        global.location.replace(verifiedUpgradeLink);
+-      },
+-    },
+-    {
+-      name: 'resetDatesBanner',
+-      shouldDisplay: resetDates,
+-      clickHandler: () => dispatch(resetDeadlines(courseId, model, tabFetch)),
+-    },
+-  ];
+-
+-  return (
+-    <>
+-      {!hasEnded && datesBanners.map((banner) => banner.shouldDisplay && (
+-        <DatesBanner
+-          name={banner.name}
+-          bannerClickHandler={banner.clickHandler}
+-          key={banner.name}
+-        />
+-      ))}
+-    </>
+-  );
+-}
+-
+-DatesBannerContainer.propTypes = {
+-  courseDateBlocks: PropTypes.arrayOf(PropTypes.object).isRequired,
+-  datesBannerInfo: PropTypes.shape({
+-    contentTypeGatingEnabled: PropTypes.bool.isRequired,
+-    missedDeadlines: PropTypes.bool.isRequired,
+-    missedGatedContent: PropTypes.bool.isRequired,
+-    verifiedUpgradeLink: PropTypes.string,
+-  }).isRequired,
+-  hasEnded: PropTypes.bool,
+-  logUpgradeLinkClick: PropTypes.func,
+-  model: PropTypes.string.isRequired,
+-  tabFetch: PropTypes.func.isRequired,
+-};
+-
+-DatesBannerContainer.defaultProps = {
+-  hasEnded: false,
+-  logUpgradeLinkClick: () => {},
+-};
+-
+-export default DatesBannerContainer;
+diff --git a/src/course-home/dates-banner/index.js b/src/course-home/dates-banner/index.js
+deleted file mode 100644
+index 6f197eb..0000000
+--- a/src/course-home/dates-banner/index.js
++++ /dev/null
+@@ -1,3 +0,0 @@
+-import DatesBannerContainer from './DatesBannerContainer';
+-
+-export default DatesBannerContainer;
+diff --git a/src/course-home/dates-banner/messages.js b/src/course-home/dates-banner/messages.js
+deleted file mode 100644
+index 5ad06e4..0000000
+--- a/src/course-home/dates-banner/messages.js
++++ /dev/null
+@@ -1,66 +0,0 @@
+-import { defineMessages } from '@edx/frontend-platform/i18n';
+-
+-const messages = defineMessages({
+-  'datesBanner.datesTabInfoBanner.header': {
+-    id: 'datesBanner.datesTabInfoBanner.header',
+-    defaultMessage: "We've built a suggested schedule to help you stay on track. ",
+-    description: 'Strong text in Dates Tab Info Banner',
+-  },
+-  'datesBanner.datesTabInfoBanner.body': {
+-    id: 'datesBanner.datesTabInfoBanner.body',
+-    defaultMessage: `But don't worry—it's flexible so you can learn at your own pace. If you happen to fall behind on
+-      our suggested dates, you'll be able to adjust them to keep yourself on track.`,
+-    description: 'Body in Dates Tab Info Banner',
+-  },
+-  'datesBanner.upgradeToCompleteGradedBanner.header': {
+-    id: 'datesBanner.upgradeToCompleteGradedBanner.header',
+-    defaultMessage: 'You are auditing this course, ',
+-    description: 'Strong text in Upgrade To Complete Graded Banner',
+-  },
+-  'datesBanner.upgradeToCompleteGradedBanner.body': {
+-    id: 'datesBanner.upgradeToCompleteGradedBanner.body',
+-    defaultMessage: `which means that you are unable to participate in graded assignments. To complete graded
+-      assignments as part of this course, you can upgrade today.`,
+-    description: 'Body in Upgrade To Complete Graded Banner',
+-  },
+-  'datesBanner.upgradeToCompleteGradedBanner.button': {
+-    id: 'datesBanner.upgradeToCompleteGradedBanner.button',
+-    defaultMessage: 'Upgrade now',
+-    description: 'Button in Upgrade To Complete Graded Banner',
+-  },
+-  'datesBanner.upgradeToResetBanner.header': {
+-    id: 'datesBanner.upgradeToResetBanner.header',
+-    defaultMessage: 'You are auditing this course, ',
+-    description: 'Strong text in Upgrade To Reset Banner',
+-  },
+-  'datesBanner.upgradeToResetBanner.body': {
+-    id: 'datesBanner.upgradeToResetBanner.body',
+-    defaultMessage: `which means that you are unable to participate in graded assignments. It looks like you missed 
+-      some important deadlines based on our suggested schedule. To complete graded assignments as part of this course 
+-      and shift the past due assignments into the future, you can upgrade today.`,
+-    description: 'Body in Upgrade To Reset Banner',
+-  },
+-  'datesBanner.upgradeToResetBanner.button': {
+-    id: 'datesBanner.upgradeToResetBanner.button',
+-    defaultMessage: 'Upgrade to shift due dates',
+-    description: 'Button in Upgrade To Reset Banner',
+-  },
+-  'datesBanner.resetDatesBanner.header': {
+-    id: 'datesBanner.resetDatesBanner.header',
+-    defaultMessage: 'It looks like you missed some important deadlines based on our suggested schedule. ',
+-    description: 'Strong text in Reset Dates Banner',
+-  },
+-  'datesBanner.resetDatesBanner.body': {
+-    id: 'datesBanner.resetDatesBanner.body',
+-    defaultMessage: `To keep yourself on track, you can update this schedule and shift the past due assignments into 
+-      the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.`,
+-    description: 'Body in Reset Dates Banner',
+-  },
+-  'datesBanner.resetDatesBanner.button': {
+-    id: 'datesBanner.resetDatesBanner.button',
+-    defaultMessage: 'Shift due dates',
+-    description: 'Button in Reset Dates Banner',
+-  },
+-});
+-
+-export default messages;
+diff --git a/src/course-home/dates-tab/Badge.jsx b/src/course-home/dates-tab/Badge.jsx
+deleted file mode 100644
+index aa0d191..0000000
+--- a/src/course-home/dates-tab/Badge.jsx
++++ /dev/null
+@@ -1,25 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import classNames from 'classnames';
+-
+-export default function Badge({ children, className, ...rest }) {
+-  return (
+-    <span
+-      className={classNames('dates-badge x-small ml-2 position-absolute', className)}
+-      data-testid="dates-badge"
+-      {...rest}
+-    >
+-      {children}
+-    </span>
+-  );
+-}
+-
+-Badge.propTypes = {
+-  children: PropTypes.node,
+-  className: PropTypes.string,
+-};
+-
+-Badge.defaultProps = {
+-  children: null,
+-  className: null,
+-};
+diff --git a/src/course-home/dates-tab/Badge.scss b/src/course-home/dates-tab/Badge.scss
+deleted file mode 100644
+index ec65b4e..0000000
+--- a/src/course-home/dates-tab/Badge.scss
++++ /dev/null
+@@ -1,4 +0,0 @@
+-.dates-badge {
+-  border-radius: 4px;
+-  padding: 1px 8px;
+-}
+diff --git a/src/course-home/dates-tab/DatesTab.jsx b/src/course-home/dates-tab/DatesTab.jsx
+index bb52de8..dee70d1 100644
+--- a/src/course-home/dates-tab/DatesTab.jsx
++++ b/src/course-home/dates-tab/DatesTab.jsx
+@@ -4,14 +4,17 @@ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from './messages';
+-import Timeline from './Timeline';
+-import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
++import Timeline from './timeline/Timeline';
+ 
+ import { fetchDatesTab } from '../data';
+ import { useModel } from '../../generic/model-store';
+ 
+ /** [MM-P2P] Experiment */
+ import { initDatesMMP2P } from '../../experiments/mm-p2p';
++import SuggestedScheduleHeader from '../suggested-schedule-messaging/SuggestedScheduleHeader';
++import ShiftDatesAlert from '../suggested-schedule-messaging/ShiftDatesAlert';
++import UpgradeToCompleteAlert from '../suggested-schedule-messaging/UpgradeToCompleteAlert';
++import UpgradeToShiftDatesAlert from '../suggested-schedule-messaging/UpgradeToShiftDatesAlert';
+ 
+ function DatesTab({ intl }) {
+   const {
+@@ -19,18 +22,19 @@ function DatesTab({ intl }) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    isSelfPaced,
+     org,
+   } = useModel('courseHomeMeta', courseId);
+ 
+   const {
+     courseDateBlocks,
+-    datesBannerInfo,
+-    hasEnded,
+   } = useModel('dates', courseId);
+ 
+   /** [MM-P2P] Experiment */
+   const mmp2p = initDatesMMP2P(courseId);
+ 
++  const hasDeadlines = courseDateBlocks && courseDateBlocks.some(x => x.dateType === 'assignment-due-date');
++
+   const logUpgradeLinkClick = () => {
+     sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
+       org_key: org,
+@@ -48,16 +52,14 @@ function DatesTab({ intl }) {
+         {intl.formatMessage(messages.title)}
+       </div>
+       { /** [MM-P2P] Experiment */ }
+-      { !mmp2p.state.isEnabled && (
+-        <DatesBannerContainer
+-          courseDateBlocks={courseDateBlocks}
+-          datesBannerInfo={datesBannerInfo}
+-          hasEnded={hasEnded}
+-          logUpgradeLinkClick={logUpgradeLinkClick}
+-          model="dates"
+-          tabFetch={fetchDatesTab}
+-        />
+-      ) }
++      {isSelfPaced && hasDeadlines && !mmp2p.state.isEnabled && (
++        <>
++          <ShiftDatesAlert model="dates" fetch={fetchDatesTab} />
++          <SuggestedScheduleHeader />
++          <UpgradeToCompleteAlert logUpgradeLinkClick={logUpgradeLinkClick} />
++          <UpgradeToShiftDatesAlert logUpgradeLinkClick={logUpgradeLinkClick} model="dates" />
++        </>
++      )}
+       <Timeline mmp2p={mmp2p} />
+     </>
+   );
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index d56ed4f..aaa4070 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -37,6 +37,19 @@ describe('DatesTab', () => {
+     </AppProvider>
+   );
+ 
++  const datesTabData = Factory.build('datesTabData');
++  let courseMetadata = Factory.build('courseHomeMetadata');
++  const { id: courseId } = courseMetadata;
++
++  const datesUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`;
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
++  courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
++
++  function setMetadata(attributes, options) {
++    courseMetadata = Factory.build('courseHomeMetadata', { id: courseId, ...attributes }, options);
++    axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++  }
++
+   // The dates tab is largely repetitive non-interactive static data. Thus it's a little tough to follow
+   // testing-library's advice around testing the way your user uses the site (i.e. can't find form elements by label or
+   // anything). Instead, we find elements by printed date (which is what the user sees) and data-testid. Which is
+@@ -61,15 +74,9 @@ describe('DatesTab', () => {
+ 
+   describe('when receiving a full set of dates data', () => {
+     beforeEach(() => {
+-      const datesTabData = Factory.build('datesTabData');
+-      const courseMetadata = Factory.build('courseHomeMetadata');
+-      const { id: courseId } = courseMetadata;
+-      let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
+-      courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+-
+       axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+       axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+-      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       history.push(`/course/${courseId}/dates`); // so tab can pull course id from url
+ 
+       render(component);
+@@ -133,34 +140,27 @@ describe('DatesTab', () => {
+     });
+   });
+ 
+-  describe('Dates banner container ', () => {
+-    const courseMetadata = Factory.build('courseHomeMetadata', { is_self_paced: true, is_enrolled: true });
+-    const { id: courseId } = courseMetadata;
+-    const datesTabData = Factory.build('datesTabData');
+-
+-    let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
+-    courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+-
++  describe('Suggested schedule messaging', () => {
+     beforeEach(() => {
+       axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+-      axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++      setMetadata({ is_self_paced: true, is_enrolled: true });
+       history.push(`/course/${courseId}/dates`);
+     });
+ 
+-    it('renders datesTabInfoBanner', async () => {
++    it('renders SuggestedScheduleHeader', async () => {
+       datesTabData.datesBannerInfo = {
+         contentTypeGatingEnabled: false,
+         missedDeadlines: false,
+         missedGatedContent: false,
+       };
+ 
+-      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       render(component);
+ 
+-      await waitFor(() => expect(screen.getByText("We've built a suggested schedule to help you stay on track.")).toBeInTheDocument());
++      await waitFor(() => expect(screen.getByText('We’ve built a suggested schedule to help you stay on track. But don’t worry—it’s flexible so you can learn at your own pace.')).toBeInTheDocument());
+     });
+ 
+-    it('renders upgradeToCompleteGradedBanner', async () => {
++    it('renders UpgradeToCompleteAlert', async () => {
+       datesTabData.datesBannerInfo = {
+         contentTypeGatingEnabled: true,
+         missedDeadlines: false,
+@@ -168,15 +168,14 @@ describe('DatesTab', () => {
+         verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+       };
+ 
+-      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       render(component);
+ 
+-      await waitFor(() => expect(screen.getByText('You are auditing this course,')).toBeInTheDocument());
+-      expect(screen.getByText('which means that you are unable to participate in graded assignments. To complete graded assignments as part of this course, you can upgrade today.')).toBeInTheDocument();
++      await waitFor(() => expect(screen.getByText('You are auditing this course, which means that you are unable to participate in graded assignments. To complete graded assignments as part of this course, you can upgrade today.')).toBeInTheDocument());
+       expect(screen.getByRole('button', { name: 'Upgrade now' })).toBeInTheDocument();
+     });
+ 
+-    it('renders upgradeToResetBanner', async () => {
++    it('renders UpgradeToShiftDatesAlert', async () => {
+       datesTabData.datesBannerInfo = {
+         contentTypeGatingEnabled: true,
+         missedDeadlines: true,
+@@ -184,15 +183,15 @@ describe('DatesTab', () => {
+         verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+       };
+ 
+-      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       render(component);
+ 
+-      await waitFor(() => expect(screen.getByText('You are auditing this course,')).toBeInTheDocument());
+-      expect(screen.getByText('which means that you are unable to participate in graded assignments. It looks like you missed some important deadlines based on our suggested schedule. To complete graded assignments as part of this course and shift the past due assignments into the future, you can upgrade today.')).toBeInTheDocument();
++      await waitFor(() => expect(screen.getByText('It looks like you missed some important deadlines based on our suggested schedule.')).toBeInTheDocument());
++      expect(screen.getByText('To keep yourself on track, you can update this schedule and shift the past due assignments into the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.')).toBeInTheDocument();
+       expect(screen.getByRole('button', { name: 'Upgrade to shift due dates' })).toBeInTheDocument();
+     });
+ 
+-    it('renders resetDatesBanner', async () => {
++    it('renders ShiftDatesAlert', async () => {
+       datesTabData.datesBannerInfo = {
+         contentTypeGatingEnabled: true,
+         missedDeadlines: true,
+@@ -200,7 +199,7 @@ describe('DatesTab', () => {
+         verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+       };
+ 
+-      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       render(component);
+ 
+       await waitFor(() => expect(screen.getByText('It looks like you missed some important deadlines based on our suggested schedule.')).toBeInTheDocument());
+@@ -216,7 +215,7 @@ describe('DatesTab', () => {
+         verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+       };
+ 
+-      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       render(component);
+ 
+       // confirm "Shift due dates" button has rendered
+@@ -244,7 +243,7 @@ describe('DatesTab', () => {
+       expect(screen.queryByRole('button', { name: 'Shift due dates' })).not.toBeInTheDocument();
+     });
+ 
+-    it('sends analytics event onClick of upgrade button in upgradeToCompleteGradedBanner', async () => {
++    it('sends analytics event onClick of upgrade button in UpgradeToCompleteAlert', async () => {
+       sendTrackEvent.mockClear();
+       datesTabData.datesBannerInfo = {
+         contentTypeGatingEnabled: true,
+@@ -253,7 +252,7 @@ describe('DatesTab', () => {
+         verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+       };
+ 
+-      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       render(component);
+ 
+       const upgradeButton = await waitFor(() => screen.getByRole('button', { name: 'Upgrade now' }));
+@@ -270,7 +269,7 @@ describe('DatesTab', () => {
+       });
+     });
+ 
+-    it('sends analytics event onClick of upgrade button in upgradeToResetBanner', async () => {
++    it('sends analytics event onClick of upgrade button in UpgradeToShiftDatesAlert', async () => {
+       sendTrackEvent.mockClear();
+       datesTabData.datesBannerInfo = {
+         contentTypeGatingEnabled: true,
+@@ -279,7 +278,7 @@ describe('DatesTab', () => {
+         verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+       };
+ 
+-      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       render(component);
+ 
+       const upgradeButton = await waitFor(() => screen.getByRole('button', { name: 'Upgrade to shift due dates' }));
+diff --git a/src/course-home/dates-tab/Day.jsx b/src/course-home/dates-tab/timeline/Day.jsx
+similarity index 89%
+rename from src/course-home/dates-tab/Day.jsx
+rename to src/course-home/dates-tab/timeline/Day.jsx
+index e052d2f..83ef53b 100644
+--- a/src/course-home/dates-tab/Day.jsx
++++ b/src/course-home/dates-tab/timeline/Day.jsx
+@@ -12,10 +12,10 @@ import { Tooltip, OverlayTrigger } from '@edx/paragon';
+ import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ 
+-import { useModel } from '../../generic/model-store';
++import { useModel } from '../../../generic/model-store';
+ 
+ import { getBadgeListAndColor } from './badgelist';
+-import { isLearnerAssignment } from './utils';
++import { isLearnerAssignment } from '../utils';
+ 
+ function Day({
+   date,
+@@ -55,18 +55,16 @@ function Day({
+ 
+       {/* Content */}
+       <div className="d-inline-block ml-3 pl-2">
+-        <div className="mb-1" data-testid="dates-header">
+-          <p className="d-inline text-dark-400">
+-            <FormattedDate
+-              /** [MM-P2P] Experiment */
+-              value={mmp2pOverride ? mmp2p.state.upgradeDeadline : date}
+-              day="numeric"
+-              month="short"
+-              weekday="short"
+-              year="numeric"
+-              {...timezoneFormatArgs}
+-            />
+-          </p>
++        <div className="row w-100 m-0 mb-1 align-items-center text-primary-700" data-testid="dates-header">
++          <FormattedDate
++            /** [MM-P2P] Experiment */
++            value={mmp2pOverride ? mmp2p.state.upgradeDeadline : date}
++            day="numeric"
++            month="short"
++            weekday="short"
++            year="numeric"
++            {...timezoneFormatArgs}
++          />
+           {badges}
+         </div>
+         {items.map((item) => {
+@@ -82,7 +80,7 @@ function Day({
+           const textColor = available ? 'text-primary-700' : 'text-gray-500';
+ 
+           return (
+-            <div key={item.title + item.date} className={classNames(textColor, 'small')} data-testid="dates-item">
++            <div key={item.title + item.date} className={classNames(textColor, 'small pb-1')} data-testid="dates-item">
+               <div>
+                 <span className="small">
+                   <span className="font-weight-bold">{item.assignmentType && `${item.assignmentType}: `}{title}</span>
+diff --git a/src/course-home/dates-tab/Day.scss b/src/course-home/dates-tab/timeline/Day.scss
+similarity index 100%
+rename from src/course-home/dates-tab/Day.scss
+rename to src/course-home/dates-tab/timeline/Day.scss
+diff --git a/src/course-home/dates-tab/Timeline.jsx b/src/course-home/dates-tab/timeline/Timeline.jsx
+similarity index 92%
+rename from src/course-home/dates-tab/Timeline.jsx
+rename to src/course-home/dates-tab/timeline/Timeline.jsx
+index 8a16666..c8e6e35 100644
+--- a/src/course-home/dates-tab/Timeline.jsx
++++ b/src/course-home/dates-tab/timeline/Timeline.jsx
+@@ -3,10 +3,10 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { useSelector } from 'react-redux';
+ 
+-import { useModel } from '../../generic/model-store';
++import { useModel } from '../../../generic/model-store';
+ 
+ import Day from './Day';
+-import { daycmp, isLearnerAssignment } from './utils';
++import { daycmp, isLearnerAssignment } from '../utils';
+ 
+ /** [MM-P2P] Experiment (argument) */
+ export default function Timeline({ mmp2p }) {
+@@ -64,7 +64,7 @@ export default function Timeline({ mmp2p }) {
+   }
+ 
+   return (
+-    <ul className="list-unstyled m-0">
++    <ul className="list-unstyled m-0 mt-4 pt-2">
+       {groupedDates.map((groupedDate) => (
+         <Day key={groupedDate.date} {...groupedDate} mmp2p={mmp2p} />
+       ))}
+diff --git a/src/course-home/dates-tab/badgelist.jsx b/src/course-home/dates-tab/timeline/badgelist.jsx
+similarity index 88%
+rename from src/course-home/dates-tab/badgelist.jsx
+rename to src/course-home/dates-tab/timeline/badgelist.jsx
+index e755b9e..0c5cc69 100644
+--- a/src/course-home/dates-tab/badgelist.jsx
++++ b/src/course-home/dates-tab/timeline/badgelist.jsx
+@@ -2,10 +2,10 @@ import React from 'react';
+ import classNames from 'classnames';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faLock } from '@fortawesome/free-solid-svg-icons';
++import { Badge } from '@edx/paragon';
+ 
+-import Badge from './Badge';
+-import messages from './messages';
+-import { daycmp, isLearnerAssignment } from './utils';
++import messages from '../messages';
++import { daycmp, isLearnerAssignment } from '../utils';
+ 
+ function hasAccess(item) {
+   return item.learnerHasAccess;
+@@ -38,14 +38,14 @@ function getBadgeListAndColor(date, intl, item, items) {
+       message: messages.today,
+       shownForDay: isToday,
+       bg: 'bg-warning-300',
+-      className: 'text-gray-900',
++      className: 'text-black',
+     },
+     {
+       message: messages.completed,
+       shownForDay: assignments.length && assignments.every(isComplete),
+       shownForItem: x => isLearnerAssignment(x) && isComplete(x),
+-      bg: 'bg-dark-100',
+-      className: 'text-gray-900',
++      bg: 'bg-light-500',
++      className: 'text-black',
+     },
+     {
+       message: messages.pastDue,
+@@ -72,12 +72,11 @@ function getBadgeListAndColor(date, intl, item, items) {
+       shownForDay: items.length && items.every(x => !hasAccess(x)),
+       shownForItem: x => !hasAccess(x),
+       icon: faLock,
+-      bg: 'bg-dark-500',
++      bg: 'bg-dark-700',
+       className: 'text-white',
+     },
+   ];
+   let color = null; // first color of any badge
+-  const marginTopStyle = item ? { marginTop: 0 } : { marginTop: '2px' };
+   const badges = (
+     <>
+       {badgesInfo.map(b => {
+@@ -97,7 +96,7 @@ function getBadgeListAndColor(date, intl, item, items) {
+           color = b.bg;
+         }
+         return (
+-          <Badge key={b.message.id} style={marginTopStyle} className={classNames(b.bg, b.className)}>
++          <Badge key={b.message.id} className={classNames('ml-2', b.bg, b.className)} data-testid="dates-badge">
+             {b.icon && <FontAwesomeIcon icon={b.icon} className="mr-1" />}
+             {intl.formatMessage(b.message)}
+           </Badge>
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 5a27c4c..a4a2f05 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -10,14 +10,15 @@ import CourseDates from './widgets/CourseDates';
+ import CourseGoalCard from './widgets/CourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
+-import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ import { fetchOutlineTab } from '../data';
+ import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ import Section from './Section';
++import ShiftDatesAlert from '../suggested-schedule-messaging/ShiftDatesAlert';
+ import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+ import UpgradeCard from '../../generic/upgrade-card/UpgradeCard';
+ import { useAccessExpirationAlertMasquerade } from '../../alerts/access-expiration-alert';
++import UpgradeToShiftDatesAlert from '../suggested-schedule-messaging/UpgradeToShiftDatesAlert';
+ import useCertificateAvailableAlert from './alerts/certificate-status-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+ import useCourseStartAlert from './alerts/course-start-alert';
+@@ -36,6 +37,7 @@ function OutlineTab({ intl }) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    isSelfPaced,
+     org,
+     title,
+     username,
+@@ -56,7 +58,6 @@ function OutlineTab({ intl }) {
+       courseDateBlocks,
+       userTimezone,
+     },
+-    hasEnded,
+     resumeCourse: {
+       hasVisitedCourse,
+       url: resumeCourseUrl,
+@@ -92,7 +93,9 @@ function OutlineTab({ intl }) {
+ 
+   const rootCourseId = courses && Object.keys(courses)[0];
+ 
+-  const logUpgradeLinkClick = () => {
++  const hasDeadlines = courseDateBlocks && courseDateBlocks.some(x => x.dateType === 'assignment-due-date');
++
++  const logUpgradeToShiftDatesLinkClick = () => {
+     sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
+       ...eventProperties,
+       linkCategory: 'personalized_learner_schedules',
+@@ -152,17 +155,11 @@ function OutlineTab({ intl }) {
+               }}
+             />
+             )}
+-          {courseDateBlocks && (
+-            <DatesBannerContainer
+-              courseDateBlocks={courseDateBlocks}
+-              datesBannerInfo={datesBannerInfo}
+-              hasEnded={hasEnded}
+-              logUpgradeLinkClick={logUpgradeLinkClick}
+-              model="outline"
+-              tabFetch={fetchOutlineTab}
+-              /** [MM-P2P] Experiment */
+-              isMMP2PEnabled={MMP2P.state.isEnabled}
+-            />
++          {isSelfPaced && hasDeadlines && !MMP2P.state.isEnabled && (
++            <>
++              <ShiftDatesAlert model="outline" fetch={fetchOutlineTab} />
++              <UpgradeToShiftDatesAlert model="outline" logUpgradeLinkClick={logUpgradeToShiftDatesLinkClick} />
++            </>
+           )}
+           {!courseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
+             <CourseGoalCard
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 28f7f45..a0b81b5 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -160,9 +160,9 @@ describe('Outline Tab', () => {
+     });
+   });
+ 
+-  describe('Dates Banner', () => {
++  describe('Suggested schedule alerts', () => {
+     beforeEach(() => {
+-      setMetadata({ is_enrolled: true });
++      setMetadata({ is_enrolled: true, is_self_paced: true });
+       setTabData({
+         dates_banner_info: {
+           content_type_gating_enabled: true,
+@@ -185,15 +185,15 @@ describe('Outline Tab', () => {
+       });
+     });
+ 
+-    it('renders upgradeToReset', async () => {
++    it('renders UpgradeToShiftDatesAlert', async () => {
+       await fetchAndRender();
+ 
+-      expect(screen.getByText('You are auditing this course,')).toBeInTheDocument();
+-      expect(screen.getByText('which means that you are unable to participate in graded assignments. It looks like you missed some important deadlines based on our suggested schedule. To complete graded assignments as part of this course and shift the past due assignments into the future, you can upgrade today.')).toBeInTheDocument();
++      expect(screen.getByText('It looks like you missed some important deadlines based on our suggested schedule.')).toBeInTheDocument();
++      expect(screen.getByText('To keep yourself on track, you can update this schedule and shift the past due assignments into the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.')).toBeInTheDocument();
+       expect(screen.getByRole('button', { name: 'Upgrade to shift due dates' })).toBeInTheDocument();
+     });
+ 
+-    it('sends analytics event onClick of upgrade button in banner', async () => {
++    it('sends analytics event onClick of upgrade button in UpgradeToShiftDatesAlert', async () => {
+       await fetchAndRender();
+       sendTrackEvent.mockClear();
+ 
+diff --git a/src/course-home/suggested-schedule-messaging/ShiftDatesAlert.jsx b/src/course-home/suggested-schedule-messaging/ShiftDatesAlert.jsx
+new file mode 100644
+index 0000000..37b918f
+--- /dev/null
++++ b/src/course-home/suggested-schedule-messaging/ShiftDatesAlert.jsx
+@@ -0,0 +1,66 @@
++import React from 'react';
++import { useDispatch, useSelector } from 'react-redux';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  Alert,
++  Button,
++  Row,
++  Col,
++} from '@edx/paragon';
++
++import { resetDeadlines } from '../data';
++import { useModel } from '../../generic/model-store';
++import messages from './messages';
++
++function ShiftDatesAlert({ fetch, intl, model }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    datesBannerInfo,
++    hasEnded,
++  } = useModel(model, courseId);
++
++  const {
++    missedDeadlines,
++    missedGatedContent,
++  } = datesBannerInfo;
++
++  if (!missedDeadlines || missedGatedContent || hasEnded) {
++    return null;
++  }
++
++  const dispatch = useDispatch();
++
++  return (
++    <Alert variant="warning">
++      <Row className="w-100 m-0">
++        <Col xs={12} md={9} className="small p-0 pr-md-2">
++          <strong>{intl.formatMessage(messages.missedDeadlines)}</strong>
++          {' '}{intl.formatMessage(messages.shiftDatesBody)}
++        </Col>
++        <Col xs={12} md={3} className="align-self-center text-right mt-3 mt-md-0 p-0">
++          <Button
++            variant="primary"
++            size="sm"
++            className="w-xs-100 w-md-auto"
++            onClick={() => dispatch(resetDeadlines(courseId, model, fetch))}
++          >
++            {intl.formatMessage(messages.shiftDatesButton)}
++          </Button>
++        </Col>
++      </Row>
++    </Alert>
++  );
++}
++
++ShiftDatesAlert.propTypes = {
++  fetch: PropTypes.func.isRequired,
++  intl: intlShape.isRequired,
++  model: PropTypes.string.isRequired,
++};
++
++export default injectIntl(ShiftDatesAlert);
+diff --git a/src/course-home/suggested-schedule-messaging/SuggestedScheduleHeader.jsx b/src/course-home/suggested-schedule-messaging/SuggestedScheduleHeader.jsx
+new file mode 100644
+index 0000000..2e9b1a7
+--- /dev/null
++++ b/src/course-home/suggested-schedule-messaging/SuggestedScheduleHeader.jsx
+@@ -0,0 +1,18 @@
++import React from 'react';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from './messages';
++
++function SuggestedScheduleHeader({ intl }) {
++  return (
++    <p className="large">
++      {intl.formatMessage(messages.suggestedSchedule)}
++    </p>
++  );
++}
++
++SuggestedScheduleHeader.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(SuggestedScheduleHeader);
+diff --git a/src/course-home/suggested-schedule-messaging/UpgradeToCompleteAlert.jsx b/src/course-home/suggested-schedule-messaging/UpgradeToCompleteAlert.jsx
+new file mode 100644
+index 0000000..d01c21d
+--- /dev/null
++++ b/src/course-home/suggested-schedule-messaging/UpgradeToCompleteAlert.jsx
+@@ -0,0 +1,69 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  Alert,
++  Button,
++  Col,
++  Row,
++} from '@edx/paragon';
++
++import { useModel } from '../../generic/model-store';
++import messages from './messages';
++
++function UpgradeToCompleteAlert({ intl, logUpgradeLinkClick }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    datesBannerInfo,
++    hasEnded,
++  } = useModel('dates', courseId);
++
++  const {
++    contentTypeGatingEnabled,
++    missedDeadlines,
++    verifiedUpgradeLink,
++  } = datesBannerInfo;
++
++  if (!contentTypeGatingEnabled || missedDeadlines || hasEnded || !verifiedUpgradeLink) {
++    return null;
++  }
++
++  return (
++    <Alert className="bg-light-200">
++      <Row className="w-100 m-0">
++        <Col xs={12} md={9} className="small p-0 pr-md-2">
++          <Alert.Heading>{intl.formatMessage(messages.upgradeToCompleteHeader)}</Alert.Heading>
++          {intl.formatMessage(messages.upgradeToCompleteBody)}
++        </Col>
++        <Col xs={12} md={3} className="align-self-center text-right mt-3 mt-md-0 p-0">
++          <Button
++            variant="brand"
++            size="sm"
++            className="w-xs-100 w-md-auto"
++            onClick={() => {
++              logUpgradeLinkClick();
++              global.location.replace(verifiedUpgradeLink);
++            }}
++          >
++            {intl.formatMessage(messages.upgradeToCompleteButton)}
++          </Button>
++        </Col>
++      </Row>
++    </Alert>
++  );
++}
++
++UpgradeToCompleteAlert.propTypes = {
++  intl: intlShape.isRequired,
++  logUpgradeLinkClick: PropTypes.func,
++};
++
++UpgradeToCompleteAlert.defaultProps = {
++  logUpgradeLinkClick: () => {},
++};
++
++export default injectIntl(UpgradeToCompleteAlert);
+diff --git a/src/course-home/suggested-schedule-messaging/UpgradeToShiftDatesAlert.jsx b/src/course-home/suggested-schedule-messaging/UpgradeToShiftDatesAlert.jsx
+new file mode 100644
+index 0000000..70f818e
+--- /dev/null
++++ b/src/course-home/suggested-schedule-messaging/UpgradeToShiftDatesAlert.jsx
+@@ -0,0 +1,72 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  Alert,
++  Button,
++  Row,
++  Col,
++} from '@edx/paragon';
++
++import { useModel } from '../../generic/model-store';
++import messages from './messages';
++
++function UpgradeToShiftDatesAlert({ intl, logUpgradeLinkClick, model }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    datesBannerInfo,
++    hasEnded,
++  } = useModel(model, courseId);
++
++  const {
++    contentTypeGatingEnabled,
++    missedDeadlines,
++    missedGatedContent,
++    verifiedUpgradeLink,
++  } = datesBannerInfo;
++
++  if (!(contentTypeGatingEnabled && missedDeadlines && missedGatedContent && verifiedUpgradeLink) || hasEnded) {
++    return null;
++  }
++
++  return (
++    <Alert className="bg-light-200">
++      <Row className="w-100 m-0">
++        <Col xs={12} md={9} className="small p-0 pr-md-2">
++          <strong>{intl.formatMessage(messages.missedDeadlines)}</strong>
++          {' '}{intl.formatMessage(messages.upgradeToShiftBody)}
++        </Col>
++        <Col xs={12} md={3} className="align-self-center text-right mt-3 mt-md-0 p-0">
++          <Button
++            variant="brand"
++            size="sm"
++            className="w-xs-100 w-md-auto"
++            onClick={() => {
++              logUpgradeLinkClick();
++              global.location.replace(verifiedUpgradeLink);
++            }}
++          >
++            {intl.formatMessage(messages.upgradeToShiftButton)}
++          </Button>
++        </Col>
++      </Row>
++    </Alert>
++  );
++}
++
++UpgradeToShiftDatesAlert.propTypes = {
++  intl: intlShape.isRequired,
++  logUpgradeLinkClick: PropTypes.func,
++  model: PropTypes.string.isRequired,
++};
++
++UpgradeToShiftDatesAlert.defaultProps = {
++  logUpgradeLinkClick: () => {},
++};
++
++export default injectIntl(UpgradeToShiftDatesAlert);
+diff --git a/src/course-home/suggested-schedule-messaging/index.js b/src/course-home/suggested-schedule-messaging/index.js
+new file mode 100644
+index 0000000..74289f5
+--- /dev/null
++++ b/src/course-home/suggested-schedule-messaging/index.js
+@@ -0,0 +1,11 @@
++import ShiftDatesAlert from './ShiftDatesAlert';
++import SuggestedScheduleHeader from './SuggestedScheduleHeader';
++import UpgradeToCompleteAlert from './UpgradeToCompleteAlert';
++import UpgradeToShiftDatesAlert from './UpgradeToShiftDatesAlert';
++
++export {
++  ShiftDatesAlert,
++  SuggestedScheduleHeader,
++  UpgradeToCompleteAlert,
++  UpgradeToShiftDatesAlert,
++};
+diff --git a/src/course-home/suggested-schedule-messaging/messages.js b/src/course-home/suggested-schedule-messaging/messages.js
+new file mode 100644
+index 0000000..4880130
+--- /dev/null
++++ b/src/course-home/suggested-schedule-messaging/messages.js
+@@ -0,0 +1,51 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  suggestedSchedule: {
++    id: 'datesBanner.suggestedSchedule',
++    defaultMessage: 'We’ve built a suggested schedule to help you stay on track. But don’t worry—it’s flexible so you'
++      + ' can learn at your own pace.',
++  },
++  upgradeToCompleteHeader: {
++    id: 'datesBanner.upgradeToCompleteGradedBanner.header',
++    defaultMessage: 'Upgrade to unlock',
++    description: 'Messaging that prompts users to upgrade their course status in order to access locked course content',
++  },
++  upgradeToCompleteBody: {
++    id: 'datesBanner.upgradeToCompleteGradedBanner.body',
++    defaultMessage: 'You are auditing this course, which means that you are unable to participate in graded'
++      + ' assignments. To complete graded assignments as part of this course, you can upgrade today.',
++  },
++  upgradeToCompleteButton: {
++    id: 'datesBanner.upgradeToCompleteGradedBanner.button',
++    defaultMessage: 'Upgrade now',
++    description: 'Button that prompts users to upgrade their course status',
++  },
++  upgradeToShiftBody: {
++    id: 'datesBanner.upgradeToResetBanner.body',
++    defaultMessage: 'To keep yourself on track, you can update this schedule and shift the past due assignments into'
++      + ' the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.',
++  },
++  upgradeToShiftButton: {
++    id: 'datesBanner.upgradeToResetBanner.button',
++    defaultMessage: 'Upgrade to shift due dates',
++    description: 'Button that prompts users to upgrade their course status before they can shift their due dates into'
++      + ' the future',
++  },
++  missedDeadlines: {
++    id: 'datesBanner.resetDatesBanner.header',
++    defaultMessage: 'It looks like you missed some important deadlines based on our suggested schedule.',
++  },
++  shiftDatesBody: {
++    id: 'datesBanner.resetDatesBanner.body',
++    defaultMessage: 'To keep yourself on track, you can update this schedule and shift the past due assignments into'
++      + ' the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.',
++  },
++  shiftDatesButton: {
++    id: 'datesBanner.resetDatesBanner.button',
++    defaultMessage: 'Shift due dates',
++    description: 'Button that prompts users to move their due dates into the future',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index ef3bc27..58ac8c5 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -70,7 +70,7 @@ describe('Sequence Navigation', () => {
+     expect(testData.onNavigate).not.toHaveBeenCalled();
+     // TODO: Not sure if this is working as expected, because the `contentType="lock"` will be overridden by the value
+     //  from Redux. To make this provide a `fa-icon` lock we could introduce something like `overriddenContentType`.
+-    expect(unitButton.firstChild.firstChild).toHaveClass('fa-edit');
++    expect(unitButton.firstChild).toHaveClass('fa-edit');
+   });
+ 
+   it('renders correctly and handles unit button clicks', () => {
+diff --git a/src/index.scss b/src/index.scss
+index f4344e9..01cb551 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -378,8 +378,7 @@
+ @import 'shared/streak-celebration/StreakCelebrationModal.scss';
+ @import 'courseware/course/content-tools/calculator/calculator.scss';
+ @import 'courseware/course/content-tools/contentTools.scss';
+-@import 'course-home/dates-tab/Badge.scss';
+-@import 'course-home/dates-tab/Day.scss';
++@import 'course-home/dates-tab/timeline/Day.scss';
+ @import 'generic/upgrade-card/UpgradeCard.scss';
+ @import 'course-home/outline-tab/widgets/ProctoringInfoPanel.scss';
+ @import 'course-home/progress-tab/course-completion/CompletionDonutChart.scss';
+-- 
+2.34.1
+

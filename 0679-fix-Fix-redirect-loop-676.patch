@@ -1,0 +1,49 @@
+From 09072f318b6dac820102e2efbbe9cc164c10c18e Mon Sep 17 00:00:00 2001
+From: Thomas Tracy <contact@tjtracy.com>
+Date: Thu, 7 Oct 2021 16:35:08 -0400
+Subject: [PATCH 0679/1021] fix: Fix redirect loop (#676)
+
+MICROBA-1523
+---
+ src/generic/notices/NoticesProvider.jsx      | 2 +-
+ src/generic/notices/NoticesProvider.test.jsx | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/generic/notices/NoticesProvider.jsx b/src/generic/notices/NoticesProvider.jsx
+index 4cbd5f9..e3066b7 100644
+--- a/src/generic/notices/NoticesProvider.jsx
++++ b/src/generic/notices/NoticesProvider.jsx
+@@ -13,7 +13,7 @@ const NoticesProvider = ({ children }) => {
+   useEffect(async () => {
+     if (getConfig().ENABLE_NOTICES) {
+       const data = await getNotices();
+-      if (data && data.results) {
++      if (data && data.results && data.results.length > 0) {
+         const { results } = data;
+         setIsRedirected(true);
+         window.location.replace(`${results[0]}?next=${window.location.href}`);
+diff --git a/src/generic/notices/NoticesProvider.test.jsx b/src/generic/notices/NoticesProvider.test.jsx
+index 1da5cb3..fdda35a 100644
+--- a/src/generic/notices/NoticesProvider.test.jsx
++++ b/src/generic/notices/NoticesProvider.test.jsx
+@@ -44,7 +44,7 @@ describe('NoticesProvider', () => {
+     delete window.location;
+     window.location = { replace: jest.fn() };
+     process.env.ENABLE_NOTICES = true;
+-    await act(() => buildAndRender());
++    await act(async () => buildAndRender());
+     expect(window.location.replace).toHaveBeenCalledWith(`${redirectUrl}?next=${window.location.href}`);
+   });
+ 
+@@ -54,7 +54,7 @@ describe('NoticesProvider', () => {
+     delete window.location;
+     window.location = { replace: jest.fn() };
+     process.env.ENABLE_NOTICES = true;
+-    await act(() => buildAndRender());
++    await act(async () => buildAndRender());
+     expect(window.location.replace).toHaveBeenCalledTimes(0);
+     expect(window.location.toString() === 'http://localhost/');
+   });
+-- 
+2.34.1
+

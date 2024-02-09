@@ -1,0 +1,71 @@
+From 45d5141769bfa57ead8f9ce147cc51ee434d4141 Mon Sep 17 00:00:00 2001
+From: Simon Chen <schen@edx.org>
+Date: Thu, 17 Feb 2022 14:11:51 -0500
+Subject: [PATCH 0805/1021] fix: deny proctored exam access to audit and honor
+ enrollment tracks (#828)
+
+Co-authored-by: Simon Chen <schen@edx-c02fw0guml85.lan>
+---
+ package-lock.json                           | 6 +++---
+ package.json                                | 2 +-
+ src/courseware/course/sequence/Sequence.jsx | 1 +
+ src/courseware/data/api.js                  | 1 +
+ 4 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index de46ef5..0fd51f9 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -3966,9 +3966,9 @@
+       }
+     },
+     "@edx/frontend-lib-special-exams": {
+-      "version": "1.15.3",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-1.15.3.tgz",
+-      "integrity": "sha512-rMAGDsj0O5m5cAnGyD+E70EUW/rWggrSsqfl1QzJDZAUG1x7Q+nwbV/01J3JqeJLzYnsxLWpP8rqnNUWPdg57w==",
++      "version": "1.15.4",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-1.15.4.tgz",
++      "integrity": "sha512-00klUabOLrulyHMfrvVm+2HsnDe3uwUjH80mJV+Yg+7+kVwz0LraUM5PHPuLR0zHFsajK49kttabJfZEOEBdtA==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "1.2.34",
+         "@fortawesome/free-brands-svg-icons": "5.11.2",
+diff --git a/package.json b/package.json
+index 2c549ee..6632082 100644
+--- a/package.json
++++ b/package.json
+@@ -34,7 +34,7 @@
+     "@edx/brand": "npm:@edx/brand-openedx@1.1.0",
+     "@edx/frontend-component-footer": "10.1.6",
+     "@edx/frontend-enterprise-utils": "1.1.1",
+-    "@edx/frontend-lib-special-exams": "1.15.3",
++    "@edx/frontend-lib-special-exams": "1.15.4",
+     "@edx/frontend-platform": "1.14.3",
+     "@edx/paragon": "16.19.0",
+     "@edx/frontend-component-header": "^2.4.2",
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 90ebb57..1cc30d9 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -252,6 +252,7 @@ function Sequence({
+           isStaff={course.isStaff}
+           originalUserIsStaff={course.originalUserIsStaff}
+           isIntegritySignatureEnabled={course.isIntegritySignatureEnabled}
++          canAccessProctoredExams={course.canAccessProctoredExams}
+         >
+           {defaultContent}
+         </SequenceExamWrapper>
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 897cef8..0623dc0 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -137,6 +137,7 @@ function normalizeMetadata(metadata) {
+     isIntegritySignatureEnabled: data.is_integrity_signature_enabled,
+     userNeedsIntegritySignature: data.user_needs_integrity_signature,
+     isMasquerading: data.original_user_is_staff && !data.is_staff,
++    canAccessProctoredExams: data.can_access_proctored_exams,
+   };
+ }
+ 
+-- 
+2.34.1
+

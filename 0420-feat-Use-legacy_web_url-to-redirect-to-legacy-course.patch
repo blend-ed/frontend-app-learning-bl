@@ -1,0 +1,246 @@
+From cf58ff3d3f7361b1c09af193b629affd3e5e2dc4 Mon Sep 17 00:00:00 2001
+From: Kyle McCormick <kmccormick@edx.org>
+Date: Wed, 7 Apr 2021 09:21:07 -0400
+Subject: [PATCH 0420/1021] feat: Use legacy_web_url to redirect to legacy
+ courseware (#404)
+
+As part of making the new courseware experience the
+default for staff, the LMS /jump_to/ links that are
+exposed by the Course Blocks API via the `lms_web_url`
+field will soon direct users to whichever experience
+is active to them (instead of always directing to
+the legacy experience & relying on the learner
+redirect).
+
+Because of this, the MFE can no longer rely on
+`lms_web_url` to land a staff user to the legacy
+experience. However, the aformentioned change
+will also introduce a `legacy_web_url` field
+to the API, which we *can* use for this purpose.
+
+TNL-7796
+---
+ .../data/__snapshots__/redux.test.js.snap           |  2 +-
+ src/course-home/data/api.js                         |  9 +++++++--
+ src/course-home/outline-tab/SequenceLink.jsx        |  8 ++++++--
+ src/courseware/CoursewareContainer.jsx              |  6 +++---
+ src/courseware/CoursewareContainer.test.jsx         |  4 ++--
+ src/courseware/CoursewareRedirect.jsx               |  2 +-
+ src/courseware/data/api.js                          |  6 ++++--
+ src/instructor-toolbar/InstructorToolbar.jsx        | 10 +++++-----
+ src/shared/data/__factories__/block.factory.js      | 13 ++++++++++++-
+ 9 files changed, 41 insertions(+), 19 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index b2c6602..5605d04 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -388,7 +388,7 @@ Object {
+               "effortTime": undefined,
+               "icon": null,
+               "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+-              "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++              "legacyWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1?experience=legacy",
+               "sectionId": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+               "showLink": true,
+               "title": "Title of Sequence",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 84468b7..afcae8e 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -56,8 +56,13 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+           effortTime: block.effort_time,
+           icon: block.icon,
+           id: block.id,
+-          lmsWebUrl: block.lms_web_url,
+-          showLink: !!block.lms_web_url, // we reconstruct the url ourselves as an MFE-internal <Link>
++          // Fall back to `lms_web_url` until `legacy_web_url` is added to API (TNL-7796).
++          legacyWebUrl: block.legacy_web_url || block.lms_web_url,
++          // The presence of an LMS URL for the sequence indicates that we want this
++          // sequence to be a clickable link in the outline (even though, if the new
++          // courseware experience is active, we will ignore `legacyWebUrl` and build a
++          // link to the MFE ourselves).
++          showLink: !!(block.legacy_web_url || block.lms_web_url),
+           title: block.display_name,
+         };
+         break;
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index b79d75f..863ef7a 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -28,7 +28,7 @@ function SequenceLink({
+     complete,
+     description,
+     due,
+-    lmsWebUrl,
++    legacyWebUrl,
+     showLink,
+     title,
+   } = sequence;
+@@ -44,7 +44,11 @@ function SequenceLink({
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+   // canLoadCourseware is true if the Courseware MFE is enabled, false otherwise
+-  const coursewareUrl = canLoadCourseware ? <Link to={`/course/${courseId}/${id}`}>{title}</Link> : <Hyperlink destination={lmsWebUrl}>{title}</Hyperlink>;
++  const coursewareUrl = (
++    canLoadCourseware
++      ? <Link to={`/course/${courseId}/${id}`}>{title}</Link>
++      : <Hyperlink destination={legacyWebUrl}>{title}</Hyperlink>
++  );
+   const displayTitle = showLink ? coursewareUrl : title;
+ 
+   return (
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 88f0443..334e900 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -61,8 +61,8 @@ const checkUnitToSequenceUnitRedirect = memoize((courseStatus, courseId, sequenc
+ 
+ const checkSpecialExamRedirect = memoize((sequenceStatus, sequence) => {
+   if (sequenceStatus === 'loaded') {
+-    if (sequence.isTimeLimited && sequence.lmsWebUrl !== undefined) {
+-      global.location.assign(sequence.lmsWebUrl);
++    if (sequence.isTimeLimited && sequence.legacyWebUrl !== undefined) {
++      global.location.assign(sequence.legacyWebUrl);
+     }
+   }
+ });
+@@ -324,7 +324,7 @@ const sequenceShape = PropTypes.shape({
+   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+   sectionId: PropTypes.string.isRequired,
+   isTimeLimited: PropTypes.bool,
+-  lmsWebUrl: PropTypes.string,
++  legacyWebUrl: PropTypes.string,
+ });
+ 
+ const sectionShape = PropTypes.shape({
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index a3dc9b6..7fbdb56 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -406,7 +406,7 @@ describe('CoursewareContainer', () => {
+         window.location = location;
+       });
+ 
+-      it('should redirect to the sequence lmsWebUrl', async () => {
++      it('should redirect to the sequence legacyWebUrl', async () => {
+         const sequenceMetadata = Factory.build(
+           'sequenceMetadata',
+           { is_time_limited: true }, // position index is 1-based and is converted to 0-based for activeUnitIndex
+@@ -417,7 +417,7 @@ describe('CoursewareContainer', () => {
+         history.push(`/course/${courseId}/${sequenceBlock.id}/${unitBlocks[2].id}`);
+         await loadContainer();
+ 
+-        expect(global.location.assign).toHaveBeenCalledWith(sequenceBlock.lms_web_url);
++        expect(global.location.assign).toHaveBeenCalledWith(sequenceBlock.legacy_web_url);
+       });
+     });
+   });
+diff --git a/src/courseware/CoursewareRedirect.jsx b/src/courseware/CoursewareRedirect.jsx
+index 136651d..57eb396 100644
+--- a/src/courseware/CoursewareRedirect.jsx
++++ b/src/courseware/CoursewareRedirect.jsx
+@@ -8,7 +8,7 @@ export default function CourseRedirect({ match }) {
+     unitId,
+   } = match.params;
+   const unit = useModel('units', unitId) || {};
+-  const coursewareUrl = unit.lmsWebUrl || `${getConfig().LMS_BASE_URL}/courses/${courseId}/courseware/`;
++  const coursewareUrl = unit.legacyWebUrl || `${getConfig().LMS_BASE_URL}/courses/${courseId}/courseware/`;
+   global.location.assign(coursewareUrl);
+   return null;
+ }
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 9a25f53..72c36b0 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -38,7 +38,8 @@ export function normalizeBlocks(courseId, blocks) {
+           effortTime: block.effort_time,
+           id: block.id,
+           title: block.display_name,
+-          lmsWebUrl: block.lms_web_url,
++          // Fall back to `lms_web_url` until `legacy_web_url` is added to API (TNL-7796).
++          legacyWebUrl: block.legacy_web_url || block.lms_web_url,
+           unitIds: block.children || [],
+         };
+         break;
+@@ -47,7 +48,8 @@ export function normalizeBlocks(courseId, blocks) {
+           graded: block.graded,
+           id: block.id,
+           title: block.display_name,
+-          lmsWebUrl: block.lms_web_url,
++          // Fall back to `lms_web_url` until `legacy_web_url` is added to API (TNL-7796).
++          legacyWebUrl: block.legacy_web_url || block.lms_web_url,
+         };
+         break;
+       default:
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 26b4e19..e21ea43 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -55,13 +55,13 @@ export default function InstructorToolbar(props) {
+     unitId,
+   } = props;
+   const urlInsights = getInsightsUrl(courseId);
+-  const urlLms = useSelector((state) => {
++  const urlLegacy = useSelector((state) => {
+     if (!unitId) {
+       return undefined;
+     }
+ 
+     const activeUnit = state.models.units[props.unitId];
+-    return activeUnit ? activeUnit.lmsWebUrl : undefined;
++    return activeUnit ? activeUnit.legacyWebUrl : undefined;
+   });
+   const urlStudio = getStudioUrl(courseId, unitId);
+   const [masqueradeErrorMessage, showMasqueradeError] = useState(null);
+@@ -73,15 +73,15 @@ export default function InstructorToolbar(props) {
+           <div className="align-items-center flex-grow-1 d-md-flex mx-1 my-1">
+             <MasqueradeWidget courseId={courseId} onError={showMasqueradeError} />
+           </div>
+-          {(urlLms || urlStudio || urlInsights) && (
++          {(urlLegacy || urlStudio || urlInsights) && (
+             <>
+               <hr className="border-light" />
+               <span className="mr-2 mt-1 col-form-label">View course in:</span>
+             </>
+           )}
+-          {urlLms && (
++          {urlLegacy && (
+             <span className="mx-1 my-1">
+-              <a className="btn btn-inverse-outline-primary" href={urlLms}>Legacy experience</a>
++              <a className="btn btn-inverse-outline-primary" href={urlLegacy}>Legacy experience</a>
+             </span>
+           )}
+           {urlStudio && (
+diff --git a/src/shared/data/__factories__/block.factory.js b/src/shared/data/__factories__/block.factory.js
+index 0bda473..83fc96e 100644
+--- a/src/shared/data/__factories__/block.factory.js
++++ b/src/shared/data/__factories__/block.factory.js
+@@ -48,7 +48,7 @@ Factory.define('block')
+   )
+   .attr(
+     'lms_web_url',
+-    ['lms_web_url', 'host', 'courseId', 'id'],
++    ['legacy_web_url', 'host', 'courseId', 'id'],
+     (url, host, courseId, id) => {
+       if (url) {
+         return url;
+@@ -56,4 +56,15 @@ Factory.define('block')
+ 
+       return `${host}/courses/${courseId}/jump_to/${id}`;
+     },
++  )
++  .attr(
++    'legacy_web_url',
++    ['legacy_web_url', 'host', 'courseId', 'id'],
++    (url, host, courseId, id) => {
++      if (url) {
++        return url;
++      }
++
++      return `${host}/courses/${courseId}/jump_to/${id}?experience=legacy`;
++    },
+   );
+-- 
+2.34.1
+

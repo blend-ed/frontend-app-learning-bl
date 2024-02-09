@@ -1,0 +1,433 @@
+From 7049445969c314ccf112093d1ed6ff3cd5da4c94 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 25 Feb 2022 16:08:17 -0500
+Subject: [PATCH 0820/1021] chore: update to paragon 19.0.0
+
+Adapt to the big <Card> redesign.
+
+Also, as part of 19.0.0, the shadow variables in paragon got
+marked as !default, letting the theme override them. This would
+normally be fine and good. But the edx.org theme has a dramatically
+larger shadow set. And a lot of our cards and card-like components
+were designed with a smaller shadow in mind. So I added a new
+raised-card custom css class to keep as many cards looking the same.
+
+Notably, I cannot fix the data tables on the Progress tab. So those
+might have a larger shadow with this change, but that's unavoidable
+and presumably the intent of the edx.org theme authors.
+---
+ package-lock.json                             | 47 ++++++++++-----
+ package.json                                  |  2 +-
+ .../widgets/StartOrResumeCourseCard.jsx       | 34 ++++++-----
+ .../widgets/WeeklyLearningGoalCard.jsx        | 23 ++++----
+ .../outline-tab/widgets/WelcomeMessage.jsx    |  2 +-
+ src/course-home/progress-tab/ProgressTab.jsx  |  2 +-
+ .../certificate-status/CertificateStatus.jsx  | 16 +++---
+ .../course-completion/CourseCompletion.jsx    |  2 +-
+ .../grades/course-grade/CourseGrade.jsx       |  2 +-
+ .../course-exit/CourseRecommendations.jsx     | 57 +++++++++----------
+ .../course-exit/CourseRecommendations.scss    | 19 -------
+ src/index.scss                                |  5 ++
+ 12 files changed, 102 insertions(+), 109 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index c9e4d2a..6c76244 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -4070,31 +4070,48 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "17.1.2",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-17.1.2.tgz",
+-      "integrity": "sha512-PDPOtpe3zuOFBs18T9cAfCABJ7ABxcPWw+sY256fNjIZlaodOwOK/LN1rtuI9MEEfRk174QKRYZzFbihcbn4iw==",
+-      "requires": {
+-        "@fortawesome/fontawesome-svg-core": "^1.2.30",
+-        "@fortawesome/free-solid-svg-icons": "^5.14.0",
+-        "@fortawesome/react-fontawesome": "^0.1.11",
+-        "@popperjs/core": "^2.6.0",
++      "version": "19.0.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-19.0.0.tgz",
++      "integrity": "sha512-JBGF+65shm2Mf4s72WMd7RtY045rPZTwxH5zuKpEaF8X3dJfG2NIK8qICOFirpCGQWHHAcYiEOR8AQM8RyzJsw==",
++      "requires": {
++        "@fortawesome/fontawesome-svg-core": "^1.2.36",
++        "@fortawesome/free-solid-svg-icons": "^5.15.4",
++        "@fortawesome/react-fontawesome": "^0.1.16",
++        "@popperjs/core": "^2.11.2",
+         "airbnb-prop-types": "^2.12.0",
+         "bootstrap": "4.6.0",
+-        "classnames": "^2.2.6",
++        "classnames": "^2.3.1",
+         "email-prop-type": "^3.0.0",
+         "font-awesome": "^4.7.0",
+         "lodash.uniqby": "^4.7.0",
+         "mailto-link": "^1.0.0",
+-        "prop-types": "^15.7.2",
+-        "react-bootstrap": "^1.3.0",
+-        "react-focus-on": "^3.5.0",
+-        "react-popper": "^2.2.4",
++        "prop-types": "^15.8.1",
++        "react-bootstrap": "^1.6.4",
++        "react-focus-on": "^3.5.4",
++        "react-popper": "^2.2.5",
+         "react-proptype-conditional-require": "^1.0.4",
+         "react-responsive": "^8.2.0",
+-        "react-table": "^7.6.1",
+-        "react-transition-group": "^4.0.0",
++        "react-table": "^7.7.0",
++        "react-transition-group": "^4.4.2",
+         "tabbable": "^4.0.0",
+         "uncontrollable": "7.2.1"
++      },
++      "dependencies": {
++        "@popperjs/core": {
++          "version": "2.11.2",
++          "resolved": "https://registry.npmjs.org/@popperjs/core/-/core-2.11.2.tgz",
++          "integrity": "sha512-92FRmppjjqz29VMJ2dn+xdyXZBrMlE42AV6Kq6BwjWV7CNUW1hs2FtxSNLQE+gJhaZ6AAmYuO9y8dshhcBl7vA=="
++        },
++        "prop-types": {
++          "version": "15.8.1",
++          "resolved": "https://registry.npmjs.org/prop-types/-/prop-types-15.8.1.tgz",
++          "integrity": "sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==",
++          "requires": {
++            "loose-envify": "^1.4.0",
++            "object-assign": "^4.1.1",
++            "react-is": "^16.13.1"
++          }
++        }
+       }
+     },
+     "@formatjs/ecma402-abstract": {
+diff --git a/package.json b/package.json
+index 5202810..1eadd62 100644
+--- a/package.json
++++ b/package.json
+@@ -36,7 +36,7 @@
+     "@edx/frontend-enterprise-utils": "1.1.1",
+     "@edx/frontend-lib-special-exams": "1.15.5",
+     "@edx/frontend-platform": "1.14.3",
+-    "@edx/paragon": "17.1.2",
++    "@edx/paragon": "19.0.0",
+     "@edx/frontend-component-header": "^2.4.2",
+     "@fortawesome/fontawesome-svg-core": "1.2.36",
+     "@fortawesome/free-brands-svg-icons": "5.15.4",
+diff --git a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+index b7987b0..38b945f 100644
+--- a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
++++ b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+@@ -41,24 +41,22 @@ function StartOrResumeCourseCard({ intl }) {
+   };
+ 
+   return (
+-    <Card className="mb-3 shadow-sm border-0" data-testid="start-resume-card">
+-      <Card.Body>
+-        <div className="row w-100 m-0 justify-content-between align-items-center">
+-          <div className="col-12 col-md-7 p-0 mb-3 mb-md-0">
+-            <h2 className="h3 m-0">{hasVisitedCourse ? intl.formatMessage(messages.resumeBlurb) : intl.formatMessage(messages.startBlurb)}</h2>
+-          </div>
+-          <div className="col-12 col-md-auto p-0">
+-            <Button
+-              variant="brand"
+-              block
+-              href={resumeCourseUrl}
+-              onClick={() => logResumeCourseClick()}
+-            >
+-              {hasVisitedCourse ? intl.formatMessage(messages.resume) : intl.formatMessage(messages.start)}
+-            </Button>
+-          </div>
+-        </div>
+-      </Card.Body>
++    <Card className="mb-3 raised-card" data-testid="start-resume-card">
++      <Card.Header
++        title={hasVisitedCourse ? intl.formatMessage(messages.resumeBlurb) : intl.formatMessage(messages.startBlurb)}
++        actions={(
++          <Button
++            variant="brand"
++            block
++            href={resumeCourseUrl}
++            onClick={() => logResumeCourseClick()}
++          >
++            {hasVisitedCourse ? intl.formatMessage(messages.resume) : intl.formatMessage(messages.start)}
++          </Button>
++        )}
++      />
++      {/* Footer is needed for internal vertical spacing to work out. If you can remove, be my guest */}
++      <Card.Footer />
+     </Card>
+   );
+ }
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index 2f9a709..08ae5e4 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -68,19 +68,18 @@ function WeeklyLearningGoalCard({
+   return (
+     <Card
+       id="courseHome-weeklyLearningGoal"
+-      className="row w-100 m-0 mb-3 shadow-sm border-0"
++      className="row w-100 m-0 mb-3 raised-card"
+       data-testid="weekly-learning-goal-card"
+     >
+-      <Card.Body className="p-3 p-lg-3.5">
+-        <h2 id="set-weekly-goal-h2" className="h4 mb-1 text-primary-500">{intl.formatMessage(messages.setWeeklyGoal)}</h2>
+-        <Card.Text
+-          className="text-gray-700 small mb-2.5"
+-        >
+-          {intl.formatMessage(messages.setWeeklyGoalDetail)}
+-        </Card.Text>
++      <Card.Header
++        size="sm"
++        title={(<div id="set-weekly-goal-header">{intl.formatMessage(messages.setWeeklyGoal)}</div>)}
++        subtitle={intl.formatMessage(messages.setWeeklyGoalDetail)}
++      />
++      <Card.Section className="text-gray-700 small">
+         <div
+           role="radiogroup"
+-          aria-labelledby="set-weekly-goal-h2"
++          aria-labelledby="set-weekly-goal-header"
+           className="flag-button-container m-0 p-0"
+         >
+           <LearningGoalButton
+@@ -108,9 +107,9 @@ function WeeklyLearningGoalCard({
+             <small>{intl.formatMessage(messages.setGoalReminder)}</small>
+           </Form.Switch>
+         </div>
+-      </Card.Body>
++      </Card.Section>
+       {isGetReminderSelected && (
+-        <Card.Footer className="border-0 px-2.5 bg-light-200">
++        <Card.Section muted>
+           <div className="row w-100 m-0 small align-center">
+             <div className="d-flex align-items-center pr-1">
+               <Icon
+@@ -122,7 +121,7 @@ function WeeklyLearningGoalCard({
+               {intl.formatMessage(messages.goalReminderDetail)}
+             </div>
+           </div>
+-        </Card.Footer>
++        </Card.Section>
+       )}
+     </Card>
+   );
+diff --git a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+index fcc7c15..b2f93ca 100644
+--- a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
++++ b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+@@ -37,7 +37,7 @@ function WelcomeMessage({ courseId, intl }) {
+         setDisplay(false);
+         dispatch(dismissWelcomeMessage(courseId));
+       }}
+-      className="shadow-sm border-0"
++      className="raised-card"
+       actions={messageCanBeShortened ? [
+         <Button
+           onClick={() => setShowShortMessage(!showShortMessage)}
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index 1a3fe82..7954927 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -41,7 +41,7 @@ function ProgressTab() {
+           <CourseCompletion />
+           {!wideScreen && <CertificateStatus />}
+           <CourseGrade />
+-          <div className={`grades my-4 p-4 rounded shadow-sm ${applyLockedOverlay}`} aria-hidden={gradesFeatureIsFullyLocked}>
++          <div className={`grades my-4 p-4 rounded raised-card ${applyLockedOverlay}`} aria-hidden={gradesFeatureIsFullyLocked}>
+             <GradeSummary />
+             <DetailedGrades />
+           </div>
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index abf1c05..9855baf 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -224,14 +224,12 @@ function CertificateStatus({ intl }) {
+ 
+   return (
+     <section data-testid="certificate-status-component" className="text-dark-700 mb-4">
+-      <Card className="bg-light-200 shadow-sm border-0">
+-        <Card.Body>
+-          <Card.Title>
+-            <h3>{header}</h3>
+-          </Card.Title>
+-          <Card.Text className="small text-gray-700">
+-            {body}
+-          </Card.Text>
++      <Card className="bg-light-200 raised-card">
++        <Card.Header title={header} />
++        <Card.Section className="small text-gray-700">
++          {body}
++        </Card.Section>
++        <Card.Footer>
+           {buttonText && (buttonLocation || buttonAction) && (
+             <Button
+               variant="outline-brand"
+@@ -245,7 +243,7 @@ function CertificateStatus({ intl }) {
+               {buttonText}
+             </Button>
+           )}
+-        </Card.Body>
++        </Card.Footer>
+       </Card>
+     </section>
+   );
+diff --git a/src/course-home/progress-tab/course-completion/CourseCompletion.jsx b/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+index c481435..5b4abc2 100644
+--- a/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
++++ b/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+@@ -6,7 +6,7 @@ import messages from './messages';
+ 
+ function CourseCompletion({ intl }) {
+   return (
+-    <section className="text-dark-700 mb-4 rounded shadow-sm p-4">
++    <section className="text-dark-700 mb-4 rounded raised-card p-4">
+       <div className="row w-100 m-0">
+         <div className="col-12 col-sm-6 col-md-7 p-0">
+           <h2>{intl.formatMessage(messages.courseCompletion)}</h2>
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+index 410ddfa..2d2677e 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -30,7 +30,7 @@ function CourseGrade({ intl }) {
+   const applyLockedOverlay = gradesFeatureIsFullyLocked ? 'locked-overlay' : '';
+ 
+   return (
+-    <section className="text-dark-700 my-4 rounded shadow-sm">
++    <section className="text-dark-700 my-4 rounded raised-card">
+       {(gradesFeatureIsFullyLocked || gradesFeatureIsPartiallyLocked) && <CourseGradeHeader />}
+       <div className={applyLockedOverlay} aria-hidden={gradesFeatureIsFullyLocked}>
+         <div className="row w-100 m-0 p-4">
+diff --git a/src/courseware/course/course-exit/CourseRecommendations.jsx b/src/courseware/course/course-exit/CourseRecommendations.jsx
+index 7eb5ca0..112d2ea 100644
+--- a/src/courseware/course/course-exit/CourseRecommendations.jsx
++++ b/src/courseware/course/course-exit/CourseRecommendations.jsx
+@@ -24,6 +24,11 @@ const messages = defineMessages({
+     description: 'Header for recommendations section of course celebration',
+     defaultMessage: 'Keep building your skills with these courses!',
+   },
++  recommendationsCourseFooter: {
++    id: 'courseCelebration.recommendations.label', // not very descriptive, but is historical
++    description: 'Label on a discovery-card that lets a user know that it is a course card',
++    defaultMessage: 'Course',
++  },
+   listJoin: {
+     id: 'courseCelebration.recommendations.formatting.list_join',
+     description: 'Joining mark or word for a list of items, use the {sp} placeholder to include space before the joining word',
+@@ -73,6 +78,20 @@ function CourseCard({
+     intl,
+   );
+ 
++  const subtitle = (
++    <FormattedMessage
++      id="courseCelebration.recommendations.card.schools.label"
++      description="Screenreader label for the Schools and Partners running the course."
++      defaultMessage="Schools and Partners"
++    >{text => (
++      <>
++        <span className="sr-only">{text}: </span>
++        {truncate(formattedOwners, 40, { reserveLastWord: -1 })}
++      </>
++    )}
++    </FormattedMessage>
++  );
++
+   return (
+     <div
+       role="group"
+@@ -83,36 +102,12 @@ function CourseCard({
+         className="text-decoration-none"
+         onClick={onClick}
+       >
+-        <Card style={{ width: '270px', height: '270px' }} className="discovery-card">
+-          <Card.Img variant="top" src={image.src} bsPrefix="d-card-hero" />
+-          <Card.Body>
+-            <Card.Title>
+-              <h3 className="h4 text-gray-700 font-weight-normal">
+-                {truncate(title, 70, { reserveLastWord: -1 })}
+-              </h3>
+-            </Card.Title>
+-            <div className="text-gray-500 small">
+-              <FormattedMessage
+-                id="courseCelebration.recommendations.card.schools.label"
+-                description="Screenreader label for the Schools and Partners running the course."
+-                defaultMessage="Schools and Partners"
+-              >{text => (
+-                <>
+-                  <span className="sr-only">{text}: </span>
+-                  {truncate(formattedOwners, 40, { reserveLastWord: -1 })}
+-                </>
+-              )}
+-              </FormattedMessage>
+-            </div>
+-          </Card.Body>
+-          <footer className="pl-4 pb-2 x-small text-gray-500">
+-            <FormattedMessage
+-              id="courseCelebration.recommendations.label"
+-              description="Label on a discovery-card that lets a user know that it is a course card"
+-              defaultMessage="Course"
+-            />
+-          </footer>
+-
++        <Card isClickable style={{ width: '21rem', height: '100%' }}>
++          <Card.ImageCap src={image.src} />
++          <Card.Header title={truncate(title, 70, { reserveLastWord: -1 })} subtitle={subtitle} size="sm" />
++          {/* Section is needed for internal vertical spacing to work out. If you can remove, be my guest */}
++          <Card.Section />
++          <Card.Footer textElement={intl.formatMessage(messages.recommendationsCourseFooter)} />
+         </Card>
+       </Hyperlink>
+     </div>
+@@ -161,7 +156,7 @@ function CourseRecommendations({ intl, variant }) {
+   }
+ 
+   if (recommendationsStatus === LOADING) {
+-    return <PageLoading srMessage={`${intl.formatMessage(messages.loadingRecommendations)}`} />;
++    return <PageLoading srMessage={intl.formatMessage(messages.loadingRecommendations)} />;
+   }
+ 
+   const onCardClick = (url) => (e) => {
+diff --git a/src/courseware/course/course-exit/CourseRecommendations.scss b/src/courseware/course/course-exit/CourseRecommendations.scss
+index 9c68020..9700920 100644
+--- a/src/courseware/course/course-exit/CourseRecommendations.scss
++++ b/src/courseware/course/course-exit/CourseRecommendations.scss
+@@ -8,23 +8,4 @@
+       }
+     }
+   }
+-
+-  .discovery-card {
+-    &:hover,
+-    &:focus {
+-      box-shadow: 0 2px 4px 2px $gray-500
+-    }
+-  }
+-
+-    .d-card-hero-top {
+-      height: 102px;
+-      min-height: 102px;
+-      background-color: $gray-200;
+-      overflow: hidden;
+-      border: {
+-        radius: 3px 3px 0 0;
+-        bottom: 1px solid $success-100;
+-      }
+-    }
+-
+ }
+diff --git a/src/index.scss b/src/index.scss
+index 498631b..eb0a0a5 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -356,6 +356,11 @@
+   }
+ }
+ 
++.raised-card {
++  border: 0 !important;
++  box-shadow: 0 .0625rem .125rem rgba(0, 0, 0, .2) !important;
++}
++
+ // Import component-specific sass files
+ @import "courseware/course/celebration/CelebrationModal.scss";
+ @import "courseware/course/NotificationTray.scss";
+-- 
+2.34.1
+

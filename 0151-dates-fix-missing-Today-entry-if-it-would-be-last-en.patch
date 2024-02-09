@@ -1,0 +1,27 @@
+From 1471abe7dd95d0b0693e3d3403168dc414ca5621 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 23 Jun 2020 09:39:54 -0400
+Subject: [PATCH 0151/1021] dates: fix missing Today entry if it would be last
+ entry (#94)
+
+---
+ src/dates-tab/Timeline.jsx | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/dates-tab/Timeline.jsx b/src/dates-tab/Timeline.jsx
+index 54c24ec..3ab288e 100644
+--- a/src/dates-tab/Timeline.jsx
++++ b/src/dates-tab/Timeline.jsx
+@@ -53,6 +53,9 @@ export default function Timeline() {
+       groupedDates[groupedDates.length - 1].items.push(dateInfo);
+     }
+   });
++  if (!foundToday) {
++    groupedDates.push({ date: now, items: [] });
++  }
+   if (groupedDates.length) {
+     groupedDates[groupedDates.length - 1].last = true;
+   }
+-- 
+2.34.1
+

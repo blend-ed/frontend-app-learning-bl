@@ -1,0 +1,25 @@
+From 5a30cddd326015d212948d7db183c1de54704a30 Mon Sep 17 00:00:00 2001
+From: Sagirov Evgeniy <34642612+UvgenGen@users.noreply.github.com>
+Date: Mon, 14 Jun 2021 17:44:37 +0300
+Subject: [PATCH 0497/1021] feat: Added 'allow_proctoring_opt_out' attribute
+ for SequenceMetadata API. (#485)
+
+---
+ src/courseware/data/api.js | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index d47d8c3..c5d69e6 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -189,6 +189,7 @@ function normalizeSequenceMetadata(sequence) {
+       activeUnitIndex: sequence.position ? sequence.position - 1 : 0,
+       saveUnitPosition: sequence.save_position,
+       showCompletion: sequence.show_completion,
++      allowProctoringOptOut: sequence.allow_proctoring_opt_out,
+     },
+     units: sequence.items.map(unit => ({
+       id: unit.id,
+-- 
+2.34.1
+

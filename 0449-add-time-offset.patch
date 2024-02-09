@@ -1,0 +1,90 @@
+From 997be712f1aa421bf915e91f06741e2bc93f3874 Mon Sep 17 00:00:00 2001
+From: Emma Green <emma.green.software@gmail.com>
+Date: Fri, 30 Apr 2021 17:09:33 -0400
+Subject: [PATCH 0449/1021] add time offset
+
+---
+ src/course-home/data/api.js      | 22 +++++++++++++++++++++-
+ src/course-home/data/api.test.js | 16 ++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+ create mode 100644 src/course-home/data/api.test.js
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index ad974ab..bc75c90 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -160,11 +160,30 @@ export async function getProctoringInfoData(courseId, username) {
+   }
+ }
+ 
++export function getTimeOffsetMillis(headerDate, requestTime, responseTime) {
++  // Time offset computation should move down into the HttpClient wrapper to maintain a global time correction reference
++  // Requires 'Access-Control-Expose-Headers: Date' on the server response per https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#access-control-expose-headers
++
++  let timeOffsetMillis = 0;
++  if (headerDate !== undefined) {
++    const headerTime = Date.parse(headerDate);
++    const roundTripMillis = requestTime - responseTime;
++    const localTime = responseTime - (roundTripMillis / 2); // Roughly compensate for transit time
++    timeOffsetMillis = headerTime - localTime;
++  }
++
++  return timeOffsetMillis;
++}
++
+ export async function getOutlineTabData(courseId) {
+   const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline/${courseId}`;
+   let { tabData } = {};
++  let requestTime = Date.now();
++  let responseTime = requestTime;
+   try {
++    requestTime = Date.now();
+     tabData = await getAuthenticatedHttpClient().get(url);
++    responseTime = Date.now();
+   } catch (error) {
+     const { httpErrorStatus } = error && error.customAttributes;
+     if (httpErrorStatus === 404) {
+@@ -189,6 +208,7 @@ export async function getOutlineTabData(courseId) {
+   const hasEnded = data.has_ended;
+   const offer = camelCaseObject(data.offer);
+   const resumeCourse = camelCaseObject(data.resume_course);
++  const timeOffsetMillis = getTimeOffsetMillis(tabData.headers.date, requestTime, responseTime);
+   const verifiedMode = camelCaseObject(data.verified_mode);
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+@@ -205,9 +225,9 @@ export async function getOutlineTabData(courseId) {
+     hasEnded,
+     offer,
+     resumeCourse,
++    timeOffsetMillis, // This should move to a global time correction reference
+     verifiedMode,
+     welcomeMessageHtml,
+-    timeOffsetMillis: 0,
+   };
+ }
+ 
+diff --git a/src/course-home/data/api.test.js b/src/course-home/data/api.test.js
+new file mode 100644
+index 0000000..865967e
+--- /dev/null
++++ b/src/course-home/data/api.test.js
+@@ -0,0 +1,16 @@
++import { getTimeOffsetMillis } from './api';
++
++describe('Calculate the time offset properly', () => {
++  it('Should return 0 if the headerDate is not set', async () => {
++    const offset = getTimeOffsetMillis(undefined, undefined, undefined);
++    expect(offset).toBe(0);
++  });
++
++  it('Should return the offset', async () => {
++    const headerDate = '2021-04-13T11:01:58.135Z';
++    const requestTime = new Date('2021-04-12T11:01:57.135Z');
++    const responseTime = new Date('2021-04-12T11:01:58.635Z');
++    const offset = getTimeOffsetMillis(headerDate, requestTime, responseTime);
++    expect(offset).toBe(86398750);
++  });
++});
+-- 
+2.34.1
+

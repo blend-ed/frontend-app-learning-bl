@@ -1,0 +1,372 @@
+From 86d28136de5e53514ce82b0e9a5c56c2a056989e Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Thu, 20 Aug 2020 13:46:44 -0400
+Subject: [PATCH 0236/1021] Paragon 10: Updating Dropdown and Button usages.
+ (#187)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Updating Dropdown and Button.
+
+* Fixing broken tests and test warnings.
+
+* Remove comment block.
+
+* Using variant=“link” on the Tabs Dropdown.Toggle.
+
+* Fixing some merge conflicts.
+---
+ package-lock.json                             |  6 ++---
+ package.json                                  |  6 ++---
+ .../enrollment-alert/EnrollmentAlert.jsx      |  2 +-
+ src/course-header/Header.jsx                  |  9 ++++----
+ .../course/bookmark/BookmarkButton.jsx        |  3 ++-
+ .../sequence/content-lock/ContentLock.jsx     |  2 +-
+ .../SequenceNavigation.jsx                    |  4 ++--
+ .../SequenceNavigationDropdown.jsx            |  7 +++---
+ .../SequenceNavigationDropdown.test.jsx       | 14 ++++++++---
+ .../SequenceNavigationTabs.test.jsx           | 23 +++++++++++++++----
+ .../sequence-navigation/UnitButton.jsx        |  1 +
+ .../sequence-navigation/UnitNavigation.jsx    |  6 +++--
+ src/generic/tabs/Tabs.jsx                     |  4 ++--
+ src/index.scss                                |  6 +++++
+ .../masquerade-widget/MasqueradeWidget.jsx    |  4 ++--
+ 15 files changed, 65 insertions(+), 32 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 83566d5..82aab18 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1443,9 +1443,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "9.1.1",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-9.1.1.tgz",
+-      "integrity": "sha512-kSnALJeIBEtGb7GiEq1pOihQlNesLFwYoHovxAatyteZYcjOF1I27W3VJdx1mE07ZjfUUwrzY2czvvPXMWKP8A==",
++      "version": "10.0.1",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-10.0.1.tgz",
++      "integrity": "sha512-rUQvGYVFDCTn9Vd5jk1zTOTzQK04TCKultizipRA1OmYJongMjUYUUTpX4A6KmYNvwkOY7GHQ1Ewd2W4nXj49g==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.21",
+         "@fortawesome/free-solid-svg-icons": "^5.10.1",
+diff --git a/package.json b/package.json
+index 32bd5ef..ee4819e 100644
+--- a/package.json
++++ b/package.json
+@@ -36,9 +36,9 @@
+   "dependencies": {
+     "@edx/frontend-component-footer": "10.0.11",
+     "@edx/frontend-component-header": "2.0.5",
+-    "@edx/frontend-enterprise": "^4.2.2",
++    "@edx/frontend-enterprise": "4.2.2",
+     "@edx/frontend-platform": "1.5.2",
+-    "@edx/paragon": "9.1.1",
++    "@edx/paragon": "10.0.1",
+     "@fortawesome/fontawesome-svg-core": "1.2.30",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+@@ -61,7 +61,7 @@
+     "reselect": "4.0.0"
+   },
+   "devDependencies": {
+-    "@edx/frontend-build": "^5.2.0",
++    "@edx/frontend-build": "5.2.0",
+     "@testing-library/dom": "7.16.3",
+     "@testing-library/jest-dom": "5.10.1",
+     "@testing-library/react": "10.3.0",
+diff --git a/src/alerts/enrollment-alert/EnrollmentAlert.jsx b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+index c9ac6e0..9574e86 100644
+--- a/src/alerts/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+@@ -33,7 +33,7 @@ function EnrollmentAlert({ intl, payload }) {
+   }
+ 
+   const button = canEnroll && (
+-    <Button disabled={loading} className="btn-link p-0 border-0 align-top" onClick={enrollClickHandler}>
++    <Button disabled={loading} variant="link" className="p-0 border-0 align-top" onClick={enrollClickHandler}>
+       {intl.formatMessage(messages.enroll)}
+     </Button>
+   );
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index 1ed133e..68bb0a6 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -55,22 +55,23 @@ export default function Header({
+         </div>
+ 
+         <Dropdown className="user-dropdown">
+-          <Dropdown.Button>
++          <Dropdown.Toggle variant="light">
+             <FontAwesomeIcon icon={faUserCircle} className="d-md-none" size="lg" />
+             <span className="d-none d-md-inline">
+               {authenticatedUser.username}
+             </span>
+-          </Dropdown.Button>
++          </Dropdown.Toggle>
+           <Dropdown.Menu className="dropdown-menu-right">
+             <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/dashboard`}>Dashboard</Dropdown.Item>
+             <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/u/${authenticatedUser.username}`}>Profile</Dropdown.Item>
+             <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/account/settings`}>Account</Dropdown.Item>
+-            { !enterpriseLearnerPortalLink
++            {!enterpriseLearnerPortalLink && (
+               // Users should only see Order History if they do not have an available
+               // learner portal, because an available learner portal currently means
+               // that they access content via Subscriptions, in which context an "order"
+               // is not relevant.
+-              && <Dropdown.Item href={getConfig().ORDER_HISTORY_URL}>Order History</Dropdown.Item>}
++              <Dropdown.Item href={getConfig().ORDER_HISTORY_URL}>Order History</Dropdown.Item>
++            )}
+             <Dropdown.Item href={getConfig().LOGOUT_URL}>Sign Out</Dropdown.Item>
+           </Dropdown.Menu>
+         </Dropdown>
+diff --git a/src/courseware/course/bookmark/BookmarkButton.jsx b/src/courseware/course/bookmark/BookmarkButton.jsx
+index 88c5ef4..c2e2098 100644
+--- a/src/courseware/course/bookmark/BookmarkButton.jsx
++++ b/src/courseware/course/bookmark/BookmarkButton.jsx
+@@ -40,7 +40,8 @@ export default function BookmarkButton({
+ 
+   return (
+     <StatefulButton
+-      className="btn-link px-1 ml-n1 btn-sm"
++      variant="link"
++      className="px-1 ml-n1 btn-sm"
+       onClick={toggleBookmark}
+       state={state}
+       disabledStates={['defaultProcessing', 'bookmarkedProcessing']}
+diff --git a/src/courseware/course/sequence/content-lock/ContentLock.jsx b/src/courseware/course/sequence/content-lock/ContentLock.jsx
+index 5e1a09f..2ec0f00 100644
+--- a/src/courseware/course/sequence/content-lock/ContentLock.jsx
++++ b/src/courseware/course/sequence/content-lock/ContentLock.jsx
+@@ -29,7 +29,7 @@ function ContentLock({
+         })}
+       </p>
+       <p>
+-        <Button className="btn-primary" onClick={handleClick}>{intl.formatMessage(messages['learn.contentLock.goToSection'])}</Button>
++        <Button variant="primary" onClick={handleClick}>{intl.formatMessage(messages['learn.contentLock.goToSection'])}</Button>
+       </p>
+     </>
+   );
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index c5d38cb..2fc39ef 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -51,7 +51,7 @@ export default function SequenceNavigation({
+ 
+   return sequenceStatus === LOADED && (
+     <nav className={classNames('sequence-navigation', className)}>
+-      <Button className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit}>
++      <Button variant="link" className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit}>
+         <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
+         <FormattedMessage
+           defaultMessage="Previous"
+@@ -60,7 +60,7 @@ export default function SequenceNavigation({
+         />
+       </Button>
+       {renderUnitButtons()}
+-      <Button className="next-btn" onClick={nextSequenceHandler} disabled={isLastUnit}>
++      <Button variant="link" className="next-btn" onClick={nextSequenceHandler} disabled={isLastUnit}>
+         <FormattedMessage
+           defaultMessage="Next"
+           id="learn.sequence.navigation.next.button"
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.jsx
+index ac0eebd..e880173 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.jsx
+@@ -13,7 +13,7 @@ export default function SequenceNavigationDropdown({
+ }) {
+   return (
+     <Dropdown className="sequence-navigation-dropdown">
+-      <Dropdown.Button className="dropdown-button font-weight-normal w-100 border-right-0">
++      <Dropdown.Toggle variant="link" className="font-weight-normal w-100 border-right-0">
+         <FormattedMessage
+           defaultMessage="{current} of {total}"
+           description="The title of the mobile menu for sequence navigation of units"
+@@ -23,10 +23,11 @@ export default function SequenceNavigationDropdown({
+             total: unitIds.length,
+           }}
+         />
+-      </Dropdown.Button>
++      </Dropdown.Toggle>
+       <Dropdown.Menu className="w-100">
+         {unitIds.map(buttonUnitId => (
+-          <UnitButton
++          <Dropdown.Item
++            as={UnitButton}
+             className="w-100"
+             isActive={unitId === buttonUnitId}
+             key={buttonUnitId}
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+index 8a9e380..fe2cce6 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
+ import { getAllByRole } from '@testing-library/dom';
++import { act } from '@testing-library/react';
+ import SequenceNavigationDropdown from './SequenceNavigationDropdown';
+ import {
+   render, screen, fireEvent, initializeTestStore,
+@@ -37,10 +38,13 @@ describe('Sequence Navigation Dropdown', () => {
+     });
+   });
+ 
+-  unitBlocks.forEach((unit, indedx) => {
+-    it(`marks unit ${indedx + 1} as active`, () => {
++  unitBlocks.forEach((unit, index) => {
++    it(`marks unit ${index + 1} as active`, async () => {
+       const { container } = render(<SequenceNavigationDropdown {...mockData} unitId={unit.id} />);
+-
++      const dropdownToggle = container.querySelector('.dropdown-toggle');
++      await act(async () => {
++        await fireEvent.click(dropdownToggle);
++      });
+       const dropdownMenu = container.querySelector('.dropdown-menu');
+       // Only the current unit should be marked as active.
+       getAllByRole(dropdownMenu, 'button', { hidden: true }).forEach(button => {
+@@ -57,6 +61,10 @@ describe('Sequence Navigation Dropdown', () => {
+     const onNavigate = jest.fn();
+     const { container } = render(<SequenceNavigationDropdown {...mockData} onNavigate={onNavigate} />);
+ 
++    const dropdownToggle = container.querySelector('.dropdown-toggle');
++    act(() => {
++      fireEvent.click(dropdownToggle);
++    });
+     const dropdownMenu = container.querySelector('.dropdown-menu');
+     getAllByRole(dropdownMenu, 'button', { hidden: true }).forEach(button => fireEvent.click(button));
+     expect(onNavigate).toHaveBeenCalledTimes(unitBlocks.length);
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+index bb23214..2742eb9 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+@@ -1,5 +1,7 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
++import { act, fireEvent, getAllByRole } from '@testing-library/react';
++
+ import { initializeTestStore, render, screen } from '../../../../setupTest';
+ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastVisibleChild';
+@@ -44,12 +46,23 @@ describe('Sequence Navigation Tabs', () => {
+     expect(screen.getAllByRole('button')).toHaveLength(unitBlocks.length);
+   });
+ 
+-  it('renders unit buttons and dropdown button', () => {
+-    useIndexOfLastVisibleChild.mockReturnValue([-1, null, null]);
+-    render(<SequenceNavigationTabs {...mockData} />);
++  it('renders unit buttons and dropdown button', async () => {
++    let container = null;
++    await act(async () => {
++      useIndexOfLastVisibleChild.mockReturnValue([-1, null, null]);
++      const booyah = render(<SequenceNavigationTabs {...mockData} />);
++      container = booyah.container;
+ 
+-    expect(screen.getAllByRole('button')).toHaveLength(unitBlocks.length + 1);
++      const dropdownToggle = container.querySelector('.dropdown-toggle');
++      // We need to await this click here, which requires us to await the `act` as well above.
++      // https://github.com/testing-library/react-testing-library/issues/535
++      // Without doing this, we get a warning about using `act` even though we are.
++      await fireEvent.click(dropdownToggle);
++    });
++    const dropdownMenu = container.querySelector('.dropdown');
++    const dropdownButtons = getAllByRole(dropdownMenu, 'button');
++    expect(dropdownButtons).toHaveLength(unitBlocks.length + 1);
+     expect(screen.getByRole('button', { name: `${activeBlockNumber} of ${unitBlocks.length}` }))
+-      .toHaveClass('dropdown-button');
++      .toHaveClass('dropdown-toggle');
+   });
+ });
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx b/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
+index f926c7f..e3863d4 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
+@@ -30,6 +30,7 @@ function UnitButton({
+         active: isActive,
+         complete: showCompletion && complete,
+       }, className)}
++      variant="link"
+       onClick={handleClick}
+       title={title}
+     >
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+index 17137e6..55c1576 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+@@ -19,7 +19,8 @@ export default function UnitNavigation(props) {
+   return (
+     <div className="unit-navigation d-flex">
+       <Button
+-        className="btn-outline-secondary previous-button mr-2"
++        variant="outline-secondary"
++        className="previous-button mr-2"
+         disabled={isFirstUnit}
+         onClick={onClickPrevious}
+       >
+@@ -42,7 +43,8 @@ export default function UnitNavigation(props) {
+         </div>
+       ) : (
+         <Button
+-          className="btn-outline-primary next-button"
++          variant="outline-primary"
++          className="next-button"
+           onClick={onClickNext}
+           disabled={isLastUnit}
+         >
+diff --git a/src/generic/tabs/Tabs.jsx b/src/generic/tabs/Tabs.jsx
+index 21e5b54..0695b3b 100644
+--- a/src/generic/tabs/Tabs.jsx
++++ b/src/generic/tabs/Tabs.jsx
+@@ -37,13 +37,13 @@ export default function Tabs({ children, className, ...attrs }) {
+         key="overflow"
+       >
+         <Dropdown>
+-          <Dropdown.Button className="nav-link font-weight-normal">
++          <Dropdown.Toggle variant="link" className="nav-link font-weight-normal">
+             <FormattedMessage
+               id="learn.course.tabs.navigation.overflow.menu"
+               description="The title of the overflow menu for course tabs"
+               defaultMessage="More..."
+             />
+-          </Dropdown.Button>
++          </Dropdown.Toggle>
+           <Dropdown.Menu className="dropdown-menu-right">{overflowChildren}</Dropdown.Menu>
+         </Dropdown>
+       </div>
+diff --git a/src/index.scss b/src/index.scss
+index b52a357..f6b6272 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -223,6 +223,12 @@ $primary: #1176B2;
+         }
+       }
+     }
++    .dropdown-item {
++      &.active {
++        // This is un-doing the default react-bootstrap styling for active dropdown-item elements.
++        background-color: transparent;
++      }
++    }
+   }
+ 
+   .previous-btn, .next-btn {
+diff --git a/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+index c8f22bd..a134982 100644
+--- a/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
++++ b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+@@ -143,9 +143,9 @@ class MasqueradeWidget extends Component {
+           className="flex-shrink-1 mx-1 my-1"
+           style={{ textAlign: 'center' }}
+         >
+-          <Dropdown.Button>
++          <Dropdown.Toggle variant="light">
+             View this course as
+-          </Dropdown.Button>
++          </Dropdown.Toggle>
+           <Dropdown.Menu>
+             {options}
+           </Dropdown.Menu>
+-- 
+2.34.1
+

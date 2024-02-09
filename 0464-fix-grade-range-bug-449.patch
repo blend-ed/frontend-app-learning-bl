@@ -1,0 +1,110 @@
+From 110088688a0b8e9dbbc6de57c0bb29439cebc50a Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 17 May 2021 09:23:49 -0400
+Subject: [PATCH 0464/1021] fix: grade range bug (#449)
+
+---
+ .../grades/course-grade/CourseGrade.jsx          |  9 +--------
+ .../grades/course-grade/CurrentGradeTooltip.jsx  |  6 +++---
+ .../grades/course-grade/GradeRangeTooltip.jsx    | 16 +++++++++-------
+ .../grade-summary/GradeSummaryTableFooter.jsx    |  2 +-
+ 4 files changed, 14 insertions(+), 19 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+index 862d930..94156f1 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -24,14 +24,7 @@ function CourseGrade({ intl }) {
+     },
+   } = useModel('progress', courseId);
+ 
+-  let passingGrade;
+-  if (gradeRange.pass) {
+-    passingGrade = gradeRange.pass * 100;
+-  } else {
+-    passingGrade = Object.entries(gradeRange).pop()[1] * 100;
+-  }
+-
+-  passingGrade = Number(passingGrade.toFixed(0));
++  const passingGrade = Number((Math.min(...Object.values(gradeRange)) * 100).toFixed(0));
+ 
+   const isLocked = lockedCount > 0;
+   const applyLockedOverlay = isLocked ? 'locked-overlay' : '';
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index f6e4662..9f0e4f8 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -37,14 +37,14 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+         )}
+       >
+         <g>
+-          <circle cx={`${currentGrade}%`} cy="50%" r="8.5" fill="transparent" />
+-          <rect className="grade-bar__divider" x={`${currentGrade}%`} style={{ transform: 'translateY(2.61em)' }} />
++          <circle cx={`${Math.min(...[currentGrade, 100])}%`} cy="50%" r="8.5" fill="transparent" />
++          <rect className="grade-bar__divider" x={`${Math.min(...[currentGrade, 100])}%`} style={{ transform: 'translateY(2.61em)' }} />
+         </g>
+       </OverlayTrigger>
+       <text
+         className="x-small"
+         textAnchor={currentGrade < 50 ? 'start' : 'end'}
+-        x={`${currentGrade}%`}
++        x={`${Math.min(...[currentGrade, 100])}%`}
+         y="20px"
+         style={{ transform: `translateX(${currentGrade < 50 ? '' : '-'}3.4em)` }}
+       >
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+index 109d878..81b01ce 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+@@ -24,7 +24,9 @@ function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+ 
+   const [showTooltip, setShowTooltip] = useState(false);
+ 
+-  const gradeRangeEntries = Object.entries(gradeRange);
++  const orderedGradeRange = Object.entries(gradeRange).sort((a, b) => (
++    gradeRange[b[0]] - gradeRange[a[0]]
++  ));
+ 
+   return (
+     <OverlayTrigger
+@@ -36,18 +38,18 @@ function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+           <Popover.Content className="px-3">
+             {intl.formatMessage(messages.courseGradeRangeTooltip)}
+             <ul className="list-unstyled m-0">
+-              {gradeRangeEntries.map((entry, index) => {
++              {orderedGradeRange.map((range, index) => {
+                 if (index === 0) {
+                   return (
+-                    <li key={entry[0]}>
+-                      {entry[0]}: {(entry[1] * 100).toFixed(0)}%-100%
++                    <li key={range[0]}>
++                      {range[0]}: {(range[1] * 100).toFixed(0)}%-100%
+                     </li>
+                   );
+                 }
+-                const previousGrade = gradeRangeEntries[index - 1];
++                const previousGrade = orderedGradeRange[index - 1];
+                 return (
+-                  <li key={entry[0]}>
+-                    {entry[0]}: {(entry[1] * 100).toFixed(0)}%-{(previousGrade[1] * 100).toFixed(0)}%
++                  <li key={range[0]}>
++                    {range[0]}: {(range[1] * 100).toFixed(0)}%-{(previousGrade[1] * 100).toFixed(0)}%
+                   </li>
+                 );
+               })}
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+index a8cf041..e14141e 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+@@ -20,7 +20,7 @@ function GradeSummaryTableFooter({ intl }) {
+   } = useModel('progress', courseId);
+ 
+   const bgColor = isPassing ? 'bg-success-100' : 'bg-warning-100';
+-  const totalGrade = percent * 100;
++  const totalGrade = (percent * 100).toFixed(0);
+ 
+   return (
+     <DataTable.TableFooter className={`border-top border-primary ${bgColor}`}>
+-- 
+2.34.1
+

@@ -1,0 +1,1203 @@
+From 4c6797c6314b7815a1244e285009b7b3ffde187f Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 16 Sep 2020 09:29:58 -0400
+Subject: [PATCH 0250/1021] AA-128: Course Home UI/UX improvements (#208)
+
+---
+ .env                                          |   1 +
+ .env.development                              |   1 +
+ .env.test                                     |   1 +
+ package-lock.json                             |  36 ++---
+ package.json                                  |   2 +-
+ src/course-header/Header.jsx                  |   4 +-
+ src/course-header/messages.js                 |   5 +
+ .../data/__snapshots__/redux.test.js.snap     |   6 +-
+ src/course-home/data/slice.js                 |   2 +-
+ src/course-home/outline-tab/DateSummary.jsx   |   6 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |  38 +++--
+ src/course-home/outline-tab/Section.jsx       |  72 +++++++++-
+ src/course-home/outline-tab/SequenceLink.jsx  | 133 +++++++++---------
+ src/course-home/outline-tab/messages.js       |  35 +++++
+ .../outline-tab/widgets/CourseDates.jsx       |  12 +-
+ .../outline-tab/widgets/CourseTools.jsx       |   2 +-
+ .../widgets/UpdateGoalSelector.jsx            |  64 +++------
+ .../outline-tab/widgets/WelcomeMessage.jsx    |  42 +++---
+ src/generic/messages.js                       |  11 ++
+ src/generic/user-messages/Alert.jsx           |  35 +++--
+ src/generic/user-messages/Alert.scss          |   1 -
+ src/index.jsx                                 |   1 +
+ src/index.scss                                |   1 +
+ src/instructor-toolbar/InstructorToolbar.jsx  |   2 +-
+ .../MasqueradeUserNameInput.jsx               |   1 +
+ .../masquerade-widget/MasqueradeWidget.jsx    |   2 +-
+ src/tab-page/TabPage.jsx                      |  19 ++-
+ src/toast/LearningToast.jsx                   |  51 -------
+ src/toast/LearningToast.scss                  |  29 ----
+ 29 files changed, 338 insertions(+), 277 deletions(-)
+ create mode 100644 src/generic/messages.js
+ delete mode 100644 src/toast/LearningToast.jsx
+ delete mode 100644 src/toast/LearningToast.scss
+
+diff --git a/.env b/.env
+index 3be594b..0007e59 100644
+--- a/.env
++++ b/.env
+@@ -17,4 +17,5 @@ SEGMENT_KEY=null
+ SITE_NAME=null
+ TWITTER_URL=null
+ STUDIO_BASE_URL=
++SUPPORT_URL=null
+ USER_INFO_COOKIE_NAME=null
+diff --git a/.env.development b/.env.development
+index 1ad937b..ff8c88d 100644
+--- a/.env.development
++++ b/.env.development
+@@ -17,4 +17,5 @@ SEGMENT_KEY=null
+ SITE_NAME='edX'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ STUDIO_BASE_URL='http://localhost:18010'
++SUPPORT_URL='https://support.edx.org'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+diff --git a/.env.test b/.env.test
+index 0a2b801..b742116 100644
+--- a/.env.test
++++ b/.env.test
+@@ -16,4 +16,5 @@ SEGMENT_KEY=null
+ SITE_NAME='edX'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ STUDIO_BASE_URL='http://localhost:18010'
++SUPPORT_URL='https://support.edx.org'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+diff --git a/package-lock.json b/package-lock.json
+index 376bee6..d664f81 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1443,9 +1443,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "10.1.1",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-10.1.1.tgz",
+-      "integrity": "sha512-2M8b3H2EhsHHheNblLCKkJtOJwFM6zFMLrIJYWUdhJCLNInHzNcGevrNxsiAXX8sKzpvHPkKpknrm57NJDpcIQ==",
++      "version": "12.0.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-12.0.0.tgz",
++      "integrity": "sha512-H+lwlDzYOEltDV3zdzmgbAM4D/mFEEEeNw/fwBwt8Nk2Cbf5yqcjPINMoEh7TkclTYqqxsoIsvI/si9cVQ/rnw==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+@@ -3006,9 +3006,9 @@
+       "dev": true
+     },
+     "@types/invariant": {
+-      "version": "2.2.33",
+-      "resolved": "https://registry.npmjs.org/@types/invariant/-/invariant-2.2.33.tgz",
+-      "integrity": "sha512-/jUNmS8d4bCKdqslfxW6dg/9Gksfzxz67IYfqApHn+HvHlMVXwYv2zpTDnS/yaK9BB0i0GlBTaYci0EFE62Hmw=="
++      "version": "2.2.34",
++      "resolved": "https://registry.npmjs.org/@types/invariant/-/invariant-2.2.34.tgz",
++      "integrity": "sha512-lYUtmJ9BqUN688fGY1U1HZoWT1/Jrmgigx2loq4ZcJpICECm/Om3V314BxdzypO0u5PORKGMM6x0OXaljV1YFg=="
+     },
+     "@types/istanbul-lib-coverage": {
+       "version": "2.0.3",
+@@ -3207,9 +3207,9 @@
+       "dev": true
+     },
+     "@types/react": {
+-      "version": "16.9.48",
+-      "resolved": "https://registry.npmjs.org/@types/react/-/react-16.9.48.tgz",
+-      "integrity": "sha512-4ykBVswgYitPGMXFRxJCHkxJDU2rjfU3/zw67f8+dB7sNdVJXsrwqoYxz/stkAucymnEEbRPFmX7Ce5Mc/kJCw==",
++      "version": "16.9.49",
++      "resolved": "https://registry.npmjs.org/@types/react/-/react-16.9.49.tgz",
++      "integrity": "sha512-DtLFjSj0OYAdVLBbyjhuV9CdGVHCkHn2R+xr3XkBvK2rS1Y1tkc14XSGjYgm5Fjjr90AxH9tiSzc1pCFMGO06g==",
+       "requires": {
+         "@types/prop-types": "*",
+         "csstype": "^3.0.2"
+@@ -7034,9 +7034,9 @@
+       }
+     },
+     "dom-serializer": {
+-      "version": "1.0.1",
+-      "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-1.0.1.tgz",
+-      "integrity": "sha512-1Aj1Qy3YLbdslkI75QEOfdp9TkQ3o8LRISAzxOibjBs/xWwr1WxZFOQphFkZuepHFGo+kB8e5FVJSS0faAJ4Rw==",
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-1.1.0.tgz",
++      "integrity": "sha512-ox7bvGXt2n+uLWtCRLybYx60IrOlWL/aCebWJk1T0d4m3y2tzf4U3ij9wBMUb6YJZpz06HCCYuyCDveE2xXmzQ==",
+       "requires": {
+         "domelementtype": "^2.0.1",
+         "domhandler": "^3.0.0",
+@@ -7050,9 +7050,9 @@
+       "dev": true
+     },
+     "domelementtype": {
+-      "version": "2.0.1",
+-      "resolved": "https://registry.npmjs.org/domelementtype/-/domelementtype-2.0.1.tgz",
+-      "integrity": "sha512-5HOHUDsYZWV8FGWN0Njbr/Rn7f/eWSQi1v7+HsUVwXgn8nWWlL64zKDkS0n8ZmQ3mlWOMuXOnR+7Nx/5tMO5AQ=="
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/domelementtype/-/domelementtype-2.0.2.tgz",
++      "integrity": "sha512-wFwTwCVebUrMgGeAwRL/NhZtHAUyT9n9yg4IMDwf10+6iCMxSkVq9MGCVEH+QZWo1nNidy8kNvwmv4zWHDTqvA=="
+     },
+     "domexception": {
+       "version": "2.0.1",
+@@ -7080,9 +7080,9 @@
+       }
+     },
+     "domutils": {
+-      "version": "2.2.0",
+-      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.2.0.tgz",
+-      "integrity": "sha512-0haAxVr1PR0SqYwCH7mxMpHZUwjih9oPPedqpR/KufsnxPyZ9dyVw1R5093qnJF3WXSbjBkdzRWLw/knJV/fAg==",
++      "version": "2.3.0",
++      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.3.0.tgz",
++      "integrity": "sha512-xWC75PM3QF6MjE5e58OzwTX0B/rPQnlqH0YyXB/c056RtVJA+eu60da2I/bdnEHzEYC00g8QaZUlAbqOZVbOsw==",
+       "requires": {
+         "dom-serializer": "^1.0.1",
+         "domelementtype": "^2.0.1",
+diff --git a/package.json b/package.json
+index 39948c1..dcff3f1 100644
+--- a/package.json
++++ b/package.json
+@@ -38,7 +38,7 @@
+     "@edx/frontend-component-header": "2.0.5",
+     "@edx/frontend-enterprise": "4.2.2",
+     "@edx/frontend-platform": "1.5.2",
+-    "@edx/paragon": "10.1.1",
++    "@edx/paragon": "12.0.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.30",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index b2d8c49..b91375e 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -78,13 +78,13 @@ function Header({
+ 
+   return (
+     <header className="course-header">
+-      <div className="container-fluid py-2 d-flex align-items-center ">
++      <div className="container-fluid py-2 d-flex align-items-center">
+         {headerLogo}
+         <div className="flex-grow-1 course-title-lockup" style={{ lineHeight: 1 }}>
+           <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
+           <span className="d-block m-0 font-weight-bold course-title">{courseTitle}</span>
+         </div>
+-
++        <a className="text-gray-700 mr-3" href={`${getConfig().SUPPORT_URL}`}>{intl.formatMessage(messages.help)}</a>
+         <Dropdown className="user-dropdown">
+           <Dropdown.Toggle variant="light">
+             <FontAwesomeIcon icon={faUserCircle} className="d-md-none" size="lg" />
+diff --git a/src/course-header/messages.js b/src/course-header/messages.js
+index 5a74ff5..07d5de9 100644
+--- a/src/course-header/messages.js
++++ b/src/course-header/messages.js
+@@ -11,6 +11,11 @@ const messages = defineMessages({
+     defaultMessage: 'Dashboard',
+     description: 'The text for the user menu Dashboard navigation link.',
+   },
++  help: {
++    id: 'header.help.label',
++    defaultMessage: 'Help',
++    description: 'The text for the link to the Help Center',
++  },
+   profile: {
+     id: 'header.menu.profile.label',
+     defaultMessage: 'Profile',
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index fac3b8b..acee81c 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -7,7 +7,7 @@ Object {
+     "courseStatus": "loading",
+     "toastBodyLink": null,
+     "toastBodyText": null,
+-    "toastHeader": null,
++    "toastHeader": "",
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -26,7 +26,7 @@ Object {
+     "courseStatus": "loaded",
+     "toastBodyLink": null,
+     "toastBodyText": null,
+-    "toastHeader": null,
++    "toastHeader": "",
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -112,7 +112,7 @@ Object {
+     "courseStatus": "loaded",
+     "toastBodyLink": null,
+     "toastBodyText": null,
+-    "toastHeader": null,
++    "toastHeader": "",
+   },
+   "courseware": Object {
+     "courseId": null,
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index 8b55f61..7e037d7 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -12,7 +12,7 @@ const slice = createSlice({
+     courseId: null,
+     toastBodyText: null,
+     toastBodyLink: null,
+-    toastHeader: null,
++    toastHeader: '',
+   },
+   reducers: {
+     fetchTabRequest: (state, { payload }) => {
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index a09516d..acc36cd 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -15,8 +15,8 @@ export default function DateSummary({
+   return (
+     <section className="container p-0 mb-3">
+       <div className="row">
+-        <FontAwesomeIcon icon={faCalendarAlt} className="ml-3 mt-1 mr-1" style={{ width: '20px' }} />
+-        <div className="ml-2 font-weight-bold">
++        <FontAwesomeIcon icon={faCalendarAlt} className="ml-3 mt-1 mr-1" fixedWidth />
++        <div className="ml-1 font-weight-bold">
+           <FormattedDate
+             value={dateBlock.date}
+             day="numeric"
+@@ -27,7 +27,7 @@ export default function DateSummary({
+           />
+         </div>
+       </div>
+-      <div className="row ml-4 px-2">
++      <div className="row ml-4 pl-1 pr-2">
+         <div className="date-summary-text">
+           {linkedTitle
+           && <div className="font-weight-bold mt-2"><a href={dateBlock.link}>{dateBlock.title}</a></div>}
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index fee3721..188a55c 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -2,13 +2,14 @@ import React, { useState } from 'react';
+ import { useSelector } from 'react-redux';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
++import { Button, Toast } from '@edx/paragon';
+ import { AlertList } from '../../generic/user-messages';
+ 
+ import CourseDates from './widgets/CourseDates';
+ import CourseGoalCard from './widgets/CourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
+-import LearningToast from '../../toast/LearningToast';
++import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ import Section from './Section';
+ import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+@@ -55,7 +56,8 @@ function OutlineTab({ intl }) {
+   } = useModel('outline', courseId);
+ 
+   const [courseGoalToDisplay, setCourseGoalToDisplay] = useState(selectedGoal);
+-  const [goalToastHeader, setGoalToastHeader] = useState(null);
++  const [goalToastHeader, setGoalToastHeader] = useState('');
++  const [expandAll, setExpandAll] = useState(false);
+ 
+   // Above the tab alerts (appearing in the order listed here)
+   const logistrationAlert = useLogistrationAlert();
+@@ -81,17 +83,23 @@ function OutlineTab({ intl }) {
+           ...logistrationAlert,
+         }}
+       />
+-      <LearningToast
+-        header={goalToastHeader}
+-        onClose={() => setGoalToastHeader(null)}
++      <Toast
++        closeLabel={intl.formatMessage(genericMessages.close)}
++        onClose={() => setGoalToastHeader('')}
+         show={!!(goalToastHeader)}
+-      />
+-      <div className="d-flex justify-content-between mb-3">
+-        <div role="heading" aria-level="1" className="h4">{title}</div>
++      >
++        {goalToastHeader}
++      </Toast>
++      <div className="row w-100 m-0 mb-3 justify-content-between">
++        <div className="col-12 col-sm-auto p-0">
++          <div role="heading" aria-level="1" className="h4">{title}</div>
++        </div>
+         {resumeCourseUrl && (
+-          <a className="btn btn-primary" href={resumeCourseUrl}>
+-            {hasVisitedCourse ? intl.formatMessage(messages.resume) : intl.formatMessage(messages.start)}
+-          </a>
++          <div className="col-12 col-sm-auto p-0">
++            <a className="btn btn-primary btn-block" href={resumeCourseUrl}>
++              {hasVisitedCourse ? intl.formatMessage(messages.resume) : intl.formatMessage(messages.start)}
++            </a>
++          </div>
+         )}
+       </div>
+       <div className="row">
+@@ -117,10 +125,18 @@ function OutlineTab({ intl }) {
+               ...offerAlert,
+             }}
+           />
++          <div className="row w-100 m-0 mb-3 justify-content-end">
++            <div className="col-12 col-sm-auto p-0">
++              <Button variant="outline-primary" block onClick={() => { setExpandAll(!expandAll); }}>
++                {expandAll ? intl.formatMessage(messages.collapseAll) : intl.formatMessage(messages.expandAll)}
++              </Button>
++            </div>
++          </div>
+           {sectionIds.map((sectionId) => (
+             <Section
+               key={sectionId}
+               courseId={courseId}
++              expand={expandAll}
+               section={sections[sectionId]}
+             />
+           ))}
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index 62de2ab..e5e339a 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -1,12 +1,21 @@
+-import React from 'react';
++import React, { useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
+-import { Collapsible } from '@edx/paragon';
+-import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Collapsible, IconButton } from '@edx/paragon';
++import { faCheckCircle as fasCheckCircle, faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';
++import { faCheckCircle as farCheckCircle } from '@fortawesome/free-regular-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import SequenceLink from './SequenceLink';
+ import { useModel } from '../../generic/model-store';
++import genericMessages from '../../generic/messages';
++import messages from './messages';
+ 
+-export default function Section({ courseId, section }) {
++function Section({
++  courseId,
++  expand,
++  intl,
++  section,
++}) {
+   const {
+     complete,
+     sequenceIds,
+@@ -18,15 +27,60 @@ export default function Section({ courseId, section }) {
+     },
+   } = useModel('outline', courseId);
+ 
++  const [open, setOpen] = useState(expand);
++
++  useEffect(() => {
++    setOpen(expand);
++  }, [expand]);
++
+   const sectionTitle = (
+     <div>
+-      {complete && <FontAwesomeIcon icon={faCheckCircle} className="float-left text-success mt-1" />}
+-      <div className="ml-4 font-weight-bold">{title}</div>
++      {complete ? (
++        <FontAwesomeIcon
++          icon={fasCheckCircle}
++          className="float-left mt-1 text-success"
++          aria-hidden="true"
++          title={intl.formatMessage(messages.completedSection)}
++        />
++      ) : (
++        <FontAwesomeIcon
++          icon={farCheckCircle}
++          className="float-left mt-1 text-gray-200"
++          aria-hidden="true"
++          title={intl.formatMessage(messages.incompleteSection)}
++        />
++      )}
++      <div className="ml-3 pl-3 font-weight-bold">
++        {title}
++        <span className="sr-only">
++          , {intl.formatMessage(complete ? messages.completedSection : messages.incompleteSection)}
++        </span>
++      </div>
+     </div>
+   );
+ 
+   return (
+-    <Collapsible className="mb-2" styling="card-lg" title={sectionTitle} defaultOpen>
++    <Collapsible
++      className="mb-2"
++      styling="card-lg"
++      title={sectionTitle}
++      open={open}
++      onToggle={() => { setOpen(!open); }}
++      iconWhenClosed={(
++        <IconButton
++          alt={intl.formatMessage(messages.openSection)}
++          icon={faPlus}
++          onClick={() => { setOpen(true); }}
++        />
++      )}
++      iconWhenOpen={(
++        <IconButton
++          alt={intl.formatMessage(genericMessages.close)}
++          icon={faMinus}
++          onClick={() => { setOpen(false); }}
++        />
++      )}
++    >
+       {sequenceIds.map((sequenceId, index) => (
+         <SequenceLink
+           key={sequenceId}
+@@ -42,5 +96,9 @@ export default function Section({ courseId, section }) {
+ 
+ Section.propTypes = {
+   courseId: PropTypes.string.isRequired,
++  expand: PropTypes.bool.isRequired,
++  intl: intlShape.isRequired,
+   section: PropTypes.shape().isRequired,
+ };
++
++export default injectIntl(Section);
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index e17bdb4..b10ce9c 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -2,21 +2,22 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { Link } from 'react-router-dom';
+-import { FormattedMessage, FormattedTime } from '@edx/frontend-platform/i18n';
+-import { faClock, faEdit } from '@fortawesome/free-regular-svg-icons';
+ import {
+-  faCheck,
+-  faCheckCircle,
+-  faExclamationTriangle,
+-  faSpinner,
+-  faTimesCircle,
+-} from '@fortawesome/free-solid-svg-icons';
++  FormattedMessage,
++  FormattedTime,
++  injectIntl,
++  intlShape,
++} from '@edx/frontend-platform/i18n';
++import { faCheckCircle as fasCheckCircle } from '@fortawesome/free-solid-svg-icons';
++import { faCheckCircle as farCheckCircle } from '@fortawesome/free-regular-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ 
+ import { useModel } from '../../generic/model-store';
++import messages from './messages';
+ 
+-export default function SequenceLink({
++function SequenceLink({
+   id,
++  intl,
+   courseId,
+   first,
+   sequence,
+@@ -25,7 +26,6 @@ export default function SequenceLink({
+     complete,
+     description,
+     due,
+-    icon,
+     showLink,
+     title,
+   } = sequence;
+@@ -37,74 +37,71 @@ export default function SequenceLink({
+ 
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+-  let text = title;
+-
+-  let faIcon;
+-  switch (icon) {
+-    // list of possible ones here: https://github.com/edx/edx-proctoring/blob/master/edx_proctoring/api.py
+-    case 'fa-check': faIcon = faCheck; break;
+-    case 'fa-clock-o': faIcon = faClock; break;
+-    case 'fa-exclamation-triangle': faIcon = faExclamationTriangle; break;
+-    case 'fa-pencil-square-o': faIcon = faEdit; break;
+-    case 'fa-spinner fa-spin': faIcon = faSpinner; break;
+-    case 'fa-times-circle': faIcon = faTimesCircle; break;
+-    default: faIcon = null; break;
+-  }
+-  if (faIcon) {
+-    text = <><FontAwesomeIcon icon={faIcon} /> {text}</>;
+-  }
+-
+-  if (due) {
+-    text = (
+-      <>
+-        {text}<br />
+-        <small className="text-body">
+-          <FormattedMessage
+-            id="learning.outline.sequence-due"
+-            defaultMessage="{description} due {assignmentDue}"
+-            description="Used below an assignment title"
+-            values={{
+-              assignmentDue: (
+-                <FormattedTime
+-                  key={`${id}-due`}
+-                  day="numeric"
+-                  month="short"
+-                  year="numeric"
+-                  hour12={false}
+-                  timeZoneName="short"
+-                  value={due}
+-                  {...timezoneFormatArgs}
+-                />
+-              ),
+-              description: description || '',
+-            }}
+-          />
+-        </small>
+-      </>
+-    );
+-  }
+-
+-  text = <div className="ml-4">{text}</div>;
+-
+-  if (complete) {
+-    text = <><FontAwesomeIcon icon={faCheckCircle} className="float-left text-success mt-1" />{text}</>;
+-  }
+-
+-  // Do link last so we include everything above in the link
+-  if (showLink) {
+-    text = <Link to={`/course/${courseId}/${id}`}><div>{text}</div></Link>;
+-  }
++  const displayTitle = showLink ? <Link to={`/course/${courseId}/${id}`}>{title}</Link> : title;
+ 
+   return (
+     <div className={classNames('', { 'mt-2 pt-2 border-top border-light': !first })}>
+-      {text}
++      <div className="row w-100 m-0">
++        <div className="col-auto p-0">
++          {complete ? (
++            <FontAwesomeIcon
++              icon={fasCheckCircle}
++              fixedWidth
++              className="float-left text-success mt-1"
++              aria-hidden="true"
++              title={intl.formatMessage(messages.completedAssignment)}
++            />
++          ) : (
++            <FontAwesomeIcon
++              icon={farCheckCircle}
++              fixedWidth
++              className="float-left text-gray-200 mt-1"
++              aria-hidden="true"
++              title={intl.formatMessage(messages.incompleteAssignment)}
++            />
++          )}
++        </div>
++        <div className="col-10 p-0 ml-2 pl-1 text-break">{displayTitle}</div>
++        <span className="sr-only">
++          , {intl.formatMessage(complete ? messages.completedAssignment : messages.incompleteAssignment)}
++        </span>
++      </div>
++      {due && (
++        <div className="row w-100 m-0 ml-3 pl-3">
++          <small className="text-body">
++            <FormattedMessage
++              id="learning.outline.sequence-due"
++              defaultMessage="{description} due {assignmentDue}"
++              description="Used below an assignment title"
++              values={{
++                assignmentDue: (
++                  <FormattedTime
++                    key={`${id}-due`}
++                    day="numeric"
++                    month="short"
++                    year="numeric"
++                    hour12={false}
++                    timeZoneName="short"
++                    value={due}
++                    {...timezoneFormatArgs}
++                  />
++                ),
++                description: description || '',
++              }}
++            />
++          </small>
++        </div>
++      )}
+     </div>
+   );
+ }
+ 
+ SequenceLink.propTypes = {
+   id: PropTypes.string.isRequired,
++  intl: intlShape.isRequired,
+   courseId: PropTypes.string.isRequired,
+   first: PropTypes.bool.isRequired,
+   sequence: PropTypes.shape().isRequired,
+ };
++
++export default injectIntl(SequenceLink);
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index 66b9fe4..fc10d2f 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -5,6 +5,21 @@ const messages = defineMessages({
+     id: 'learning.outline.dates.all',
+     defaultMessage: 'View all course dates',
+   },
++  collapseAll: {
++    id: 'learning.outline.collapseAll',
++    defaultMessage: 'Collapse All',
++    description: 'Label for button to close all of the collapsible sections',
++  },
++  completedAssignment: {
++    id: 'learning.outline.completedAssignment',
++    defaultMessage: 'Completed',
++    description: 'Text used to describe the green checkmark icon in front of an assignment title',
++  },
++  completedSection: {
++    id: 'learning.outline.completedSection',
++    defaultMessage: 'Completed section',
++    description: 'Text used to describe the green checkmark icon in front of a section title',
++  },
+   dates: {
+     id: 'learning.outline.dates',
+     defaultMessage: 'Upcoming Dates',
+@@ -14,6 +29,11 @@ const messages = defineMessages({
+     defaultMessage: 'Edit goal',
+     description: 'Edit course goal button',
+   },
++  expandAll: {
++    id: 'learning.outline.expandAll',
++    defaultMessage: 'Expand All',
++    description: 'Label for button to open all of the collapsible sections',
++  },
+   goal: {
+     id: 'learning.outline.goal',
+     defaultMessage: 'Goal',
+@@ -32,6 +52,21 @@ const messages = defineMessages({
+     id: 'learning.outline.handouts',
+     defaultMessage: 'Course Handouts',
+   },
++  incompleteAssignment: {
++    id: 'learning.outline.incompleteAssignment',
++    defaultMessage: 'Incomplete',
++    description: 'Text used to describe the gray checkmark icon in front of an assignment title',
++  },
++  incompleteSection: {
++    id: 'learning.outline.incompleteSection',
++    defaultMessage: 'Incomplete section',
++    description: 'Text used to describe the gray checkmark icon in front of a section title',
++  },
++  openSection: {
++    id: 'learning.outline.altText.openSection',
++    defaultMessage: 'Open',
++    description: 'A button to open the given section of the course outline',
++  },
+   resume: {
+     id: 'learning.outline.resume',
+     defaultMessage: 'Resume Course',
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index 2d2c1d7..d8dbb25 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -9,20 +9,24 @@ import { useModel } from '../../../generic/model-store';
+ 
+ function CourseDates({ courseId, intl }) {
+   const {
+-    datesWidget,
++    datesWidget: {
++      courseDateBlocks,
++      datesTabLink,
++      userTimezone,
++    },
+   } = useModel('outline', courseId);
+ 
+   return (
+     <section className="mb-3">
+       <h2 className="h6">{intl.formatMessage(messages.dates)}</h2>
+-      {datesWidget.courseDateBlocks.map((courseDateBlock) => (
++      {courseDateBlocks.map((courseDateBlock) => (
+         <DateSummary
+           key={courseDateBlock.title + courseDateBlock.date}
+           dateBlock={courseDateBlock}
+-          userTimezone={datesWidget.userTimezone}
++          userTimezone={userTimezone}
+         />
+       ))}
+-      <a className="font-weight-bold ml-4 pl-2" href={datesWidget.datesTabLink}>
++      <a className="font-weight-bold ml-4 pl-1" href={datesTabLink}>
+         {intl.formatMessage(messages.allDates)}
+       </a>
+     </section>
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index b653998..5a9fc8c 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -52,7 +52,7 @@ function CourseTools({ courseId, intl }) {
+       {courseTools.map((courseTool) => (
+         <div key={courseTool.analyticsId}>
+           <a href={courseTool.url} onClick={() => logClick(courseTool.analyticsId)}>
+-            <FontAwesomeIcon icon={renderIcon(courseTool.analyticsId)} className="mr-2" style={{ width: '20px' }} />
++            <FontAwesomeIcon icon={renderIcon(courseTool.analyticsId)} className="mr-2" fixedWidth />
+             {courseTool.title}
+           </a>
+         </div>
+diff --git a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+index 4a234cf..8d27dba 100644
+--- a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
++++ b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+@@ -1,10 +1,8 @@
+-import React, { useState } from 'react';
++import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Button, Card, Input } from '@edx/paragon';
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faPencilAlt } from '@fortawesome/free-solid-svg-icons';
++import { Dropdown } from '@edx/paragon';
+ 
+ import messages from '../messages';
+ import { saveCourseGoal } from '../../data';
+@@ -17,18 +15,14 @@ function UpdateGoalSelector({
+   setGoalToDisplay,
+   setGoalToastHeader,
+ }) {
+-  const [editingGoal, setEditingGoal] = useState(false);
+-
+   function selectGoalHandler(event) {
+-    const key = event.currentTarget.value;
+-    const { options } = event.currentTarget;
+-    const { text } = options[options.selectedIndex];
++    const key = event.currentTarget.id;
++    const text = event.currentTarget.innerText;
+     const newGoal = {
+       key,
+       text,
+     };
+ 
+-    setEditingGoal(false);
+     setGoalToDisplay(newGoal);
+     saveCourseGoal(courseId, key).then((response) => {
+       const { data } = response;
+@@ -45,44 +39,28 @@ function UpdateGoalSelector({
+       <section className="mb-3">
+         <div className="row w-100 m-0">
+           <div className="col-12 p-0">
+-            <label className="h6" htmlFor="edit-goal-selector">
++            <label className="h6 m-0" htmlFor="edit-goal-selector">
+               {intl.formatMessage(messages.goal)}
+             </label>
+           </div>
+           <div className="col-12 p-0">
+-            <Card>
+-              <Card.Body className="px-3 py-2">
+-                <div className="row w-100 m-0 justify-content-between align-items-center">
+-                  <div className="col-10 p-0">
+-                    {!editingGoal && (
+-                      <p className="m-0">{selectedGoal.text}</p>
+-                    )}
+-                    {editingGoal && (
+-                      <Input
+-                        id="edit-goal-selector"
+-                        type="select"
+-                        defaultValue={selectedGoal.key}
+-                        onBlur={() => { setEditingGoal(false); }}
+-                        onChange={(event) => { selectGoalHandler(event); }}
+-                        options={goalOptions.map(([goalKey, goalText]) => (
+-                          { value: goalKey, label: goalText }
+-                        ))}
+-                        autoFocus
+-                      />
+-                    )}
+-                  </div>
+-                  <Button
+-                    aria-label={intl.formatMessage(messages.editGoal)}
+-                    className="p-1"
+-                    size="sm"
+-                    variant="light"
+-                    onClick={() => { setEditingGoal(true); }}
++            <Dropdown className="py-2">
++              <Dropdown.Toggle variant="outline-primary" block id="edit-goal-selector">
++                {selectedGoal.text}
++              </Dropdown.Toggle>
++              <Dropdown.Menu>
++                {goalOptions.map(([goalKey, goalText]) => (
++                  <Dropdown.Item
++                    id={goalKey}
++                    key={goalKey}
++                    onClick={(event) => { selectGoalHandler(event); }}
++                    role="button"
+                   >
+-                    <FontAwesomeIcon icon={faPencilAlt} />
+-                  </Button>
+-                </div>
+-              </Card.Body>
+-            </Card>
++                    {goalText}
++                  </Dropdown.Item>
++                ))}
++              </Dropdown.Menu>
++            </Dropdown>
+           </div>
+         </div>
+       </section>
+diff --git a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+index c12c0d8..9b62b5a 100644
+--- a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
++++ b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+@@ -2,6 +2,7 @@ import React, { useState } from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button, TransitionReplace } from '@edx/paragon';
+ 
+ import { useDispatch } from 'react-redux';
+ import LmsHtmlFragment from '../LmsHtmlFragment';
+@@ -34,27 +35,36 @@ function WelcomeMessage({ courseId, intl }) {
+           setDisplay(false);
+           dispatch(dismissWelcomeMessage(courseId));
+         }}
+-      >
+-        <div className="my-3">
+-          <LmsHtmlFragment
+-            html={showShortMessage ? shortWelcomeMessageHtml : welcomeMessageHtml}
+-            title={intl.formatMessage(messages.welcomeMessage)}
+-          />
+-        </div>
+-        {
+-          shortWelcomeMessageHtml && (
+-            <div className="d-flex justify-content-end">
+-              <button
+-                type="button"
+-                className="btn rounded align-self-center border border-primary bg-white font-weight-bold mb-3"
++        footer={shortWelcomeMessageHtml && (
++          <div className="row w-100 m-0">
++            <div className="col-12 col-sm-auto p-0">
++              <Button
++                block
+                 onClick={() => setShowShortMessage(!showShortMessage)}
++                variant="outline-primary"
+               >
+                 {showShortMessage ? intl.formatMessage(messages.welcomeMessageShowMoreButton)
+                   : intl.formatMessage(messages.welcomeMessageShowLessButton)}
+-              </button>
++              </Button>
+             </div>
+-          )
+-        }
++          </div>
++        )}
++      >
++        <TransitionReplace className="mb-3" enterDuration={200} exitDuration={200}>
++          {showShortMessage ? (
++            <LmsHtmlFragment
++              key="short-html"
++              html={shortWelcomeMessageHtml}
++              title={intl.formatMessage(messages.welcomeMessage)}
++            />
++          ) : (
++            <LmsHtmlFragment
++              key="full-html"
++              html={welcomeMessageHtml}
++              title={intl.formatMessage(messages.welcomeMessage)}
++            />
++          )}
++        </TransitionReplace>
+       </Alert>
+     )
+   );
+diff --git a/src/generic/messages.js b/src/generic/messages.js
+new file mode 100644
+index 0000000..6d96161
+--- /dev/null
++++ b/src/generic/messages.js
+@@ -0,0 +1,11 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  close: {
++    id: 'general.altText.close',
++    defaultMessage: 'Close',
++    description: 'Text used as an aria-label to describe closing or dismissing a component',
++  },
++});
++
++export default messages;
+diff --git a/src/generic/user-messages/Alert.jsx b/src/generic/user-messages/Alert.jsx
+index fa5fe33..832fc12 100644
+--- a/src/generic/user-messages/Alert.jsx
++++ b/src/generic/user-messages/Alert.jsx
+@@ -5,10 +5,12 @@ import {
+   faExclamationTriangle, faInfoCircle, faCheckCircle, faMinusCircle, faTimes,
+ } from '@fortawesome/free-solid-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { Button } from '@edx/paragon';
++import { IconButton } from '@edx/paragon';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { ALERT_TYPES } from './UserMessagesProvider';
+ import './Alert.scss';
++import messages from '../messages';
+ 
+ function getAlertClass(type) {
+   if (type === ALERT_TYPES.ERROR) {
+@@ -40,21 +42,33 @@ function getAlertIcon(type) {
+ }
+ 
+ function Alert({
+-  type, dismissible, children, onDismiss,
++  type, dismissible, children, footer, intl, onDismiss,
+ }) {
+   return (
+-    <div className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))}>
+-      <div className="d-flex align-items-start">
++    <div className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))} style={{ padding: '20px' }}>
++      <div className="row w-100 m-0">
+         {type !== ALERT_TYPES.WELCOME && (
+-          <div className="mr-2">
++          <div className="col-auto p-0 mr-2">
+             <FontAwesomeIcon icon={getAlertIcon(type)} />
+           </div>
+         )}
+-        <div role="alert" className="flex-grow-1">
+-          {children}
++        <div className="col mr-4 p-0 align-items-start">
++          <div role="alert" className="flex-grow-1">
++            {children}
++          </div>
+         </div>
++        {dismissible && (
++          <div className="col-auto p-0">
++            <IconButton
++              icon={faTimes}
++              className="close"
++              onClick={onDismiss}
++              alt={intl.formatMessage(messages.close)}
++            />
++          </div>
++        )}
+       </div>
+-      {dismissible && <Button className="close" onClick={onDismiss}><FontAwesomeIcon size="sm" icon={faTimes} /></Button>}
++      {footer}
+     </div>
+   );
+ }
+@@ -69,13 +83,16 @@ Alert.propTypes = {
+   ]).isRequired,
+   dismissible: PropTypes.bool,
+   children: PropTypes.node,
++  footer: PropTypes.node,
++  intl: intlShape.isRequired,
+   onDismiss: PropTypes.func,
+ };
+ 
+ Alert.defaultProps = {
+   dismissible: false,
+   children: undefined,
++  footer: null,
+   onDismiss: null,
+ };
+ 
+-export default Alert;
++export default injectIntl(Alert);
+diff --git a/src/generic/user-messages/Alert.scss b/src/generic/user-messages/Alert.scss
+index 8808693..93d77aa 100644
+--- a/src/generic/user-messages/Alert.scss
++++ b/src/generic/user-messages/Alert.scss
+@@ -1,4 +1,3 @@
+ .alert-welcome {
+   border: #b9babe solid 1px !important;
+-  border-left: #000000 solid 3px !important;
+ }
+diff --git a/src/index.jsx b/src/index.jsx
+index 308da6a..81d23ad 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -75,6 +75,7 @@ initialize({
+       mergeConfig({
+         INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
+         STUDIO_BASE_URL: process.env.STUDIO_BASE_URL || null,
++        SUPPORT_URL: process.env.SUPPORT_URL || null,
+         TWITTER_URL: process.env.TWITTER_URL || null,
+         ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
+       }, 'LearnerAppConfig');
+diff --git a/src/index.scss b/src/index.scss
+index e29c11a..fa9b151 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -61,6 +61,7 @@ $primary: #1176B2;
+       white-space: nowrap;
+       overflow: hidden;
+       text-overflow: ellipsis;
++      padding-bottom: .1rem;
+     }
+   }
+   .user-dropdown {
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 4233515..af11763 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -53,7 +53,7 @@ export default function InstructorToolbar(props) {
+   const [masqueradeErrorMessage, showMasqueradeError] = useState(null);
+   return (
+     <div>
+-      <div className="bg-primary text-light">
++      <div className="bg-primary text-white">
+         <div className="container-fluid py-3 d-md-flex justify-content-end align-items-start">
+           <div className="align-items-center flex-grow-1 d-md-flex mx-1 my-1">
+             <MasqueradeWidget courseId={courseId} onError={showMasqueradeError} />
+diff --git a/src/instructor-toolbar/masquerade-widget/MasqueradeUserNameInput.jsx b/src/instructor-toolbar/masquerade-widget/MasqueradeUserNameInput.jsx
+index 5b65b23..3166c70 100644
+--- a/src/instructor-toolbar/masquerade-widget/MasqueradeUserNameInput.jsx
++++ b/src/instructor-toolbar/masquerade-widget/MasqueradeUserNameInput.jsx
+@@ -47,6 +47,7 @@ class MasqueradeUserNameInput extends Component {
+     } = this.props;
+     return (
+       <Input
++        aria-labelledby="masquerade-search-label"
+         label={intl.formatMessage(messages.userNameLabel)}
+         onKeyPress={(event) => this.onKeyPress(event)}
+         type="text"
+diff --git a/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+index 0de94cb..1255a57 100644
+--- a/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
++++ b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+@@ -132,7 +132,7 @@ class MasqueradeWidget extends Component {
+         </div>
+         {shouldShowUserNameInput && (
+           <div className="row mt-2">
+-            <span className="col-auto col-form-label pl-3">{`${specificLearnerInputText}:`}</span>
++            <span className="col-auto col-form-label pl-3" id="masquerade-search-label">{`${specificLearnerInputText}:`}</span>
+             <MasqueradeUserNameInput
+               id="masquerade-search"
+               className="col-4 form-control"
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index ca3fc12..9eda696 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -3,12 +3,13 @@ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useDispatch, useSelector } from 'react-redux';
+ 
++import { Toast } from '@edx/paragon';
+ import { Header } from '../course-header';
+ import PageLoading from '../generic/PageLoading';
+ 
++import genericMessages from '../generic/messages';
+ import messages from './messages';
+ import LoadedTabPage from './LoadedTabPage';
+-import LearningToast from '../toast/LearningToast';
+ import { setCallToActionToast } from '../course-home/data/slice';
+ 
+ function TabPage({
+@@ -37,13 +38,17 @@ function TabPage({
+   if (courseStatus === 'loaded') {
+     return (
+       <>
+-        <LearningToast
+-          bodyLink={toastBodyLink}
+-          bodyText={toastBodyText}
+-          header={toastHeader}
+-          onClose={() => dispatch(setCallToActionToast({ header: null, link: null, link_text: null }))}
++        <Toast
++          action={toastBodyText ? {
++            label: toastBodyText,
++            href: toastBodyLink,
++          } : null}
++          closeLabel={intl.formatMessage(genericMessages.close)}
++          onClose={() => dispatch(setCallToActionToast({ header: '', link: null, link_text: null }))}
+           show={!!(toastHeader)}
+-        />
++        >
++          {toastHeader}
++        </Toast>
+         <LoadedTabPage {...passthroughProps} />
+       </>
+     );
+diff --git a/src/toast/LearningToast.jsx b/src/toast/LearningToast.jsx
+deleted file mode 100644
+index 8335145..0000000
+--- a/src/toast/LearningToast.jsx
++++ /dev/null
+@@ -1,51 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { Toast } from '@edx/paragon';
+-
+-import './LearningToast.scss';
+-
+-export default function LearningToast({
+-  bodyLink,
+-  bodyText,
+-  header,
+-  onClose,
+-  show,
+-}) {
+-  return (
+-    <Toast
+-      onClose={onClose}
+-      show={show}
+-      delay={5000}
+-      autohide
+-      className="bg-gray-700 learning-toast"
+-      style={{
+-        boxShadow: 'none',
+-        position: 'fixed',
+-        zIndex: 2,
+-      }}
+-    >
+-      <Toast.Header className="bg-gray-700 border-bottom-0 p-0 text-light justify-content-between align-items-center">
+-        <p className="small m-0 mr-4">{header}</p>
+-      </Toast.Header>
+-      {bodyLink && bodyText && (
+-        <Toast.Body className="bg-gray-700 text-light p-0 pt-3">
+-          <a className="btn btn-sm btn-outline-light" href={bodyLink}>{bodyText}</a>
+-        </Toast.Body>
+-      )}
+-    </Toast>
+-  );
+-}
+-
+-LearningToast.propTypes = {
+-  bodyLink: PropTypes.string,
+-  bodyText: PropTypes.string,
+-  header: PropTypes.string,
+-  onClose: PropTypes.func.isRequired,
+-  show: PropTypes.bool.isRequired,
+-};
+-
+-LearningToast.defaultProps = {
+-  bodyLink: null,
+-  bodyText: null,
+-  header: null,
+-};
+diff --git a/src/toast/LearningToast.scss b/src/toast/LearningToast.scss
+deleted file mode 100644
+index f2bed04..0000000
+--- a/src/toast/LearningToast.scss
++++ /dev/null
+@@ -1,29 +0,0 @@
+-.learning-toast {
+-  bottom: 20px;
+-  radius: 3px;
+-  left: 20px;
+-  max-width: 400px;
+-  padding: 11px 20px;
+-
+-  @media only screen and (max-width: 768px) {
+-    bottom: 10px;
+-    left: 10px;
+-    right: 10px;
+-  }
+-}
+-
+-.toast-header {
+-  button {
+-    align-self: flex-start;
+-    color: #FFFFFF;
+-    &:hover {
+-      color: #FFFFFF;
+-    }
+-  }
+-}
+-
+-.toast-body {
+-  a:hover {
+-    color: #2D323E;
+-  }
+-}
+-- 
+2.34.1
+

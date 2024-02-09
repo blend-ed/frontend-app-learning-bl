@@ -1,0 +1,29 @@
+From 73fa56d40105d7c15022303bfe2afef25fce68fe Mon Sep 17 00:00:00 2001
+From: alangsto <46360176+alangsto@users.noreply.github.com>
+Date: Thu, 6 May 2021 10:25:56 -0400
+Subject: [PATCH 0447/1021] fix: update border color for approved in another
+ course status (#436)
+
+---
+ src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index d6f1383..458f2a3 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -58,9 +58,9 @@ function ProctoringInfoPanel({ courseId, username, intl }) {
+ 
+   function getBorderClass() {
+     let borderClass = '';
+-    if (readableStatus === readableStatuses.submitted) {
++    if ([readableStatuses.submitted, readableStatuses.expiringSoon].includes(readableStatus)) {
+       borderClass = 'proctoring-onboarding-submitted';
+-    } else if (readableStatus === readableStatuses.verified) {
++    } else if ([readableStatuses.verified, readableStatuses.otherCourseApproved].includes(readableStatus)) {
+       borderClass = 'proctoring-onboarding-success';
+     }
+     return borderClass;
+-- 
+2.34.1
+

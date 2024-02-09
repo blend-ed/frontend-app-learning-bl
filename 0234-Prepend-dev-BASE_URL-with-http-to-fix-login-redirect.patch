@@ -1,0 +1,56 @@
+From caabf6a54c811d57f9a55e81373918c650e24f7a Mon Sep 17 00:00:00 2001
+From: Kyle McCormick <kmccormick@edx.org>
+Date: Thu, 20 Aug 2020 08:35:16 -0400
+Subject: [PATCH 0234/1021] Prepend dev BASE_URL with http:// to fix login
+ redirects (#189)
+
+---
+ .env.development | 4 ++--
+ .env.test        | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/.env.development b/.env.development
+index fe0e863..b44ffca 100644
+--- a/.env.development
++++ b/.env.development
+@@ -1,6 +1,6 @@
+ NODE_ENV='development'
+ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+-BASE_URL='localhost:2000'
++BASE_URL='http://localhost:2000'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+@@ -9,7 +9,7 @@ LMS_BASE_URL='http://localhost:18000'
+ LOGIN_URL='http://localhost:18000/login'
+ LOGOUT_URL='http://localhost:18000/logout'
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+-ORDER_HISTORY_URL='localhost:1996/orders'
++ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+ SEGMENT_KEY=null
+diff --git a/.env.test b/.env.test
+index 60d5faa..0a2b801 100644
+--- a/.env.test
++++ b/.env.test
+@@ -1,6 +1,6 @@
+ NODE_ENV='test'
+ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+-BASE_URL='localhost:2000'
++BASE_URL='http://localhost:2000'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+@@ -9,7 +9,7 @@ LMS_BASE_URL='http://localhost:18000'
+ LOGIN_URL='http://localhost:18000/login'
+ LOGOUT_URL='http://localhost:18000/logout'
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+-ORDER_HISTORY_URL='localhost:1996/orders'
++ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+ SEGMENT_KEY=null
+-- 
+2.34.1
+

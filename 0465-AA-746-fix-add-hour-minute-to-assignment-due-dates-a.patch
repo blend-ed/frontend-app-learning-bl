@@ -1,0 +1,128 @@
+From 3c07cab8c288287855276793f396c910b85ea843 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Mon, 17 May 2021 12:39:34 -0400
+Subject: [PATCH 0465/1021] [AA-746] fix: add hour/minute to assignment due
+ dates and update dates timeline with branding styles (#450)
+
+* fix: add hour/minute to assignment due dates and update dates timeline with branding styles
+
+* update badge styles
+---
+ src/course-home/dates-tab/Badge.jsx     |  5 +++--
+ src/course-home/dates-tab/Badge.scss    |  2 +-
+ src/course-home/dates-tab/Day.jsx       | 28 +++++++++++++++++++------
+ src/course-home/dates-tab/badgelist.jsx |  3 ++-
+ 4 files changed, 28 insertions(+), 10 deletions(-)
+
+diff --git a/src/course-home/dates-tab/Badge.jsx b/src/course-home/dates-tab/Badge.jsx
+index c4f9304..aa0d191 100644
+--- a/src/course-home/dates-tab/Badge.jsx
++++ b/src/course-home/dates-tab/Badge.jsx
+@@ -2,11 +2,12 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ 
+-export default function Badge({ children, className }) {
++export default function Badge({ children, className, ...rest }) {
+   return (
+     <span
+-      className={classNames('dates-badge small ml-2', className)}
++      className={classNames('dates-badge x-small ml-2 position-absolute', className)}
+       data-testid="dates-badge"
++      {...rest}
+     >
+       {children}
+     </span>
+diff --git a/src/course-home/dates-tab/Badge.scss b/src/course-home/dates-tab/Badge.scss
+index f4368cf..ec65b4e 100644
+--- a/src/course-home/dates-tab/Badge.scss
++++ b/src/course-home/dates-tab/Badge.scss
+@@ -1,4 +1,4 @@
+ .dates-badge {
+   border-radius: 4px;
+-  padding: 2px 8px 3px 8px;
++  padding: 1px 8px;
+ }
+diff --git a/src/course-home/dates-tab/Day.jsx b/src/course-home/dates-tab/Day.jsx
+index df987d3..e052d2f 100644
+--- a/src/course-home/dates-tab/Day.jsx
++++ b/src/course-home/dates-tab/Day.jsx
+@@ -2,7 +2,12 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { useSelector } from 'react-redux';
+-import { FormattedDate, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  FormattedDate,
++  FormattedTime,
++  injectIntl,
++  intlShape,
++} from '@edx/frontend-platform/i18n';
+ import { Tooltip, OverlayTrigger } from '@edx/paragon';
+ import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+@@ -51,7 +56,7 @@ function Day({
+       {/* Content */}
+       <div className="d-inline-block ml-3 pl-2">
+         <div className="mb-1" data-testid="dates-header">
+-          <p className="d-inline text-dark-500 font-weight-bold">
++          <p className="d-inline text-dark-400">
+             <FormattedDate
+               /** [MM-P2P] Experiment */
+               value={mmp2pOverride ? mmp2p.state.upgradeDeadline : date}
+@@ -70,16 +75,27 @@ function Day({
+             ? getBadgeListAndColor(new Date(mmp2p.state.upgradeDeadline), intl, item, items)
+             : getBadgeListAndColor(date, intl, item, items);
+ 
++          const showDueDateTime = item.dateType === 'assignment-due-date';
+           const showLink = item.link && isLearnerAssignment(item);
+           const title = showLink ? (<u><a href={item.link} className="text-reset">{item.title}</a></u>) : item.title;
+           const available = item.learnerHasAccess && (item.link || !isLearnerAssignment(item));
+-          const textColor = available ? 'text-dark-500' : 'text-dark-200';
++          const textColor = available ? 'text-primary-700' : 'text-gray-500';
+ 
+           return (
+-            <div key={item.title + item.date} className={textColor} data-testid="dates-item">
++            <div key={item.title + item.date} className={classNames(textColor, 'small')} data-testid="dates-item">
+               <div>
+-                <span className="font-weight-bold small mt-1">
+-                  {item.assignmentType && `${item.assignmentType}: `}{title}
++                <span className="small">
++                  <span className="font-weight-bold">{item.assignmentType && `${item.assignmentType}: `}{title}</span>
++                  {showDueDateTime && (
++                    <span>
++                      <span className="mx-1">due</span>
++                      <FormattedTime
++                        value={date}
++                        timeZoneName="short"
++                        {...timezoneFormatArgs}
++                      />
++                    </span>
++                  )}
+                 </span>
+                 {itemBadges}
+                 {item.extraInfo && (
+diff --git a/src/course-home/dates-tab/badgelist.jsx b/src/course-home/dates-tab/badgelist.jsx
+index df819a0..e755b9e 100644
+--- a/src/course-home/dates-tab/badgelist.jsx
++++ b/src/course-home/dates-tab/badgelist.jsx
+@@ -77,6 +77,7 @@ function getBadgeListAndColor(date, intl, item, items) {
+     },
+   ];
+   let color = null; // first color of any badge
++  const marginTopStyle = item ? { marginTop: 0 } : { marginTop: '2px' };
+   const badges = (
+     <>
+       {badgesInfo.map(b => {
+@@ -96,7 +97,7 @@ function getBadgeListAndColor(date, intl, item, items) {
+           color = b.bg;
+         }
+         return (
+-          <Badge key={b.message.id} className={classNames(b.bg, b.className)}>
++          <Badge key={b.message.id} style={marginTopStyle} className={classNames(b.bg, b.className)}>
+             {b.icon && <FontAwesomeIcon icon={b.icon} className="mr-1" />}
+             {intl.formatMessage(b.message)}
+           </Badge>
+-- 
+2.34.1
+

@@ -1,0 +1,399 @@
+From f9806d07597e04d600e19018ac64f6a3677d3da6 Mon Sep 17 00:00:00 2001
+From: Hammad Ahmad Waqas <hammadahmadwaqas1@gmail.com>
+Date: Wed, 7 Sep 2022 11:39:03 +0500
+Subject: [PATCH 0926/1021] feat: added support to check if active enterprise
+ is same as EnterpriseCourseEnrollment object (#967)
+
+---
+ .../ActiveEnterpriseAlert.jsx                 | 45 +++++++++++++
+ .../ActiveEnterpriseAlert.test.jsx            | 26 ++++++++
+ src/alerts/active-enteprise-alert/hooks.js    | 28 +++++++++
+ src/alerts/active-enteprise-alert/index.js    |  3 +
+ src/alerts/active-enteprise-alert/messages.js | 11 ++++
+ src/courseware/CoursewareContainer.test.jsx   |  7 +++
+ .../CoursewareRedirectLandingPage.jsx         |  6 ++
+ .../CoursewareRedirectLandingPage.test.jsx    | 14 +++++
+ src/generic/CourseAccessErrorPage.jsx         | 63 +++++++++++++++++++
+ src/generic/CourseAccessErrorPage.test.jsx    | 58 +++++++++++++++++
+ src/index.jsx                                 |  2 +
+ src/shared/access.js                          |  3 +
+ 12 files changed, 266 insertions(+)
+ create mode 100644 src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
+ create mode 100644 src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.test.jsx
+ create mode 100644 src/alerts/active-enteprise-alert/hooks.js
+ create mode 100644 src/alerts/active-enteprise-alert/index.js
+ create mode 100644 src/alerts/active-enteprise-alert/messages.js
+ create mode 100644 src/generic/CourseAccessErrorPage.jsx
+ create mode 100644 src/generic/CourseAccessErrorPage.test.jsx
+
+diff --git a/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
+new file mode 100644
+index 0000000..e6acd80
+--- /dev/null
++++ b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
+@@ -0,0 +1,45 @@
++import React from 'react';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import PropTypes from 'prop-types';
++import { Alert, Hyperlink } from '@edx/paragon';
++import { WarningFilled } from '@edx/paragon/icons';
++
++import { getConfig } from '@edx/frontend-platform';
++import genericMessages from './messages';
++
++function ActiveEnterpriseAlert({ intl, payload }) {
++  const { text } = payload;
++  const changeActiveEnterprise = (
++    <Hyperlink
++      style={{ textDecoration: 'underline' }}
++      destination={
++        `${getConfig().LMS_BASE_URL}/enterprise/select/active/?success_url=${encodeURIComponent(global.location.href)}`
++    }
++    >
++      {intl.formatMessage(genericMessages.changeActiveEnterpriseLowercase)}
++    </Hyperlink>
++  );
++
++  return (
++    <Alert variant="warning" icon={WarningFilled}>
++      {text}
++      <FormattedMessage
++        id="learning.activeEnterprise.alert"
++        description="Prompts the user to log-in with the correct enterprise to access the course content."
++        defaultMessage=" {changeActiveEnterprise}."
++        values={{
++          changeActiveEnterprise,
++        }}
++      />
++    </Alert>
++  );
++}
++
++ActiveEnterpriseAlert.propTypes = {
++  intl: intlShape.isRequired,
++  payload: PropTypes.shape({
++    text: PropTypes.string,
++  }).isRequired,
++};
++
++export default injectIntl(ActiveEnterpriseAlert);
+diff --git a/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.test.jsx b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.test.jsx
+new file mode 100644
+index 0000000..f3d5403
+--- /dev/null
++++ b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.test.jsx
+@@ -0,0 +1,26 @@
++import React from 'react';
++import { getConfig } from '@edx/frontend-platform';
++import {
++  initializeTestStore, render, screen,
++} from '../../setupTest';
++import ActiveEnterpriseAlert from './ActiveEnterpriseAlert';
++
++describe('ActiveEnterpriseAlert', () => {
++  const mockData = {
++    payload: {
++      text: 'test message',
++    },
++  };
++  beforeAll(async () => {
++    await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true });
++  });
++
++  it('Shows alert message and links', () => {
++    render(<ActiveEnterpriseAlert {...mockData} />);
++    expect(screen.getByRole('alert')).toBeInTheDocument();
++    expect(screen.getByText('test message')).toBeInTheDocument();
++    expect(screen.getByRole('link', { name: 'change enterprise now' })).toHaveAttribute(
++      'href', `${getConfig().LMS_BASE_URL}/enterprise/select/active/?success_url=http%3A%2F%2Flocalhost%2F`,
++    );
++  });
++});
+diff --git a/src/alerts/active-enteprise-alert/hooks.js b/src/alerts/active-enteprise-alert/hooks.js
+new file mode 100644
+index 0000000..7fcaf67
+--- /dev/null
++++ b/src/alerts/active-enteprise-alert/hooks.js
+@@ -0,0 +1,28 @@
++import React, { useMemo } from 'react';
++import { ALERT_TYPES, useAlert } from '../../generic/user-messages';
++import { useModel } from '../../generic/model-store';
++
++const ActiveEnterpriseAlert = React.lazy(() => import('./ActiveEnterpriseAlert'));
++
++export default function useActiveEnterpriseAlert(courseId) {
++  const { courseAccess } = useModel('courseHomeMeta', courseId);
++  /**
++   * This alert should render if
++   *    1. course access code is incorrect_active_enterprise
++   */
++  const isVisible = courseAccess && !courseAccess.hasAccess && courseAccess.errorCode === 'incorrect_active_enterprise';
++
++  const payload = {
++    text: courseAccess && courseAccess.userMessage,
++    courseId,
++  };
++  useAlert(isVisible, {
++    code: 'clientActiveEnterpriseAlert',
++    topic: 'outline',
++    dismissible: false,
++    type: ALERT_TYPES.ERROR,
++    payload: useMemo(() => payload, Object.values(payload).sort()),
++  });
++
++  return { clientActiveEnterpriseAlert: ActiveEnterpriseAlert };
++}
+diff --git a/src/alerts/active-enteprise-alert/index.js b/src/alerts/active-enteprise-alert/index.js
+new file mode 100644
+index 0000000..7f5b2c3
+--- /dev/null
++++ b/src/alerts/active-enteprise-alert/index.js
+@@ -0,0 +1,3 @@
++import useActiveEnterpriseAlert from './hooks';
++
++export default useActiveEnterpriseAlert;
+diff --git a/src/alerts/active-enteprise-alert/messages.js b/src/alerts/active-enteprise-alert/messages.js
+new file mode 100644
+index 0000000..30a4e38
+--- /dev/null
++++ b/src/alerts/active-enteprise-alert/messages.js
+@@ -0,0 +1,11 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  changeActiveEnterpriseLowercase: {
++    id: 'learning.activeEnterprise.change.alert',
++    defaultMessage: 'change enterprise now',
++    description: 'Text in a link, prompting the user to change active enterprise.  Used in learning.activeEnterprise.change.alert"',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 73fa6c0..1770f87 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -483,6 +483,13 @@ describe('CoursewareContainer', () => {
+       expect(global.location.href).toEqual('http://localhost/redirect/consent?consentPath=data_sharing_consent_url');
+     });
+ 
++    it('should go to access denied page for a incorrect_active_enterprise error code', async () => {
++      const { courseMetadata } = setUpWithDeniedStatus('incorrect_active_enterprise');
++      await loadContainer();
++
++      expect(global.location.href).toEqual(`http://localhost/course/${courseMetadata.id}/access-denied`);
++    });
++
+     it('should go to course home for an authentication_required error code', async () => {
+       const { courseMetadata } = setUpWithDeniedStatus('authentication_required');
+       await loadContainer();
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index 1e62d74..5be31f9 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -40,6 +40,12 @@ export default () => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}${consentPath}`);
+           }}
+         />
++        <PageRoute
++          path={`${path}/home/:courseId`}
++          render={({ match }) => {
++            global.location.assign(`/course/${match.params.courseId}/home`);
++          }}
++        />
+       </Switch>
+     </div>
+   );
+diff --git a/src/courseware/CoursewareRedirectLandingPage.test.jsx b/src/courseware/CoursewareRedirectLandingPage.test.jsx
+index ecede53..d9c1ce4 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.test.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.test.jsx
+@@ -34,4 +34,18 @@ describe('CoursewareRedirectLandingPage', () => {
+ 
+     expect(redirectUrl).toHaveBeenCalledWith('http://localhost:18000/grant_data_sharing_consent');
+   });
++
++  it('Redirects to correct consent URL', () => {
++    const history = createMemoryHistory({
++      initialEntries: ['/redirect/home/course-v1:edX+DemoX+Demo_Course'],
++    });
++
++    render(
++      <Router history={history}>
++        <CoursewareRedirectLandingPage />
++      </Router>,
++    );
++
++    expect(redirectUrl).toHaveBeenCalledWith('/course/course-v1:edX+DemoX+Demo_Course/home');
++  });
+ });
+diff --git a/src/generic/CourseAccessErrorPage.jsx b/src/generic/CourseAccessErrorPage.jsx
+new file mode 100644
+index 0000000..a88f723
+--- /dev/null
++++ b/src/generic/CourseAccessErrorPage.jsx
+@@ -0,0 +1,63 @@
++import React, { useEffect } from 'react';
++import { LearningHeader as Header } from '@edx/frontend-component-header';
++import Footer from '@edx/frontend-component-footer';
++import { useParams } from 'react-router-dom';
++import { useDispatch, useSelector } from 'react-redux';
++import { Redirect } from 'react-router';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import useActiveEnterpriseAlert from '../alerts/active-enteprise-alert';
++import { AlertList } from './user-messages';
++import { fetchDiscussionTab } from '../course-home/data/thunks';
++import { LOADED, LOADING } from '../course-home/data/slice';
++import PageLoading from './PageLoading';
++import messages from '../tab-page/messages';
++
++function CourseAccessErrorPage({ intl }) {
++  const { courseId } = useParams();
++
++  const dispatch = useDispatch();
++  const activeEnterpriseAlert = useActiveEnterpriseAlert(courseId);
++  useEffect(() => {
++    dispatch(fetchDiscussionTab(courseId));
++  }, [courseId]);
++
++  const {
++    courseStatus,
++  } = useSelector(state => state.courseHome);
++
++  if (courseStatus === LOADING) {
++    return (
++      <>
++        <Header />
++        <PageLoading
++          srMessage={intl.formatMessage(messages.loading)}
++        />
++        <Footer />
++      </>
++    );
++  }
++  if (courseStatus === LOADED) {
++    return (<Redirect to={`/redirect/home/${courseId}`} />);
++  }
++  return (
++    <>
++      <Header />
++      <main id="main-content" className="container my-5 text-center" data-testid="access-denied-main">
++        <AlertList
++          topic="outline"
++          className="mx-5 mt-3"
++          customAlerts={{
++            ...activeEnterpriseAlert,
++          }}
++        />
++      </main>
++      <Footer />
++    </>
++  );
++}
++
++CourseAccessErrorPage.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CourseAccessErrorPage);
+diff --git a/src/generic/CourseAccessErrorPage.test.jsx b/src/generic/CourseAccessErrorPage.test.jsx
+new file mode 100644
+index 0000000..375466b
+--- /dev/null
++++ b/src/generic/CourseAccessErrorPage.test.jsx
+@@ -0,0 +1,58 @@
++import React from 'react';
++import { history } from '@edx/frontend-platform';
++import { Route } from 'react-router';
++import { initializeTestStore, render, screen } from '../setupTest';
++import CourseAccessErrorPage from './CourseAccessErrorPage';
++
++const mockDispatch = jest.fn();
++let mockCourseStatus;
++jest.mock('react-redux', () => ({
++  ...jest.requireActual('react-redux'),
++  useDispatch: () => mockDispatch,
++  useSelector: () => ({ courseStatus: mockCourseStatus }),
++}));
++jest.mock('./PageLoading', () => () => <div data-testid="page-loading" />);
++
++describe('CourseAccessErrorPage', () => {
++  let courseId;
++  let accessDeniedUrl;
++  beforeEach(async () => {
++    const store = await initializeTestStore({ excludeFetchSequence: true });
++    courseId = store.getState().courseware.courseId;
++    accessDeniedUrl = `/course/${courseId}/access-denied`;
++    history.push(accessDeniedUrl);
++  });
++
++  it('Displays loading in start on page rendering', () => {
++    mockCourseStatus = 'loading';
++    render(
++      <Route path="/course/:courseId/access-denied">
++        <CourseAccessErrorPage />
++      </Route>,
++    );
++    expect(screen.getByTestId('page-loading')).toBeInTheDocument();
++    expect(history.location.pathname).toBe(accessDeniedUrl);
++  });
++
++  it('Redirect user to homepage if user has access', () => {
++    mockCourseStatus = 'loaded';
++    render(
++      <Route path="/course/:courseId/access-denied">
++        <CourseAccessErrorPage />
++      </Route>,
++    );
++    expect(history.location.pathname).toBe('/redirect/home/course-v1:edX+DemoX+Demo_Course');
++  });
++
++  it('For access denied it should render access denied page', () => {
++    mockCourseStatus = 'denied';
++
++    render(
++      <Route path="/course/:courseId/access-denied">
++        <CourseAccessErrorPage />
++      </Route>,
++    );
++    expect(screen.getByTestId('access-denied-main')).toBeInTheDocument();
++    expect(history.location.pathname).toBe(accessDeniedUrl);
++  });
++});
+diff --git a/src/index.jsx b/src/index.jsx
+index fa82aba..425ba0a 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -34,6 +34,7 @@ import initializeStore from './store';
+ import NoticesProvider from './generic/notices';
+ import PathFixesProvider from './generic/path-fixes';
+ import LiveTab from './course-home/live-tab/LiveTab';
++import CourseAccessErrorPage from './generic/CourseAccessErrorPage';
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+@@ -44,6 +45,7 @@ subscribe(APP_READY, () => {
+             <Switch>
+               <PageRoute exact path="/goal-unsubscribe/:token" component={GoalUnsubscribe} />
+               <PageRoute path="/redirect" component={CoursewareRedirectLandingPage} />
++              <PageRoute path="/course/:courseId/access-denied" component={CourseAccessErrorPage} />
+               <PageRoute path="/course/:courseId/home">
+                 <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
+                   <OutlineTab />
+diff --git a/src/shared/access.js b/src/shared/access.js
+index a60a21a..4937fe7 100644
+--- a/src/shared/access.js
++++ b/src/shared/access.js
+@@ -21,6 +21,9 @@ export function getAccessDeniedRedirectUrl(courseId, activeTabSlug, courseAccess
+     case 'data_sharing_access_required':
+       url = `/redirect/consent?consentPath=${encodeURIComponent(courseAccess.developerMessage)}`;
+       break;
++    case 'incorrect_active_enterprise':
++      url = `/course/${courseId}/access-denied`;
++      break;
+     case 'unfulfilled_milestones':
+       url = '/redirect/dashboard';
+       break;
+-- 
+2.34.1
+

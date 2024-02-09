@@ -1,0 +1,780 @@
+From 31dd6b81b810718b4889b7422c6325a757688b3d Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Thu, 5 Mar 2020 14:36:13 -0500
+Subject: [PATCH 0066/1021] Minor style update (#18)
+
+Basic design changes described in TNL-7105
+---
+ src/courseware/CourseContainer.jsx            |  44 +++----
+ src/courseware/course/Course.jsx              |  40 +++---
+ src/courseware/course/CourseBreadcrumb.jsx    |  15 +--
+ src/courseware/course/CourseBreadcrumbs.jsx   |  31 +++--
+ src/courseware/course/CourseHeader.jsx        |   2 +-
+ .../course/CourseTabsNavigation.jsx           |  16 ++-
+ src/courseware/course/SequenceContainer.jsx   |  63 +++++-----
+ src/courseware/sequence/CompleteIcon.jsx      |   4 +-
+ src/courseware/sequence/Sequence.jsx          |  75 ++++++------
+ .../sequence/SequenceNavigation.jsx           |  23 +++-
+ src/courseware/sequence/Unit.jsx              |  11 +-
+ src/courseware/sequence/UnitButton.jsx        |   6 +-
+ src/courseware/sequence/UnitIcon.jsx          |   4 +-
+ .../sequence/bookmark/BookmarkButton.jsx      |   2 +-
+ src/index.scss                                | 115 +++++++++++++++++-
+ 15 files changed, 287 insertions(+), 164 deletions(-)
+
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index 739707d..16a0d9d 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -47,28 +47,30 @@ function CourseContainer(props) {
+     }
+   }, [metadataLoaded]);
+ 
+-  if (!courseId || !sequenceId) {
+-    return (
+-      <PageLoading
+-        srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-      />
+-    );
+-  }
++  const isLoaded = courseId && sequenceId && metadataLoaded;
+ 
+-  return metadataLoaded && (
+-    <Course
+-      courseOrg={props.metadata.org}
+-      courseNumber={props.metadata.number}
+-      courseName={props.metadata.name}
+-      courseUsageKey={courseUsageKey}
+-      courseId={courseId}
+-      sequenceId={sequenceId}
+-      unitId={unitId}
+-      models={models}
+-      tabs={props.metadata.tabs}
+-      isEnrolled={props.metadata.isEnrolled}
+-      verifiedMode={props.metadata.verifiedMode}
+-    />
++  return (
++    <main className="flex-grow-1 d-flex flex-column">
++      { isLoaded ? (
++        <Course
++          courseOrg={props.metadata.org}
++          courseNumber={props.metadata.number}
++          courseName={props.metadata.name}
++          courseUsageKey={courseUsageKey}
++          courseId={courseId}
++          isEnrolled={props.metadata.isEnrolled}
++          sequenceId={sequenceId}
++          unitId={unitId}
++          models={models}
++          tabs={props.metadata.tabs}
++          verifiedMode={props.metadata.verifiedMode}
++        />
++      ) : (
++        <PageLoading
++          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++        />
++      )}
++    </main>
+   );
+ }
+ 
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 2d47b42..7ba061a 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -67,25 +67,23 @@ export default function Course({
+         sequenceId={sequenceId}
+         unitId={unitId}
+       />
+-      <main className="d-flex flex-column flex-grow-1">
+-        <div className="container-fluid">
+-          <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug="courseware" />
+-          <AlertList
+-            topic="course"
+-            className="mb-3"
+-            customAlerts={{
+-              clientEnrollmentAlert: EnrollmentAlert,
+-              clientLogistrationAlert: LogistrationAlert,
+-            }}
+-          />
+-          <CourseBreadcrumbs
+-            courseUsageKey={courseUsageKey}
+-            courseId={courseId}
+-            sequenceId={sequenceId}
+-            unitId={unitId}
+-            models={models}
+-          />
+-        </div>
++      <CourseTabsNavigation tabs={tabs} activeTabSlug="courseware" />
++      <div className="container-fluid flex-grow-1 d-flex flex-column">
++        <AlertList
++          className="my-3"
++          topic="course"
++          customAlerts={{
++            clientEnrollmentAlert: EnrollmentAlert,
++            clientLogistrationAlert: LogistrationAlert,
++          }}
++        />
++        <CourseBreadcrumbs
++          courseUsageKey={courseUsageKey}
++          courseId={courseId}
++          sequenceId={sequenceId}
++          unitId={unitId}
++          models={models}
++        />
+         <SequenceContainer
+           key={sequenceId}
+           courseUsageKey={courseUsageKey}
+@@ -96,8 +94,8 @@ export default function Course({
+           onNext={nextSequenceHandler}
+           onPrevious={previousSequenceHandler}
+         />
+-        {verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
+-      </main>
++      </div>
++      {verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
+     </>
+   );
+ }
+diff --git a/src/courseware/course/CourseBreadcrumb.jsx b/src/courseware/course/CourseBreadcrumb.jsx
+index 788c08d..4ee35fe 100644
+--- a/src/courseware/course/CourseBreadcrumb.jsx
++++ b/src/courseware/course/CourseBreadcrumb.jsx
+@@ -1,19 +1,15 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
+ 
+-export default function CourseBreadcrumb({ url, label, last }) {
++export default function CourseBreadcrumb({ url, label }) {
+   return (
+     <React.Fragment key={`${label}-${url}`}>
++      <li className="list-inline-item text-gray-300" role="presentation" aria-label="spacer">
++        /
++      </li>
+       <li className="list-inline-item">
+-        {last ? label : (<a href={url}>{label}</a>)}
++        <a href={url}>{label}</a>
+       </li>
+-      {!last && (
+-        <li className="list-inline-item" role="presentation" aria-label="spacer">
+-          <FontAwesomeIcon icon={faChevronRight} />
+-        </li>
+-      )}
+     </React.Fragment>
+   );
+ }
+@@ -21,5 +17,4 @@ export default function CourseBreadcrumb({ url, label, last }) {
+ CourseBreadcrumb.propTypes = {
+   url: PropTypes.string.isRequired,
+   label: PropTypes.string.isRequired,
+-  last: PropTypes.bool.isRequired,
+ };
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 6a5957c..1d0b744 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -1,18 +1,18 @@
+ import React, { useMemo } from 'react';
+ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faHome } from '@fortawesome/free-solid-svg-icons';
+ 
+ import CourseBreadcrumb from './CourseBreadcrumb';
+ 
+ export default function CourseBreadcrumbs({
+-  courseUsageKey, courseId, sequenceId, unitId, models,
++  courseUsageKey, courseId, sequenceId, models,
+ }) {
+   const links = useMemo(() => {
+     const sectionId = models[sequenceId].parentId;
+-    if (!unitId) {
+-      return [];
+-    }
+-    return [courseId, sectionId, sequenceId, unitId].map((nodeId) => {
++    return [sectionId, sequenceId].map((nodeId) => {
+       const node = models[nodeId];
+       return {
+         id: node.id,
+@@ -20,11 +20,21 @@ export default function CourseBreadcrumbs({
+         url: `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/#${node.id}`,
+       };
+     });
+-  }, [courseUsageKey, courseId, sequenceId, unitId, models]);
++  }, [courseUsageKey, courseId, sequenceId, models]);
+ 
+   return (
+-    <nav aria-label="breadcrumb">
+-      <ol className="list-inline">
++    <nav aria-label="breadcrumb" className="my-4">
++      <ol className="list-inline m-0">
++        <li className="list-inline-item">
++          <a href={`${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/`}>
++            <FontAwesomeIcon icon={faHome} className="mr-2" />
++            <FormattedMessage
++              id="learn.breadcrumb.navigation.course.home"
++              description="The course home link in breadcrumbs nav"
++              defaultMessage="Course"
++            />
++          </a>
++        </li>
+         {links.map(({ id, url, label }, i) => (
+           <CourseBreadcrumb key={id} url={url} label={label} last={i === links.length - 1} />
+         ))}
+@@ -37,7 +47,6 @@ CourseBreadcrumbs.propTypes = {
+   courseUsageKey: PropTypes.string.isRequired,
+   courseId: PropTypes.string.isRequired,
+   sequenceId: PropTypes.string.isRequired,
+-  unitId: PropTypes.string,
+   models: PropTypes.objectOf(PropTypes.shape({
+     id: PropTypes.string.isRequired,
+     displayName: PropTypes.string.isRequired,
+@@ -45,7 +54,3 @@ CourseBreadcrumbs.propTypes = {
+     parentId: PropTypes.string,
+   })).isRequired,
+ };
+-
+-CourseBreadcrumbs.defaultProps = {
+-  unitId: null,
+-};
+diff --git a/src/courseware/course/CourseHeader.jsx b/src/courseware/course/CourseHeader.jsx
+index 9009395..393d184 100644
+--- a/src/courseware/course/CourseHeader.jsx
++++ b/src/courseware/course/CourseHeader.jsx
+@@ -31,7 +31,7 @@ export default function CourseHeader({
+   const { authenticatedUser } = useContext(AppContext);
+ 
+   return (
+-    <header className="border-bottom border-primary">
++    <header>
+       <div className="container-fluid py-2 d-flex align-items-center ">
+         <LinkedLogo
+           className="logo"
+diff --git a/src/courseware/course/CourseTabsNavigation.jsx b/src/courseware/course/CourseTabsNavigation.jsx
+index 696d6e2..4a5b724 100644
+--- a/src/courseware/course/CourseTabsNavigation.jsx
++++ b/src/courseware/course/CourseTabsNavigation.jsx
+@@ -18,12 +18,16 @@ function CourseTabsNavigation({
+   ));
+ 
+   return (
+-    <nav
+-      aria-label={intl.formatMessage(messages['learn.navigation.course.tabs.label'])}
+-      className={classNames('nav nav-underline-tabs', className)}
+-    >
+-      {courseNavTabs}
+-    </nav>
++    <div className="course-tabs-navigation">
++      <div className="container-fluid">
++        <nav
++          aria-label={intl.formatMessage(messages['learn.navigation.course.tabs.label'])}
++          className={classNames('nav nav-underline-tabs', className)}
++        >
++          {courseNavTabs}
++        </nav>
++      </div>
++    </div>
+   );
+ }
+ 
+diff --git a/src/courseware/course/SequenceContainer.jsx b/src/courseware/course/SequenceContainer.jsx
+index a639e00..453ec3c 100644
+--- a/src/courseware/course/SequenceContainer.jsx
++++ b/src/courseware/course/SequenceContainer.jsx
+@@ -8,6 +8,7 @@ import { history } from '@edx/frontend-platform';
+ import messages from '../messages';
+ import PageLoading from '../PageLoading';
+ import Sequence from '../sequence/Sequence';
++import AlertList from '../../user-messages/AlertList';
+ import { fetchSequenceMetadata, checkBlockCompletion, saveSequencePosition } from '../../data/course-blocks/thunks';
+ 
+ function SequenceContainer(props) {
+@@ -66,37 +67,41 @@ function SequenceContainer(props) {
+     }
+   }, [isTimeLimited]);
+ 
+-  if (!loaded || !unitId || isTimeLimited) {
+-    return (
+-      <PageLoading
+-        srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-      />
+-    );
+-  }
+-
+-  const prerequisite = {
+-    id: gatedContent.prereqId,
+-    name: gatedContent.gatedSectionName,
+-  };
++  const isLoading = !loaded || !unitId || isTimeLimited;
+ 
+   return (
+-    <Sequence
+-      id={sequenceId}
+-      courseUsageKey={courseUsageKey}
+-      courseId={courseId}
+-      unitIds={unitIds}
+-      displayName={displayName}
+-      activeUnitId={unitId}
+-      showCompletion={showCompletion}
+-      isTimeLimited={isTimeLimited}
+-      isGated={gatedContent.gated}
+-      savePosition={savePosition}
+-      bannerText={bannerText}
+-      onNext={onNext}
+-      onPrevious={onPrevious}
+-      onNavigateUnit={handleUnitNavigation}
+-      prerequisite={prerequisite}
+-    />
++    <>
++      <AlertList topic="sequence" />
++      <div className="course-content-container">
++        {isLoading ? (
++          <PageLoading
++            srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++          />
++        ) : (
++          <Sequence
++            id={sequenceId}
++            courseUsageKey={courseUsageKey}
++            courseId={courseId}
++            unitIds={unitIds}
++            displayName={displayName}
++            activeUnitId={unitId}
++            showCompletion={showCompletion}
++            isTimeLimited={isTimeLimited}
++            isGated={gatedContent.gated}
++            savePosition={savePosition}
++            bannerText={bannerText}
++            onNext={onNext}
++            onPrevious={onPrevious}
++            onNavigateUnit={handleUnitNavigation}
++            prerequisite={{
++              id: gatedContent.prereqId,
++              name: gatedContent.gatedSectionName,
++            }}
++          />
++        )}
++      </div>
++    </>
++
+   );
+ }
+ 
+diff --git a/src/courseware/sequence/CompleteIcon.jsx b/src/courseware/sequence/CompleteIcon.jsx
+index 150779d..bfddccd 100644
+--- a/src/courseware/sequence/CompleteIcon.jsx
++++ b/src/courseware/sequence/CompleteIcon.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
++import { faCheck } from '@fortawesome/free-solid-svg-icons';
+ 
+ export default function CompleteIcon(props) {
+-  return <FontAwesomeIcon icon={faCheckCircle} {...props} />;
++  return <FontAwesomeIcon icon={faCheck} {...props} />;
+ }
+diff --git a/src/courseware/sequence/Sequence.jsx b/src/courseware/sequence/Sequence.jsx
+index d1989bd..06c1bb8 100644
+--- a/src/courseware/sequence/Sequence.jsx
++++ b/src/courseware/sequence/Sequence.jsx
+@@ -2,13 +2,14 @@
+ import React, { useEffect, useContext, Suspense } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+ import { Button } from '@edx/paragon';
+ 
+ import Unit from './Unit';
+ import SequenceNavigation from './SequenceNavigation';
+ import PageLoading from '../PageLoading';
+ import messages from './messages';
+-import AlertList from '../../user-messages/AlertList';
+ import UserMessagesContext from '../../user-messages/UserMessagesContext';
+ 
+ const ContentLock = React.lazy(() => import('./content-lock'));
+@@ -73,18 +74,17 @@ function Sequence({
+ 
+   return (
+     <>
+-      <div className="container-fluid">
+-        <AlertList topic="sequence" className="mt-3" />
+-        <SequenceNavigation
+-          className="mb-3"
+-          onNext={handleNext}
+-          onNavigate={handleNavigate}
+-          onPrevious={handlePrevious}
+-          unitIds={unitIds}
+-          activeUnitId={activeUnitId}
+-          isLocked={isGated}
+-          showCompletion={showCompletion}
+-        />
++      <SequenceNavigation
++        className="mb-4"
++        onNext={handleNext}
++        onNavigate={handleNavigate}
++        onPrevious={handlePrevious}
++        unitIds={unitIds}
++        activeUnitId={activeUnitId}
++        isLocked={isGated}
++        showCompletion={showCompletion}
++      />
++      <div className="flex-grow-1">
+         {isGated && (
+           <Suspense
+             fallback={(
+@@ -101,8 +101,6 @@ function Sequence({
+             />
+           </Suspense>
+         )}
+-      </div>
+-      <div className="flex-grow-1">
+         {!isGated && (
+           <Unit
+             key={activeUnitId}
+@@ -110,32 +108,29 @@ function Sequence({
+           />
+         )}
+       </div>
+-      <div className="container-fluid">
+-        <div
+-          className="d-flex justify-content-center mx-auto my-4"
+-          style={{ maxWidth: '1024px' }}
++      <div className="unit-content-container below-unit-navigation">
++        <Button
++          className="btn-outline-secondary previous-button w-25 mr-2"
++          onClick={handlePrevious}
+         >
+-          <Button
+-            className="btn-outline-secondary previous-button w-25 mr-2"
+-            onClick={handlePrevious}
+-          >
+-            <FormattedMessage
+-              id="learn.sequence.navigation.after.unit.previous"
+-              description="The button to go to the previous unit"
+-              defaultMessage="Previous"
+-            />
+-          </Button>
+-          <Button
+-            className="btn-outline-primary next-button w-75"
+-            onClick={handleNext}
+-          >
+-            <FormattedMessage
+-              id="learn.sequence.navigation.after.unit.next"
+-              description="The button to go to the next unit"
+-              defaultMessage="Next"
+-            />
+-          </Button>
+-        </div>
++          <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
++          <FormattedMessage
++            id="learn.sequence.navigation.after.unit.previous"
++            description="The button to go to the previous unit"
++            defaultMessage="Previous"
++          />
++        </Button>
++        <Button
++          className="btn-outline-primary next-button w-75"
++          onClick={handleNext}
++        >
++          <FormattedMessage
++            id="learn.sequence.navigation.after.unit.next"
++            description="The button to go to the next unit"
++            defaultMessage="Next"
++          />
++          <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
++        </Button>
+       </div>
+     </>
+   );
+diff --git a/src/courseware/sequence/SequenceNavigation.jsx b/src/courseware/sequence/SequenceNavigation.jsx
+index 044dd80..e041466 100644
+--- a/src/courseware/sequence/SequenceNavigation.jsx
++++ b/src/courseware/sequence/SequenceNavigation.jsx
+@@ -2,6 +2,9 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { Button } from '@edx/paragon';
+ import classNames from 'classnames';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ 
+ import UnitButton from './UnitButton';
+ 
+@@ -26,15 +29,25 @@ export default function SequenceNavigation({
+   ));
+ 
+   return (
+-    <nav className={classNames('flex-grow-0 d-flex w-100 btn-group', className)}>
+-      <Button className="btn-outline-primary" onClick={onPrevious}>
+-        Previous
++    <nav className={classNames('sequence-navigation', className)}>
++      <Button className="previous-btn" onClick={onPrevious}>
++        <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
++        <FormattedMessage
++          defaultMessage="Previous"
++          id="learn.sequence.navigation.previous.button"
++          description="The Previous button in the sequence nav"
++        />
+       </Button>
+ 
+       {isLocked ? <UnitButton type="lock" isActive /> : unitButtons}
+ 
+-      <Button className="btn-outline-primary" onClick={onNext}>
+-        Next
++      <Button className="next-btn" onClick={onNext}>
++        <FormattedMessage
++          defaultMessage="Next"
++          id="learn.sequence.navigation.next.button"
++          description="The Next button in the sequence nav"
++        />
++        <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
+       </Button>
+     </nav>
+   );
+diff --git a/src/courseware/sequence/Unit.jsx b/src/courseware/sequence/Unit.jsx
+index 9fae383..c7affd0 100644
+--- a/src/courseware/sequence/Unit.jsx
++++ b/src/courseware/sequence/Unit.jsx
+@@ -35,9 +35,9 @@ function Unit({
+   };
+ 
+   return (
+-    <div>
+-      <div className="container-fluid mb-2">
+-        <h2 className="mb-0">{displayName}</h2>
++    <>
++      <div className="unit-content-container">
++        <h2 className="mb-0 h4">{displayName}</h2>
+         <BookmarkButton
+           onClick={toggleBookmark}
+           isBookmarked={bookmarked}
+@@ -45,17 +45,16 @@ function Unit({
+         />
+       </div>
+       <iframe
++        id="unit-iframe"
+         title={displayName}
+         ref={iframeRef}
+         src={iframeUrl}
+         allowFullScreen
+-        className="d-block container-fluid px-0"
+         height={iframeHeight}
+         scrolling="no"
+         referrerPolicy="origin"
+-        style={{ border: 0, width: '100%' }}
+       />
+-    </div>
++    </>
+   );
+ }
+ 
+diff --git a/src/courseware/sequence/UnitButton.jsx b/src/courseware/sequence/UnitButton.jsx
+index 6a9dae0..c31c18e 100644
+--- a/src/courseware/sequence/UnitButton.jsx
++++ b/src/courseware/sequence/UnitButton.jsx
+@@ -26,15 +26,13 @@ function UnitButton({
+     <Button
+       className={classNames({
+         active: isActive,
+-        'btn-outline-primary': !isActive,
+-        'btn-outline-secondary': isActive,
++        complete: showCompletion && complete,
+       })}
+-
+       onClick={handleClick}
+       title={displayName}
+     >
+       <UnitIcon type={contentType} />
+-      {showCompletion && complete ? <CompleteIcon className="text-success ml-2" /> : null}
++      {showCompletion && complete ? <CompleteIcon size="sm" className="text-success ml-2" /> : null}
+       {bookmarked ? (
+         <BookmarkFilledIcon
+           className="text-primary small position-absolute"
+diff --git a/src/courseware/sequence/UnitIcon.jsx b/src/courseware/sequence/UnitIcon.jsx
+index ef4d96f..dec610f 100644
+--- a/src/courseware/sequence/UnitIcon.jsx
++++ b/src/courseware/sequence/UnitIcon.jsx
+@@ -2,7 +2,7 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import {
+-  faFilm, faBook, faPencilAlt, faTasks, faLock,
++  faFilm, faBook, faEdit, faTasks, faLock,
+ } from '@fortawesome/free-solid-svg-icons';
+ 
+ export default function UnitIcon({ type }) {
+@@ -18,7 +18,7 @@ export default function UnitIcon({ type }) {
+       icon = faTasks;
+       break;
+     case 'problem':
+-      icon = faPencilAlt;
++      icon = faEdit;
+       break;
+     case 'lock':
+       icon = faLock;
+diff --git a/src/courseware/sequence/bookmark/BookmarkButton.jsx b/src/courseware/sequence/bookmark/BookmarkButton.jsx
+index 18d6629..67894b0 100644
+--- a/src/courseware/sequence/bookmark/BookmarkButton.jsx
++++ b/src/courseware/sequence/bookmark/BookmarkButton.jsx
+@@ -27,7 +27,7 @@ export default function BookmarkButton({ onClick, isBookmarked, isProcessing })
+ 
+   return (
+     <StatefulButton
+-      className="btn-link px-1 ml-n1"
++      className="btn-link px-1 ml-n1 btn-sm"
+       onClick={onClick}
+       state={state}
+       disabledStates={['defaultProcessing', 'bookmarkedProcessing']}
+diff --git a/src/index.scss b/src/index.scss
+index 608ed57..799df49 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -1,3 +1,4 @@
++$primary: #1176B2;
+ @import '~@edx/paragon/scss/edx/theme.scss';
+ 
+ @import "~@edx/frontend-component-header/dist/index";
+@@ -6,8 +7,10 @@
+ #root {
+   display: flex;
+   flex-direction: column;
+-  height: 100vh;
+-
++  min-height: 100vh;
++  main {
++    flex-grow: 1;
++  }
+   header {
+     flex: 0;
+ 
+@@ -30,10 +33,15 @@
+   }
+ }
+ 
++.course-tabs-navigation {
++  margin-top: 4px;
++  border-bottom: solid 1px #EAEAEA;
++}
+ .nav-underline-tabs {
++  margin: 0;
+   .nav-link {
+     border-bottom: 4px solid transparent;
+-    color: theme-color('gray', 700);
++    color: theme-color('gray', 400);
+ 
+     &:hover,
+     &:focus,
+@@ -44,3 +52,104 @@
+     }
+   }
+ }
++
++.course-content-container {
++  border: solid 1px #EAEAEA;
++  border-radius: 4px;
++  margin-bottom: 4rem;
++  display: flex;
++  flex-direction: column;
++  flex-grow: 1;
++}
++
++
++.sequence-navigation {
++  display: flex;
++  margin: -1px -1px 0;
++  .btn {
++    flex-grow: 1;
++    display: block;
++    border-radius: 0;
++    border: solid 1px #EAEAEA;
++    margin-left: -1px;
++    position: relative;
++    font-weight: 400;
++    flex-basis: 80%;
++    padding: .5rem;
++    color: theme-color('gray', 400);
++
++    &:hover,
++    &:focus,
++    &.active {
++      color: theme-color('gray', 700);
++    }
++
++    &:focus {
++      z-index: 1;
++    }
++    &.active {
++      &:after {
++        content: '';
++        position: absolute;
++        bottom: -1px;
++        left: 0;
++        right: 0;
++        height: 2px;
++        background: $primary;
++      }
++    }
++    &.complete {
++      background-color: #EEF7E5;
++    }
++    &:first-child {
++      margin-left: 0;
++    }
++  }
++  .previous-btn, .next-btn {
++    flex-basis: 10em;
++    min-width: 9em;
++    display: inline-flex;
++    justify-content: center;
++    align-items: center;
++  }
++  .previous-btn {
++    border-top-left-radius: 4px;
++  }
++  .next-btn {
++    border-top-right-radius: 4px;
++  }
++}
++
++.below-unit-navigation {
++  display: flex;
++  justify-content: center;
++  margin-top: 2rem;
++  margin-bottom: 2rem;
++  .previous-button,
++  .next-button {
++    border-radius: 4px;
++    &:focus:before {
++      border-radius: 6px;
++    }
++  }
++}
++
++.unit-content-container {
++  padding-left: 20px;
++  padding-right: 20px;
++  max-width: 1024px;
++  margin-left: auto;
++  margin-right: auto;
++  width: 100%;
++  @media (min-width: 830px) {
++    padding-left: 40px;
++    padding-right: 40px;
++  }
++}
++#unit-iframe {
++  max-width: 1024px;
++  width: 100%;
++  margin: 0 auto;
++  border: none;
++  display: block;
++}
+\ No newline at end of file
+-- 
+2.34.1
+

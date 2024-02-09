@@ -1,0 +1,435 @@
+From aaa367780d2d9c75a806ae3e9e441b17ae171bd0 Mon Sep 17 00:00:00 2001
+From: Thomas Tracy <contact@tjtracy.com>
+Date: Wed, 13 Apr 2022 10:14:00 -0400
+Subject: [PATCH 0906/1021] fix: [MICROBA-1769] Cert status before course end
+ (#918)
+
+* fix: [MICROBA-1769] Cert status before course end
+
+Right now, learners who are nonpassing are able to view information
+about thier certificates early at the course end screen and progress
+pages. This is because we show messaging around the nonpassing state in
+some cases before a course ends and certificates are available. This can
+also lead to cases where grades are not finalized and students who may
+be passing see a scary nonpassing message instead.
+
+This change makes it so during the course exit, a student who finishes a
+course before the course is over will see the celebration screen
+regardless of passing status. Once the course is over (or if
+certificates are available immediately), and they are
+still not passing, they will see the nonpassing messaging. The same
+change was made for the certificate status alert in the progress tab.
+---
+ .../courseHomeMetadata.factory.js             |  1 +
+ .../data/__snapshots__/redux.test.js.snap     |  3 +
+ .../progress-tab/ProgressTab.test.jsx         | 62 +++++++++++++++++++
+ .../certificate-status/CertificateStatus.jsx  | 23 ++++++-
+ .../certificate-status/messages.js            |  5 ++
+ .../course/course-exit/CourseCelebration.jsx  | 26 ++++++++
+ .../course/course-exit/CourseExit.jsx         |  6 +-
+ .../course/course-exit/CourseExit.test.jsx    | 61 ++++++++++++++++++
+ src/courseware/course/course-exit/messages.js |  5 ++
+ src/courseware/course/course-exit/utils.js    |  5 +-
+ 10 files changed, 192 insertions(+), 5 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index fb4781b..7bdf3b5 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -10,6 +10,7 @@ Factory.define('courseHomeMetadata')
+     is_enrolled: false,
+     is_staff: false,
+     can_load_courseware: true,
++    can_view_certificate: true,
+     celebrations: null,
+     course_access: {
+       additional_context_user_message: null,
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 8d927da..d387287 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -22,6 +22,7 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course": Object {
+         "canLoadCourseware": true,
++        "canViewCertificate": true,
+         "celebrations": null,
+         "courseAccess": Object {
+           "additionalContextUserMessage": null,
+@@ -340,6 +341,7 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course": Object {
+         "canLoadCourseware": true,
++        "canViewCertificate": true,
+         "celebrations": null,
+         "courseAccess": Object {
+           "additionalContextUserMessage": null,
+@@ -538,6 +540,7 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course": Object {
+         "canLoadCourseware": true,
++        "canViewCertificate": true,
+         "celebrations": null,
+         "courseAccess": Object {
+           "additionalContextUserMessage": null,
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index aa9c1ff..6097f06 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -31,6 +31,9 @@ describe('Progress Tab', () => {
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+   const progressUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/course_home/progress/*`);
+   const masqueradeUrl = `${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`;
++  const now = new Date();
++  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
++  const overmorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+ 
+   function setMetadata(attributes, options) {
+     const courseMetadata = Factory.build('courseHomeMetadata', attributes, options);
+@@ -1220,6 +1223,65 @@ describe('Progress Tab', () => {
+       await fetchAndRender();
+       expect(screen.queryByTestId('certificate-status-component')).not.toBeInTheDocument();
+     });
++
++    it('Shows not available messaging before certificates are available to nonpassing learners when theres no certificate data', async () => {
++      setMetadata({
++        can_view_certificate: false,
++        is_enrolled: true,
++      });
++      setTabData({
++        end: tomorrow.toISOString(),
++        certificate_data: undefined,
++      });
++      await fetchAndRender();
++      expect(screen.getByText(`Final grades and any earned certificates are scheduled to be available after ${tomorrow.toLocaleDateString('en-us', {
++        year: 'numeric',
++        month: 'long',
++        day: 'numeric',
++      })}.`)).toBeInTheDocument();
++    });
++
++    it('Shows not available messaging before certificates are available to passing learners when theres no certificate data', async () => {
++      setMetadata({
++        can_view_certificate: false,
++        is_enrolled: true,
++      });
++      setTabData({
++        end: tomorrow.toISOString(),
++        user_has_passing_grade: true,
++        certificate_data: undefined,
++      });
++      await fetchAndRender();
++      expect(screen.getByText(`Final grades and any earned certificates are scheduled to be available after ${tomorrow.toLocaleDateString('en-us', {
++        year: 'numeric',
++        month: 'long',
++        day: 'numeric',
++      })}.`)).toBeInTheDocument();
++    });
++
++    it('Shows certificate_available_date if learner is passing', async () => {
++      setMetadata({
++        can_view_certificate: false,
++        is_enrolled: true,
++      });
++      setTabData({
++        end: tomorrow.toISOString(),
++        user_has_passing_grade: true,
++        certificate_data: {
++          cert_status: 'earned_but_not_available',
++          certificate_available_date: overmorrow.toISOString(),
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('Certificate status'));
++      expect(screen.getByText(
++        overmorrow.toLocaleDateString('en-us', {
++          year: 'numeric',
++          month: 'long',
++          day: 'numeric',
++        }),
++      )).toBeInTheDocument();
++    });
+   });
+ 
+   describe('Credit Information', () => {
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index e32b353..d6c7b44 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -22,6 +22,8 @@ function CertificateStatus({ intl }) {
+   const {
+     isEnrolled,
+     org,
++    canViewCertificate,
++    userTimezone,
+   } = useModel('courseHomeMeta', courseId);
+ 
+   const {
+@@ -45,6 +47,8 @@ function CertificateStatus({ intl }) {
+     hasScheduledContent,
+     isEnrolled,
+     userHasPassingGrade,
++    null, // CourseExitPageIsActive
++    canViewCertificate,
+   );
+ 
+   const eventProperties = {
+@@ -58,6 +62,7 @@ function CertificateStatus({ intl }) {
+   let certStatus;
+   let certWebViewUrl;
+   let downloadUrl;
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+   if (certificateData) {
+     certStatus = certificateData.certStatus;
+@@ -178,10 +183,22 @@ function CertificateStatus({ intl }) {
+         }
+         break;
+ 
+-      // This code shouldn't be hit but coding defensively since switch expects a default statement
+       default:
+-        certCase = null;
+-        certEventName = 'no_certificate_status';
++        // if user completes a course before certificates are available, treat it as notAvailable
++        // regardless of passing or nonpassing status
++        if (!canViewCertificate) {
++          certCase = 'notAvailable';
++          endDate = intl.formatDate(end, {
++            year: 'numeric',
++            month: 'long',
++            day: 'numeric',
++            ...timezoneFormatArgs,
++          });
++          body = intl.formatMessage(messages.notAvailableEndDateBody, { endDate });
++        } else {
++          certCase = null;
++          certEventName = 'no_certificate_status';
++        }
+         break;
+     }
+   }
+diff --git a/src/course-home/progress-tab/certificate-status/messages.js b/src/course-home/progress-tab/certificate-status/messages.js
+index 332fea7..54b21e9 100644
+--- a/src/course-home/progress-tab/certificate-status/messages.js
++++ b/src/course-home/progress-tab/certificate-status/messages.js
+@@ -76,6 +76,11 @@ const messages = defineMessages({
+     defaultMessage: 'Certificate status',
+     description: 'Header text when the certifcate is not available',
+   },
++  notAvailableEndDateBody: {
++    id: 'progress.certificateBody.notAvailable.endDate',
++    defaultMessage: 'Final grades and any earned certificates are scheduled to be available after {endDate}.',
++    description: 'Shown for learners who have finished a course before grades and certificates are available.',
++  },
+   upgradeHeader: {
+     id: 'progress.certificateStatus.upgradeHeader',
+     defaultMessage: 'Earn a certificate',
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 69ee717..ec12e82 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -55,6 +55,8 @@ function CourseCelebration({ intl }) {
+   const {
+     org,
+     verifiedMode,
++    canViewCertificate,
++    userTimezone,
+   } = useModel('courseHomeMeta', courseId);
+ 
+   const {
+@@ -69,6 +71,7 @@ function CourseCelebration({ intl }) {
+   const dashboardLink = <DashboardLink />;
+   const idVerificationSupportLink = <IdVerificationSupportLink />;
+   const profileLink = <ProfileLink />;
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+   let buttonPrefix = null;
+   let buttonLocation;
+@@ -248,6 +251,29 @@ function CourseCelebration({ intl }) {
+       }
+       break;
+     default:
++      if (!canViewCertificate) {
++        //  We reuse the cert event here. Since this default state is so
++        //  Similar to the earned_not_available state, this event name should be fine
++        //  to cover the same cases.
++        visitEvent = 'celebration_with_unavailable_cert';
++        certHeader = intl.formatMessage(messages.certificateHeaderNotAvailable);
++        const endDate = intl.formatDate(end, {
++          year: 'numeric',
++          month: 'long',
++          day: 'numeric',
++          ...timezoneFormatArgs,
++        });
++        message = (
++          <>
++            <p>
++              {intl.formatMessage(messages.certificateNotAvailableEndDateBody, { endDate })}
++            </p>
++            <p>
++              {intl.formatMessage(messages.certificateNotAvailableBodyAccessCert)}
++            </p>
++          </>
++        );
++      }
+       break;
+   }
+ 
+diff --git a/src/courseware/course/course-exit/CourseExit.jsx b/src/courseware/course/course-exit/CourseExit.jsx
+index b9e7de7..6bd80b8 100644
+--- a/src/courseware/course/course-exit/CourseExit.jsx
++++ b/src/courseware/course/course-exit/CourseExit.jsx
+@@ -27,7 +27,10 @@ function CourseExit({ intl }) {
+     userHasPassingGrade,
+   } = useModel('coursewareMeta', courseId);
+ 
+-  const { isMasquerading } = useModel('courseHomeMeta', courseId);
++  const {
++    isMasquerading,
++    canViewCertificate,
++  } = useModel('courseHomeMeta', courseId);
+ 
+   const mode = getCourseExitMode(
+     certificateData,
+@@ -35,6 +38,7 @@ function CourseExit({ intl }) {
+     isEnrolled,
+     userHasPassingGrade,
+     courseExitPageIsActive,
++    canViewCertificate,
+   );
+ 
+   // Audit users cannot fully complete a course, so we will
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 5c8d039..cd7b558 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -38,6 +38,9 @@ describe('Course Exit Pages', () => {
+   const discoveryRecommendationsUrl = new RegExp(`${getConfig().DISCOVERY_API_BASE_URL}/api/v1/course_recommendations/*`);
+   const enrollmentsUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment*`);
+   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
++  const now = new Date();
++  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
++  const overmorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+ 
+   function setMetadata(coursewareAttributes, courseHomeAttributes = {}) {
+     const extendedCourseMetadata = { ...coursewareMetadata, ...coursewareAttributes };
+@@ -363,6 +366,64 @@ describe('Course Exit Pages', () => {
+         expect(screen.queryByText('Same Course')).not.toBeInTheDocument();
+       });
+     });
++
++    it('Shows not available messaging before certificates are available to nonpassing learners when theres no certificate data', async () => {
++      setMetadata({
++        is_enrolled: true,
++        end: tomorrow.toISOString(),
++        user_has_passing_grade: false,
++        certificate_data: undefined,
++      }, {
++        can_view_certificate: false,
++      });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByText(`Final grades and any earned certificates are scheduled to be available after ${tomorrow.toLocaleDateString('en-us', {
++        year: 'numeric',
++        month: 'long',
++        day: 'numeric',
++      })}.`)).toBeInTheDocument();
++    });
++
++    it('Shows not available messaging before certificates are available to passing learners when theres no certificate data', async () => {
++      setMetadata({
++        is_enrolled: true,
++        end: tomorrow.toISOString(),
++        user_has_passing_grade: true,
++        certificate_data: undefined,
++      }, {
++        can_view_certificate: false,
++      });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByText(`Final grades and any earned certificates are scheduled to be available after ${tomorrow.toLocaleDateString('en-us', {
++        year: 'numeric',
++        month: 'long',
++        day: 'numeric',
++      })}.`)).toBeInTheDocument();
++    });
++
++    it('Shows certificate_available_date if learner is passing', async () => {
++      setMetadata({
++        is_enrolled: true,
++        end: tomorrow.toISOString(),
++        user_has_passing_grade: true,
++        certificate_data: {
++          cert_status: 'earned_but_not_available',
++          certificate_available_date: overmorrow.toISOString(),
++        },
++      }, {
++        can_view_certificate: false,
++      });
++
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByText('Your grade and certificate status will be available soon.'));
++      expect(screen.getByText(
++        overmorrow.toLocaleDateString('en-us', {
++          year: 'numeric',
++          month: 'long',
++          day: 'numeric',
++        }),
++      )).toBeInTheDocument();
++    });
+   });
+ 
+   describe('Course Non-passing Experience', () => {
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index 63bff39..3543c66 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -21,6 +21,11 @@ const messages = defineMessages({
+     defaultMessage: 'If you have earned a passing grade, your certificate will be automatically issued.',
+     description: 'Text displayed when course certificate is not yet available to be viewed',
+   },
++  certificateNotAvailableEndDateBody: {
++    id: 'courseCelebration.certificateBody.notAvailable.endDate',
++    defaultMessage: 'Final grades and any earned certificates are scheduled to be available after {endDate}.',
++    description: 'Shown for learners who have finished a course before grades and certificates are available.',
++  },
+   certificateHeaderUnverified: {
+     id: 'courseCelebration.certificateHeader.unverified',
+     defaultMessage: 'You must complete verification to receive your certificate.',
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index 7fabdcd..5da8356 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -31,6 +31,7 @@ function getCourseExitMode(
+   isEnrolled,
+   userHasPassingGrade,
+   courseExitPageIsActive = null,
++  canImmediatelyViewCertificate = false,
+ ) {
+   const authenticatedUser = getAuthenticatedUser();
+ 
+@@ -55,7 +56,7 @@ function getCourseExitMode(
+   if (hasScheduledContent && !userHasPassingGrade) {
+     return COURSE_EXIT_MODES.inProgress;
+   }
+-  if (isEligibleForCertificate && !userHasPassingGrade) {
++  if (isEligibleForCertificate && !userHasPassingGrade && canImmediatelyViewCertificate) {
+     return COURSE_EXIT_MODES.nonPassing;
+   }
+   if (isCelebratoryStatus) {
+@@ -73,12 +74,14 @@ function getCourseExitNavigation(courseId, intl) {
+     userHasPassingGrade,
+     courseExitPageIsActive,
+   } = useModel('coursewareMeta', courseId);
++  const { canViewCertificate } = useModel('courseHomeMeta', courseId);
+   const exitMode = getCourseExitMode(
+     certificateData,
+     hasScheduledContent,
+     isEnrolled,
+     userHasPassingGrade,
+     courseExitPageIsActive,
++    canViewCertificate,
+   );
+   const exitActive = exitMode !== COURSE_EXIT_MODES.disabled;
+ 
+-- 
+2.34.1
+

@@ -1,0 +1,61 @@
+From c510fe1c1d23662435c71f0be7027833cf5f4154 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 21 Apr 2020 15:07:49 -0700
+Subject: [PATCH 0107/1021] Use new upgrade offer banner
+
+---
+ src/courseware/course/Course.jsx | 4 ++++
+ src/data/api.js                  | 1 +
+ 2 files changed, 5 insertions(+)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 634a2aa..5083677 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -7,6 +7,7 @@ import AlertList from '../../user-messages/AlertList';
+ import { useAccessExpirationAlert } from '../../access-expiration-alert';
+ import { useLogistrationAlert } from '../../logistration-alert';
+ import { useEnrollmentAlert } from '../../enrollment-alert';
++import { useOfferAlert } from '../../offer-alert';
+ import PageLoading from '../../PageLoading';
+ 
+ import InstructorToolbar from './InstructorToolbar';
+@@ -27,6 +28,7 @@ const AccessExpirationAlert = React.lazy(() => import('../../access-expiration-a
+ const EnrollmentAlert = React.lazy(() => import('../../enrollment-alert/EnrollmentAlert'));
+ const StaffEnrollmentAlert = React.lazy(() => import('../../enrollment-alert/StaffEnrollmentAlert'));
+ const LogistrationAlert = React.lazy(() => import('../../logistration-alert'));
++const OfferAlert = React.lazy(() => import('../../offer-alert/OfferAlert'));
+ 
+ function Course({
+   courseId,
+@@ -41,6 +43,7 @@ function Course({
+   const sequence = useModel('sequences', sequenceId);
+   const section = useModel('sections', sequence ? sequence.sectionId : null);
+ 
++  useOfferAlert(courseId);
+   useLogistrationAlert();
+   useEnrollmentAlert(courseId);
+   useAccessExpirationAlert(courseId);
+@@ -81,6 +84,7 @@ function Course({
+               clientStaffEnrollmentAlert: StaffEnrollmentAlert,
+               clientLogistrationAlert: LogistrationAlert,
+               clientAccessExpirationAlert: AccessExpirationAlert,
++              clientOfferAlert: OfferAlert,
+             }}
+           />
+           <CourseBreadcrumbs
+diff --git a/src/data/api.js b/src/data/api.js
+index b45b628..f8f3545 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -11,6 +11,7 @@ function normalizeMetadata(metadata) {
+     id: metadata.id,
+     title: metadata.name,
+     number: metadata.number,
++    offerHtml: metadata.offer_html,
+     org: metadata.org,
+     enrollmentStart: metadata.enrollment_start,
+     enrollmentEnd: metadata.enrollment_end,
+-- 
+2.34.1
+

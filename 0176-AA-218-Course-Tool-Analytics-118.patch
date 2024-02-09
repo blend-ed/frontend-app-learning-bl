@@ -1,0 +1,68 @@
+From cdab8959caeffd38df0343f5f07afceb5b4063d0 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <ciduarte@wpi.edu>
+Date: Thu, 23 Jul 2020 10:40:52 -0400
+Subject: [PATCH 0176/1021] AA-218: Course Tool Analytics (#118)
+
+Tracking analytics for onClick events in the Course Tool widget.
+Extra: Fixed intl error in the Course Dates widget.
+
+Co-authored-by: Carla Duarte <cduarte@edx.org>
+---
+ src/course-home/outline-tab/widgets/CourseDates.jsx |  2 +-
+ src/course-home/outline-tab/widgets/CourseTools.jsx | 13 ++++++++++++-
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index f2615ed..33bcae3 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -14,7 +14,7 @@ function CourseDates({ courseId, intl }) {
+ 
+   return (
+     <section className="mb-3">
+-      <h4>{intl.formatMessage(messages.tools)}</h4>
++      <h4>{intl.formatMessage(messages.dates)}</h4>
+       {datesWidget.courseDateBlocks.map((courseDateBlock) => (
+         <DateSummary
+           key={courseDateBlock.title + courseDateBlock.date}
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 38ce966..24c0a09 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -1,6 +1,8 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import {
+@@ -16,6 +18,15 @@ function CourseTools({ courseId, intl }) {
+     courseTools,
+   } = useModel('outline', courseId);
+ 
++  const logClick = (analyticsId) => {
++    const { administrator } = getAuthenticatedUser();
++    sendTrackEvent('edx.course.tool.accessed', {
++      course_id: courseId,
++      is_staff: administrator,
++      tool_name: analyticsId,
++    });
++  };
++
+   const renderIcon = (iconClasses) => {
+     switch (iconClasses) {
+       case 'edx.bookmarks':
+@@ -40,7 +51,7 @@ function CourseTools({ courseId, intl }) {
+       <h4>{intl.formatMessage(messages.tools)}</h4>
+       {courseTools.map((courseTool) => (
+         <div key={courseTool.analyticsId}>
+-          <a data-analytics-id={courseTool.analyticsId} href={courseTool.url}>
++          <a href={courseTool.url} onClick={() => logClick(courseTool.analyticsId)}>
+             <FontAwesomeIcon icon={renderIcon(courseTool.analyticsId)} className="mr-2" style={{ width: '20px' }} />
+             {courseTool.title}
+           </a>
+-- 
+2.34.1
+

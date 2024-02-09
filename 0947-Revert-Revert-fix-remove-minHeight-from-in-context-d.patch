@@ -1,0 +1,28 @@
+From b343ca7a74374b5a661a5dd91ff8e0a529cdd74e Mon Sep 17 00:00:00 2001
+From: Awais Ansari <79941147+awais-ansari@users.noreply.github.com>
+Date: Thu, 1 Dec 2022 14:17:18 +0500
+Subject: [PATCH 0947/1021] Revert "Revert "fix: remove minHeight from
+ in-context discussion sidebar (#1002)" (#1003)" (#1007)
+
+This reverts commit ba06fd7c98d69dbc2f24988921e62ad2bb7d96c0.
+---
+ .../course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+index ef463a7..459622c 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -30,8 +30,7 @@ function DiscussionsSidebar({ intl }) {
+     >
+       <iframe
+         src={`${discussionsUrl}?inContext`}
+-        className="d-flex w-100 border-0"
+-        style={{ minHeight: '60rem' }}
++        className="d-flex w-100 h-100 border-0"
+         title={intl.formatMessage(messages.discussionsTitle)}
+       />
+     </SidebarBase>
+-- 
+2.34.1
+

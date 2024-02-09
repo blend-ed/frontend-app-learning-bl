@@ -1,0 +1,43 @@
+From 54d96cc1622862c214fdf6acd403ce0af937c18c Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 13 Sep 2021 15:31:43 -0400
+Subject: [PATCH 0650/1021] fix: stop logging course-blocks 403 responses as
+ errors (#637)
+
+They are benign and normal for logged out users. Instead, log them
+as info messages, so we can still track them if we need to.
+
+AA-1011
+---
+ src/courseware/data/thunks.js | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 9322b1b..c4d5380 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -1,4 +1,4 @@
+-import { logError } from '@edx/frontend-platform/logging';
++import { logError, logInfo } from '@edx/frontend-platform/logging';
+ import {
+   getBlockCompletion,
+   postSequencePosition,
+@@ -188,7 +188,14 @@ export function fetchCourse(courseId) {
+       // Log errors for each request if needed. Course block failures may occur
+       // even if the course metadata request is successful
+       if (!fetchedBlocks) {
+-        logError(courseBlocksResult.reason);
++        const { response } = courseBlocksResult.reason;
++        if (response && response.status === 403) {
++          // 403 responses are normal - they happen when the learner is logged out.
++          // We'll redirect them in a moment to the outline tab by calling fetchCourseDenied() below.
++          logInfo(courseBlocksResult.reason);
++        } else {
++          logError(courseBlocksResult.reason);
++        }
+       }
+       if (!fetchedMetadata) {
+         logError(courseMetadataResult.reason);
+-- 
+2.34.1
+

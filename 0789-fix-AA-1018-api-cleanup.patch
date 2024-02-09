@@ -1,0 +1,616 @@
+From 7f016e55aa5a72ec7753eb2debd539f23eb6952a Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 25 Jan 2022 14:08:32 -0500
+Subject: [PATCH 0789/1021] fix: [AA-1018] api cleanup
+
+Implement review feedback.
+Clean up tests
+---
+ .../data/__snapshots__/redux.test.js.snap     | 72 +++++++++----------
+ src/course-home/dates-tab/DatesTab.test.jsx   |  2 +-
+ .../outline-tab/OutlineTab.test.jsx           | 12 ++--
+ .../progress-tab/ProgressTab.test.jsx         | 12 ++--
+ src/courseware/CoursewareContainer.test.jsx   |  1 -
+ .../course/NotificationTray.test.jsx          |  6 +-
+ .../course/sequence/Sequence.test.jsx         |  2 +-
+ .../course/sequence/honor-code/HonorCode.jsx  |  7 +-
+ src/courseware/data/thunks.js                 |  4 +-
+ src/product-tours/ProductTours.test.jsx       |  8 +--
+ src/setupTest.js                              |  2 +-
+ .../courseMetadataBase.factory.js             |  2 +-
+ .../StreakCelebrationModal.jsx                |  2 +-
+ .../StreakCelebrationModal.test.jsx           |  2 +-
+ src/shared/streak-celebration/utils.jsx       |  4 +-
+ src/tab-page/LoadedTabPage.test.jsx           |  7 +-
+ 16 files changed, 71 insertions(+), 74 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index bc74623..b9d86e3 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -3,7 +3,7 @@
+ exports[`Data layer integration tests Test fetchDatesTab Should fetch, normalize, and save metadata 1`] = `
+ Object {
+   "courseHome": Object {
+-    "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++    "courseId": "course-v1:edX+DemoX+Demo_Course",
+     "courseStatus": "loaded",
+     "proctoringPanelStatus": "loading",
+     "targetUserId": undefined,
+@@ -19,7 +19,7 @@ Object {
+   },
+   "models": Object {
+     "courseHomeMeta": Object {
+-      "course-v1:edX+DemoX+Demo_Course_1": Object {
++      "course-v1:edX+DemoX+Demo_Course": Object {
+         "canLoadCourseware": false,
+         "celebrations": null,
+         "courseAccess": Object {
+@@ -30,7 +30,7 @@ Object {
+           "userFragment": null,
+           "userMessage": null,
+         },
+-        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "course-v1:edX+DemoX+Demo_Course",
+         "isEnrolled": false,
+         "isMasquerading": false,
+         "isSelfPaced": false,
+@@ -43,32 +43,32 @@ Object {
+           Object {
+             "slug": "outline",
+             "title": "Course",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course/",
+           },
+           Object {
+             "slug": "discussion",
+             "title": "Discussion",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/discussion/forum/",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/discussion/forum/",
+           },
+           Object {
+             "slug": "wiki",
+             "title": "Wiki",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course_wiki",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course_wiki",
+           },
+           Object {
+             "slug": "progress",
+             "title": "Progress",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/progress",
+           },
+           Object {
+             "slug": "instructor",
+             "title": "Instructor",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/instructor",
+           },
+           Object {
+             "slug": "dates",
+             "title": "Dates",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/dates",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/dates",
+           },
+         ],
+         "title": "Demonstration Course",
+@@ -82,7 +82,7 @@ Object {
+       },
+     },
+     "dates": Object {
+-      "course-v1:edX+DemoX+Demo_Course_1": Object {
++      "course-v1:edX+DemoX+Demo_Course": Object {
+         "courseDateBlocks": Array [
+           Object {
+             "date": "2020-05-01T17:59:41Z",
+@@ -296,7 +296,7 @@ Object {
+           "verifiedUpgradeLink": "http://localhost:18130/basket/add/?sku=8CF08E5",
+         },
+         "hasEnded": false,
+-        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "course-v1:edX+DemoX+Demo_Course",
+         "learnerIsFullAccess": true,
+       },
+     },
+@@ -317,7 +317,7 @@ Object {
+ exports[`Data layer integration tests Test fetchOutlineTab Should fetch, normalize, and save metadata 1`] = `
+ Object {
+   "courseHome": Object {
+-    "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++    "courseId": "course-v1:edX+DemoX+Demo_Course",
+     "courseStatus": "loaded",
+     "proctoringPanelStatus": "loading",
+     "targetUserId": undefined,
+@@ -333,7 +333,7 @@ Object {
+   },
+   "models": Object {
+     "courseHomeMeta": Object {
+-      "course-v1:edX+DemoX+Demo_Course_1": Object {
++      "course-v1:edX+DemoX+Demo_Course": Object {
+         "canLoadCourseware": false,
+         "celebrations": null,
+         "courseAccess": Object {
+@@ -344,7 +344,7 @@ Object {
+           "userFragment": null,
+           "userMessage": null,
+         },
+-        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "course-v1:edX+DemoX+Demo_Course",
+         "isEnrolled": false,
+         "isMasquerading": false,
+         "isSelfPaced": false,
+@@ -357,32 +357,32 @@ Object {
+           Object {
+             "slug": "outline",
+             "title": "Course",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course/",
+           },
+           Object {
+             "slug": "discussion",
+             "title": "Discussion",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/discussion/forum/",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/discussion/forum/",
+           },
+           Object {
+             "slug": "wiki",
+             "title": "Wiki",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course_wiki",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course_wiki",
+           },
+           Object {
+             "slug": "progress",
+             "title": "Progress",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/progress",
+           },
+           Object {
+             "slug": "instructor",
+             "title": "Instructor",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/instructor",
+           },
+           Object {
+             "slug": "dates",
+             "title": "Dates",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/dates",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/dates",
+           },
+         ],
+         "title": "Demonstration Course",
+@@ -396,7 +396,7 @@ Object {
+       },
+     },
+     "outline": Object {
+-      "course-v1:edX+DemoX+Demo_Course_1": Object {
++      "course-v1:edX+DemoX+Demo_Course": Object {
+         "accessExpiration": null,
+         "canShowUpgradeSock": false,
+         "certData": Object {
+@@ -409,7 +409,7 @@ Object {
+           "courses": Object {
+             "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
+               "hasScheduledContent": false,
+-              "id": "course-v1:edX+DemoX+Demo_Course_1",
++              "id": "course-v1:edX+DemoX+Demo_Course",
+               "sectionIds": Array [
+                 "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+               ],
+@@ -419,7 +419,7 @@ Object {
+           "sections": Object {
+             "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2": Object {
+               "complete": false,
+-              "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++              "courseId": "course-v1:edX+DemoX+Demo_Course",
+               "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+               "resumeBlock": false,
+               "sequenceIds": Array [
+@@ -475,7 +475,7 @@ Object {
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "hasEnded": undefined,
+         "hasScheduledContent": null,
+-        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "course-v1:edX+DemoX+Demo_Course",
+         "offer": null,
+         "resumeCourse": Object {
+           "hasVisitedCourse": false,
+@@ -511,7 +511,7 @@ Object {
+ exports[`Data layer integration tests Test fetchProgressTab Should fetch, normalize, and save metadata 1`] = `
+ Object {
+   "courseHome": Object {
+-    "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++    "courseId": "course-v1:edX+DemoX+Demo_Course",
+     "courseStatus": "loaded",
+     "proctoringPanelStatus": "loading",
+     "targetUserId": undefined,
+@@ -527,7 +527,7 @@ Object {
+   },
+   "models": Object {
+     "courseHomeMeta": Object {
+-      "course-v1:edX+DemoX+Demo_Course_1": Object {
++      "course-v1:edX+DemoX+Demo_Course": Object {
+         "canLoadCourseware": false,
+         "celebrations": null,
+         "courseAccess": Object {
+@@ -538,7 +538,7 @@ Object {
+           "userFragment": null,
+           "userMessage": null,
+         },
+-        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "course-v1:edX+DemoX+Demo_Course",
+         "isEnrolled": false,
+         "isMasquerading": false,
+         "isSelfPaced": false,
+@@ -551,32 +551,32 @@ Object {
+           Object {
+             "slug": "outline",
+             "title": "Course",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course/",
+           },
+           Object {
+             "slug": "discussion",
+             "title": "Discussion",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/discussion/forum/",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/discussion/forum/",
+           },
+           Object {
+             "slug": "wiki",
+             "title": "Wiki",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course_wiki",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course_wiki",
+           },
+           Object {
+             "slug": "progress",
+             "title": "Progress",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/progress",
+           },
+           Object {
+             "slug": "instructor",
+             "title": "Instructor",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/instructor",
+           },
+           Object {
+             "slug": "dates",
+             "title": "Dates",
+-            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/dates",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/dates",
+           },
+         ],
+         "title": "Demonstration Course",
+@@ -590,7 +590,7 @@ Object {
+       },
+     },
+     "progress": Object {
+-      "course-v1:edX+DemoX+Demo_Course_1": Object {
++      "course-v1:edX+DemoX+Demo_Course": Object {
+         "accessExpiration": null,
+         "certificateData": Object {},
+         "completionSummary": Object {
+@@ -604,7 +604,7 @@ Object {
+           "percent": 1,
+           "visiblePercent": 1,
+         },
+-        "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++        "courseId": "course-v1:edX+DemoX+Demo_Course",
+         "creditCourseRequirements": null,
+         "end": "3027-03-31T00:00:00Z",
+         "enrollmentMode": "audit",
+@@ -626,7 +626,7 @@ Object {
+           },
+         },
+         "hasScheduledContent": false,
+-        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "course-v1:edX+DemoX+Demo_Course",
+         "sectionScores": Array [
+           Object {
+             "displayName": "First section",
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index d9c00dd..8588055 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -51,7 +51,7 @@ describe('DatesTab', () => {
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
+   function setMetadata(attributes, options) {
+-    courseMetadata = Factory.build('courseHomeMetadata', { id: courseId, ...attributes }, options);
++    courseMetadata = Factory.build('courseHomeMetadata', attributes, options);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   }
+ 
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 5316731..5fc5b99 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -28,7 +28,7 @@ jest.mock('@edx/frontend-platform/analytics');
+ describe('Outline Tab', () => {
+   let axiosMock;
+ 
+-  const courseId = 'course-v1:edX+Test+run';
++  const courseId = 'course-v1:edX+DemoX+Demo_Course';
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+   const enrollmentUrl = `${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`;
+@@ -38,11 +38,11 @@ describe('Outline Tab', () => {
+   const proctoringInfoUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=${encodeURIComponent(courseId)}&username=MockUser`;
+ 
+   const store = initializeStore();
+-  const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
++  const defaultMetadata = Factory.build('courseHomeMetadata');
+   const defaultTabData = Factory.build('outlineTabData');
+ 
+   function setMetadata(attributes, options) {
+-    const courseMetadata = Factory.build('courseHomeMetadata', { id: courseId, ...attributes }, options);
++    const courseMetadata = Factory.build('courseHomeMetadata', attributes, options);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   }
+ 
+@@ -785,7 +785,7 @@ describe('Outline Tab', () => {
+         expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+         expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_outline.certificate_alert_request_cert_button.clicked',
+           {
+-            courserun_key: 'course-v1:edX+Test+run',
++            courserun_key: courseId,
+             is_staff: false,
+             org_key: 'edX',
+           });
+@@ -829,7 +829,7 @@ describe('Outline Tab', () => {
+         expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+         expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_outline.certificate_alert_downloadable_button.clicked',
+           {
+-            courserun_key: 'course-v1:edX+Test+run',
++            courserun_key: courseId,
+             is_staff: false,
+             org_key: 'edX',
+           });
+@@ -873,7 +873,7 @@ describe('Outline Tab', () => {
+         expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+         expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_outline.certificate_alert_unverified_button.clicked',
+           {
+-            courserun_key: 'course-v1:edX+Test+run',
++            courserun_key: courseId,
+             is_staff: false,
+             org_key: 'edX',
+           });
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index fa6c38e..e3824fa 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -21,18 +21,18 @@ jest.mock('@edx/frontend-platform/analytics');
+ describe('Progress Tab', () => {
+   let axiosMock;
+ 
+-  const courseId = 'course-v1:edX+Test+run';
++  const store = initializeStore();
++  const defaultMetadata = Factory.build('courseHomeMetadata');
++  const defaultTabData = Factory.build('progressTabData');
++
++  const courseId = defaultMetadata.id;
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+   const progressUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/course_home/progress/*`);
+   const masqueradeUrl = `${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`;
+ 
+-  const store = initializeStore();
+-  const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+-  const defaultTabData = Factory.build('progressTabData');
+-
+   function setMetadata(attributes, options) {
+-    const courseMetadata = Factory.build('courseHomeMetadata', { id: courseId, ...attributes }, options);
++    const courseMetadata = Factory.build('courseHomeMetadata', attributes, options);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   }
+ 
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 465266d..05d65da 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -425,7 +425,6 @@ describe('CoursewareContainer', () => {
+           error_code: errorCode,
+           additional_context_user_message: 'uhoh oh no', // only used by audit_expired
+         },
+-        id: courseMetadata.id,
+       });
+ 
+       const courseId = courseMetadata.id;
+diff --git a/src/courseware/course/NotificationTray.test.jsx b/src/courseware/course/NotificationTray.test.jsx
+index 6d688bd..12a1d07 100644
+--- a/src/courseware/course/NotificationTray.test.jsx
++++ b/src/courseware/course/NotificationTray.test.jsx
+@@ -22,14 +22,12 @@ describe('NotificationTray', () => {
+   let axiosMock;
+   let store;
+ 
+-  const courseId = 'course-v1:edX+DemoX+Demo_Course';
+-
+-  const defaultMetadata = Factory.build('courseMetadata', { id: courseId });
++  const defaultMetadata = Factory.build('courseMetadata');
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${defaultMetadata.id}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
+   function setMetadata(attributes, options) {
+-    const courseMetadata = Factory.build('courseMetadata', { id: courseId, ...attributes }, options);
++    const courseMetadata = Factory.build('courseMetadata', attributes, options);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   }
+ 
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 7e89e82..de4761a 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -108,7 +108,7 @@ describe('Sequence', () => {
+       expect(screen.queryByText('The due date for this assignment has passed.')).toBeInTheDocument();
+     });
+     expect(screen.getByRole('link', { name: 'progress page' }))
+-      .toHaveAttribute('href', 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress');
++      .toHaveAttribute('href', 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/progress');
+ 
+     // No normal content or navigation should be rendered. Just the above alert.
+     expect(screen.queryAllByRole('button').length).toEqual(0);
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.jsx b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+index c819f3d..0866d29 100644
+--- a/src/courseware/course/sequence/honor-code/HonorCode.jsx
++++ b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+@@ -12,7 +12,10 @@ import messages from './messages';
+ 
+ function HonorCode({ intl, courseId }) {
+   const dispatch = useDispatch();
+-  const coursewareMetaData = useModel('courseHomeMeta', courseId);
++  const {
++    isMasquerading,
++    username,
++  } = useModel('courseHomeMeta', courseId);
+   const authUser = getAuthenticatedUser();
+   const siteName = getConfig().SITE_NAME;
+   const honorCodeUrl = `${getConfig().TERMS_OF_SERVICE_URL}#honor-code`;
+@@ -26,7 +29,7 @@ function HonorCode({ intl, courseId }) {
+     // Otherwise, even for staff users, we want to record the signature.
+     saveIntegritySignature(
+       courseId,
+-      coursewareMetaData.isMasquerading && coursewareMetaData.username !== authUser.username,
++      isMasquerading && username !== authUser.username,
+     ),
+   );
+ 
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 6fbd80c..0e746c3 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -204,7 +204,9 @@ export function fetchCourse(courseId) {
+       if (!fetchedMetadata) {
+         logError(courseMetadataResult.reason);
+       }
+-
++      if (!fetchedCourseHomeMetadata) {
++        logError(courseHomeMetadataResult.reason);
++      }
+       if (fetchedMetadata && fetchedCourseHomeMetadata) {
+         if (courseHomeMetadataResult.value.courseAccess.hasAccess && fetchedBlocks) {
+           // User has access
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+index 9f5149a..561f379 100644
+--- a/src/product-tours/ProductTours.test.jsx
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -32,10 +32,10 @@ const popperMock = jest.spyOn(popper, 'createPopper');
+ describe('Course Home Tours', () => {
+   let axiosMock;
+ 
+-  const courseId = 'course-v1:edX+Test+run';
++  const courseId = 'course-v1:edX+DemoX+Demo_Course';
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+-  const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
++  const defaultMetadata = Factory.build('courseHomeMetadata');
+ 
+   const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+   const tourDataUrl = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/MockUser`;
+@@ -45,7 +45,7 @@ describe('Course Home Tours', () => {
+   const defaultTabData = Factory.build('outlineTabData');
+ 
+   function setMetadata(attributes, options) {
+-    const courseMetadata = Factory.build('courseHomeMetadata', { id: courseId, ...attributes }, options);
++    const courseMetadata = Factory.build('courseHomeMetadata', attributes, options);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   }
+ 
+@@ -272,7 +272,7 @@ describe('Courseware Tour', () => {
+       const courseMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`);
+       axiosMock.onGet(courseMetadataUrl).reply(200, defaultCourseMetadata);
+ 
+-      const defaultCourseHomeMetadata = Factory.build('courseHomeMetadata', { id: courseId, courseId });
++      const defaultCourseHomeMetadata = Factory.build('courseHomeMetadata');
+       const courseHomeMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`);
+       axiosMock.onGet(courseHomeMetadataUrl).reply(200, defaultCourseHomeMetadata);
+ 
+diff --git a/src/setupTest.js b/src/setupTest.js
+index c38ddbd..63bb0e1 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -31,7 +31,7 @@ class MockLoggingService {
+   logInfo = jest.fn(infoString => console.log(infoString));
+ 
+   // eslint-disable-next-line no-console
+-  logError = jest.fn(infoString => console.log(infoString));
++  logError = jest.fn(errorString => console.log(errorString));
+ }
+ 
+ window.getComputedStyle = jest.fn(() => ({
+diff --git a/src/shared/data/__factories__/courseMetadataBase.factory.js b/src/shared/data/__factories__/courseMetadataBase.factory.js
+index 440a470..b379dee 100644
+--- a/src/shared/data/__factories__/courseMetadataBase.factory.js
++++ b/src/shared/data/__factories__/courseMetadataBase.factory.js
+@@ -7,7 +7,7 @@ import './tab.factory';
+ export default new Factory()
+   .option('host')
+   .attrs({
+-    id: 'course-v1:edX+DemoX+Demo_Course_1',
++    id: 'course-v1:edX+DemoX+Demo_Course',
+     is_staff: false,
+     original_user_is_staff: false,
+     number: 'DemoX',
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index edc01ff..fd14d2a 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -155,7 +155,7 @@ function StreakModal({
+       title={title}
+       onClose={() => {
+         closeStreakCelebration();
+-        recordModalClosing('courseHomeMeta', celebrations, org, courseId, dispatch);
++        recordModalClosing(celebrations, org, courseId, dispatch);
+       }}
+       isOpen={isStreakCelebrationOpen}
+       isFullscreenScroll
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index 0ac9782..9528ab3 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -23,7 +23,7 @@ describe('Loaded Tab Page', () => {
+   let axiosMock;
+   const calculateUrl = `${getConfig().ECOMMERCE_BASE_URL}/api/v2/baskets/calculate/?code=ZGY11119949&sku=8CF08E5&username=MockUser`;
+   const courseMetadata = Factory.build('courseMetadata', { celebrations: { streak_length_to_celebrate: 3 } });
+-  const courseHomeMetadata = Factory.build('courseHomeMetadata', { id: courseMetadata.id, courseId: courseMetadata.courseId });
++  const courseHomeMetadata = Factory.build('courseHomeMetadata');
+ 
+   function setDiscount(percent) {
+     mockData.streakDiscountCouponEnabled = true;
+diff --git a/src/shared/streak-celebration/utils.jsx b/src/shared/streak-celebration/utils.jsx
+index 026d256..a96b4fb 100644
+--- a/src/shared/streak-celebration/utils.jsx
++++ b/src/shared/streak-celebration/utils.jsx
+@@ -13,10 +13,10 @@ function recordStreakCelebration(org, courseId) {
+   });
+ }
+ 
+-function recordModalClosing(metadataModel, celebrations, org, courseId, dispatch) {
++function recordModalClosing(celebrations, org, courseId, dispatch) {
+   // Ensure we only celebrate each streak once
+   dispatch(updateModel({
+-    modelType: metadataModel,
++    modelType: 'courseHomeMeta',
+     model: {
+       id: courseId,
+       celebrations: { ...celebrations, streakLengthToCelebrate: null },
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+index ac3bdaa..54d59c3 100644
+--- a/src/tab-page/LoadedTabPage.test.jsx
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -25,12 +25,7 @@ describe('Loaded Tab Page', () => {
+ 
+   it('shows Instructor Toolbar if original user is staff', async () => {
+     const courseMetadata = Factory.build('courseMetadata', { original_user_is_staff: true });
+-    const courseHomeMetadata = Factory.build('courseHomeMetadata', {
+-      courseId: courseMetadata.id,
+-      // need to synchronize the id with the courseMetadata because it is autoincremented by courseMetadataBase
+-      id: courseMetadata.id,
+-      original_user_is_staff: true,
+-    });
++    const courseHomeMetadata = Factory.build('courseHomeMetadata', { original_user_is_staff: true });
+     const testStore = await initializeTestStore(
+       {
+         courseMetadata,
+-- 
+2.34.1
+

@@ -1,0 +1,488 @@
+From a614145e6de84266df933a6a2fb11c9eab9ed2f7 Mon Sep 17 00:00:00 2001
+From: Diane Kaplan <dianekaplan@gmail.com>
+Date: Wed, 25 Aug 2021 13:08:23 -0400
+Subject: [PATCH 0627/1021] REV-2297: add NotificationTray red dot
+ functionality, so learner notices new prompt
+
+---
+ src/courseware/course/Course.jsx              | 25 +++++++
+ src/courseware/course/NotificationTray.jsx    | 13 +++-
+ src/courseware/course/NotificationTrigger.jsx | 29 ++++++--
+ .../course/NotificationTrigger.test.jsx       | 44 ++++++++++--
+ src/courseware/course/sequence/Sequence.jsx   | 18 +++++
+ .../UpgradeNotification.jsx                   | 71 +++++++++++++++++--
+ 6 files changed, 185 insertions(+), 15 deletions(-)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 162fd7a..748d8a4 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -15,6 +15,7 @@ import NotificationTrigger from './NotificationTrigger';
+ 
+ import { useModel } from '../../generic/model-store';
+ import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWindowSize';
++import { getLocalStorage, setLocalStorage } from '../../data/localStorage';
+ 
+ /** [MM-P2P] Experiment */
+ import { initCoursewareMMP2P, MMP2PBlockModal } from '../../experiments/mm-p2p';
+@@ -60,6 +61,22 @@ function Course({
+     if (notificationTrayVisible) { setNotificationTray(false); } else { setNotificationTray(true); }
+   };
+ 
++  if (!getLocalStorage('notificationStatus')) {
++    setLocalStorage('notificationStatus', 'active'); // Show red dot on notificationTrigger until seen
++  }
++
++  if (!getLocalStorage('upgradeNotificationCurrentState')) {
++    setLocalStorage('upgradeNotificationCurrentState', 'initialize');
++  }
++
++  const [notificationStatus, setNotificationStatus] = useState(getLocalStorage('notificationStatus'));
++  const [upgradeNotificationCurrentState, setupgradeNotificationCurrentState] = useState(getLocalStorage('upgradeNotificationCurrentState'));
++
++  const onNotificationSeen = () => {
++    setNotificationStatus('inactive');
++    setLocalStorage('notificationStatus', 'inactive');
++  };
++
+   /** [MM-P2P] Experiment */
+   const MMP2P = initCoursewareMMP2P(courseId, sequenceId, unitId);
+ 
+@@ -81,6 +98,9 @@ function Course({
+           <NotificationTrigger
+             toggleNotificationTray={toggleNotificationTray}
+             isNotificationTrayVisible={isNotificationTrayVisible}
++            notificationStatus={notificationStatus}
++            setNotificationStatus={setNotificationStatus}
++            upgradeNotificationCurrentState={upgradeNotificationCurrentState}
+           />
+         ) : null}
+       </div>
+@@ -96,6 +116,11 @@ function Course({
+         toggleNotificationTray={toggleNotificationTray}
+         isNotificationTrayVisible={isNotificationTrayVisible}
+         notificationTrayVisible={notificationTrayVisible}
++        notificationStatus={notificationStatus}
++        setNotificationStatus={setNotificationStatus}
++        onNotificationSeen={onNotificationSeen}
++        upgradeNotificationCurrentState={upgradeNotificationCurrentState}
++        setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+         //* * [MM-P2P] Experiment */
+         mmp2p={MMP2P}
+       />
+diff --git a/src/courseware/course/NotificationTray.jsx b/src/courseware/course/NotificationTray.jsx
+index bb5fef1..0d284dc 100644
+--- a/src/courseware/course/NotificationTray.jsx
++++ b/src/courseware/course/NotificationTray.jsx
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import React, { useEffect } from 'react';
+ import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+@@ -12,7 +12,7 @@ import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWind
+ import UpgradeNotification from '../../generic/upgrade-notification/UpgradeNotification';
+ 
+ function NotificationTray({
+-  intl, toggleNotificationTray,
++  intl, toggleNotificationTray, onNotificationSeen, upgradeNotificationCurrentState, setupgradeNotificationCurrentState,
+ }) {
+   const {
+     courseId,
+@@ -32,6 +32,9 @@ function NotificationTray({
+ 
+   const shouldDisplayFullScreen = useWindowSize().width < responsiveBreakpoints.large.minWidth;
+ 
++  // After three seconds, update notificationSeen (to hide red dot)
++  useEffect(() => { setTimeout(onNotificationSeen, 3000); }, []);
++
+   return (
+     <section className={classNames('notification-tray-container ml-0 ml-lg-4', { 'no-notification': !verifiedMode && !shouldDisplayFullScreen })} aria-label={intl.formatMessage(messages.notificationTray)}>
+       {shouldDisplayFullScreen ? (
+@@ -64,6 +67,8 @@ function NotificationTray({
+             timeOffsetMillis={timeOffsetMillis}
+             courseId={courseId}
+             org={org}
++            upgradeNotificationCurrentState={upgradeNotificationCurrentState}
++            setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+           />
+         ) : <p className="notification-tray-content">{intl.formatMessage(messages.noNotificationsMessage)}</p>}
+       </div>
+@@ -74,10 +79,14 @@ function NotificationTray({
+ NotificationTray.propTypes = {
+   intl: intlShape.isRequired,
+   toggleNotificationTray: PropTypes.func,
++  onNotificationSeen: PropTypes.func,
++  upgradeNotificationCurrentState: PropTypes.string.isRequired,
++  setupgradeNotificationCurrentState: PropTypes.func.isRequired,
+ };
+ 
+ NotificationTray.defaultProps = {
+   toggleNotificationTray: null,
++  onNotificationSeen: null,
+ };
+ 
+ export default injectIntl(NotificationTray);
+diff --git a/src/courseware/course/NotificationTrigger.jsx b/src/courseware/course/NotificationTrigger.jsx
+index 3486ae4..f679953 100644
+--- a/src/courseware/course/NotificationTrigger.jsx
++++ b/src/courseware/course/NotificationTrigger.jsx
+@@ -1,12 +1,31 @@
+-import React from 'react';
++import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { getLocalStorage, setLocalStorage } from '../../data/localStorage';
+ 
+ import NotificationIcon from './NotificationIcon';
+ import messages from './messages';
+ 
+-function NotificationTrigger({ intl, toggleNotificationTray, isNotificationTrayVisible }) {
++function NotificationTrigger({
++  intl, toggleNotificationTray, isNotificationTrayVisible, notificationStatus, setNotificationStatus,
++  upgradeNotificationCurrentState,
++}) {
++  /* Re-show a red dot beside the notification trigger for each of the 7 UpgradeNotification stages
++   The upgradeNotificationCurrentState prop will be available after UpgradeNotification mounts. Once available,
++  compare with the last state they've seen, and if it's different then set dot back to red */
++  function UpdateUpgradeNotificationLastSeen() {
++    if (upgradeNotificationCurrentState) {
++      if (getLocalStorage('upgradeNotificationLastSeen') !== upgradeNotificationCurrentState) {
++        setNotificationStatus('active');
++        setLocalStorage('notificationStatus', 'active');
++        setLocalStorage('upgradeNotificationLastSeen', upgradeNotificationCurrentState);
++      }
++    }
++  }
++
++  useEffect(() => { UpdateUpgradeNotificationLastSeen(); });
++
+   return (
+     <button
+       className={classNames('notification-trigger-btn', { 'trigger-active': isNotificationTrayVisible() })}
+@@ -14,8 +33,7 @@ function NotificationTrigger({ intl, toggleNotificationTray, isNotificationTrayV
+       onClick={() => { toggleNotificationTray(); }}
+       aria-label={intl.formatMessage(messages.openNotificationTrigger)}
+     >
+-      {/* REV-2297 TODO: add logic for status "active" if red dot should display */}
+-      <NotificationIcon status="inactive" notificationColor="bg-danger-500" />
++      <NotificationIcon status={notificationStatus} notificationColor="bg-danger-500" />
+     </button>
+   );
+ }
+@@ -23,7 +41,10 @@ function NotificationTrigger({ intl, toggleNotificationTray, isNotificationTrayV
+ NotificationTrigger.propTypes = {
+   intl: intlShape.isRequired,
+   toggleNotificationTray: PropTypes.func.isRequired,
++  notificationStatus: PropTypes.string.isRequired,
++  setNotificationStatus: PropTypes.func.isRequired,
+   isNotificationTrayVisible: PropTypes.func.isRequired,
++  upgradeNotificationCurrentState: PropTypes.string.isRequired,
+ };
+ 
+ export default injectIntl(NotificationTrigger);
+diff --git a/src/courseware/course/NotificationTrigger.test.jsx b/src/courseware/course/NotificationTrigger.test.jsx
+index 32cbab7..e48588c 100644
+--- a/src/courseware/course/NotificationTrigger.test.jsx
++++ b/src/courseware/course/NotificationTrigger.test.jsx
+@@ -4,27 +4,51 @@ import {
+   render, initializeTestStore, screen, fireEvent,
+ } from '../../setupTest';
+ import NotificationTrigger from './NotificationTrigger';
++import { getLocalStorage } from '../../data/localStorage';
+ 
+ describe('Notification Trigger', () => {
+   let mockData;
++  // let mockDataSameState;
++  // let mockDataDifferentState;
+   const courseMetadata = Factory.build('courseMetadata');
+ 
+-  beforeAll(async () => {
++  beforeEach(async () => {
+     await initializeTestStore({ courseMetadata, excludeFetchCourse: true, excludeFetchSequence: true });
+     mockData = {
+       toggleNotificationTray: () => {},
+       isNotificationTrayVisible: () => {},
++      notificationStatus: 'active',
++      setNotificationStatus: () => {},
++      upgradeNotificationCurrentState: 'FPDdaysLeft',
+     };
+   });
+ 
+-  it('renders notification trigger with icon', async () => {
++  it('renders notification trigger icon with red dot when notificationStatus is active', async () => {
+     const { container } = render(<NotificationTrigger {...mockData} />);
+     expect(container).toBeInTheDocument();
+     const buttonIcon = container.querySelectorAll('svg');
+     expect(buttonIcon).toHaveLength(1);
++    expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
++  });
++
++  it('renders notification trigger icon WITHOUT red dot 3 seconds later', async () => {
++    const { container } = render(<NotificationTrigger {...mockData} />);
++    expect(container).toBeInTheDocument();
++    jest.useFakeTimers();
++    setTimeout(() => {
++      expect(screen.queryByRole('notification-dot')).not.toBeInTheDocument();
++    }, 3000);
++    jest.runAllTimers();
++  });
+ 
+-    // REV-2297 TODO: update below test once the status=active or inactive is implemented
+-    // expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
++  it('renders notification trigger icon WITHOUT red dot within the same phase', async () => {
++    const { container } = render(
++      <NotificationTrigger {...mockData} upgradeNotificationCurrentState="sameState" upgradeNotificationLastSeen="sameState" />,
++    );
++    expect(container).toBeInTheDocument();
++    const buttonIcon = container.querySelectorAll('svg');
++    expect(buttonIcon).toHaveLength(1);
++    expect(screen.queryByRole('notification-dot')).not.toBeInTheDocument();
+   });
+ 
+   it('handles onClick event toggling the notification tray', async () => {
+@@ -40,4 +64,16 @@ describe('Notification Trigger', () => {
+     fireEvent.click(notificationTrigger);
+     expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
+   });
++
++  // rendering NotificationTrigger has the effect of calling UpdateUpgradeNotificationLastSeen()
++  // Verify that local storage was updated accordingly
++  it('we make the right updates when rendering a new phase (before -> after)', async () => {
++    const { container } = render(
++      <NotificationTrigger {...mockData} upgradeNotificationLastSeen="before" upgradeNotificationCurrentState="after" />,
++    );
++    expect(container).toBeInTheDocument();
++
++    expect(getLocalStorage('notificationStatus')).toBe('active');
++    expect(getLocalStorage('upgradeNotificationLastSeen')).toBe('after');
++  });
+ });
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index c7b0090..684b8b6 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -40,6 +40,11 @@ function Sequence({
+   toggleNotificationTray,
+   notificationTrayVisible,
+   isNotificationTrayVisible,
++  notificationStatus,
++  setNotificationStatus,
++  onNotificationSeen,
++  upgradeNotificationCurrentState,
++  setupgradeNotificationCurrentState,
+   mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+@@ -194,6 +199,9 @@ function Sequence({
+           <NotificationTrigger
+             toggleNotificationTray={toggleNotificationTray}
+             isNotificationTrayVisible={isNotificationTrayVisible}
++            notificationStatus={notificationStatus}
++            setNotificationStatus={setNotificationStatus}
++            upgradeNotificationCurrentState={upgradeNotificationCurrentState}
+           />
+         ) : null}
+ 
+@@ -229,6 +237,10 @@ function Sequence({
+         <NotificationTray
+           toggleNotificationTray={toggleNotificationTray}
+           notificationTrayVisible={notificationTrayVisible}
++          notificationStatus={notificationStatus}
++          onNotificationSeen={onNotificationSeen}
++          upgradeNotificationCurrentState={upgradeNotificationCurrentState}
++          setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+         />
+       ) : null }
+ 
+@@ -276,6 +288,11 @@ Sequence.propTypes = {
+   toggleNotificationTray: PropTypes.func,
+   notificationTrayVisible: PropTypes.bool,
+   isNotificationTrayVisible: PropTypes.func,
++  notificationStatus: PropTypes.string.isRequired,
++  setNotificationStatus: PropTypes.func.isRequired,
++  onNotificationSeen: PropTypes.func,
++  upgradeNotificationCurrentState: PropTypes.string.isRequired,
++  setupgradeNotificationCurrentState: PropTypes.func.isRequired,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+@@ -297,6 +314,7 @@ Sequence.defaultProps = {
+   toggleNotificationTray: null,
+   notificationTrayVisible: null,
+   isNotificationTrayVisible: null,
++  onNotificationSeen: null,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: {
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+index 935a51f..8d124ee 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { FormattedDate, FormattedMessage, injectIntl } from '@edx/frontend-platform/i18n';
+ import { getConfig } from '@edx/frontend-platform';
++import { setLocalStorage } from '../../data/localStorage';
+ 
+ import { UpgradeButton } from '../upgrade-button';
+ 
+@@ -184,10 +185,20 @@ UpsellFBESoonCardContent.defaultProps = {
+   timezoneFormatArgs: {},
+ };
+ 
+-function ExpirationCountdown({ hoursToExpiration }) {
++function ExpirationCountdown({ hoursToExpiration, setupgradeNotificationCurrentState, type }) {
+   let expirationText;
+-
+   if (hoursToExpiration >= 24) {
++    // setupgradeNotificationCurrentState is available in NotificationTray (not course home)
++    if (setupgradeNotificationCurrentState) {
++      if (type === 'access') {
++        setupgradeNotificationCurrentState('accessDaysLeft');
++        setLocalStorage('upgradeNotificationCurrentState', 'accessDaysLeft');
++      }
++      if (type === 'offer') {
++        setupgradeNotificationCurrentState('FPDdaysLeft');
++        setLocalStorage('upgradeNotificationCurrentState', 'FPDdaysLeft');
++      }
++    }
+     expirationText = (
+       <FormattedMessage
+         id="learning.generic.upgradeNotification.expirationDays"
+@@ -200,6 +211,17 @@ function ExpirationCountdown({ hoursToExpiration }) {
+       />
+     );
+   } else if (hoursToExpiration >= 1) {
++    // setupgradeNotificationCurrentState is available in NotificationTray (not course home)
++    if (setupgradeNotificationCurrentState) {
++      if (type === 'access') {
++        setupgradeNotificationCurrentState('accessHoursLeft');
++        setLocalStorage('upgradeNotificationCurrentState', 'accessHoursLeft');
++      }
++      if (type === 'offer') {
++        setupgradeNotificationCurrentState('FPDHoursLeft');
++        setLocalStorage('upgradeNotificationCurrentState', 'FPDHoursLeft');
++      }
++    }
+     expirationText = (
+       <FormattedMessage
+         id="learning.generic.upgradeNotification.expirationHours"
+@@ -212,6 +234,17 @@ function ExpirationCountdown({ hoursToExpiration }) {
+       />
+     );
+   } else {
++    // setupgradeNotificationCurrentState is available in NotificationTray (not course home)
++    if (setupgradeNotificationCurrentState) {
++      if (type === 'access') {
++        setupgradeNotificationCurrentState('accessLastHour');
++        setLocalStorage('upgradeNotificationCurrentState', 'accessLastHour');
++      }
++      if (type === 'offer') {
++        setupgradeNotificationCurrentState('FPDLastHour');
++        setLocalStorage('upgradeNotificationCurrentState', 'FPDLastHour');
++      }
++    }
+     expirationText = (
+       <FormattedMessage
+         id="learning.generic.upgradeNotification.expirationMinutes"
+@@ -224,9 +257,19 @@ function ExpirationCountdown({ hoursToExpiration }) {
+ 
+ ExpirationCountdown.propTypes = {
+   hoursToExpiration: PropTypes.number.isRequired,
++  setupgradeNotificationCurrentState: PropTypes.func,
++  type: PropTypes.string,
++};
++ExpirationCountdown.defaultProps = {
++  setupgradeNotificationCurrentState: null,
++  type: null,
+ };
+ 
+-function AccessExpirationDateBanner({ accessExpirationDate, timezoneFormatArgs }) {
++function AccessExpirationDateBanner({ accessExpirationDate, timezoneFormatArgs, setupgradeNotificationCurrentState }) {
++  if (setupgradeNotificationCurrentState) {
++    setupgradeNotificationCurrentState('accessDateView');
++    setLocalStorage('upgradeNotificationCurrentState', 'accessDateView');
++  }
+   return (
+     <div className="upsell-warning-light">
+       <FormattedMessage
+@@ -253,10 +296,12 @@ AccessExpirationDateBanner.propTypes = {
+   timezoneFormatArgs: PropTypes.shape({
+     timeZone: PropTypes.string,
+   }),
++  setupgradeNotificationCurrentState: PropTypes.func,
+ };
+ 
+ AccessExpirationDateBanner.defaultProps = {
+   timezoneFormatArgs: {},
++  setupgradeNotificationCurrentState: null,
+ };
+ 
+ function UpgradeNotification({
+@@ -265,6 +310,7 @@ function UpgradeNotification({
+   courseId,
+   offer,
+   org,
++  setupgradeNotificationCurrentState,
+   shouldDisplayBorder,
+   timeOffsetMillis,
+   upsellPageName,
+@@ -340,7 +386,13 @@ function UpgradeNotification({
+             }}
+           />
+         );
+-        expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToDiscountExpiration} />;
++        expirationBanner = (
++          <ExpirationCountdown
++            hoursToExpiration={hoursToDiscountExpiration}
++            setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
++            type="offer"
++          />
++        );
+       } else {
+         upgradeNotificationHeaderText = (
+           <FormattedMessage
+@@ -352,6 +404,7 @@ function UpgradeNotification({
+           <AccessExpirationDateBanner
+             accessExpirationDate={accessExpirationDate}
+             timezoneFormatArgs={timezoneFormatArgs}
++            setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+           />
+         );
+       }
+@@ -363,7 +416,13 @@ function UpgradeNotification({
+           defaultMessage="Course Access Expiration"
+         />
+       );
+-      expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToAccessExpiration} />;
++      expirationBanner = (
++        <ExpirationCountdown
++          hoursToExpiration={hoursToAccessExpiration}
++          setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
++          type="access"
++        />
++      );
+       upsellMessage = (
+         <UpsellFBESoonCardContent
+           accessExpirationDate={accessExpirationDate}
+@@ -429,6 +488,7 @@ UpgradeNotification.propTypes = {
+     code: PropTypes.string,
+   }),
+   shouldDisplayBorder: PropTypes.bool,
++  setupgradeNotificationCurrentState: PropTypes.func,
+   timeOffsetMillis: PropTypes.number,
+   upsellPageName: PropTypes.string.isRequired,
+   userTimezone: PropTypes.string,
+@@ -443,6 +503,7 @@ UpgradeNotification.defaultProps = {
+   accessExpiration: null,
+   contentTypeGatingEnabled: false,
+   offer: null,
++  setupgradeNotificationCurrentState: null,
+   shouldDisplayBorder: null,
+   timeOffsetMillis: 0,
+   userTimezone: null,
+-- 
+2.34.1
+

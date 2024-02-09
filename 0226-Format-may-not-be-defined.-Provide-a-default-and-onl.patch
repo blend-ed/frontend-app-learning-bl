@@ -1,0 +1,45 @@
+From a975b8ae70cb117e605a92310f19011eb320ec5a Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Wed, 12 Aug 2020 09:49:21 -0700
+Subject: [PATCH 0226/1021] Format may not be defined. Provide a default and
+ only add to URL if it exists (#178)
+
+---
+ src/courseware/course/sequence/Unit.jsx | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 2023b22..ff43094 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -57,7 +57,10 @@ function Unit({
+   id,
+   intl,
+ }) {
+-  const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0&format=${format}`;
++  let iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0`;
++  if (format) {
++    iframeUrl += `&format=${format}`;
++  }
+ 
+   const [iframeHeight, setIframeHeight] = useState(0);
+   const [hasLoaded, setHasLoaded] = useState(false);
+@@ -151,13 +154,14 @@ function Unit({
+ 
+ Unit.propTypes = {
+   courseId: PropTypes.string.isRequired,
+-  format: PropTypes.string.isRequired,
++  format: PropTypes.string,
+   id: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
+   onLoaded: PropTypes.func,
+ };
+ 
+ Unit.defaultProps = {
++  format: null,
+   onLoaded: undefined,
+ };
+ 
+-- 
+2.34.1
+

@@ -1,0 +1,54 @@
+From 8a7c61b64aaca5b991de2f9b0dd81017d2c4ac3d Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Thu, 22 Apr 2021 12:04:13 -0700
+Subject: [PATCH 0431/1021] feat: Switch to default values for 12 vs 24 hour
+ time. (#420)
+
+Our current version on react-intl doesn't support hourCycle
+anyway and after speaking to product, we feel comfortable with
+letting it default based on locale.
+---
+ src/course-home/outline-tab/SequenceLink.jsx                     | 1 -
+ .../outline-tab/alerts/course-end-alert/CourseEndAlert.jsx       | 1 -
+ .../outline-tab/alerts/course-start-alert/CourseStartAlert.jsx   | 1 -
+ 3 files changed, 3 deletions(-)
+
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index 96c1c6d..0aa5d5a 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -96,7 +96,6 @@ function SequenceLink({
+                       day="numeric"
+                       month="short"
+                       year="numeric"
+-                      hourCycle="h23"
+                       timeZoneName="short"
+                       value={due}
+                       {...timezoneFormatArgs}
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+index b329823..ee2fd80 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+@@ -37,7 +37,6 @@ function CourseEndAlert({ payload }) {
+         day="numeric"
+         month="short"
+         year="numeric"
+-        hourCycle="h23"
+         timeZoneName="short"
+         value={endDate}
+         {...timezoneFormatArgs}
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+index 873ac5b..51db209 100644
+--- a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+@@ -42,7 +42,6 @@ function CourseStartAlert({ payload }) {
+                 day="numeric"
+                 month="short"
+                 year="numeric"
+-                hourCycle="h23"
+                 timeZoneName="short"
+                 value={startDate}
+                 {...timezoneFormatArgs}
+-- 
+2.34.1
+

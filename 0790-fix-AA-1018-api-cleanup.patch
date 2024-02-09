@@ -1,0 +1,104 @@
+From 99cf1f9f0678312def20591006d211b9f7ded9e5 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 25 Jan 2022 14:27:42 -0500
+Subject: [PATCH 0790/1021] fix: [AA-1018] api cleanup
+
+refactor - remove 'slice' prom from TabContainer.jsx
+---
+ src/index.jsx                      |  2 +-
+ src/tab-page/TabContainer.jsx      |  6 ++----
+ src/tab-page/TabContainer.test.jsx | 13 ++++++++-----
+ 3 files changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/src/index.jsx b/src/index.jsx
+index 280855d..1705408 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -66,7 +66,7 @@ subscribe(APP_READY, () => {
+                 )}
+               />
+               <PageRoute path="/course/:courseId/course-end">
+-                <TabContainer tab="courseware" fetch={fetchCourse} slice="courseHome">
++                <TabContainer tab="courseware" fetch={fetchCourse}>
+                   <CourseExit />
+                 </TabContainer>
+               </PageRoute>
+diff --git a/src/tab-page/TabContainer.jsx b/src/tab-page/TabContainer.jsx
+index 4961d37..51a349a 100644
+--- a/src/tab-page/TabContainer.jsx
++++ b/src/tab-page/TabContainer.jsx
+@@ -10,7 +10,6 @@ export default function TabContainer(props) {
+   const {
+     children,
+     fetch,
+-    slice,
+     tab,
+   } = props;
+ 
+@@ -26,14 +25,14 @@ export default function TabContainer(props) {
+   const {
+     courseId,
+     courseStatus,
+-  } = useSelector(state => state[slice]);
++  } = useSelector(state => state.courseHome);
+ 
+   return (
+     <TabPage
+       activeTabSlug={tab}
+       courseId={courseId}
+       courseStatus={courseStatus}
+-      metadataModel={`${slice}Meta`}
++      metadataModel="courseHomeMeta"
+     >
+       {courseId && <OuterExamTimer courseId={courseId} />}
+       {children}
+@@ -44,6 +43,5 @@ export default function TabContainer(props) {
+ TabContainer.propTypes = {
+   children: PropTypes.node.isRequired,
+   fetch: PropTypes.func.isRequired,
+-  slice: PropTypes.string.isRequired,
+   tab: PropTypes.string.isRequired,
+ };
+diff --git a/src/tab-page/TabContainer.test.jsx b/src/tab-page/TabContainer.test.jsx
+index 55c81fa..099d92f 100644
+--- a/src/tab-page/TabContainer.test.jsx
++++ b/src/tab-page/TabContainer.test.jsx
+@@ -20,10 +20,8 @@ describe('Tab Container', () => {
+   beforeEach(async () => {
+     mockFetch = jest.fn().mockImplementation((x) => x);
+     mockData = {
+-      children: [],
+       fetch: mockFetch,
+       tab: 'dummy',
+-      slice: 'courseware',
+     };
+     const store = await initializeTestStore({ excludeFetchSequence: true });
+     courseId = store.getState().courseware.courseId;
+@@ -33,7 +31,9 @@ describe('Tab Container', () => {
+     history.push(`/course/${courseId}`);
+     render(
+       <Route path="/course/:courseId">
+-        <TabContainer {...mockData} />
++        <TabContainer {...mockData}>
++          children={[]}
++        </TabContainer>
+       </Route>,
+     );
+ 
+@@ -56,8 +56,11 @@ describe('Tab Container', () => {
+         render={({ match }) => (
+           <TabContainer
+             fetch={() => mockFetch(match.params.courseId, match.params.targetUserId)}
+-            slice="courseHome"
+-          />
++            tab="dummy"
++          >
++            children={[]}
++          </TabContainer>
++
+         )}
+       />,
+     );
+-- 
+2.34.1
+

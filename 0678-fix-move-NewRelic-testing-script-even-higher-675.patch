@@ -1,0 +1,44 @@
+From 1f7cb2cc28d4fa66ea17e28d30a0329984c10016 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 7 Oct 2021 14:44:32 -0400
+Subject: [PATCH 0678/1021] fix: move NewRelic testing script even higher
+ (#675)
+
+Per their docs, this really should be the first script. And we were
+hitting some cloudflare scripts being inserted ahead of us. This
+might fix that.
+---
+ public/index.html | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/public/index.html b/public/index.html
+index ecc04ec..a04aaf8 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -1,11 +1,6 @@
+ <!doctype html>
+ <html lang="en-us">
+   <head>
+-    <title>Course | <%= process.env.SITE_NAME %></title>
+-    <meta charset="utf-8">
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <link rel="shortcut icon" href="<%=htmlWebpackPlugin.options.FAVICON_URL%>" type="image/x-icon" />
+-
+     <% if (process.env.NEW_RELIC_ACCOUNT_ID) { %>
+       <!-- NewRelic agent 1209 -->
+       <script>
+@@ -16,6 +11,11 @@
+       </script>
+     <% } %>
+ 
++    <title>Course | <%= process.env.SITE_NAME %></title>
++    <meta charset="utf-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <link rel="shortcut icon" href="<%=htmlWebpackPlugin.options.FAVICON_URL%>" type="image/x-icon" />
++
+     <% if (htmlWebpackPlugin.options.OPTIMIZELY_PROJECT_ID) { %>
+       <script src="https://www.edx.org/optimizelyjs/<%= htmlWebpackPlugin.options.OPTIMIZELY_PROJECT_ID %>.js"></script>
+     <% } %>
+-- 
+2.34.1
+

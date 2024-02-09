@@ -1,0 +1,621 @@
+From eabbb440f01ffa0362014acc105d22fee87e60f4 Mon Sep 17 00:00:00 2001
+From: Phillip Shiu <pshiu@users.noreply.github.com>
+Date: Wed, 20 Oct 2021 09:47:39 -0400
+Subject: [PATCH 0701/1021] Revert "refactor: create generic bullets to reuse
+ in all upsell messaging (#689)" (#696)
+
+This reverts commit 8735f219e9ef09c7615bba9ce753cd78a7b05a93.
+---
+ .../sequence/lock-paywall/LockPaywall.jsx     |  73 +++++++++--
+ .../sequence/lock-paywall/LockPaywall.scss    |  12 +-
+ .../course/sequence/lock-paywall/messages.js  |  20 +++
+ .../UpgradeNotification.jsx                   | 114 ++++++++++++++++--
+ .../UpgradeNotification.scss                  |  15 ++-
+ .../UpgradeNotification.test.jsx              |  16 +--
+ src/generic/upsell-bullets/UpsellBullets.jsx  | 107 ----------------
+ src/generic/upsell-bullets/UpsellBullets.scss |  13 --
+ .../upsell-bullets/UpsellBullets.test.jsx     |  35 ------
+ src/index.scss                                |   1 -
+ 10 files changed, 215 insertions(+), 191 deletions(-)
+ delete mode 100644 src/generic/upsell-bullets/UpsellBullets.jsx
+ delete mode 100644 src/generic/upsell-bullets/UpsellBullets.scss
+ delete mode 100644 src/generic/upsell-bullets/UpsellBullets.test.jsx
+
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index 3ea40b1..849ff42 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -1,8 +1,10 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faCheck } from '@fortawesome/free-solid-svg-icons';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Alert } from '@edx/paragon';
+ import { Locked } from '@edx/paragon/icons';
+ import messages from './messages';
+@@ -10,12 +12,6 @@ import certificateLocked from '../../../../generic/assets/edX_locked_certificate
+ import { useModel } from '../../../../generic/model-store';
+ import useWindowSize, { responsiveBreakpoints } from '../../../../generic/tabs/useWindowSize';
+ import { UpgradeButton } from '../../../../generic/upgrade-button';
+-import {
+-  VerifiedCertBullet,
+-  UnlockGradedBullet,
+-  FullAccessBullet,
+-  SupportMissionBullet,
+-} from '../../../../generic/upsell-bullets/UpsellBullets';
+ 
+ function LockPaywall({
+   intl,
+@@ -60,6 +56,32 @@ function LockPaywall({
+     });
+   };
+ 
++  const verifiedCertLink = (
++    <Alert.Link
++      href="https://www.edx.org/verified-certificate"
++      target="_blank"
++      rel="noopener noreferrer"
++    >
++      {intl.formatMessage(messages['learn.lockPaywall.list.bullet1.linktext'])}
++    </Alert.Link>
++  );
++
++  const gradedAssignments = (
++    <span className="font-weight-bold">
++      {intl.formatMessage(messages['learn.lockPaywall.list.bullet2.boldtext'])}
++    </span>
++  );
++  const fullAccess = (
++    <span className="font-weight-bold">
++      {intl.formatMessage(messages['learn.lockPaywall.list.bullet3.boldtext'])}
++    </span>
++  );
++  const nonProfitMission = (
++    <span className="font-weight-bold">
++      {intl.formatMessage(messages['learn.lockPaywall.list.bullet4.boldtext'])}
++    </span>
++  );
++
+   return (
+     <Alert variant="light" aria-live="off" icon={Locked} className="lock-paywall-container">
+       <div className="row">
+@@ -87,10 +109,39 @@ function LockPaywall({
+                 {intl.formatMessage(messages['learn.lockPaywall.list.intro'])}
+               </div>
+               <ul className="fa-ul ml-4 pl-2">
+-                <VerifiedCertBullet />
+-                <UnlockGradedBullet />
+-                <FullAccessBullet />
+-                <SupportMissionBullet />
++                <li>
++                  <span className="fa-li"><FontAwesomeIcon icon={faCheck} /></span>
++                  <FormattedMessage
++                    id="gatedContent.paragraph.bulletOne"
++                    defaultMessage="Earn a {verifiedCertLink} of completion to showcase on your resumé"
++                    values={{ verifiedCertLink }}
++                    className="bullet-text"
++                  />
++                </li>
++                <li>
++                  <span className="fa-li"><FontAwesomeIcon icon={faCheck} /></span>
++                  <FormattedMessage
++                    id="gatedContent.paragraph.bulletTwo"
++                    defaultMessage="Unlock access to all course activities, including {gradedAssignments}"
++                    values={{ gradedAssignments }}
++                  />
++                </li>
++                <li>
++                  <span className="fa-li"><FontAwesomeIcon icon={faCheck} /></span>
++                  <FormattedMessage
++                    id="gatedContent.paragraph.bulletThree"
++                    defaultMessage="{fullAccess} to course content and materials, even after the course ends"
++                    values={{ fullAccess }}
++                  />
++                </li>
++                <li>
++                  <span className="fa-li"><FontAwesomeIcon icon={faCheck} /></span>
++                  <FormattedMessage
++                    id="gatedContent.paragraph.bulletFour"
++                    defaultMessage="Support our {nonProfitMission} at edX"
++                    values={{ nonProfitMission }}
++                  />
++                </li>
+               </ul>
+             </div>
+           </div>
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.scss b/src/courseware/course/sequence/lock-paywall/LockPaywall.scss
+index 9638c66..9af9fc3 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.scss
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.scss
+@@ -6,8 +6,14 @@
+     color: $primary-700;
+ }
+ 
+-@media only screen and (min-width: 992px) and (max-width: 1100px) {
+-    .list-div {
+-        width: 62%;
++.fa-li {
++    left: -31px !important;
++    padding-right: 22px;
++    top: 0;
++}
++
++    @media only screen and (min-width: 992px) and (max-width: 1100px) {
++        .list-div {
++            width: 62%;
+     }
+ }
+diff --git a/src/courseware/course/sequence/lock-paywall/messages.js b/src/courseware/course/sequence/lock-paywall/messages.js
+index 964d33a..0d39ec4 100644
+--- a/src/courseware/course/sequence/lock-paywall/messages.js
++++ b/src/courseware/course/sequence/lock-paywall/messages.js
+@@ -21,6 +21,26 @@ const messages = defineMessages({
+     defaultMessage: 'When you upgrade, you:',
+     description: 'Text displayed to introduce the list of benefits from upgrading.',
+   },
++  'learn.lockPaywall.list.bullet1.linktext': {
++    id: 'learn.lockPaywall.list.bullet1.linktext',
++    defaultMessage: 'verified certificate',
++    description: 'Link text for verified certificate info page.',
++  },
++  'learn.lockPaywall.list.bullet2.boldtext': {
++    id: 'learn.lockPaywall.list.bullet2.boldtext',
++    defaultMessage: 'graded assignments',
++    description: 'Bolded text for graded assignments.',
++  },
++  'learn.lockPaywall.list.bullet3.boldtext': {
++    id: 'learn.lockPaywall.list.bullet3.boldtext',
++    defaultMessage: 'Full access',
++    description: 'Bolded text for full access.',
++  },
++  'learn.lockPaywall.list.bullet4.boldtext': {
++    id: 'learn.lockPaywall.list.bullet4.boldtext',
++    defaultMessage: 'non-profit mission',
++    description: 'Bolded text to highlight our non-profit status.',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+index 32edac5..deb28bd 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -1,33 +1,123 @@
+ import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
++import { faCheck } from '@fortawesome/free-solid-svg-icons';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++
+ import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { FormattedDate, FormattedMessage, injectIntl } from '@edx/frontend-platform/i18n';
++import { getConfig } from '@edx/frontend-platform';
+ import { setLocalStorage } from '../../data/localStorage';
++
+ import { UpgradeButton } from '../upgrade-button';
+-import {
+-  VerifiedCertBullet,
+-  UnlockGradedBullet,
+-  FullAccessBullet,
+-  SupportMissionBullet,
+-} from '../upsell-bullets/UpsellBullets';
+ 
+ function UpsellNoFBECardContent() {
++  const verifiedCertLink = (
++    <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href={`${getConfig().MARKETING_SITE_BASE_URL}/verified-certificate`}>
++      <FormattedMessage
++        id="learning.generic.upgradeNotification.verifiedCertLink"
++        defaultMessage="verified certificate"
++      />
++    </a>
++  );
++
+   return (
+     <ul className="fa-ul upgrade-notification-ul pt-0">
+-      <VerifiedCertBullet />
+-      <SupportMissionBullet />
++      <li>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.generic.upgradeNotification.verifiedCertMessage"
++          defaultMessage="Earn a {verifiedCertLink} of completion to showcase on your resumé"
++          values={{ verifiedCertLink }}
++        />
++      </li>
++      <li>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.generic.upgradeNotification.noFBE.nonProfitMission"
++          defaultMessage="Support our {nonProfitMission} at edX"
++          values={{
++            nonProfitMission: (
++              <span className="font-weight-bold">non-profit mission</span>
++            ),
++          }}
++        />
++      </li>
+     </ul>
+   );
+ }
+ 
+ function UpsellFBEFarAwayCardContent() {
++  const verifiedCertLink = (
++    <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href={`${getConfig().MARKETING_SITE_BASE_URL}/verified-certificate`}>
++      <FormattedMessage
++        id="learning.generic.upgradeNotification.verifiedCertLink"
++        defaultMessage="verified certificate"
++      />
++    </a>
++  );
++
++  const gradedAssignments = (
++    <span className="font-weight-bold">
++      <FormattedMessage
++        id="learning.generic.upgradeNotification.gradedAssignments"
++        defaultMessage="graded assignments"
++      />
++    </span>
++  );
++
++  const fullAccess = (
++    <span className="font-weight-bold">
++      <FormattedMessage
++        id="learning.generic.upgradeNotification.verifiedCertLink.fullAccess"
++        defaultMessage="Full access"
++      />
++    </span>
++  );
++
++  const nonProfitMission = (
++    <span className="font-weight-bold">
++      <FormattedMessage
++        id="learning.generic.upgradeNotification.FBE.nonProfitMission"
++        defaultMessage="non-profit mission"
++      />
++    </span>
++  );
++
+   return (
+     <ul className="fa-ul upgrade-notification-ul">
+-      <VerifiedCertBullet />
+-      <UnlockGradedBullet />
+-      <FullAccessBullet />
+-      <SupportMissionBullet />
++      <li>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.generic.upgradeNotification.verifiedCertMessage"
++          defaultMessage="Earn a {verifiedCertLink} of completion to showcase on your resumé"
++          values={{ verifiedCertLink }}
++        />
++      </li>
++      <li>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.generic.upgradeNotification.unlockGraded"
++          defaultMessage="Unlock your access to all course activities, including {gradedAssignments}"
++          values={{ gradedAssignments }}
++        />
++      </li>
++      <li>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.generic.upgradeNotification.fullAccess"
++          defaultMessage="{fullAccess} to course content and materials, even after the course ends"
++          values={{ fullAccess }}
++        />
++      </li>
++      <li>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.generic.upgradeNotification.nonProfitMission"
++          defaultMessage="Support our {nonProfitMission} at edX"
++          values={{ nonProfitMission }}
++        />
++      </li>
+     </ul>
+   );
+ }
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.scss b/src/generic/upgrade-notification/UpgradeNotification.scss
+index bcd33f3..eb8f41f 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.scss
++++ b/src/generic/upgrade-notification/UpgradeNotification.scss
+@@ -19,11 +19,16 @@
+ }
+ 
+ .upgrade-notification-ul {
+-  padding-left: 1.25rem;
++  padding-left: 1.25rem !important;
+   padding-top: 0.875rem;
+   padding-right: 1.25rem;
+ }
+ 
++.upgrade-notification-li {
++  left: -2.125rem;
++  top: 0 !important;
++}
++
+ .upgrade-notification-text {
+   padding: 0.875rem 1.25rem 0 1.25rem;
+ }
+@@ -38,3 +43,11 @@
+   padding-top: .75rem;
+   padding-bottom: .75rem;
+ }
++
++.inline-link-underline {
++  text-decoration: underline;
++}
++
++.upgrade-notification .upgrade-notification-message a {
++  color: $primary-500;
++}
+\ No newline at end of file
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.test.jsx b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+index b4510a2..11edac2 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.test.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+@@ -51,7 +51,7 @@ describe('Upgrade Notification', () => {
+     buildAndRender();
+     expect(screen.getByRole('heading', { name: 'Pursue a verified certificate' })).toBeInTheDocument();
+     expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+     expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+   });
+ 
+@@ -65,7 +65,7 @@ describe('Upgrade Notification', () => {
+     });
+     expect(screen.getByRole('heading', { name: 'Pursue a verified certificate' })).toBeInTheDocument();
+     expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+     expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+   });
+ 
+@@ -75,7 +75,7 @@ describe('Upgrade Notification', () => {
+     });
+     expect(screen.getByRole('heading', { name: 'Pursue a verified certificate' })).toBeInTheDocument();
+     expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+     expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+   });
+ 
+@@ -94,7 +94,7 @@ describe('Upgrade Notification', () => {
+     });
+     expect(screen.getByRole('heading', { name: 'Pursue a verified certificate' })).toBeInTheDocument();
+     expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+     expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
+@@ -161,7 +161,7 @@ describe('Upgrade Notification', () => {
+     expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+     expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
+     expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+     expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+   });
+ 
+@@ -189,7 +189,7 @@ describe('Upgrade Notification', () => {
+     expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+     expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
+     expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+     expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
+@@ -218,7 +218,7 @@ describe('Upgrade Notification', () => {
+     expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+     expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
+     expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+     expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
+@@ -247,7 +247,7 @@ describe('Upgrade Notification', () => {
+     expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+     expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
+     expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+     expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
+diff --git a/src/generic/upsell-bullets/UpsellBullets.jsx b/src/generic/upsell-bullets/UpsellBullets.jsx
+deleted file mode 100644
+index 876a7cf..0000000
+--- a/src/generic/upsell-bullets/UpsellBullets.jsx
++++ /dev/null
+@@ -1,107 +0,0 @@
+-import React from 'react';
+-import { faCheck } from '@fortawesome/free-solid-svg-icons';
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { FormattedMessage } from '@edx/frontend-platform/i18n';
+-import { getConfig } from '@edx/frontend-platform';
+-
+-function CheckmarkBullet() {
+-  return (
+-    <span className="fa-li"><FontAwesomeIcon icon={faCheck} /></span>
+-  );
+-}
+-
+-// Must be child of a <ul className="fa-ul">
+-export function VerifiedCertBullet() {
+-  const verifiedCertLink = (
+-    <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href={`${getConfig().MARKETING_SITE_BASE_URL}/verified-certificate`}>
+-      <FormattedMessage
+-        id="learning.generic.upsell.verifiedCertBullet.verifiedCert"
+-        defaultMessage="verified certificate"
+-        description="Bolded words 'verified certificate', which is the name of credential the learner receives."
+-      />
+-    </a>
+-  );
+-  return (
+-    <li className="upsell-bullet">
+-      <CheckmarkBullet />
+-      <FormattedMessage
+-        id="learning.generic.upsell.verifiedCertBullet"
+-        defaultMessage="Earn a {verifiedCertLink} of completion to showcase on your resumé"
+-        description="Bullet showcasing benefit of earned credential."
+-        values={{ verifiedCertLink }}
+-      />
+-    </li>
+-  );
+-}
+-
+-// Must be child of a <ul className="fa-ul">
+-export function UnlockGradedBullet() {
+-  const gradedAssignmentsInBoldText = (
+-    <span className="font-weight-bold">
+-      <FormattedMessage
+-        id="learning.generic.upsell.unlockGradedBullet.gradedAssignments"
+-        defaultMessage="graded assignments"
+-        description="Bolded words 'graded assignment', which is the name of unlocked feature with upgrade."
+-      />
+-    </span>
+-  );
+-  return (
+-    <li className="upsell-bullet">
+-      <CheckmarkBullet />
+-      <FormattedMessage
+-        id="learning.generic.upsell.unlockGradedBullet"
+-        defaultMessage="Unlock your access to all course activities, including {gradedAssignmentsInBoldText}"
+-        description="Bullet showcasing benefit of additional course material."
+-        values={{ gradedAssignmentsInBoldText }}
+-      />
+-    </li>
+-  );
+-}
+-
+-// Must be child of a <ul className="fa-ul">
+-export function FullAccessBullet() {
+-  const fullAccessInBoldText = (
+-    <span className="font-weight-bold">
+-      <FormattedMessage
+-        id="learning.generic.upsell.fullAccessBullet.fullAccess"
+-        defaultMessage="Full access"
+-        description="Bolded phrase 'Full access'."
+-      />
+-    </span>
+-  );
+-  return (
+-    <li className="upsell-bullet">
+-      <CheckmarkBullet />
+-      <FormattedMessage
+-        id="learning.generic.upsell.fullAccessBullet"
+-        defaultMessage="{fullAccessInBoldText} to course content and materials, even after the course ends"
+-        description="Bullet showcasing upgrade lifts access durations."
+-        values={{ fullAccessInBoldText }}
+-      />
+-    </li>
+-  );
+-}
+-
+-// Must be child of a <ul className="fa-ul">
+-export function SupportMissionBullet() {
+-  const missionInBoldText = (
+-    <span className="font-weight-bold">
+-      <FormattedMessage
+-        id="learning.generic.upsell.supportMissionBullet.mission"
+-        defaultMessage="mission"
+-        description="Bolded word 'mission'."
+-      />
+-    </span>
+-  );
+-  return (
+-    <li className="upsell-bullet">
+-      <CheckmarkBullet />
+-      <FormattedMessage
+-        id="learning.generic.upsell.supportMissionBullet"
+-        defaultMessage="Support our {missionInBoldText} at edX"
+-        description="Bullet encouraging user to support edX."
+-        values={{ missionInBoldText }}
+-      />
+-    </li>
+-  );
+-}
+diff --git a/src/generic/upsell-bullets/UpsellBullets.scss b/src/generic/upsell-bullets/UpsellBullets.scss
+deleted file mode 100644
+index 0cf7590..0000000
+--- a/src/generic/upsell-bullets/UpsellBullets.scss
++++ /dev/null
+@@ -1,13 +0,0 @@
+-.upsell-bullet > .fa-li {
+-    left: -31px;
+-    padding-right: 22px;
+-}
+-
+-.inline-link-underline {
+-  text-decoration: underline;
+-}
+-
+-.upsell-bullet a {
+-  color: $primary-500;
+-}
+-
+diff --git a/src/generic/upsell-bullets/UpsellBullets.test.jsx b/src/generic/upsell-bullets/UpsellBullets.test.jsx
+deleted file mode 100644
+index daf7494..0000000
+--- a/src/generic/upsell-bullets/UpsellBullets.test.jsx
++++ /dev/null
+@@ -1,35 +0,0 @@
+-import React from 'react';
+-
+-import {
+-  initializeMockApp,
+-  render,
+-  screen,
+-} from '../../setupTest';
+-
+-import {
+-  VerifiedCertBullet,
+-  UnlockGradedBullet,
+-  FullAccessBullet,
+-  SupportMissionBullet,
+-} from './UpsellBullets';
+-
+-initializeMockApp();
+-
+-describe('UpsellBullets', () => {
+-  const bullets = (
+-    <>
+-      <VerifiedCertBullet />
+-      <UnlockGradedBullet />
+-      <FullAccessBullet />
+-      <SupportMissionBullet />
+-    </>
+-  );
+-
+-  it('upsell bullet text properly rendered', async () => {
+-    render(bullets);
+-    expect(screen.getByText(/Earn a.*?of completion to showcase on your resumé/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resumé');
+-    expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
+-    expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
+-    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our mission at edX');
+-  });
+-});
+diff --git a/src/index.scss b/src/index.scss
+index 2e23649..f383422 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -390,7 +390,6 @@
+ @import "courseware/course/content-tools/contentTools.scss";
+ @import "course-home/dates-tab/timeline/Day.scss";
+ @import "generic/upgrade-notification/UpgradeNotification.scss";
+-@import "generic/upsell-bullets/UpsellBullets.scss";
+ @import "course-home/outline-tab/widgets/ProctoringInfoPanel.scss";
+ @import "src/course-home/outline-tab/widgets/FlagButton.scss";
+ @import "course-home/progress-tab/course-completion/CompletionDonutChart.scss";
+-- 
+2.34.1
+

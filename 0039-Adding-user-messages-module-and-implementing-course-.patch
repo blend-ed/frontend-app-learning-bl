@@ -1,0 +1,313 @@
+From d36b5bd0b050f8f3017795c3495eb6bf5ef995b7 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Wed, 15 Jan 2020 13:59:05 -0500
+Subject: [PATCH 0039/1021] Adding user-messages module and implementing
+ course-level messaging.
+
+---
+ package.json                                |  1 +
+ src/index.jsx                               | 21 ++++---
+ src/learning-sequence/course/Course.jsx     |  2 +
+ src/learning-sequence/sequence/Sequence.jsx | 28 ++++-----
+ src/user-messages/Alert.jsx                 | 63 +++++++++++++++++++++
+ src/user-messages/AlertList.jsx             | 34 +++++++++++
+ src/user-messages/UserMessagesContext.js    |  5 ++
+ src/user-messages/UserMessagesProvider.jsx  | 44 ++++++++++++++
+ 8 files changed, 175 insertions(+), 23 deletions(-)
+ create mode 100644 src/user-messages/Alert.jsx
+ create mode 100644 src/user-messages/AlertList.jsx
+ create mode 100644 src/user-messages/UserMessagesContext.js
+ create mode 100644 src/user-messages/UserMessagesProvider.jsx
+
+diff --git a/package.json b/package.json
+index 71c4b6d..9beca09 100644
+--- a/package.json
++++ b/package.json
+@@ -43,6 +43,7 @@
+     "@fortawesome/free-regular-svg-icons": "^5.12.0",
+     "@fortawesome/free-solid-svg-icons": "^5.12.0",
+     "@fortawesome/react-fontawesome": "^0.1.8",
++    "classnames": "^2.2.6",
+     "core-js": "^3.6.2",
+     "prop-types": "^15.7.2",
+     "react": "^16.12.0",
+diff --git a/src/index.jsx b/src/index.jsx
+index a62e3b6..55fa01e 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -13,6 +13,7 @@ import Footer, { messages as footerMessages } from '@edx/frontend-component-foot
+ import appMessages from './i18n';
+ import CourseTabsNavigation from './components/CourseTabsNavigation';
+ import LearningSequencePage from './learning-sequence/LearningSequencePage';
++import UserMessagesProvider from './user-messages/UserMessagesProvider';
+ 
+ import './index.scss';
+ import './assets/favicon.ico';
+@@ -31,15 +32,17 @@ function courseLinks() {
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+     <AppProvider>
+-      <Header />
+-      <div className="container pt-2">
+-        <CourseTabsNavigation activeTabSlug="course" />
+-      </div>
+-      <Switch>
+-        <Route exact path="/" render={courseLinks} />
+-        <Route path="/course" component={LearningSequencePage} />
+-      </Switch>
+-      <Footer />
++      <UserMessagesProvider>
++        <Header />
++        <div className="container pt-2">
++          <CourseTabsNavigation activeTabSlug="course" />
++        </div>
++        <Switch>
++          <Route exact path="/" render={courseLinks} />
++          <Route path="/course" component={LearningSequencePage} />
++        </Switch>
++        <Footer />
++      </UserMessagesProvider>
+     </AppProvider>,
+     document.getElementById('root'),
+   );
+diff --git a/src/learning-sequence/course/Course.jsx b/src/learning-sequence/course/Course.jsx
+index c21fa17..c2bc7e9 100644
+--- a/src/learning-sequence/course/Course.jsx
++++ b/src/learning-sequence/course/Course.jsx
+@@ -5,6 +5,7 @@ import { history } from '@edx/frontend-platform';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import SequenceContainer from './SequenceContainer';
+ import { createSequenceIdList } from '../utils';
++import AlertList from '../../user-messages/AlertList';
+ 
+ export default function Course({
+   courseUsageKey, courseId, sequenceId, unitId, models,
+@@ -33,6 +34,7 @@ export default function Course({
+ 
+   return (
+     <main className="container-fluid d-flex flex-column flex-grow-1">
++      <AlertList topic="course" className="mt-3" />
+       <CourseBreadcrumbs
+         courseUsageKey={courseUsageKey}
+         courseId={courseId}
+diff --git a/src/learning-sequence/sequence/Sequence.jsx b/src/learning-sequence/sequence/Sequence.jsx
+index f4fe1b4..a935f72 100644
+--- a/src/learning-sequence/sequence/Sequence.jsx
++++ b/src/learning-sequence/sequence/Sequence.jsx
+@@ -118,29 +118,29 @@ function Sequence({
+ }
+ 
+ Sequence.propTypes = {
+-  id: PropTypes.string.isRequired,
++  activeUnitId: PropTypes.string.isRequired,
++  bannerText: PropTypes.string,
+   courseUsageKey: PropTypes.string.isRequired,
+-  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+-  units: PropTypes.objectOf(PropTypes.shape({
+-    id: PropTypes.string.isRequired,
+-    complete: PropTypes.bool,
+-    pageTitle: PropTypes.string.isRequired,
+-  })).isRequired,
+   displayName: PropTypes.string.isRequired,
+-  activeUnitId: PropTypes.string.isRequired,
+-  showCompletion: PropTypes.bool.isRequired,
++  id: PropTypes.string.isRequired,
++  intl: intlShape.isRequired,
++  isGated: PropTypes.bool.isRequired,
+   isTimeLimited: PropTypes.bool.isRequired,
+-  bannerText: PropTypes.string,
++  onNavigateUnit: PropTypes.func,
+   onNext: PropTypes.func.isRequired,
+   onPrevious: PropTypes.func.isRequired,
+-  onNavigateUnit: PropTypes.func,
+-  isGated: PropTypes.bool.isRequired,
++  savePosition: PropTypes.bool.isRequired,
++  showCompletion: PropTypes.bool.isRequired,
+   prerequisite: PropTypes.shape({
+     name: PropTypes.string,
+     id: PropTypes.string,
+   }).isRequired,
+-  savePosition: PropTypes.bool.isRequired,
+-  intl: intlShape.isRequired,
++  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++  units: PropTypes.objectOf(PropTypes.shape({
++    id: PropTypes.string.isRequired,
++    complete: PropTypes.bool,
++    pageTitle: PropTypes.string.isRequired,
++  })).isRequired,
+ };
+ 
+ Sequence.defaultProps = {
+diff --git a/src/user-messages/Alert.jsx b/src/user-messages/Alert.jsx
+new file mode 100644
+index 0000000..dda6f99
+--- /dev/null
++++ b/src/user-messages/Alert.jsx
+@@ -0,0 +1,63 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++import { faExclamationTriangle, faInfoCircle, faCheckCircle, faMinusCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { Button } from '@edx/paragon';
++
++function getAlertClass(type) {
++  if (type === 'error') {
++    return 'alert-warning';
++  } else if (type === 'danger') {
++    return 'alert-danger';
++  } else if (type === 'success') {
++    return 'alert-success';
++  }
++  return 'alert-info';
++}
++
++function getAlertIcon(type) {
++  if (type === 'error') {
++    return faExclamationTriangle;
++  } else if (type === 'danger') {
++    return faMinusCircle;
++  } else if (type === 'success') {
++    return faCheckCircle;
++  }
++  return faInfoCircle;
++}
++
++function Alert({
++  type, dismissible, children, onDismiss,
++}) {
++  return (
++    <div className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))}>
++      <div className="d-flex align-items-start">
++        <div className="mr-2">
++          <FontAwesomeIcon icon={getAlertIcon(type)} />
++        </div>
++        <div role="alert" className="flex-grow-1">
++          {children}
++        </div>
++      </div>
++      {dismissible && <Button className="close" onClick={onDismiss}><FontAwesomeIcon size="sm" icon={faTimes} /></Button>}
++    </div>
++  );
++}
++
++
++Alert.propTypes = {
++  type: PropTypes.oneOf(['error', 'danger', 'info', 'success']).isRequired,
++  dismissible: PropTypes.bool,
++  children: PropTypes.node,
++  onDismiss: PropTypes.func,
++};
++
++Alert.defaultProps = {
++  dismissible: false,
++  children: undefined,
++  onDismiss: null,
++};
++
++
++export default Alert;
+diff --git a/src/user-messages/AlertList.jsx b/src/user-messages/AlertList.jsx
+new file mode 100644
+index 0000000..3b398ec
+--- /dev/null
++++ b/src/user-messages/AlertList.jsx
+@@ -0,0 +1,34 @@
++import React, { useContext } from 'react';
++import PropTypes from 'prop-types';
++
++import UserMessagesContext from './UserMessagesContext';
++import Alert from './Alert';
++
++export default function AlertList({ topic, className }) {
++  const { remove, messages } = useContext(UserMessagesContext);
++
++  return (
++    <div className={className}>
++      {messages.filter(message => !topic || message.topic === topic).map(message => (
++        <Alert
++          key={message.id}
++          type={message.type}
++          dismissible={message.dismissible}
++          onDismiss={() => remove(message.id)}
++        >
++          {message.text}
++        </Alert>
++      ))}
++    </div>
++  );
++}
++
++AlertList.propTypes = {
++  className: PropTypes.string,
++  topic: PropTypes.string,
++};
++
++AlertList.defaultProps = {
++  topic: null,
++  className: null,
++};
+diff --git a/src/user-messages/UserMessagesContext.js b/src/user-messages/UserMessagesContext.js
+new file mode 100644
+index 0000000..490e34d
+--- /dev/null
++++ b/src/user-messages/UserMessagesContext.js
+@@ -0,0 +1,5 @@
++import React from 'react';
++
++const UserMessagesContext = React.createContext({});
++
++export default UserMessagesContext;
+diff --git a/src/user-messages/UserMessagesProvider.jsx b/src/user-messages/UserMessagesProvider.jsx
+new file mode 100644
+index 0000000..1129c57
+--- /dev/null
++++ b/src/user-messages/UserMessagesProvider.jsx
+@@ -0,0 +1,44 @@
++import React, { useState } from 'react';
++import PropTypes from 'prop-types';
++
++import UserMessagesContext from './UserMessagesContext';
++
++export default function UserMessagesProvider({ children }) {
++  const [messages, setMessages] = useState([
++    {
++      code: null,
++      dismissible: true,
++      id: 0,
++      text: 'This is a course level message.',
++      type: 'info',
++      topic: 'course',
++    },
++  ]);
++  const [nextId, setNextId] = useState(1);
++
++  const add = (message) => {
++    setMessages([...messages, { ...message, id: nextId }]);
++    setNextId(nextId + 1);
++  };
++  const remove = id => setMessages(messages.filter(message => message.id !== id));
++
++  const value = {
++    add,
++    remove,
++    messages,
++  };
++
++  return (
++    <UserMessagesContext.Provider value={value}>
++      {children}
++    </UserMessagesContext.Provider>
++  );
++}
++
++UserMessagesProvider.propTypes = {
++  children: PropTypes.node,
++};
++
++UserMessagesProvider.defaultProps = {
++  children: null,
++};
+-- 
+2.34.1
+

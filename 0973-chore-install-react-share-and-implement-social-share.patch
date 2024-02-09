@@ -1,0 +1,138 @@
+From 851e49f8fb0dbd792d2728695ec8d103f336fae7 Mon Sep 17 00:00:00 2001
+From: Leangseu Kim <lkim@edx.org>
+Date: Fri, 13 Jan 2023 11:05:20 -0500
+Subject: [PATCH 0973/1021] chore: install react share and implement social
+ share demo
+
+---
+ package-lock.json                           |  2 +-
+ package.json                                |  2 +-
+ src/courseware/course/sequence/Unit.jsx     |  3 ++
+ src/courseware/course/share/ShareButton.jsx | 39 +++++++++++++++++++++
+ src/courseware/course/share/messages.js     | 21 +++++++++++
+ 5 files changed, 65 insertions(+), 2 deletions(-)
+ create mode 100644 src/courseware/course/share/ShareButton.jsx
+ create mode 100644 src/courseware/course/share/messages.js
+
+diff --git a/package-lock.json b/package-lock.json
+index b6e6886..60219b1 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -35,7 +35,7 @@
+         "react-redux": "7.2.9",
+         "react-router": "5.2.1",
+         "react-router-dom": "5.3.0",
+-        "react-share": "4.4.1",
++        "react-share": "^4.4.1",
+         "redux": "4.1.2",
+         "regenerator-runtime": "0.13.11",
+         "reselect": "4.1.7",
+diff --git a/package.json b/package.json
+index b16ad97..bdc6e4b 100644
+--- a/package.json
++++ b/package.json
+@@ -55,7 +55,7 @@
+     "react-redux": "7.2.9",
+     "react-router": "5.2.1",
+     "react-router-dom": "5.3.0",
+-    "react-share": "4.4.1",
++    "react-share": "^4.4.1",
+     "redux": "4.1.2",
+     "regenerator-runtime": "0.13.11",
+     "reselect": "4.1.7",
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 31a9bf9..f01975c 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -15,6 +15,7 @@ import { useModel } from '../../../generic/model-store';
+ import PageLoading from '../../../generic/PageLoading';
+ import { fetchCourse } from '../../data';
+ import BookmarkButton from '../bookmark/BookmarkButton';
++import ShareButton from '../share/ShareButton';
+ import messages from './messages';
+ 
+ const HonorCode = React.lazy(() => import('./honor-code'));
+@@ -152,6 +153,8 @@ function Unit({
+         isBookmarked={unit.bookmarked}
+         isProcessing={unit.bookmarkedUpdateState === 'loading'}
+       />
++      {/* TODO: social share exp. Need to remove later */}
++      {window.expSocialShareEnabled && <ShareButton url={window.expSocialShareAboutUrl} />}
+       { !mmp2p.state.isEnabled && contentTypeGatingEnabled && unit.containsContentTypeGatedContent && (
+         <Suspense
+           fallback={(
+diff --git a/src/courseware/course/share/ShareButton.jsx b/src/courseware/course/share/ShareButton.jsx
+new file mode 100644
+index 0000000..251dd35
+--- /dev/null
++++ b/src/courseware/course/share/ShareButton.jsx
+@@ -0,0 +1,39 @@
++import { PropTypes } from 'prop-types';
++import { Icon } from '@edx/paragon';
++import { Share } from '@edx/paragon/icons';
++import { useIntl } from '@edx/frontend-platform/i18n';
++import { TwitterShareButton } from 'react-share';
++
++import { stringifyUrl } from 'query-string';
++
++import messages from './messages';
++
++function ShareButton({ url }) {
++  const { formatMessage } = useIntl();
++
++  const twitterUrl = stringifyUrl({
++    url,
++    query: {
++      utm_source: 'twitter',
++      utm_medium: 'social',
++      utm_campaign: 'social-share-exp',
++    },
++  });
++
++  return (
++    <TwitterShareButton
++      url={twitterUrl}
++      resetButtonStyle={false}
++      className="px-1 ml-n1 btn-sm text-primary-500 btn btn-link"
++    >
++      <Icon src={Share} />
++      {formatMessage(messages.shareButton)}
++    </TwitterShareButton>
++  );
++}
++
++ShareButton.propTypes = {
++  url: PropTypes.string.isRequired,
++};
++
++export default ShareButton;
+diff --git a/src/courseware/course/share/messages.js b/src/courseware/course/share/messages.js
+new file mode 100644
+index 0000000..2ef5912
+--- /dev/null
++++ b/src/courseware/course/share/messages.js
+@@ -0,0 +1,21 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  shareButton: {
++    id: 'learn.sequence.share.button',
++    defaultMessage: 'Share this content',
++    description: 'share message button message',
++  },
++  shareModalTitle: {
++    id: 'learn.sequence.share.modal.title',
++    defaultMessage: 'Title',
++    description: 'share message modal title',
++  },
++  shareModalBody: {
++    id: 'learn.sequence.share.modal.body',
++    defaultMessage: 'Copy the link below to share this content.',
++    description: 'share message modal body',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

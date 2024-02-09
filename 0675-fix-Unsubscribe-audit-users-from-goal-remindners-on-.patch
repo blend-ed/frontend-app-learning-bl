@@ -1,0 +1,185 @@
+From 5aa857f1dec8ccd3932c00a91939765fe7dee212 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Thu, 7 Oct 2021 09:14:48 -0400
+Subject: [PATCH 0675/1021] fix: Unsubscribe audit users from goal remindners
+ on the course exit page (#671)
+
+This reverts commit 20390d1e339783f51cac421463ff6a56e16b126b.
+---
+ .../course/course-exit/CourseExit.jsx         | 17 ++++++++++++--
+ .../course/course-exit/CourseExit.test.jsx    | 22 +++++++++++++++++++
+ src/courseware/course/course-exit/data/api.js | 10 ++++++++-
+ .../course/course-exit/data/thunks.js         |  9 +++++++-
+ .../__factories__/courseMetadata.factory.js   |  7 ++++++
+ src/courseware/data/api.js                    |  1 +
+ 6 files changed, 62 insertions(+), 4 deletions(-)
+
+diff --git a/src/courseware/course/course-exit/CourseExit.jsx b/src/courseware/course/course-exit/CourseExit.jsx
+index 37b28cf..3c95f5b 100644
+--- a/src/courseware/course/course-exit/CourseExit.jsx
++++ b/src/courseware/course/course-exit/CourseExit.jsx
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import React, { useEffect } from 'react';
+ 
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -11,6 +11,7 @@ import CourseInProgress from './CourseInProgress';
+ import CourseNonPassing from './CourseNonPassing';
+ import { COURSE_EXIT_MODES, getCourseExitMode } from './utils';
+ import messages from './messages';
++import { unsubscribeFromGoalReminders } from './data/thunks';
+ 
+ import { useModel } from '../../../generic/model-store';
+ 
+@@ -18,10 +19,13 @@ function CourseExit({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+   const {
+     certificateData,
++    courseExitPageIsActive,
++    courseGoals,
++    enrollmentMode,
+     hasScheduledContent,
+     isEnrolled,
++    isMasquerading,
+     userHasPassingGrade,
+-    courseExitPageIsActive,
+   } = useModel('coursewareMeta', courseId);
+ 
+   const mode = getCourseExitMode(
+@@ -32,6 +36,15 @@ function CourseExit({ intl }) {
+     courseExitPageIsActive,
+   );
+ 
++  // Audit users cannot fully complete a course, so we will
++  // unsubscribe them from goal reminders once they reach the course exit page
++  // to avoid spamming them with goal reminder emails
++  if (courseGoals && enrollmentMode === 'audit' && !isMasquerading) {
++    useEffect(() => {
++      unsubscribeFromGoalReminders(courseId);
++    }, []);
++  }
++
+   let body = null;
+   if (mode === COURSE_EXIT_MODES.nonPassing) {
+     body = (<CourseNonPassing />);
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 0a1e2c2..55f0d10 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -3,6 +3,7 @@ import MockAdapter from 'axios-mock-adapter';
+ import { Factory } from 'rosie';
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { waitFor } from '@testing-library/react';
+ 
+ import { fetchCourse } from '../../data';
+ import { buildSimpleCourseBlocks } from '../../../shared/data/__factories__/courseBlocks.factory';
+@@ -377,4 +378,25 @@ describe('Course Exit Pages', () => {
+       expect(screen.getByRole('link', { name: 'View course schedule' })).toBeInTheDocument();
+     });
+   });
++
++  it('unsubscribes the user when loading the course exit page', async () => {
++    setMetadata({
++      enrollment: {
++        mode: 'audit',
++        courseGoals: {
++          goal_options: [],
++          selected_goal: {
++            days_per_week: 1,
++            subscribed_to_reminders: true,
++          },
++        },
++      },
++    });
++    await fetchAndRender(<CourseExit />);
++    const url = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
++    await waitFor(() => {
++      expect(axiosMock.history.post[0].url).toMatch(url);
++      expect(axiosMock.history.post[0].data).toMatch(`{"course_id":"${defaultMetadata.id}","subscribed_to_reminders":false}`);
++    });
++  });
+ });
+diff --git a/src/courseware/course/course-exit/data/api.js b/src/courseware/course/course-exit/data/api.js
+index 000f968..d819db7 100644
+--- a/src/courseware/course/course-exit/data/api.js
++++ b/src/courseware/course/course-exit/data/api.js
+@@ -23,7 +23,7 @@ function filterRecommendationsList(
+   ));
+ }
+ 
+-export default async function getCourseRecommendations(courseKey) {
++export async function getCourseRecommendations(courseKey) {
+   const discoveryApiUrl = getConfig().DISCOVERY_API_BASE_URL;
+   if (!discoveryApiUrl) {
+     return [];
+@@ -36,3 +36,11 @@ export default async function getCourseRecommendations(courseKey) {
+   ]);
+   return filterRecommendationsList(camelCaseObject(recommendationsResponse), camelCaseObject(enrollmentsResponse));
+ }
++
++export async function postUnsubscribeFromGoalReminders(courseId) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`);
++  return getAuthenticatedHttpClient().post(url.href, {
++    course_id: courseId,
++    subscribed_to_reminders: false,
++  });
++}
+diff --git a/src/courseware/course/course-exit/data/thunks.js b/src/courseware/course/course-exit/data/thunks.js
+index f355afb..56d6696 100644
+--- a/src/courseware/course/course-exit/data/thunks.js
++++ b/src/courseware/course/course-exit/data/thunks.js
+@@ -5,7 +5,10 @@ import {
+   fetchCourseRecommendationsRequest,
+   fetchCourseRecommendationsSuccess,
+ } from './slice';
+-import getCourseRecommendations from './api';
++import {
++  getCourseRecommendations,
++  postUnsubscribeFromGoalReminders,
++} from './api';
+ import { updateModel } from '../../../../generic/model-store';
+ 
+ export default function fetchCourseRecommendations(courseKey, courseId) {
+@@ -27,3 +30,7 @@ export default function fetchCourseRecommendations(courseKey, courseId) {
+     }
+   };
+ }
++
++export async function unsubscribeFromGoalReminders(courseId, daysPerWeek, subscribedToReminders) {
++  return postUnsubscribeFromGoalReminders(courseId, daysPerWeek, subscribedToReminders);
++}
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 10b180b..a8ca74a 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -8,6 +8,13 @@ Factory.define('courseMetadata')
+   .attrs({
+     content_type_gating_enabled: false,
+     course_expired_message: null,
++    course_goals: {
++      goal_options: [],
++      selected_goal: {
++        days_per_week: 1,
++        subscribed_to_reminders: true,
++      },
++    },
+     end: null,
+     enrollment_start: null,
+     enrollment_end: null,
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index e9df4f4..941426e 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -187,6 +187,7 @@ function normalizeMetadata(metadata) {
+     accessExpiration: camelCaseObject(data.access_expiration),
+     canShowUpgradeSock: data.can_show_upgrade_sock,
+     contentTypeGatingEnabled: data.content_type_gating_enabled,
++    courseGoals: data.course_goals,
+     id: data.id,
+     title: data.name,
+     number: data.number,
+-- 
+2.34.1
+

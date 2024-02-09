@@ -1,0 +1,184 @@
+From ee88a12d8fad5571819eb98b794a697b454d8e87 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 31 Jan 2022 11:52:08 -0500
+Subject: [PATCH 0909/1021] fix: assume that dates & outline legacy tabs don't
+ exist
+
+They've both been removed from the LMS now. It would be harmless
+to keep support for them in place, but it's pointless because
+any redirects to the LMS will just come right back to us.
+
+AA-799
+---
+ src/course-home/data/api.js                   | 22 +++----------------
+ src/course-home/dates-tab/DatesTab.test.jsx   |  4 ++--
+ .../grades/detailed-grades/DetailedGrades.jsx |  3 +--
+ .../related-links/RelatedLinks.jsx            |  5 ++---
+ src/courseware/CoursewareContainer.test.jsx   |  4 ++--
+ .../CoursewareRedirectLandingPage.jsx         |  6 -----
+ src/shared/access.js                          |  2 +-
+ 7 files changed, 11 insertions(+), 35 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 46155d1..e4c0d18 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -208,10 +208,6 @@ export async function getDatesTabData(courseId) {
+     return camelCaseObject(data);
+   } catch (error) {
+     const { httpErrorStatus } = error && error.customAttributes;
+-    if (httpErrorStatus === 404) {
+-      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/dates`);
+-      return {};
+-    }
+     if (httpErrorStatus === 401) {
+       // The backend sends this for unenrolled and unauthenticated learners, but we handle those cases by examining
+       // courseAccess in the metadata call, so just ignore this status for now.
+@@ -328,21 +324,9 @@ export function getTimeOffsetMillis(headerDate, requestTime, responseTime) {
+ 
+ export async function getOutlineTabData(courseId) {
+   const url = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+-  let { tabData } = {};
+-  let requestTime = Date.now();
+-  let responseTime = requestTime;
+-  try {
+-    requestTime = Date.now();
+-    tabData = await getAuthenticatedHttpClient().get(url);
+-    responseTime = Date.now();
+-  } catch (error) {
+-    const { httpErrorStatus } = error && error.customAttributes;
+-    if (httpErrorStatus === 404) {
+-      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/course/`);
+-      return {};
+-    }
+-    throw error;
+-  }
++  const requestTime = Date.now();
++  const tabData = await getAuthenticatedHttpClient().get(url);
++  const responseTime = Date.now();
+ 
+   const {
+     data,
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index 2eceeaf..dc03dcf 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -341,12 +341,12 @@ describe('DatesTab', () => {
+ 
+     it('redirects to the home page when unauthenticated', async () => {
+       await renderDenied('authentication_required');
+-      expect(global.location.href).toEqual(`http://localhost/redirect/course-home/${courseMetadata.id}`);
++      expect(global.location.href).toEqual(`http://localhost/course/${courseMetadata.id}/home`);
+     });
+ 
+     it('redirects to the home page when unenrolled', async () => {
+       await renderDenied('enrollment_required');
+-      expect(global.location.href).toEqual(`http://localhost/redirect/course-home/${courseMetadata.id}`);
++      expect(global.location.href).toEqual(`http://localhost/course/${courseMetadata.id}/home`);
+     });
+   });
+ });
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 4920071..8a7f455 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -1,7 +1,6 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ 
+-import { getConfig } from '@edx/frontend-platform';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -41,7 +40,7 @@ function DetailedGrades({ intl }) {
+     <Hyperlink
+       variant="muted"
+       isInline
+-      destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}
++      destination={`/course/${courseId}/home`}
+       onClick={logOutlineLinkClick}
+       tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+     >
+diff --git a/src/course-home/progress-tab/related-links/RelatedLinks.jsx b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+index 2759ceb..ac514d0 100644
+--- a/src/course-home/progress-tab/related-links/RelatedLinks.jsx
++++ b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+@@ -1,7 +1,6 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ 
+-import { getConfig } from '@edx/frontend-platform';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -33,13 +32,13 @@ function RelatedLinks({ intl }) {
+       <h3 className="h4">{intl.formatMessage(messages.relatedLinks)}</h3>
+       <ul className="pl-4">
+         <li>
+-          <Hyperlink destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/dates`} onClick={() => logLinkClicked('dates')}>
++          <Hyperlink destination={`/course/${courseId}/dates`} onClick={() => logLinkClicked('dates')}>
+             {intl.formatMessage(messages.datesCardLink)}
+           </Hyperlink>
+           <p>{intl.formatMessage(messages.datesCardDescription)}</p>
+         </li>
+         <li>
+-          <Hyperlink destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`} onClick={() => logLinkClicked('course_outline')}>
++          <Hyperlink destination={`/course/${courseId}/home`} onClick={() => logLinkClicked('course_outline')}>
+             {intl.formatMessage(messages.outlineCardLink)}
+           </Hyperlink>
+           <p>{intl.formatMessage(messages.outlineCardDescription)}</p>
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 2fd42b4..aa5b99b 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -465,7 +465,7 @@ describe('CoursewareContainer', () => {
+       const { courseMetadata } = setUpWithDeniedStatus('enrollment_required');
+       await loadContainer();
+ 
+-      expect(global.location.href).toEqual(`http://localhost/redirect/course-home/${courseMetadata.id}`);
++      expect(global.location.href).toEqual(`http://localhost/course/${courseMetadata.id}/home`);
+     });
+ 
+     it('should go to course survey for a survey_required error code', async () => {
+@@ -479,7 +479,7 @@ describe('CoursewareContainer', () => {
+       const { courseMetadata } = setUpWithDeniedStatus('authentication_required');
+       await loadContainer();
+ 
+-      expect(global.location.href).toEqual(`http://localhost/redirect/course-home/${courseMetadata.id}`);
++      expect(global.location.href).toEqual(`http://localhost/course/${courseMetadata.id}/home`);
+     });
+ 
+     it('should go to dashboard for an unfulfilled_milestones error code', async () => {
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index f0306f9..16388f9 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -26,12 +26,6 @@ export default () => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/jump_to/${match.params.unitId}?experience=legacy`);
+           }}
+         />
+-        <PageRoute
+-          path={`${path}/course-home/:courseId`}
+-          render={({ match }) => {
+-            global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/course/`);
+-          }}
+-        />
+         <PageRoute
+           path={`${path}/survey/:courseId`}
+           render={({ match }) => {
+diff --git a/src/shared/access.js b/src/shared/access.js
+index 3e98c2e..773aa2e 100644
+--- a/src/shared/access.js
++++ b/src/shared/access.js
+@@ -29,7 +29,7 @@ export function getAccessDeniedRedirectUrl(courseId, activeTabSlug, canLoadCours
+       if (activeTabSlug === 'courseware' && canLoadCourseware === false && unitId) {
+         url = `/redirect/courseware/${courseId}/unit/${unitId}`;
+       } else if (activeTabSlug !== 'outline') {
+-        url = `/redirect/course-home/${courseId}`;
++        url = `/course/${courseId}/home`;
+       }
+   }
+   return url;
+-- 
+2.34.1
+

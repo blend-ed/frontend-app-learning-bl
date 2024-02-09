@@ -1,0 +1,537 @@
+From 6257cb4b588fc4f9903113e22b318a63d1ddfe8e Mon Sep 17 00:00:00 2001
+From: ruzniaievdm <rewalkerof@gmail.com>
+Date: Mon, 13 Jun 2022 16:15:09 +0300
+Subject: [PATCH 0921/1021] refactor: Replace PDF course certificate view code
+ (#946)
+
+Co-authored-by: ruzniaievdm <ruzniaievdm@gmail.com>
+---
+ .../__factories__/outlineTabData.factory.js   |  1 -
+ .../data/__snapshots__/redux.test.js.snap     |  1 -
+ .../outline-tab/OutlineTab.test.jsx           | 78 +------------------
+ .../CertificateStatusAlert.jsx                |  8 +-
+ .../alerts/certificate-status-alert/hooks.js  |  6 --
+ .../progress-tab/ProgressTab.test.jsx         | 43 ----------
+ .../certificate-status/CertificateStatus.jsx  |  7 --
+ .../certificate-status/messages.js            |  5 --
+ .../course/course-exit/CourseCelebration.jsx  |  4 -
+ .../course/course-exit/CourseExit.test.jsx    | 11 ---
+ src/courseware/course/course-exit/messages.js |  5 --
+ .../data/pact-tests/lmsPact.test.jsx          |  3 +-
+ src/i18n/messages/ar.json                     |  2 -
+ src/i18n/messages/es_419.json                 |  2 -
+ src/i18n/messages/fr.json                     |  2 -
+ src/i18n/messages/zh_CN.json                  |  2 -
+ src/pacts/frontend-app-learning-lms.json      |  3 +-
+ 17 files changed, 4 insertions(+), 179 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index d984c67..30327a6 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -35,7 +35,6 @@ Factory.define('outlineTabData')
+       cert_status: null,
+       cert_web_view_url: null,
+       certificate_available_date: null,
+-      download_url: null,
+     },
+     course_goals: {
+       goal_options: [],
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 8fe76e5..4644d7b 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -411,7 +411,6 @@ Object {
+           "certStatus": null,
+           "certWebViewUrl": null,
+           "certificateAvailableDate": null,
+-          "downloadUrl": null,
+         },
+         "courseBlocks": Object {
+           "courses": Object {
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 575f12f..d21193f 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -642,7 +642,6 @@ describe('Outline Tab', () => {
+             cert_status: CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE,
+             cert_web_view_url: null,
+             certificate_available_date: tomorrow.toISOString(),
+-            download_url: null,
+           },
+         }, {
+           date_blocks: [
+@@ -670,7 +669,6 @@ describe('Outline Tab', () => {
+           cert_data: {
+             cert_status: CERT_STATUS_TYPE.UNVERIFIED,
+             cert_web_view_url: null,
+-            download_url: null,
+           },
+         }, {
+           date_blocks: [
+@@ -739,7 +737,6 @@ describe('Outline Tab', () => {
+           cert_data: {
+             cert_status: CERT_STATUS_TYPE.REQUESTING,
+             cert_web_view_url: null,
+-            download_url: null,
+           },
+         }, {
+           date_blocks: [
+@@ -773,50 +770,7 @@ describe('Outline Tab', () => {
+             org_key: 'edX',
+           });
+       });
+-      it('tracks download cert button', async () => {
+-        sendTrackEvent.mockClear();
+-        const now = new Date();
+-        const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+-        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+-        setMetadata({ is_enrolled: true });
+-        setTabData({
+-          cert_data: {
+-            cert_status: CERT_STATUS_TYPE.DOWNLOADABLE,
+-            cert_web_view_url: null,
+-            download_url: null,
+-          },
+-        }, {
+-          date_blocks: [
+-            {
+-              date_type: 'course-end-date',
+-              date: yesterday.toISOString(),
+-              title: 'End',
+-            },
+-            {
+-              date_type: 'certificate-available-date',
+-              date: tomorrow.toISOString(),
+-              title: 'Cert Available',
+-            },
+-            {
+-              date_type: 'verification-deadline-date',
+-              date: tomorrow.toISOString(),
+-              link_text: 'Verify',
+-              title: 'Verification Upgrade Deadline',
+-            },
+-          ],
+-        });
+-        await fetchAndRender();
+-        sendTrackEvent.mockClear();
+-        const requestingButton = screen.getByRole('button', { name: 'View my certificate' });
+-        fireEvent.click(requestingButton);
+-        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+-        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_outline.certificate_alert_downloadable_button.clicked',
+-          {
+-            courserun_key: courseId,
+-            is_staff: false,
+-            org_key: 'edX',
+-          });
+-      });
++
+       it('tracks unverified cert button', async () => {
+         sendTrackEvent.mockClear();
+         const now = new Date();
+@@ -827,7 +781,6 @@ describe('Outline Tab', () => {
+           cert_data: {
+             cert_status: CERT_STATUS_TYPE.UNVERIFIED,
+             cert_web_view_url: null,
+-            download_url: null,
+           },
+         }, {
+           date_blocks: [
+@@ -915,7 +868,6 @@ describe('Outline Tab', () => {
+           cert_status: CERT_STATUS_TYPE.DOWNLOADABLE,
+           cert_web_view_url: 'certificate/testuuid',
+           certificate_available_date: null,
+-          download_url: null,
+         },
+       }, {
+         date_blocks: [
+@@ -941,7 +893,6 @@ describe('Outline Tab', () => {
+           cert_status: CERT_STATUS_TYPE.REQUESTING,
+           cert_web_view_url: null,
+           certificate_available_date: null,
+-          download_url: null,
+         },
+       }, {
+         date_blocks: [
+@@ -958,33 +909,6 @@ describe('Outline Tab', () => {
+     });
+   });
+ 
+-  describe('Certificate (pdf) Complete Alert', () => {
+-    it('appears', async () => {
+-      const now = new Date();
+-      const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+-      setMetadata({ is_enrolled: true });
+-      setTabData({
+-        cert_data: {
+-          cert_status: CERT_STATUS_TYPE.DOWNLOADABLE,
+-          cert_web_view_url: null,
+-          certificate_available_date: null,
+-          download_url: 'download/url',
+-        },
+-      }, {
+-        date_blocks: [
+-          {
+-            date_type: 'course-end-date',
+-            date: yesterday.toISOString(),
+-            title: 'End',
+-          },
+-        ],
+-      });
+-      await fetchAndRender();
+-      expect(screen.queryByText('Congratulations! Your certificate is ready.')).toBeInTheDocument();
+-      expect(screen.queryByRole('link', { name: 'Download my certificate' })).toBeInTheDocument();
+-    });
+-  });
+-
+   describe('Proctoring Info Panel', () => {
+     const onboardingReleaseDate = new Date();
+     onboardingReleaseDate.setDate(new Date().getDate() - 7);
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+index 2de03e7..b650b36 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+@@ -33,7 +33,6 @@ function CertificateStatusAlert({ intl, payload }) {
+     courseEndDate,
+     courseId,
+     certURL,
+-    isWebCert,
+     userTimezone,
+     org,
+     notPassingCourseEnded,
+@@ -79,11 +78,7 @@ function CertificateStatusAlert({ intl, payload }) {
+       );
+     } else if (certStatus === CERT_STATUS_TYPE.DOWNLOADABLE) {
+       alertProps.header = intl.formatMessage(certMessages.certStatusDownloadableHeader);
+-      if (isWebCert) {
+-        alertProps.buttonMessage = intl.formatMessage(certStatusMessages.viewableButton);
+-      } else {
+-        alertProps.buttonMessage = intl.formatMessage(certStatusMessages.downloadableButton);
+-      }
++      alertProps.buttonMessage = intl.formatMessage(certStatusMessages.viewableButton);
+       alertProps.buttonVisible = true;
+       alertProps.buttonLink = certURL;
+       alertProps.buttonAction = () => {
+@@ -204,7 +199,6 @@ CertificateStatusAlert.propTypes = {
+     courseEndDate: PropTypes.string,
+     courseId: PropTypes.string,
+     certURL: PropTypes.string,
+-    isWebCert: PropTypes.bool,
+     userTimezone: PropTypes.string,
+     org: PropTypes.string,
+     notPassingCourseEnded: PropTypes.bool,
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+index 693a457..86445e3 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+@@ -51,10 +51,8 @@ function useCertificateStatusAlert(courseId) {
+     certStatus,
+     certWebViewUrl,
+     certificateAvailableDate,
+-    downloadUrl,
+   } = certData || {};
+   const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+-  const isWebCert = downloadUrl === null;
+   const isVerifiedEnrollmentMode = (
+     enrollmentMode !== null
+     && enrollmentMode !== undefined
+@@ -63,9 +61,6 @@ function useCertificateStatusAlert(courseId) {
+   let certURL = '';
+   if (certWebViewUrl) {
+     certURL = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
+-  } else if (downloadUrl) {
+-    // PDF Certificate
+-    certURL = downloadUrl;
+   }
+   const hasAlertingCertStatus = verifyCertStatusType(certStatus);
+ 
+@@ -87,7 +82,6 @@ function useCertificateStatusAlert(courseId) {
+     courseId,
+     courseEndDate: endBlock && endBlock.date,
+     userTimezone,
+-    isWebCert,
+     org,
+     notPassingCourseEnded,
+     tabs,
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 6097f06..e53ef5f 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -959,49 +959,6 @@ describe('Progress Tab', () => {
+         });
+       });
+ 
+-      it('Displays download link', async () => {
+-        setTabData({
+-          certificate_data: {
+-            cert_status: 'downloadable',
+-            download_url: 'fake.download.url',
+-          },
+-          user_has_passing_grade: true,
+-        });
+-        await fetchAndRender();
+-        expect(screen.getByRole('link', { name: 'Download my certificate' })).toBeInTheDocument();
+-      });
+-
+-      it('sends events on view of progress tab and on click of downloadable certificate link', async () => {
+-        setTabData({
+-          certificate_data: {
+-            cert_status: 'downloadable',
+-            download_url: 'fake.download.url',
+-          },
+-          user_has_passing_grade: true,
+-        });
+-        await fetchAndRender();
+-        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+-        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
+-          org_key: 'edX',
+-          courserun_key: courseId,
+-          is_staff: false,
+-          track_variant: 'audit',
+-          grade_variant: 'passing',
+-          certificate_status_variant: 'earned_downloadable',
+-        });
+-
+-        const downloadCertificateLink = screen.getByRole('link', { name: 'Download my certificate' });
+-        fireEvent.click(downloadCertificateLink);
+-
+-        expect(sendTrackEvent).toHaveBeenCalledTimes(2);
+-        expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.course_progress.certificate_status.clicked', {
+-          org_key: 'edX',
+-          courserun_key: courseId,
+-          is_staff: false,
+-          certificate_status_variant: 'earned_downloadable',
+-        });
+-      });
+-
+       it('Displays webview link', async () => {
+         setTabData({
+           certificate_data: {
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index d6c7b44..5e187d4 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -61,13 +61,11 @@ function CertificateStatus({ intl }) {
+ 
+   let certStatus;
+   let certWebViewUrl;
+-  let downloadUrl;
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+   if (certificateData) {
+     certStatus = certificateData.certStatus;
+     certWebViewUrl = certificateData.certWebViewUrl;
+-    downloadUrl = certificateData.downloadUrl;
+   }
+ 
+   let certCase;
+@@ -143,15 +141,10 @@ function CertificateStatus({ intl }) {
+             values={{ dashboardLink, profileLink }}
+           />
+         );
+-
+         if (certWebViewUrl) {
+           certEventName = 'earned_viewable';
+           buttonLocation = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
+           buttonText = intl.formatMessage(messages.viewableButton);
+-        } else if (downloadUrl) {
+-          certEventName = 'earned_downloadable';
+-          buttonLocation = downloadUrl;
+-          buttonText = intl.formatMessage(messages.downloadableButton);
+         }
+         break;
+ 
+diff --git a/src/course-home/progress-tab/certificate-status/messages.js b/src/course-home/progress-tab/certificate-status/messages.js
+index 54b21e9..adfb729 100644
+--- a/src/course-home/progress-tab/certificate-status/messages.js
++++ b/src/course-home/progress-tab/certificate-status/messages.js
+@@ -61,11 +61,6 @@ const messages = defineMessages({
+     defaultMessage: 'Showcase your accomplishment on LinkedIn or your resumé today. You can download your certificate now and access it any time from your Dashboard and Profile.',
+     description: 'Recommending an action for learner when course certificate is available',
+   },
+-  downloadableButton: {
+-    id: 'progress.certificateStatus.downloadableButton',
+-    defaultMessage: 'Download my certificate',
+-    description: 'Button text when learner certifcate status is downloadable',
+-  },
+   viewableButton: {
+     id: 'progress.certificateStatus.viewableButton',
+     defaultMessage: 'View my certificate',
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index ec12e82..c9c5a2b 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -62,7 +62,6 @@ function CourseCelebration({ intl }) {
+   const {
+     certStatus,
+     certWebViewUrl,
+-    downloadUrl,
+     certificateAvailableDate,
+   } = certificateData || {};
+ 
+@@ -104,9 +103,6 @@ function CourseCelebration({ intl }) {
+       if (certWebViewUrl) {
+         buttonLocation = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
+         buttonText = intl.formatMessage(messages.viewCertificateButton);
+-      } else if (downloadUrl) {
+-        buttonLocation = downloadUrl;
+-        buttonText = intl.formatMessage(messages.downloadButton);
+       }
+       if (linkedinAddToProfileUrl) {
+         buttonPrefix = (
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index cd7b558..48dc037 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -108,17 +108,6 @@ describe('Course Exit Pages', () => {
+   });
+ 
+   describe('Course Celebration Experience', () => {
+-    it('Displays download link', async () => {
+-      setMetadata({
+-        certificate_data: {
+-          cert_status: 'downloadable',
+-          download_url: 'fake.download.url',
+-        },
+-      });
+-      await fetchAndRender(<CourseCelebration />);
+-      expect(screen.getByRole('link', { name: 'Download my certificate' })).toBeInTheDocument();
+-    });
+-
+     it('Displays webview link', async () => {
+       setMetadata({
+         certificate_data: {
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index 3543c66..297596f 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -76,11 +76,6 @@ const messages = defineMessages({
+     defaultMessage: 'Dashboard',
+     description: 'Link to user’s dashboard',
+   },
+-  downloadButton: {
+-    id: 'courseCelebration.downloadButton',
+-    defaultMessage: 'Download my certificate',
+-    description: 'Button to download the course certificate',
+-  },
+   endOfCourseDescription: {
+     id: 'courseExit.endOfCourseDescription',
+     defaultMessage: 'Unfortunately, you are not currently eligible for a certificate. You need to receive a passing grade to be eligible for a certificate.',
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index cf77a27..9404847 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -283,7 +283,7 @@ describe('Courseware Service', () => {
+             user_has_passing_grade: boolean(false),
+             course_exit_page_is_active: boolean(false),
+             certificate_data: {
+-              cert_status: string('audit_passing'), cert_web_view_url: null, download_url: null, certificate_available_date: null,
++              cert_status: string('audit_passing'), cert_web_view_url: null, certificate_available_date: null,
+             },
+             verify_identity_url: null,
+             verification_status: string('none'),
+@@ -328,7 +328,6 @@ describe('Courseware Service', () => {
+         certificateData: {
+           certStatus: 'audit_passing',
+           certWebViewUrl: null,
+-          downloadUrl: null,
+           certificateAvailableDate: null,
+         },
+         timeOffsetMillis: 0,
+diff --git a/src/i18n/messages/ar.json b/src/i18n/messages/ar.json
+index 3c4cbd0..9dc6c2c 100644
+--- a/src/i18n/messages/ar.json
++++ b/src/i18n/messages/ar.json
+@@ -125,7 +125,6 @@
+   "progress.certificateStatus.unverifiedButton": "التحقق من الهوية",
+   "progress.certificateStatus.courseCelebration.verificationPending": "عملية التحقق من المعرّف الخاص بك معلّقة وستتوفر شهادتك بمجرد الموافقة.",
+   "progress.certificateStatus.downloadableHeader": "!شهادتك جاهزة",
+-  "progress.certificateStatus.downloadableButton": "تحميل شهاداتي",
+   "progress.certificateStatus.viewableButton": "عرض شهاداتي",
+   "progress.certificateStatus.notAvailableHeader": "حالة الشهادة",
+   "progress.certificateBody.notAvailable.endDate": "Final grades and any earned certificates are scheduled to be available after {endDate}.",
+@@ -288,7 +287,6 @@
+   "courseExit.courseInProgressDescription": "يبدو أن هناك المزيد من المحتوى في هذه الدورة والذي سيتم إصداره في المستقبل. ابقى على اطلاع بتحديثات البريد الإلكتروني أو تحقق مرة أخرى من الدورة التدريبية الخاصة بك لمعرفة وقت توفر هذا المحتوى.",
+   "courseExit.courseInProgressHeader": "المزيد من المحتوى قريبا!",
+   "courseExit.dashboardLink": "لوحة المعلومات",
+-  "courseCelebration.downloadButton": "تحميل شهاداتي",
+   "courseExit.endOfCourseDescription": "لسوء الحظ، لست مؤهلًا الآن للحصول على شهادة. تحتاج إلى تحقيق درجة الاجتياز تؤهلك للحصول على شهادة.",
+   "courseExit.endOfCourseHeader": "لقد أتممت المساق!",
+   "courseExit.endOfCourseTitle": "نهاية المساق",
+diff --git a/src/i18n/messages/es_419.json b/src/i18n/messages/es_419.json
+index 7bf0406..9155334 100644
+--- a/src/i18n/messages/es_419.json
++++ b/src/i18n/messages/es_419.json
+@@ -125,7 +125,6 @@
+   "progress.certificateStatus.unverifiedButton": "Verificar tu identidad",
+   "progress.certificateStatus.courseCelebration.verificationPending": "Su verificación de ID está pendiente y su certificado estará disponible una vez que se haya aprobado.",
+   "progress.certificateStatus.downloadableHeader": "¡Tu certificado está disponible!",
+-  "progress.certificateStatus.downloadableButton": "Descargar mi certificado",
+   "progress.certificateStatus.viewableButton": "Ver mi certificado",
+   "progress.certificateStatus.notAvailableHeader": "Estado del certificado",
+   "progress.certificateBody.notAvailable.endDate": "Final grades and any earned certificates are scheduled to be available after {endDate}.",
+@@ -288,7 +287,6 @@
+   "courseExit.courseInProgressDescription": "Parece que hay más contenido en este curso que se publicará en el futuro. Presta atención a las novedades por correo electrónico o consulta tu curso para saber cuándo estará disponible este contenido.",
+   "courseExit.courseInProgressHeader": "¡Pronto habrá más contenido!",
+   "courseExit.dashboardLink": "Panel de Control",
+-  "courseCelebration.downloadButton": "Descargar mi certificado",
+   "courseExit.endOfCourseDescription": "Lamentablemente, no puedes obtener un certificado en este momento. Debes recibir una calificación aprobatoria para poder obtener un certificado.",
+   "courseExit.endOfCourseHeader": "¡Has llegado al fin del curso!",
+   "courseExit.endOfCourseTitle": "Fin del curso",
+diff --git a/src/i18n/messages/fr.json b/src/i18n/messages/fr.json
+index bb247de..44b49f0 100644
+--- a/src/i18n/messages/fr.json
++++ b/src/i18n/messages/fr.json
+@@ -125,7 +125,6 @@
+   "progress.certificateStatus.unverifiedButton": "Vérifiez votre identité",
+   "progress.certificateStatus.courseCelebration.verificationPending": "La vérification de votre identité est en attente et votre attestation sera disponible une fois approuvé.",
+   "progress.certificateStatus.downloadableHeader": "Votre attestation est disponible!",
+-  "progress.certificateStatus.downloadableButton": "Téléchargez mon attestation",
+   "progress.certificateStatus.viewableButton": "Voir mon attestation",
+   "progress.certificateStatus.notAvailableHeader": "État de l'attestation",
+   "progress.certificateBody.notAvailable.endDate": "Les notes finales et toutes les attestations obtenues devraient être disponibles après le {endDate}.",
+@@ -288,7 +287,6 @@
+   "courseExit.courseInProgressDescription": "Il semble qu'il y ait plus de contenu dans ce cours qui sera publié dans le futur. Attendez les mises à jour par courriel ou revenez sur votre cours pour savoir quand ce contenu sera disponible.",
+   "courseExit.courseInProgressHeader": "Plus de contenu sera bientôt disponible!",
+   "courseExit.dashboardLink": "Tableau de bord",
+-  "courseCelebration.downloadButton": "Téléchargez mon attestation",
+   "courseExit.endOfCourseDescription": "Malheureusement, vous n'êtes actuellement pas éligible pour une attestatation. Vous devez recevoir une note de passage pour être admissible à une attestation.",
+   "courseExit.endOfCourseHeader": "Vous avez atteint la fin du cours!",
+   "courseExit.endOfCourseTitle": "Fin du cours",
+diff --git a/src/i18n/messages/zh_CN.json b/src/i18n/messages/zh_CN.json
+index 6119324..d48806a 100644
+--- a/src/i18n/messages/zh_CN.json
++++ b/src/i18n/messages/zh_CN.json
+@@ -125,7 +125,6 @@
+   "progress.certificateStatus.unverifiedButton": "Verify ID",
+   "progress.certificateStatus.courseCelebration.verificationPending": "Your ID verification is pending and your certificate will be available once approved.",
+   "progress.certificateStatus.downloadableHeader": "Your certificate is available!",
+-  "progress.certificateStatus.downloadableButton": "Download my certificate",
+   "progress.certificateStatus.viewableButton": "View my certificate",
+   "progress.certificateStatus.notAvailableHeader": "Certificate status",
+   "progress.certificateBody.notAvailable.endDate": "Final grades and any earned certificates are scheduled to be available after {endDate}.",
+@@ -288,7 +287,6 @@
+   "courseExit.courseInProgressDescription": "It looks like there is more content in this course that will be released in the future. Look out for email updates or check back on your course for when this content will be available.",
+   "courseExit.courseInProgressHeader": "More content is coming soon!",
+   "courseExit.dashboardLink": "Dashboard",
+-  "courseCelebration.downloadButton": "Download my certificate",
+   "courseExit.endOfCourseDescription": "Unfortunately, you are not currently eligible for a certificate. You need to receive a passing grade to be eligible for a certificate.",
+   "courseExit.endOfCourseHeader": "You’ve reached the end of the course!",
+   "courseExit.endOfCourseTitle": "End of Course",
+diff --git a/src/pacts/frontend-app-learning-lms.json b/src/pacts/frontend-app-learning-lms.json
+index 76880a7..bd4b5b8 100644
+--- a/src/pacts/frontend-app-learning-lms.json
++++ b/src/pacts/frontend-app-learning-lms.json
+@@ -299,8 +299,7 @@
+           "course_exit_page_is_active": false,
+           "certificate_data": {
+             "cert_status": "audit_passing",
+-            "cert_web_view_url": null,
+-            "download_url": null,
++            "cert_web_view_url": null,            
+             "certificate_available_date": null
+           },
+           "verify_identity_url": null,
+-- 
+2.34.1
+

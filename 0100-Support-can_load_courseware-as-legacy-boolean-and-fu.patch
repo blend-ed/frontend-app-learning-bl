@@ -1,0 +1,27 @@
+From a852182a00ce3e6e8ce996c14c980f408f78a1eb Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Thu, 9 Apr 2020 16:10:55 -0400
+Subject: [PATCH 0100/1021] Support can_load_courseware as legacy boolean and
+ future object (#47)
+
+---
+ src/data/api.js | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/data/api.js b/src/data/api.js
+index a1f38cb..4ebe3ad 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -15,7 +15,8 @@ function normalizeMetadata(metadata) {
+     start: metadata.start,
+     enrollmentMode: metadata.enrollment.mode,
+     isEnrolled: metadata.enrollment.is_active,
+-    canLoadCourseware: metadata.can_load_courseware,
++    canLoadCourseware: typeof metadata.can_load_courseware === 'boolean'
++      ? metadata.can_load_courseware : metadata.can_load_courseware.has_access,
+     isStaff: metadata.is_staff,
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+     tabs: camelCaseObject(metadata.tabs),
+-- 
+2.34.1
+

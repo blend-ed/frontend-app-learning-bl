@@ -1,0 +1,2381 @@
+From 3362047bcc73a0cec724cdf6419b12991fa3c855 Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Thu, 9 Jul 2020 03:54:44 +0200
+Subject: [PATCH 0192/1021] [TNL-7268] Replace snapshots with specific
+ assertions
+
+---
+ .../course/sequence/Sequence.test.jsx         |  42 +-
+ .../course/sequence/SequenceContent.test.jsx  |  15 +-
+ src/courseware/course/sequence/Unit.test.jsx  |  26 +-
+ .../__snapshots__/Sequence.test.jsx.snap      | 475 ------------------
+ .../SequenceContent.test.jsx.snap             | 125 -----
+ .../sequence/__snapshots__/Unit.test.jsx.snap | 194 -------
+ .../SequenceNavigation.test.jsx               |  47 +-
+ .../SequenceNavigationDropdown.test.jsx       |  25 +-
+ .../SequenceNavigationTabs.test.jsx           |  18 +-
+ .../sequence-navigation/UnitButton.test.jsx   |  23 +-
+ .../sequence-navigation/UnitIcon.test.jsx     |   3 +-
+ .../UnitNavigation.test.jsx                   |   5 +-
+ .../SequenceNavigation.test.jsx.snap          | 244 ---------
+ .../SequenceNavigationDropdown.test.jsx.snap  |  26 -
+ .../SequenceNavigationTabs.test.jsx.snap      | 436 ----------------
+ .../__snapshots__/UnitButton.test.jsx.snap    | 143 ------
+ .../__snapshots__/UnitIcon.test.jsx.snap      |  61 ---
+ .../UnitNavigation.test.jsx.snap              |  36 --
+ src/setupTest.js                              |   7 +-
+ 19 files changed, 89 insertions(+), 1862 deletions(-)
+ delete mode 100644 src/courseware/course/sequence/__snapshots__/Sequence.test.jsx.snap
+ delete mode 100644 src/courseware/course/sequence/__snapshots__/SequenceContent.test.jsx.snap
+ delete mode 100644 src/courseware/course/sequence/__snapshots__/Unit.test.jsx.snap
+ delete mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigation.test.jsx.snap
+ delete mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationDropdown.test.jsx.snap
+ delete mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationTabs.test.jsx.snap
+ delete mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitButton.test.jsx.snap
+ delete mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
+ delete mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitNavigation.test.jsx.snap
+
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 9e575c4..14afec0 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -4,8 +4,7 @@ import { fireEvent, waitFor } from '@testing-library/dom';
+ import { cloneDeep } from 'lodash';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import {
+-  initialState,
+-  messageEvent, render, screen, testUnits,
++  initialState, loadUnit, render, screen, testUnits,
+ } from '../../../setupTest';
+ import Sequence from './Sequence';
+ 
+@@ -23,51 +22,42 @@ describe('Sequence', () => {
+   };
+ 
+   it('renders correctly without data', () => {
+-    const { asFragment } = render(
+-      <Sequence {...mockData} {...{ unitId: undefined, sequenceId: undefined }} />, { initialState: {} },
+-    );
++    render(<Sequence {...mockData} {...{ unitId: undefined, sequenceId: undefined }} />, { initialState: {} });
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('renders correctly for gated content', async () => {
+-    const { asFragment } = render(<Sequence {...mockData} {...{ sequenceId: '3' }} />);
++    render(<Sequence {...mockData} {...{ sequenceId: '3' }} />);
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+     // Only `Previous`, `Next` and `Bookmark` buttons.
+     expect(screen.getAllByRole('button').length).toEqual(3);
+ 
+-    const beforeLoadingUnit = asFragment();
+-    expect(beforeLoadingUnit).toMatchSnapshot();
+-
+-    window.postMessage(messageEvent, '*');
+-    await waitFor(() => expect(screen.getByText(/You must complete the prerequisite/)).toBeInTheDocument());
+-    expect(beforeLoadingUnit).toMatchDiffSnapshot(asFragment());
++    expect(await screen.findByText('Content Locked')).toBeInTheDocument();
++    expect(screen.getByAltText('fa-lock')).toBeInTheDocument();
++    expect(screen.getByText(/You must complete the prerequisite/)).toBeInTheDocument();
++    expect(screen.getByRole('button', { name: 'Go To Prerequisite Section' })).toBeInTheDocument();
++    expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
+   });
+ 
+   it('displays error message on sequence load failure', () => {
+     const testState = cloneDeep(initialState);
+     testState.courseware.sequenceStatus = 'failed';
+-    const { asFragment } = render(<Sequence {...mockData} />, { initialState: testState });
++    render(<Sequence {...mockData} />, { initialState: testState });
+ 
+     expect(screen.getByText('There was an error loading this course.')).toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('handles loading unit', async () => {
+-    const { asFragment } = render(<Sequence {...mockData} />);
++    render(<Sequence {...mockData} />);
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+     // Renders navigation buttons plus one button for each unit.
+     expect(screen.getAllByRole('button').length).toEqual(3 + testUnits.length);
+ 
+-    const beforeLoadingUnit = asFragment();
+-    expect(beforeLoadingUnit).toMatchSnapshot();
+-
+-    window.postMessage(messageEvent, '*');
++    loadUnit();
+     await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+     // At this point there will be 2 `Previous` and 2 `Next` buttons.
+     expect(screen.getAllByRole('button', { name: /previous|next/i }).length).toEqual(4);
+-    expect(beforeLoadingUnit).toMatchDiffSnapshot(asFragment());
+   });
+ 
+   describe('sequence and unit navigation buttons', () => {
+@@ -89,7 +79,7 @@ describe('Sequence', () => {
+         widget_placement: 'top',
+       });
+ 
+-      window.postMessage(messageEvent, '*');
++      loadUnit();
+       await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+       const unitPreviousButton = screen.getAllByRole('button', { name: /previous/i })
+         .filter(button => button !== sequencePreviousButton)[0];
+@@ -121,7 +111,7 @@ describe('Sequence', () => {
+         widget_placement: 'top',
+       });
+ 
+-      window.postMessage(messageEvent, '*');
++      loadUnit();
+       await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+       const unitNextButton = screen.getAllByRole('button', { name: /next/i })
+         .filter(button => button !== sequenceNextButton)[0];
+@@ -162,7 +152,7 @@ describe('Sequence', () => {
+       const previousSequenceHandler = jest.fn();
+       const unitId = '1';
+       render(<Sequence {...mockData} {...{ unitNavigationHandler, previousSequenceHandler, unitId }} />);
+-      window.postMessage(messageEvent, '*');
++      loadUnit();
+       await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+ 
+       screen.getAllByRole('button', { name: /previous/i }).forEach(button => fireEvent.click(button));
+@@ -184,7 +174,7 @@ describe('Sequence', () => {
+           unitNavigationHandler, nextSequenceHandler, unitId, sequenceId,
+         }}
+       />);
+-      window.postMessage(messageEvent, '*');
++      loadUnit();
+       await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+ 
+       screen.getAllByRole('button', { name: /next/i }).forEach(button => fireEvent.click(button));
+@@ -211,7 +201,7 @@ describe('Sequence', () => {
+         {...mockData}
+         {...{ unitNavigationHandler, previousSequenceHandler, nextSequenceHandler }}
+       />, { initialState: testState });
+-      window.postMessage(messageEvent, '*');
++      loadUnit();
+       await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+ 
+       screen.getAllByRole('button', { name: /previous/i }).forEach(button => fireEvent.click(button));
+diff --git a/src/courseware/course/sequence/SequenceContent.test.jsx b/src/courseware/course/sequence/SequenceContent.test.jsx
+index a0aa14c..bbed341 100644
+--- a/src/courseware/course/sequence/SequenceContent.test.jsx
++++ b/src/courseware/course/sequence/SequenceContent.test.jsx
+@@ -13,25 +13,24 @@ describe('Sequence Content', () => {
+   };
+ 
+   it('displays loading message', () => {
+-    const { asFragment } = render(<SequenceContent {...mockData} />, { initialState });
++    render(<SequenceContent {...mockData} />, { initialState });
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('displays messages for the locked content', async () => {
+-    const { asFragment } = render(<SequenceContent {...mockData} gated />, { initialState });
++    render(<SequenceContent {...mockData} gated />, { initialState });
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
+ 
+-    expect(await screen.findByText(/content locked/i)).toBeInTheDocument();
++    expect(await screen.findByText('Content Locked')).toBeInTheDocument();
+     expect(screen.getByText('test-sequence')).toBeInTheDocument();
+     expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
++    expect(screen.getByAltText('fa-lock')).toBeInTheDocument();
++    expect(screen.getByText(/You must complete the prerequisite/)).toBeInTheDocument();
++    expect(screen.getByRole('button', { name: 'Go To Prerequisite Section' })).toBeInTheDocument();
+   });
+ 
+   it('displays message for no content', () => {
+-    const { asFragment } = render(<SequenceContent {...mockData} unitId={null} />, { initialState });
++    render(<SequenceContent {...mockData} unitId={null} />, { initialState });
+     expect(screen.getByText('There is no content here.')).toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ });
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index f91734c..4d25189 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -3,7 +3,7 @@ import React from 'react';
+ import { cloneDeep } from 'lodash';
+ import { waitFor } from '@testing-library/dom';
+ import {
+-  initialState, messageEvent, render, screen,
++  initialState, loadUnit, messageEvent, render, screen,
+ } from '../../../setupTest';
+ import Unit from './Unit';
+ 
+@@ -15,40 +15,40 @@ describe('Unit', () => {
+   };
+ 
+   it('renders correctly', () => {
+-    const { asFragment } = render(<Unit {...mockData} />, { initialState });
++    render(<Unit {...mockData} />, { initialState });
+ 
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+     expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(0));
+-    expect(asFragment()).toMatchSnapshot();
++    expect(screen.getByTitle(mockData.id)).toHaveAttribute(
++      'src', `http://localhost:18000/xblock/${mockData.id}?show_title=0&show_bookmark_button=0`,
++    );
+   });
+ 
+   it('renders proper message for gated content', () => {
+     // Clone initialState.
+     const testState = cloneDeep(initialState);
+     testState.models.units[mockData.id].graded = true;
+-    const { asFragment } = render(<Unit {...mockData} />, { initialState: testState });
++    render(<Unit {...mockData} />, { initialState: testState });
+ 
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
++    expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+   });
+ 
+   it('handles receiving MessageEvent', async () => {
+-    const { asFragment } = render(<Unit {...mockData} />, { initialState });
+-    const beforePostingMessage = asFragment();
++    render(<Unit {...mockData} />, { initialState });
++    loadUnit();
+ 
+-    window.postMessage(messageEvent, '*');
+     // Loading message is gone now.
+     await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+     // Iframe's height is set via message.
+     expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(messageEvent.payload.height));
+-    expect(beforePostingMessage).toMatchDiffSnapshot(asFragment());
+   });
+ 
+-  it('handles onLoaded after receiving MessageEvent', async () => {
++  it('calls onLoaded after receiving MessageEvent', async () => {
+     const onLoaded = jest.fn();
+     render(<Unit {...mockData} {...{ onLoaded }} />, { initialState });
++    loadUnit();
+ 
+-    window.postMessage(messageEvent, '*');
+     await waitFor(() => expect(onLoaded).toHaveBeenCalledTimes(1));
+   });
+ 
+@@ -57,8 +57,8 @@ describe('Unit', () => {
+     // Clone message and set different height.
+     const testMessageWithOtherHeight = { ...messageEvent, payload: { height: 200 } };
+     render(<Unit {...mockData} {...{ onLoaded }} />, { initialState });
++    loadUnit();
+ 
+-    window.postMessage(messageEvent, '*');
+     await waitFor(() => expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(messageEvent.payload.height)));
+     window.postMessage(testMessageWithOtherHeight, '*');
+     await waitFor(() => expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(testMessageWithOtherHeight.payload.height)));
+@@ -69,8 +69,8 @@ describe('Unit', () => {
+     // Clone message and set different type.
+     const testMessageWithUnhandledType = { ...messageEvent, type: 'wrong type' };
+     render(<Unit {...mockData} />, { initialState });
+-
+     window.postMessage(testMessageWithUnhandledType, '*');
++
+     // HACK: We don't have a function we could reliably await here, so this test relies on the timeout of `waitFor`.
+     // FIXME: After the last updates `toThrowErrorMatchingSnapshot` (due to a bug) started returning DOM
+     //  after the error, so we had to fall back to `toThrowError` assertion for better readability.
+diff --git a/src/courseware/course/sequence/__snapshots__/Sequence.test.jsx.snap b/src/courseware/course/sequence/__snapshots__/Sequence.test.jsx.snap
+deleted file mode 100644
+index 19ba71c..0000000
+--- a/src/courseware/course/sequence/__snapshots__/Sequence.test.jsx.snap
++++ /dev/null
+@@ -1,475 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Sequence displays error message on sequence load failure 1`] = `
+-<DocumentFragment>
+-  <p
+-    class="text-center py-5 mx-auto"
+-    style="max-width: 30em;"
+-  >
+-    There was an error loading this course.
+-  </p>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence handles loading unit 1`] = `
+-<DocumentFragment>
+-  <div
+-    class="sequence-container"
+-  >
+-    <div
+-      class="sequence"
+-    >
+-      <nav
+-        class="sequence-navigation mb-4"
+-      >
+-        <button
+-          class="btn previous-btn"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-chevron-left"
+-            class="fa-chevron-left"
+-            data-testid="icon"
+-          />
+-          <span>
+-            Previous
+-          </span>
+-        </button>
+-        <div
+-          style="flex-basis: 100%; min-width: 0;"
+-        >
+-          <div
+-            class="sequence-navigation-tabs-container"
+-          >
+-            <div
+-              class="sequence-navigation-tabs d-flex flex-grow-1"
+-              style=""
+-            >
+-              <button
+-                class="btn"
+-                title="1"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn"
+-                title="2"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn active"
+-                title="3"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn"
+-                title="4"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn"
+-                title="5"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn"
+-                title="6"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn"
+-                title="7"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn"
+-                title="8"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn"
+-                title="9"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-              <button
+-                class="btn"
+-                title="10"
+-                type="button"
+-              >
+-                <img
+-                  alt="fa-book"
+-                  class="fa-book"
+-                  data-testid="icon"
+-                />
+-              </button>
+-            </div>
+-          </div>
+-        </div>
+-        <button
+-          class="btn next-btn"
+-          type="button"
+-        >
+-          <span>
+-            Next
+-          </span>
+-          <img
+-            alt="fa-chevron-right"
+-            class="fa-chevron-right"
+-            data-testid="icon"
+-          />
+-        </button>
+-      </nav>
+-      <div
+-        class="unit-container flex-grow-1"
+-      >
+-        <div
+-          class="unit"
+-        >
+-          <h2
+-            class="mb-0 h4"
+-          >
+-            3
+-          </h2>
+-          <button
+-            aria-disabled="false"
+-            aria-live="assertive"
+-            class="btn pgn__stateful-btn pgn__stateful-btn-state-default btn-link px-1 ml-n1 btn-sm"
+-            type="button"
+-          >
+-            <span
+-              class="d-flex align-items-center justify-content-center"
+-            >
+-              <span
+-                class="pgn__stateful-btn-icon"
+-              >
+-                <img
+-                  alt="fa-bookmark"
+-                  class="fa-bookmark"
+-                  data-testid="icon"
+-                />
+-              </span>
+-              <span>
+-                Bookmark this page
+-              </span>
+-            </span>
+-          </button>
+-          <div>
+-            <div
+-              class="d-flex justify-content-center align-items-center flex-column"
+-              style="height: 50vh;"
+-            >
+-              <div
+-                class="spinner-border text-primary"
+-                role="status"
+-              >
+-                <span
+-                  class="sr-only"
+-                >
+-                  Loading learning sequence...
+-                </span>
+-              </div>
+-            </div>
+-          </div>
+-          <div
+-            class="unit-iframe-wrapper"
+-          >
+-            <iframe
+-              allowfullscreen=""
+-              height="0"
+-              id="unit-iframe"
+-              referrerpolicy="origin"
+-              scrolling="no"
+-              src="http://localhost:18000/xblock/3?show_title=0&show_bookmark_button=0"
+-              title="3"
+-            />
+-          </div>
+-        </div>
+-      </div>
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence handles loading unit 2`] = `
+-"Snapshot Diff:
+-- First value
+-+ Second value
+-
+-@@ -190,40 +190,53 @@
+-                <span>
+-                  Bookmark this page
+-                </span>
+-              </span>
+-            </button>
+--           <div>
+--             <div
+--               class=\\"d-flex justify-content-center align-items-center flex-column\\"
+--               style=\\"height: 50vh;\\"
+--             >
+--               <div
+--                 class=\\"spinner-border text-primary\\"
+--                 role=\\"status\\"
+--               >
+--                 <span
+--                   class=\\"sr-only\\"
+--                 >
+--                   Loading learning sequence...
+--                 </span>
+--               </div>
+--             </div>
+--           </div>
+-            <div
+-              class=\\"unit-iframe-wrapper\\"
+-            >
+-              <iframe
+-                allowfullscreen=\\"\\"
+--               height=\\"0\\"
+-+               height=\\"300\\"
+-                id=\\"unit-iframe\\"
+-                referrerpolicy=\\"origin\\"
+-                scrolling=\\"no\\"
+-                src=\\"http://localhost:18000/xblock/3?show_title=0&show_bookmark_button=0\\"
+-                title=\\"3\\"
+-              />
+-            </div>
+-+         </div>
+-+         <div
+-+           class=\\"unit-navigation d-flex\\"
+-+         >
+-+           <button
+-+             class=\\"btn btn-outline-secondary previous-button mr-2\\"
+-+             type=\\"button\\"
+-+           >
+-+             <img
+-+               alt=\\"fa-chevron-left\\"
+-+               class=\\"fa-chevron-left\\"
+-+               data-testid=\\"icon\\"
+-+             />
+-+             <span>
+-+               Previous
+-+             </span>
+-+           </button>
+-+           <button
+-+             class=\\"btn btn-outline-primary next-button\\"
+-+             type=\\"button\\"
+-+           >
+-+             <span>
+-+               Next
+-+             </span>
+-+             <img
+-+               alt=\\"fa-chevron-right\\"
+-+               class=\\"fa-chevron-right\\"
+-+               data-testid=\\"icon\\"
+-+             />
+-+           </button>
+-          </div>
+-        </div>
+-      </div>
+-    </div>
+-  </DocumentFragment>"
+-`;
+-
+-exports[`Sequence renders correctly for gated content 1`] = `
+-<DocumentFragment>
+-  <div
+-    class="sequence-container"
+-  >
+-    <div
+-      class="sequence"
+-    >
+-      <nav
+-        class="sequence-navigation mb-4"
+-      >
+-        <button
+-          class="btn previous-btn"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-chevron-left"
+-            class="fa-chevron-left"
+-            data-testid="icon"
+-          />
+-          <span>
+-            Previous
+-          </span>
+-        </button>
+-        <button
+-          class="btn active"
+-          title="3"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn next-btn"
+-          type="button"
+-        >
+-          <span>
+-            Next
+-          </span>
+-          <img
+-            alt="fa-chevron-right"
+-            class="fa-chevron-right"
+-            data-testid="icon"
+-          />
+-        </button>
+-      </nav>
+-      <div
+-        class="unit-container flex-grow-1"
+-      >
+-        <div>
+-          <div
+-            class="d-flex justify-content-center align-items-center flex-column"
+-            style="height: 50vh;"
+-          >
+-            <div
+-              class="spinner-border text-primary"
+-              role="status"
+-            >
+-              <span
+-                class="sr-only"
+-              >
+-                Loading locked content messaging...
+-              </span>
+-            </div>
+-          </div>
+-        </div>
+-      </div>
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence renders correctly for gated content 2`] = `
+-"Snapshot Diff:
+-- First value
+-+ Second value
+-
+-@@ -47,26 +47,31 @@
+-          </button>
+-        </nav>
+-        <div
+-          class=\\"unit-container flex-grow-1\\"
+-        >
+--         <div>
+--           <div
+--             class=\\"d-flex justify-content-center align-items-center flex-column\\"
+--             style=\\"height: 50vh;\\"
+-+         <h3>
+-+           <img
+-+             alt=\\"fa-lock\\"
+-+             class=\\"fa-lock\\"
+-+             data-testid=\\"icon\\"
+-+           />
+-+            test-sequence-3
+-+         </h3>
+-+         <h4>
+-+           Content Locked
+-+         </h4>
+-+         <p>
+-+           You must complete the prerequisite: 'test-gated-section' to access this content.
+-+         </p>
+-+         <p>
+-+           <button
+-+             class=\\"btn btn-primary\\"
+-+             type=\\"button\\"
+-            >
+--             <div
+--               class=\\"spinner-border text-primary\\"
+--               role=\\"status\\"
+--             >
+--               <span
+--                 class=\\"sr-only\\"
+--               >
+--                 Loading locked content messaging...
+--               </span>
+--             </div>
+--           </div>
+--         </div>
+-+             Go To Prerequisite Section
+-+           </button>
+-+         </p>
+-        </div>
+-      </div>
+-    </div>
+-  </DocumentFragment>"
+-`;
+-
+-exports[`Sequence renders correctly without data 1`] = `
+-<DocumentFragment>
+-  <div>
+-    <div
+-      class="d-flex justify-content-center align-items-center flex-column"
+-      style="height: 50vh;"
+-    >
+-      <div
+-        class="spinner-border text-primary"
+-        role="status"
+-      >
+-        <span
+-          class="sr-only"
+-        >
+-          Loading learning sequence...
+-        </span>
+-      </div>
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+diff --git a/src/courseware/course/sequence/__snapshots__/SequenceContent.test.jsx.snap b/src/courseware/course/sequence/__snapshots__/SequenceContent.test.jsx.snap
+deleted file mode 100644
+index 0018bd6..0000000
+--- a/src/courseware/course/sequence/__snapshots__/SequenceContent.test.jsx.snap
++++ /dev/null
+@@ -1,125 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Sequence Content displays loading message 1`] = `
+-<DocumentFragment>
+-  <div
+-    class="unit"
+-  >
+-    <h2
+-      class="mb-0 h4"
+-    >
+-      1
+-    </h2>
+-    <button
+-      aria-disabled="false"
+-      aria-live="assertive"
+-      class="btn pgn__stateful-btn pgn__stateful-btn-state-default btn-link px-1 ml-n1 btn-sm"
+-      type="button"
+-    >
+-      <span
+-        class="d-flex align-items-center justify-content-center"
+-      >
+-        <span
+-          class="pgn__stateful-btn-icon"
+-        >
+-          <img
+-            alt="fa-bookmark"
+-            class="fa-bookmark"
+-            data-testid="icon"
+-          />
+-        </span>
+-        <span>
+-          Bookmark this page
+-        </span>
+-      </span>
+-    </button>
+-    <div>
+-      <div
+-        class="d-flex justify-content-center align-items-center flex-column"
+-        style="height: 50vh;"
+-      >
+-        <div
+-          class="spinner-border text-primary"
+-          role="status"
+-        >
+-          <span
+-            class="sr-only"
+-          >
+-            Loading learning sequence...
+-          </span>
+-        </div>
+-      </div>
+-    </div>
+-    <div
+-      class="unit-iframe-wrapper"
+-    >
+-      <iframe
+-        allowfullscreen=""
+-        height="0"
+-        id="unit-iframe"
+-        referrerpolicy="origin"
+-        scrolling="no"
+-        src="http://localhost:18000/xblock/1?show_title=0&show_bookmark_button=0"
+-        title="1"
+-      />
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence Content displays message for no content 1`] = `
+-<DocumentFragment>
+-  <div>
+-    There is no content here.
+-  </div>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence Content displays messages for the locked content 1`] = `
+-<DocumentFragment>
+-  <div>
+-    <div
+-      class="d-flex justify-content-center align-items-center flex-column"
+-      style="height: 50vh;"
+-    >
+-      <div
+-        class="spinner-border text-primary"
+-        role="status"
+-      >
+-        <span
+-          class="sr-only"
+-        >
+-          Loading locked content messaging...
+-        </span>
+-      </div>
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence Content displays messages for the locked content 2`] = `
+-<DocumentFragment>
+-  <h3>
+-    <img
+-      alt="fa-lock"
+-      class="fa-lock"
+-      data-testid="icon"
+-    />
+-     test-sequence
+-  </h3>
+-  <h4>
+-    Content Locked
+-  </h4>
+-  <p>
+-    You must complete the prerequisite: 'test-gated-section' to access this content.
+-  </p>
+-  <p>
+-    <button
+-      class="btn btn-primary"
+-      type="button"
+-    >
+-      Go To Prerequisite Section
+-    </button>
+-  </p>
+-</DocumentFragment>
+-`;
+diff --git a/src/courseware/course/sequence/__snapshots__/Unit.test.jsx.snap b/src/courseware/course/sequence/__snapshots__/Unit.test.jsx.snap
+deleted file mode 100644
+index d166775..0000000
+--- a/src/courseware/course/sequence/__snapshots__/Unit.test.jsx.snap
++++ /dev/null
+@@ -1,194 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Unit handles receiving MessageEvent 1`] = `
+-"Snapshot Diff:
+-- First value
+-+ Second value
+-
+-@@ -28,33 +28,16 @@
+-          <span>
+-            Bookmark this page
+-          </span>
+-        </span>
+-      </button>
+--     <div>
+-      <div
+--         class=\\"d-flex justify-content-center align-items-center flex-column\\"
+--         style=\\"height: 50vh;\\"
+--       >
+--         <div
+--           class=\\"spinner-border text-primary\\"
+--           role=\\"status\\"
+--         >
+--           <span
+--             class=\\"sr-only\\"
+--           >
+--             Loading learning sequence...
+--           </span>
+--         </div>
+--       </div>
+--     </div>
+--     <div
+-        class=\\"unit-iframe-wrapper\\"
+-      >
+-        <iframe
+-          allowfullscreen=\\"\\"
+--         height=\\"0\\"
+-+         height=\\"300\\"
+-          id=\\"unit-iframe\\"
+-          referrerpolicy=\\"origin\\"
+-          scrolling=\\"no\\"
+-          src=\\"http://localhost:18000/xblock/3?show_title=0&show_bookmark_button=0\\"
+-          title=\\"3\\""
+-`;
+-
+-exports[`Unit renders correctly 1`] = `
+-<DocumentFragment>
+-  <div
+-    class="unit"
+-  >
+-    <h2
+-      class="mb-0 h4"
+-    >
+-      3
+-    </h2>
+-    <button
+-      aria-disabled="false"
+-      aria-live="assertive"
+-      class="btn pgn__stateful-btn pgn__stateful-btn-state-default btn-link px-1 ml-n1 btn-sm"
+-      type="button"
+-    >
+-      <span
+-        class="d-flex align-items-center justify-content-center"
+-      >
+-        <span
+-          class="pgn__stateful-btn-icon"
+-        >
+-          <img
+-            alt="fa-bookmark"
+-            class="fa-bookmark"
+-            data-testid="icon"
+-          />
+-        </span>
+-        <span>
+-          Bookmark this page
+-        </span>
+-      </span>
+-    </button>
+-    <div>
+-      <div
+-        class="d-flex justify-content-center align-items-center flex-column"
+-        style="height: 50vh;"
+-      >
+-        <div
+-          class="spinner-border text-primary"
+-          role="status"
+-        >
+-          <span
+-            class="sr-only"
+-          >
+-            Loading learning sequence...
+-          </span>
+-        </div>
+-      </div>
+-    </div>
+-    <div
+-      class="unit-iframe-wrapper"
+-    >
+-      <iframe
+-        allowfullscreen=""
+-        height="0"
+-        id="unit-iframe"
+-        referrerpolicy="origin"
+-        scrolling="no"
+-        src="http://localhost:18000/xblock/3?show_title=0&show_bookmark_button=0"
+-        title="3"
+-      />
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit renders proper message for gated content 1`] = `
+-<DocumentFragment>
+-  <div
+-    class="unit"
+-  >
+-    <h2
+-      class="mb-0 h4"
+-    >
+-      3
+-    </h2>
+-    <button
+-      aria-disabled="false"
+-      aria-live="assertive"
+-      class="btn pgn__stateful-btn pgn__stateful-btn-state-default btn-link px-1 ml-n1 btn-sm"
+-      type="button"
+-    >
+-      <span
+-        class="d-flex align-items-center justify-content-center"
+-      >
+-        <span
+-          class="pgn__stateful-btn-icon"
+-        >
+-          <img
+-            alt="fa-bookmark"
+-            class="fa-bookmark"
+-            data-testid="icon"
+-          />
+-        </span>
+-        <span>
+-          Bookmark this page
+-        </span>
+-      </span>
+-    </button>
+-    <div>
+-      <div
+-        class="d-flex justify-content-center align-items-center flex-column"
+-        style="height: 50vh;"
+-      >
+-        <div
+-          class="spinner-border text-primary"
+-          role="status"
+-        >
+-          <span
+-            class="sr-only"
+-          >
+-            Loading locked content messaging...
+-          </span>
+-        </div>
+-      </div>
+-    </div>
+-    <div>
+-      <div
+-        class="d-flex justify-content-center align-items-center flex-column"
+-        style="height: 50vh;"
+-      >
+-        <div
+-          class="spinner-border text-primary"
+-          role="status"
+-        >
+-          <span
+-            class="sr-only"
+-          >
+-            Loading learning sequence...
+-          </span>
+-        </div>
+-      </div>
+-    </div>
+-    <div
+-      class="unit-iframe-wrapper"
+-    >
+-      <iframe
+-        allowfullscreen=""
+-        height="0"
+-        id="unit-iframe"
+-        referrerpolicy="origin"
+-        scrolling="no"
+-        src="http://localhost:18000/xblock/3?show_title=0&show_bookmark_button=0"
+-        title="3"
+-      />
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index 94c5726..e52f48d 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ // eslint-disable-next-line import/no-extraneous-dependencies
+ import { cloneDeep } from 'lodash';
+-import { fireEvent } from '@testing-library/dom';
++import { fireEvent, getByText } from '@testing-library/dom';
+ import {
+   initialState, render, screen, testUnits,
+ } from '../../../../setupTest';
+@@ -26,40 +26,46 @@ describe('Sequence Navigation', () => {
+     const testState = cloneDeep(initialState);
+     testState.courseware.sequenceStatus = 'loading';
+ 
+-    const { asFragment } = render(
++    const { container } = render(
+       <SequenceNavigation {...mockData} />,
+       { initialState: testState },
+     );
+-    expect(asFragment()).toMatchSnapshot();
++    expect(container).toBeEmptyDOMElement();
+   });
+ 
+   it('renders empty div without unitId', () => {
+-    const { asFragment } = render(<SequenceNavigation {...mockData} unitId={undefined} />, { initialState });
+-    expect(asFragment()).toMatchSnapshot();
++    const { container } = render(<SequenceNavigation {...mockData} unitId={undefined} />, { initialState });
++    expect(getByText(container, (content, element) => (
++      element.tagName.toLowerCase() === 'div' && element.getAttribute('style')))).toBeEmptyDOMElement();
+   });
+ 
+   it('renders locked button for gated content', () => {
+-    // TODO: Not sure if this is working as expected, because the `contentType="lock"` will be overridden by the value
+-    //  from Redux. To make this provide a `fa-icon` lock we could introduce something like `overriddenContentType`.
+     const testState = cloneDeep(initialState);
+     testState.models.sequences['1'].gatedContent = { gated: true };
++    const onNavigate = jest.fn();
++    render(<SequenceNavigation {...mockData} {...{ onNavigate }} />, { initialState: testState });
+ 
+-    const { asFragment } = render(
+-      <SequenceNavigation {...mockData} />,
+-      { initialState: testState },
+-    );
+-    expect(asFragment()).toMatchSnapshot();
++    const unitButton = screen.getByTitle(mockData.unitId);
++    fireEvent.click(unitButton);
++    // The unit button should not work for gated content.
++    expect(onNavigate).not.toHaveBeenCalled();
++    // TODO: Not sure if this is working as expected, because the `contentType="lock"` will be overridden by the value
++    //  from Redux. To make this provide a `fa-icon` lock we could introduce something like `overriddenContentType`.
++    expect(unitButton.firstChild).toHaveClass('fa-book');
+   });
+ 
+-  it('renders correctly', () => {
+-    const { asFragment } = render(<SequenceNavigation {...mockData} />, { initialState });
+-    expect(asFragment()).toMatchSnapshot();
++  it('renders correctly and handles unit button clicks', () => {
++    const onNavigate = jest.fn();
++    render(<SequenceNavigation {...mockData} {...{ onNavigate }} />, { initialState });
++
++    const unitButtons = screen.getAllByRole('button', { name: /\d+/ });
++    expect(unitButtons).toHaveLength(testUnits.length);
++    unitButtons.forEach(button => fireEvent.click(button));
++    expect(onNavigate).toHaveBeenCalledTimes(unitButtons.length);
+   });
+ 
+   it('has both navigation buttons enabled for a non-corner unit of the sequence', () => {
+-    render(<SequenceNavigation
+-      {...mockData}
+-    />, { initialState });
++    render(<SequenceNavigation {...mockData} />, { initialState });
+ 
+     screen.getAllByRole('button', { name: /previous|next/i }).forEach(button => {
+       expect(button).toBeEnabled();
+@@ -67,10 +73,7 @@ describe('Sequence Navigation', () => {
+   });
+ 
+   it('has the "Previous" button disabled for the first unit of the sequence', () => {
+-    render(<SequenceNavigation
+-      {...mockData}
+-      unitId="1"
+-    />, { initialState });
++    render(<SequenceNavigation {...mockData} unitId="1" />, { initialState });
+ 
+     expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
+     expect(screen.getByRole('button', { name: /next/i })).toBeEnabled();
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+index 68e33c4..de7eb29 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+@@ -14,31 +14,20 @@ describe('Sequence Navigation Dropdown', () => {
+   };
+ 
+   it('renders correctly without units', () => {
+-    const { asFragment } = render(<SequenceNavigationDropdown
+-      {...mockData}
+-      unitIds={[]}
+-    />);
+-
+-    expect(asFragment()).toMatchSnapshot();
++    render(<SequenceNavigationDropdown {...mockData} unitIds={[]} />);
++    expect(screen.getByRole('button')).toHaveTextContent('0 of 0');
+   });
+ 
+   testUnits.forEach(unitId => {
+     it(`displays proper text for unit ${unitId} on mobile`, () => {
+-      render(<SequenceNavigationDropdown
+-        {...mockData}
+-        unitId={unitId}
+-      />, { initialState });
+-
++      render(<SequenceNavigationDropdown {...mockData} unitId={unitId} />, { initialState });
+       expect(screen.getByRole('button')).toHaveTextContent(`${unitId} of ${testUnits.length}`);
+     });
+   });
+ 
+   testUnits.forEach(unitId => {
+     it(`marks unit ${unitId} as active`, () => {
+-      render(<SequenceNavigationDropdown
+-        {...mockData}
+-        unitId={unitId}
+-      />, { initialState });
++      render(<SequenceNavigationDropdown {...mockData} unitId={unitId} />, { initialState });
+ 
+       // Only the current unit should be marked as active.
+       screen.getAllByText(/^\d$/).forEach(element => {
+@@ -53,11 +42,7 @@ describe('Sequence Navigation Dropdown', () => {
+ 
+   it('handles the clicks', () => {
+     const onNavigate = jest.fn();
+-
+-    render(<SequenceNavigationDropdown
+-      {...mockData}
+-      onNavigate={onNavigate}
+-    />, { initialState });
++    render(<SequenceNavigationDropdown {...mockData} onNavigate={onNavigate} />, { initialState });
+ 
+     screen.getAllByText(/^\d+$/).forEach(element => fireEvent.click(element));
+     expect(onNavigate).toHaveBeenCalledTimes(testUnits.length);
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+index 32cfb5c..c047181 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+@@ -10,34 +10,26 @@ jest.mock('../../../../generic/tabs/useIndexOfLastVisibleChild');
+ 
+ describe('Sequence Navigation Tabs', () => {
+   const mockData = {
+-    unitId: '1',
++    unitId: '2',
+     onNavigate: () => {
+     },
+     showCompletion: false,
+     unitIds: testUnits,
+   };
+ 
+-  it('renders correctly without dropdown', () => {
+-    useIndexOfLastVisibleChild.mockReturnValue([0, null, null]);
+-    const { asFragment } = render(<SequenceNavigationTabs {...mockData} />, { initialState });
+-    expect(asFragment()).toMatchSnapshot();
+-  });
+-
+-  it('renders correctly with dropdown', () => {
+-    useIndexOfLastVisibleChild.mockReturnValue([-1, null, null]);
+-    const { asFragment } = render(<SequenceNavigationTabs {...mockData} />, { initialState });
+-    expect(asFragment()).toMatchSnapshot();
+-  });
+-
+   it('renders unit buttons', () => {
+     useIndexOfLastVisibleChild.mockReturnValue([0, null, null]);
+     render(<SequenceNavigationTabs {...mockData} />, { initialState });
++
+     expect(screen.getAllByRole('button').length).toEqual(testUnits.length);
+   });
+ 
+   it('renders unit buttons and dropdown button', () => {
+     useIndexOfLastVisibleChild.mockReturnValue([-1, null, null]);
+     render(<SequenceNavigationTabs {...mockData} />, { initialState });
++
++    expect(screen.getByRole('button', { name: `${mockData.unitId} of ${testUnits.length}` }))
++      .toHaveClass('dropdown-button');
+     expect(screen.getAllByRole('button').length).toEqual(testUnits.length + 1);
+   });
+ });
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+index e75650b..3f0b9d7 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+@@ -27,45 +27,38 @@ describe('Unit Button', () => {
+   };
+ 
+   it('hides title by default', () => {
+-    const { asFragment } = render(<UnitButton {...mockData} />, { initialState });
+-    expect(screen.getByTestId('icon')).toBeEmptyDOMElement();
+-    expect(asFragment()).toMatchSnapshot();
++    render(<UnitButton {...mockData} />, { initialState });
++    expect(screen.getByRole('button')).not.toHaveTextContent('other-unit');
+   });
+ 
+   it('shows title', () => {
+-    const { asFragment } = render(<UnitButton {...mockData} showTitle />, { initialState });
++    render(<UnitButton {...mockData} showTitle />, { initialState });
+     expect(screen.getByRole('button')).toHaveTextContent('other-unit');
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('does not show completion for non-completed unit', () => {
+-    const { asFragment } = render(<UnitButton {...mockData} />, { initialState });
++    render(<UnitButton {...mockData} />, { initialState });
+     expect(screen.queryByAltText('fa-check')).toBeNull();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('shows completion for completed unit', () => {
+-    const { asFragment } = render(<UnitButton {...mockData} unitId="problem" />, { initialState });
++    render(<UnitButton {...mockData} unitId="problem" />, { initialState });
+     expect(screen.getByAltText('fa-check')).toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('hides completion', () => {
+-    const { asFragment } = render(<UnitButton {...mockData} unitId="problem" showCompletion={false} />, { initialState });
++    render(<UnitButton {...mockData} unitId="problem" showCompletion={false} />, { initialState });
+     expect(screen.queryByAltText('fa-check')).toBeNull();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('does not show bookmark', () => {
+-    const { asFragment } = render(<UnitButton {...mockData} />, { initialState });
++    render(<UnitButton {...mockData} />, { initialState });
+     expect(screen.queryByAltText('fa-bookmark')).toBeNull();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('shows bookmark', () => {
+-    const { asFragment } = render(<UnitButton {...mockData} unitId="problem" />, { initialState });
++    render(<UnitButton {...mockData} unitId="problem" />, { initialState });
+     expect(screen.getByAltText('fa-bookmark')).toBeInTheDocument();
+-    expect(asFragment()).toMatchSnapshot();
+   });
+ 
+   it('handles the click', () => {
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+index 9ffffa1..509474e 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+@@ -19,9 +19,8 @@ describe('Unit Icon', () => {
+         jest.spyOn(console, 'error').mockImplementation(() => {});
+       }
+ 
+-      const { asFragment } = render(<UnitIcon type={key} />);
++      render(<UnitIcon type={key} />);
+       expect(screen.getByTestId('icon')).toHaveClass(value);
+-      expect(asFragment()).toMatchSnapshot();
+     });
+   });
+ });
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+index 09c373f..a55201a 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+@@ -14,7 +14,7 @@ describe('Unit Navigation', () => {
+   };
+ 
+   it('renders correctly without units', () => {
+-    const { asFragment } = render(<UnitNavigation
++    render(<UnitNavigation
+       {...mockData}
+       sequenceId=""
+       unitId=""
+@@ -22,7 +22,8 @@ describe('Unit Navigation', () => {
+       onClickNext={() => {}}
+     />);
+ 
+-    expect(asFragment()).toMatchSnapshot();
++    // Only "Previous" and "Next" buttons should be rendered.
++    expect(screen.getAllByRole('button')).toHaveLength(2);
+   });
+ 
+   it('handles the clicks', () => {
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigation.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigation.test.jsx.snap
+deleted file mode 100644
+index aa4cc9c..0000000
+--- a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigation.test.jsx.snap
++++ /dev/null
+@@ -1,244 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Sequence Navigation is empty while loading 1`] = `<DocumentFragment />`;
+-
+-exports[`Sequence Navigation renders correctly 1`] = `
+-<DocumentFragment>
+-  <nav
+-    class="sequence-navigation"
+-  >
+-    <button
+-      class="btn previous-btn"
+-      type="button"
+-    >
+-      <img
+-        alt="fa-chevron-left"
+-        class="fa-chevron-left"
+-        data-testid="icon"
+-      />
+-      <span>
+-        Previous
+-      </span>
+-    </button>
+-    <div
+-      style="flex-basis: 100%; min-width: 0;"
+-    >
+-      <div
+-        class="sequence-navigation-tabs-container"
+-      >
+-        <div
+-          class="sequence-navigation-tabs d-flex flex-grow-1"
+-        >
+-          <button
+-            class="btn"
+-            title="1"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn"
+-            title="2"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn active"
+-            title="3"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn"
+-            title="4"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn"
+-            title="5"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn"
+-            title="6"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn"
+-            title="7"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn"
+-            title="8"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn"
+-            title="9"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-          <button
+-            class="btn"
+-            title="10"
+-            type="button"
+-          >
+-            <img
+-              alt="fa-book"
+-              class="fa-book"
+-              data-testid="icon"
+-            />
+-          </button>
+-        </div>
+-      </div>
+-    </div>
+-    <button
+-      class="btn next-btn"
+-      type="button"
+-    >
+-      <span>
+-        Next
+-      </span>
+-      <img
+-        alt="fa-chevron-right"
+-        class="fa-chevron-right"
+-        data-testid="icon"
+-      />
+-    </button>
+-  </nav>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence Navigation renders empty div without unitId 1`] = `
+-<DocumentFragment>
+-  <nav
+-    class="sequence-navigation"
+-  >
+-    <button
+-      class="btn previous-btn"
+-      type="button"
+-    >
+-      <img
+-        alt="fa-chevron-left"
+-        class="fa-chevron-left"
+-        data-testid="icon"
+-      />
+-      <span>
+-        Previous
+-      </span>
+-    </button>
+-    <div
+-      style="flex-basis: 100%; min-width: 0; border-bottom: 1px solid #EAEAEA;"
+-    />
+-    <button
+-      class="btn next-btn"
+-      type="button"
+-    >
+-      <span>
+-        Next
+-      </span>
+-      <img
+-        alt="fa-chevron-right"
+-        class="fa-chevron-right"
+-        data-testid="icon"
+-      />
+-    </button>
+-  </nav>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence Navigation renders locked button for gated content 1`] = `
+-<DocumentFragment>
+-  <nav
+-    class="sequence-navigation"
+-  >
+-    <button
+-      class="btn previous-btn"
+-      type="button"
+-    >
+-      <img
+-        alt="fa-chevron-left"
+-        class="fa-chevron-left"
+-        data-testid="icon"
+-      />
+-      <span>
+-        Previous
+-      </span>
+-    </button>
+-    <button
+-      class="btn active"
+-      title="3"
+-      type="button"
+-    >
+-      <img
+-        alt="fa-book"
+-        class="fa-book"
+-        data-testid="icon"
+-      />
+-    </button>
+-    <button
+-      class="btn next-btn"
+-      type="button"
+-    >
+-      <span>
+-        Next
+-      </span>
+-      <img
+-        alt="fa-chevron-right"
+-        class="fa-chevron-right"
+-        data-testid="icon"
+-      />
+-    </button>
+-  </nav>
+-</DocumentFragment>
+-`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationDropdown.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationDropdown.test.jsx.snap
+deleted file mode 100644
+index 1204f27..0000000
+--- a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationDropdown.test.jsx.snap
++++ /dev/null
+@@ -1,26 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Sequence Navigation Dropdown renders correctly without units 1`] = `
+-<DocumentFragment>
+-  <div
+-    class="dropdown sequence-navigation-dropdown"
+-  >
+-    <button
+-      aria-expanded="false"
+-      aria-haspopup="true"
+-      class="dropdown-toggle btn dropdown-button font-weight-normal w-100 border-right-0"
+-      id="pgn__dropdown-trigger-0"
+-    >
+-      <span>
+-        0 of 0
+-      </span>
+-    </button>
+-    <div
+-      aria-hidden="true"
+-      aria-labelledby="pgn__dropdown-trigger-0"
+-      class="dropdown-menu w-100"
+-      role="menu"
+-    />
+-  </div>
+-</DocumentFragment>
+-`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationTabs.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationTabs.test.jsx.snap
+deleted file mode 100644
+index 65de0dc..0000000
+--- a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationTabs.test.jsx.snap
++++ /dev/null
+@@ -1,436 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Sequence Navigation Tabs renders correctly with dropdown 1`] = `
+-<DocumentFragment>
+-  <div
+-    style="flex-basis: 100%; min-width: 0;"
+-  >
+-    <div
+-      class="sequence-navigation-tabs-container"
+-    >
+-      <div
+-        class="sequence-navigation-tabs d-flex flex-grow-1"
+-      >
+-        <button
+-          class="btn active"
+-          title="1"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="2"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="3"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="4"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="5"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="6"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="7"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="8"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="9"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="10"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-      </div>
+-    </div>
+-    <div
+-      class="dropdown sequence-navigation-dropdown"
+-    >
+-      <button
+-        aria-expanded="false"
+-        aria-haspopup="true"
+-        class="dropdown-toggle btn dropdown-button font-weight-normal w-100 border-right-0"
+-        id="pgn__dropdown-trigger-0"
+-      >
+-        <span>
+-          1 of 10
+-        </span>
+-      </button>
+-      <div
+-        aria-hidden="true"
+-        aria-labelledby="pgn__dropdown-trigger-0"
+-        class="dropdown-menu w-100"
+-        role="menu"
+-      >
+-        <button
+-          class="btn active w-100"
+-          title="1"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            1
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="2"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            2
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="3"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            3
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="4"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            4
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="5"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            5
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="6"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            6
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="7"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            7
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="8"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            8
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="9"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            9
+-          </span>
+-        </button>
+-        <button
+-          class="btn w-100"
+-          title="10"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-          <span
+-            class="unit-title"
+-          >
+-            10
+-          </span>
+-        </button>
+-      </div>
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+-
+-exports[`Sequence Navigation Tabs renders correctly without dropdown 1`] = `
+-<DocumentFragment>
+-  <div
+-    style="flex-basis: 100%; min-width: 0;"
+-  >
+-    <div
+-      class="sequence-navigation-tabs-container"
+-    >
+-      <div
+-        class="sequence-navigation-tabs d-flex flex-grow-1"
+-      >
+-        <button
+-          class="btn active"
+-          title="1"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="2"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="3"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="4"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="5"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="6"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="7"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="8"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="9"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-        <button
+-          class="btn"
+-          title="10"
+-          type="button"
+-        >
+-          <img
+-            alt="fa-book"
+-            class="fa-book"
+-            data-testid="icon"
+-          />
+-        </button>
+-      </div>
+-    </div>
+-  </div>
+-</DocumentFragment>
+-`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitButton.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitButton.test.jsx.snap
+deleted file mode 100644
+index eb1efa6..0000000
+--- a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitButton.test.jsx.snap
++++ /dev/null
+@@ -1,143 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Unit Button does not show bookmark 1`] = `
+-<DocumentFragment>
+-  <button
+-    class="btn"
+-    title="other-unit"
+-    type="button"
+-  >
+-    <img
+-      alt="fa-book"
+-      class="fa-book"
+-      data-testid="icon"
+-    />
+-  </button>
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Button does not show completion for non-completed unit 1`] = `
+-<DocumentFragment>
+-  <button
+-    class="btn"
+-    title="other-unit"
+-    type="button"
+-  >
+-    <img
+-      alt="fa-book"
+-      class="fa-book"
+-      data-testid="icon"
+-    />
+-  </button>
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Button hides completion 1`] = `
+-<DocumentFragment>
+-  <button
+-    class="btn"
+-    title="problem-unit"
+-    type="button"
+-  >
+-    <img
+-      alt="fa-edit"
+-      class="fa-edit"
+-      data-testid="icon"
+-    />
+-    <img
+-      alt="fa-bookmark"
+-      class="fa-bookmark"
+-      data-testid="icon"
+-    />
+-  </button>
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Button hides title by default 1`] = `
+-<DocumentFragment>
+-  <button
+-    class="btn"
+-    title="other-unit"
+-    type="button"
+-  >
+-    <img
+-      alt="fa-book"
+-      class="fa-book"
+-      data-testid="icon"
+-    />
+-  </button>
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Button shows bookmark 1`] = `
+-<DocumentFragment>
+-  <button
+-    class="btn complete"
+-    title="problem-unit"
+-    type="button"
+-  >
+-    <img
+-      alt="fa-edit"
+-      class="fa-edit"
+-      data-testid="icon"
+-    />
+-    <img
+-      alt="fa-check"
+-      class="fa-check"
+-      data-testid="icon"
+-    />
+-    <img
+-      alt="fa-bookmark"
+-      class="fa-bookmark"
+-      data-testid="icon"
+-    />
+-  </button>
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Button shows completion for completed unit 1`] = `
+-<DocumentFragment>
+-  <button
+-    class="btn complete"
+-    title="problem-unit"
+-    type="button"
+-  >
+-    <img
+-      alt="fa-edit"
+-      class="fa-edit"
+-      data-testid="icon"
+-    />
+-    <img
+-      alt="fa-check"
+-      class="fa-check"
+-      data-testid="icon"
+-    />
+-    <img
+-      alt="fa-bookmark"
+-      class="fa-bookmark"
+-      data-testid="icon"
+-    />
+-  </button>
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Button shows title 1`] = `
+-<DocumentFragment>
+-  <button
+-    class="btn"
+-    title="other-unit"
+-    type="button"
+-  >
+-    <img
+-      alt="fa-book"
+-      class="fa-book"
+-      data-testid="icon"
+-    />
+-    <span
+-      class="unit-title"
+-    >
+-      other-unit
+-    </span>
+-  </button>
+-</DocumentFragment>
+-`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
+deleted file mode 100644
+index 49aeec7..0000000
+--- a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
++++ /dev/null
+@@ -1,61 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Unit Icon renders correct icon for lock unit 1`] = `
+-<DocumentFragment>
+-  <img
+-    alt="fa-lock"
+-    class="fa-lock"
+-    data-testid="icon"
+-  />
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Icon renders correct icon for other unit 1`] = `
+-<DocumentFragment>
+-  <img
+-    alt="fa-book"
+-    class="fa-book"
+-    data-testid="icon"
+-  />
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Icon renders correct icon for problem unit 1`] = `
+-<DocumentFragment>
+-  <img
+-    alt="fa-edit"
+-    class="fa-edit"
+-    data-testid="icon"
+-  />
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Icon renders correct icon for undefined unit 1`] = `
+-<DocumentFragment>
+-  <img
+-    alt="fa-book"
+-    class="fa-book"
+-    data-testid="icon"
+-  />
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Icon renders correct icon for vertical unit 1`] = `
+-<DocumentFragment>
+-  <img
+-    alt="fa-tasks"
+-    class="fa-tasks"
+-    data-testid="icon"
+-  />
+-</DocumentFragment>
+-`;
+-
+-exports[`Unit Icon renders correct icon for video unit 1`] = `
+-<DocumentFragment>
+-  <img
+-    alt="fa-video"
+-    class="fa-video"
+-    data-testid="icon"
+-  />
+-</DocumentFragment>
+-`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitNavigation.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitNavigation.test.jsx.snap
+deleted file mode 100644
+index c15047d..0000000
+--- a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitNavigation.test.jsx.snap
++++ /dev/null
+@@ -1,36 +0,0 @@
+-// Jest Snapshot v1, https://goo.gl/fbAQLP
+-
+-exports[`Unit Navigation renders correctly without units 1`] = `
+-<DocumentFragment>
+-  <div
+-    class="unit-navigation d-flex"
+-  >
+-    <button
+-      class="btn btn-outline-secondary previous-button mr-2"
+-      type="button"
+-    >
+-      <img
+-        alt="fa-chevron-left"
+-        class="fa-chevron-left"
+-        data-testid="icon"
+-      />
+-      <span>
+-        Previous
+-      </span>
+-    </button>
+-    <button
+-      class="btn btn-outline-primary next-button"
+-      type="button"
+-    >
+-      <span>
+-        Next
+-      </span>
+-      <img
+-        alt="fa-chevron-right"
+-        class="fa-chevron-right"
+-        data-testid="icon"
+-      />
+-    </button>
+-  </div>
+-</DocumentFragment>
+-`;
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 0349bd2..120652b 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -146,6 +146,11 @@ const messageEvent = {
+   },
+ };
+ 
++// Send MessageEvent indicating that a unit has been loaded.
++function loadUnit(message = messageEvent) {
++  window.postMessage(message, '*');
++}
++
+ function render(
+   ui,
+   {
+@@ -187,5 +192,5 @@ export * from '@testing-library/react';
+ 
+ // override `render` method; export `screen` too to suppress errors
+ export {
+-  render, screen, testUnits, baseInitialState as initialState, messageEvent,
++  render, screen, testUnits, baseInitialState as initialState, messageEvent, loadUnit,
+ };
+-- 
+2.34.1
+

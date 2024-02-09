@@ -1,0 +1,106 @@
+From 5f06d726f7cd4cf85efb6c11835bb5383612a8e2 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 7 Dec 2020 14:09:44 -0500
+Subject: [PATCH 0316/1021] AA-478: correctly refresh outline data when
+ refreshing dates (#292)
+
+---
+ src/course-home/dates-banner/DatesBannerContainer.jsx | 6 ++++--
+ src/course-home/dates-tab/DatesTab.jsx                | 2 ++
+ src/course-home/outline-tab/OutlineTab.jsx            | 2 ++
+ src/instructor-toolbar/InstructorToolbar.jsx          | 2 +-
+ 4 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index 4a370b1..dfbe4fb 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -5,13 +5,14 @@ import { useDispatch, useSelector } from 'react-redux';
+ import { useModel } from '../../generic/model-store';
+ 
+ import DatesBanner from './DatesBanner';
+-import { fetchDatesTab, resetDeadlines } from '../data/thunks';
++import { resetDeadlines } from '../data';
+ 
+ function DatesBannerContainer({
+   courseDateBlocks,
+   datesBannerInfo,
+   hasEnded,
+   model,
++  tabFetch,
+ }) {
+   const {
+     courseId,
+@@ -53,7 +54,7 @@ function DatesBannerContainer({
+     {
+       name: 'resetDatesBanner',
+       shouldDisplay: resetDates,
+-      clickHandler: () => dispatch(resetDeadlines(courseId, fetchDatesTab)),
++      clickHandler: () => dispatch(resetDeadlines(courseId, tabFetch)),
+     },
+   ];
+ 
+@@ -80,6 +81,7 @@ DatesBannerContainer.propTypes = {
+   }).isRequired,
+   hasEnded: PropTypes.bool,
+   model: PropTypes.string.isRequired,
++  tabFetch: PropTypes.func.isRequired,
+ };
+ 
+ DatesBannerContainer.defaultProps = {
+diff --git a/src/course-home/dates-tab/DatesTab.jsx b/src/course-home/dates-tab/DatesTab.jsx
+index f12a5e2..45b482a 100644
+--- a/src/course-home/dates-tab/DatesTab.jsx
++++ b/src/course-home/dates-tab/DatesTab.jsx
+@@ -6,6 +6,7 @@ import messages from './messages';
+ import Timeline from './Timeline';
+ import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ 
++import { fetchDatesTab } from '../data';
+ import { useModel } from '../../generic/model-store';
+ 
+ function DatesTab({ intl }) {
+@@ -29,6 +30,7 @@ function DatesTab({ intl }) {
+         datesBannerInfo={datesBannerInfo}
+         hasEnded={hasEnded}
+         model="dates"
++        tabFetch={fetchDatesTab}
+       />
+       <Timeline />
+     </>
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 91c7589..19f4651 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -10,6 +10,7 @@ import CourseGoalCard from './widgets/CourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
+ import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
++import { fetchOutlineTab } from '../data';
+ import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ import Section from './Section';
+@@ -134,6 +135,7 @@ function OutlineTab({ intl }) {
+             datesBannerInfo={datesBannerInfo}
+             hasEnded={hasEnded}
+             model="outline"
++            tabFetch={fetchOutlineTab}
+           />
+           <WelcomeMessage courseId={courseId} />
+           {rootCourseId && (
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 766d7f7..98421c1 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -29,7 +29,7 @@ function getStudioUrl(courseId, unitId) {
+     if (unitId) {
+       urlFull = `${urlBase}/container/${unitId}`;
+     } else if (courseId) {
+-      urlFull = `{$urlBase}/course/${courseId}`;
++      urlFull = `${urlBase}/course/${courseId}`;
+     }
+   }
+   return urlFull;
+-- 
+2.34.1
+

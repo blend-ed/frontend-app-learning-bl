@@ -1,0 +1,315 @@
+From 3fcc0d87c946d7eddb98d6253f6959faed440392 Mon Sep 17 00:00:00 2001
+From: Thomas Tracy <contact@tjtracy.com>
+Date: Wed, 6 Oct 2021 14:25:05 -0400
+Subject: [PATCH 0674/1021] [feat] Add notices redirect to learning MFE (#667)
+
+* [feat] MICROBA-1523 Add notices redirect to learning MFE
+
+To support the notices plugin on platform, this adds a redirect to the
+course home page. If a user lands on that page and has not acknowledged
+a notice, the user will be redirected to notice instead of the course
+home.
+---
+ .env                                         |  1 +
+ .env.development                             |  1 +
+ .env.test                                    |  1 +
+ src/generic/notices/NoticesProvider.jsx      | 35 ++++++++
+ src/generic/notices/NoticesProvider.test.jsx | 61 +++++++++++++
+ src/generic/notices/api.js                   | 25 ++++++
+ src/generic/notices/index.js                 |  1 +
+ src/index.jsx                                | 90 ++++++++++----------
+ 8 files changed, 172 insertions(+), 43 deletions(-)
+ create mode 100644 src/generic/notices/NoticesProvider.jsx
+ create mode 100644 src/generic/notices/NoticesProvider.test.jsx
+ create mode 100644 src/generic/notices/api.js
+ create mode 100644 src/generic/notices/index.js
+
+diff --git a/.env b/.env
+index 8864ad8..912f29c 100644
+--- a/.env
++++ b/.env
+@@ -38,3 +38,4 @@ TWITTER_URL=''
+ USER_INFO_COOKIE_NAME=''
+ SESSION_COOKIE_DOMAIN=''
+ ENABLE_JUMPNAV='true'
++ENABLE_NOTICES=''
+diff --git a/.env.development b/.env.development
+index 61164b0..16d6764 100644
+--- a/.env.development
++++ b/.env.development
+@@ -38,3 +38,4 @@ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+ SESSION_COOKIE_DOMAIN='localhost'
+ ENABLE_JUMPNAV='true'
++ENABLE_NOTICES=''
+diff --git a/.env.test b/.env.test
+index 3b844f3..24a5c93 100644
+--- a/.env.test
++++ b/.env.test
+@@ -37,3 +37,4 @@ TWITTER_HASHTAG='myedxjourney'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+ ENABLE_JUMPNAV='true'
++ENABLE_NOTICES=''
+diff --git a/src/generic/notices/NoticesProvider.jsx b/src/generic/notices/NoticesProvider.jsx
+new file mode 100644
+index 0000000..4cbd5f9
+--- /dev/null
++++ b/src/generic/notices/NoticesProvider.jsx
+@@ -0,0 +1,35 @@
++import React, { useEffect, useState } from 'react';
++import { getConfig } from '@edx/frontend-platform';
++import PropTypes from 'prop-types';
++import { getNotices } from './api';
++/**
++ * This component uses the platform-plugin-notices plugin to function.
++ * If the user has an unacknowledged notice, they will be rerouted off
++ * course home and onto a full-screen notice page. If the plugin is not
++ * installed, or there are no notices, we just passthrough this component.
++ */
++const NoticesProvider = ({ children }) => {
++  const [isRedirected, setIsRedirected] = useState();
++  useEffect(async () => {
++    if (getConfig().ENABLE_NOTICES) {
++      const data = await getNotices();
++      if (data && data.results) {
++        const { results } = data;
++        setIsRedirected(true);
++        window.location.replace(`${results[0]}?next=${window.location.href}`);
++      }
++    }
++  }, []);
++
++  return (
++    <div>
++      {isRedirected === true ? null : children}
++    </div>
++  );
++};
++
++NoticesProvider.propTypes = {
++  children: PropTypes.node.isRequired,
++};
++
++export default NoticesProvider;
+diff --git a/src/generic/notices/NoticesProvider.test.jsx b/src/generic/notices/NoticesProvider.test.jsx
+new file mode 100644
+index 0000000..1da5cb3
+--- /dev/null
++++ b/src/generic/notices/NoticesProvider.test.jsx
+@@ -0,0 +1,61 @@
++import React from 'react';
++
++import { getConfig } from '@edx/frontend-platform';
++import {
++  initializeMockApp,
++  render,
++  act,
++} from '../../setupTest';
++import NoticesProvider from './NoticesProvider';
++import { getNotices } from './api';
++
++jest.mock('./api', () => ({
++  getNotices: jest.fn(),
++}));
++
++jest.mock('@edx/frontend-platform', () => ({
++  getConfig: jest.fn(),
++}));
++
++describe('NoticesProvider', () => {
++  beforeAll(async () => {
++    jest.resetModules();
++    await initializeMockApp();
++  });
++
++  function buildAndRender() {
++    render(
++      <NoticesProvider>
++        <div />
++      </NoticesProvider>,
++    );
++  }
++
++  it('does not call api if ENABLE_NOTICES is false', () => {
++    getConfig.mockImplementation(() => ({ ENABLE_NOTICES: false }));
++    buildAndRender();
++    expect(getNotices).toHaveBeenCalledTimes(0);
++  });
++
++  it('redirects user on notice returned from API', async () => {
++    const redirectUrl = 'http://example.com/test_route';
++    getConfig.mockImplementation(() => ({ ENABLE_NOTICES: true }));
++    getNotices.mockImplementation(() => ({ results: [redirectUrl] }));
++    delete window.location;
++    window.location = { replace: jest.fn() };
++    process.env.ENABLE_NOTICES = true;
++    await act(() => buildAndRender());
++    expect(window.location.replace).toHaveBeenCalledWith(`${redirectUrl}?next=${window.location.href}`);
++  });
++
++  it('does not redirect on no data', async () => {
++    getNotices.mockImplementation(() => ({}));
++    getConfig.mockImplementation(() => ({ ENABLE_NOTICES: true }));
++    delete window.location;
++    window.location = { replace: jest.fn() };
++    process.env.ENABLE_NOTICES = true;
++    await act(() => buildAndRender());
++    expect(window.location.replace).toHaveBeenCalledTimes(0);
++    expect(window.location.toString() === 'http://localhost/');
++  });
++});
+diff --git a/src/generic/notices/api.js b/src/generic/notices/api.js
+new file mode 100644
+index 0000000..a3b4fb4
+--- /dev/null
++++ b/src/generic/notices/api.js
+@@ -0,0 +1,25 @@
++/* eslint-disable import/prefer-default-export */
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { logError, logInfo } from '@edx/frontend-platform/logging';
++
++export const getNotices = async () => {
++  const authenticatedUser = getAuthenticatedUser();
++  const url = new URL(`${getConfig().LMS_BASE_URL}/notices/api/v1/unacknowledged`);
++  if (authenticatedUser) {
++    try {
++      const { data } = await getAuthenticatedHttpClient().get(url.href, {});
++      return data;
++    } catch (e) {
++      // we will just swallow error, as that probably means the notices app is not installed.
++      // Notices are not necessary for the rest of courseware to function.
++      const { customAttributes: { httpErrorStatus } } = e;
++      if (httpErrorStatus === 404) {
++        logInfo(`${e}. This probably happened because the notices plugin is not installed on platform.`);
++      } else {
++        logError(e);
++      }
++    }
++  }
++  return null;
++};
+diff --git a/src/generic/notices/index.js b/src/generic/notices/index.js
+new file mode 100644
+index 0000000..436d09a
+--- /dev/null
++++ b/src/generic/notices/index.js
+@@ -0,0 +1 @@
++export { default } from './NoticesProvider';
+diff --git a/src/index.jsx b/src/index.jsx
+index 0378fde..fd6d8c3 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -28,54 +28,57 @@ import { TabContainer } from './tab-page';
+ import { fetchDatesTab, fetchOutlineTab, fetchProgressTab } from './course-home/data';
+ import { fetchCourse } from './courseware/data';
+ import initializeStore from './store';
++import NoticesProvider from './generic/notices';
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+     <AppProvider store={initializeStore()}>
+-      <UserMessagesProvider>
+-        <Switch>
+-          <PageRoute exact path="/goal-unsubscribe/:token" component={GoalUnsubscribe} />
+-          <PageRoute path="/redirect" component={CoursewareRedirectLandingPage} />
+-          <PageRoute path="/course/:courseId/home">
+-            <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
+-              <OutlineTab />
+-            </TabContainer>
+-          </PageRoute>
+-          <PageRoute path="/course/:courseId/dates">
+-            <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
+-              <DatesTab />
+-            </TabContainer>
+-          </PageRoute>
+-          <PageRoute
+-            path={[
+-              '/course/:courseId/progress/:targetUserId/',
+-              '/course/:courseId/progress',
+-            ]}
+-            render={({ match }) => (
+-              <TabContainer
+-                tab="progress"
+-                fetch={(courseId) => fetchProgressTab(courseId, match.params.targetUserId)}
+-                slice="courseHome"
+-              >
+-                <ProgressTab />
++      <NoticesProvider>
++        <UserMessagesProvider>
++          <Switch>
++            <PageRoute exact path="/goal-unsubscribe/:token" component={GoalUnsubscribe} />
++            <PageRoute path="/redirect" component={CoursewareRedirectLandingPage} />
++            <PageRoute path="/course/:courseId/home">
++              <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
++                <OutlineTab />
+               </TabContainer>
+-            )}
+-          />
+-          <PageRoute path="/course/:courseId/course-end">
+-            <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
+-              <CourseExit />
+-            </TabContainer>
+-          </PageRoute>
+-          <PageRoute
+-            path={[
+-              '/course/:courseId/:sequenceId/:unitId',
+-              '/course/:courseId/:sequenceId',
+-              '/course/:courseId',
+-            ]}
+-            component={CoursewareContainer}
+-          />
+-        </Switch>
+-      </UserMessagesProvider>
++            </PageRoute>
++            <PageRoute path="/course/:courseId/dates">
++              <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
++                <DatesTab />
++              </TabContainer>
++            </PageRoute>
++            <PageRoute
++              path={[
++                '/course/:courseId/progress/:targetUserId/',
++                '/course/:courseId/progress',
++              ]}
++              render={({ match }) => (
++                <TabContainer
++                  tab="progress"
++                  fetch={(courseId) => fetchProgressTab(courseId, match.params.targetUserId)}
++                  slice="courseHome"
++                >
++                  <ProgressTab />
++                </TabContainer>
++              )}
++            />
++            <PageRoute path="/course/:courseId/course-end">
++              <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
++                <CourseExit />
++              </TabContainer>
++            </PageRoute>
++            <PageRoute
++              path={[
++                '/course/:courseId/:sequenceId/:unitId',
++                '/course/:courseId/:sequenceId',
++                '/course/:courseId',
++              ]}
++              component={CoursewareContainer}
++            />
++          </Switch>
++        </UserMessagesProvider>
++      </NoticesProvider>
+     </AppProvider>,
+     document.getElementById('root'),
+   );
+@@ -93,6 +96,7 @@ initialize({
+         CREDENTIALS_BASE_URL: process.env.CREDENTIALS_BASE_URL || null,
+         ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
+         ENABLE_JUMPNAV: process.env.ENABLE_JUMPNAV || null,
++        ENABLE_NOTICES: process.env.ENABLE_NOTICES || null,
+         INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
+         SEARCH_CATALOG_URL: process.env.SEARCH_CATALOG_URL || null,
+         SOCIAL_UTM_MILESTONE_CAMPAIGN: process.env.SOCIAL_UTM_MILESTONE_CAMPAIGN || null,
+-- 
+2.34.1
+

@@ -1,0 +1,255 @@
+From fdfb60bee803dc22c062865ed098e051714cf9cc Mon Sep 17 00:00:00 2001
+From: "Albert (AJ) St. Aubin" <astaubin@edx.org>
+Date: Thu, 20 May 2021 16:27:34 -0400
+Subject: [PATCH 0475/1021] feat: Updating the messages for certificate
+ availability.
+
+[MICROBA-678]
+---
+ .../outline-tab/OutlineTab.test.jsx           |  2 +-
+ .../CertificateAvailableAlert.jsx             | 37 ++++++-------------
+ .../certificate-available-alert/hooks.js      |  2 +-
+ .../course/course-exit/CourseCelebration.jsx  | 18 ++++-----
+ .../course/course-exit/CourseExit.test.jsx    |  9 ++++-
+ src/courseware/course/course-exit/messages.js |  8 +++-
+ src/generic/user-messages/Alert.jsx           |  9 ++++-
+ 7 files changed, 43 insertions(+), 42 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 43f5534..db234c2 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -686,7 +686,7 @@ describe('Outline Tab', () => {
+           ],
+         });
+         await fetchAndRender();
+-        await screen.findByText('We are working on generating course certificates.');
++        await screen.findByText('Your grade and certificate will be ready soon!');
+       });
+     });
+ 
+diff --git a/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx b/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
+index 70b59b1..9cbe405 100644
+--- a/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
++++ b/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
+@@ -1,51 +1,38 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import { getConfig } from '@edx/frontend-platform';
+-import { FormattedMessage, FormattedRelative } from '@edx/frontend-platform/i18n';
+-import { Hyperlink } from '@edx/paragon';
++import { FormattedDate, FormattedMessage } from '@edx/frontend-platform/i18n';
+ 
+ import { Alert, ALERT_TYPES } from '../../../../generic/user-messages';
+ 
+ function CertificateAvailableAlert({ payload }) {
+   const {
+     certDate,
+-    username,
+     userTimezone,
++    courseEndDate,
+   } = payload;
+ 
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++  const certificateAvailableDateFormatted = <FormattedDate value={certDate} day="numeric" month="long" year="numeric" />;
++  const courseEndDateFormatted = <FormattedDate value={courseEndDate} day="numeric" month="long" year="numeric" />;
+ 
+   return (
+-    <Alert type={ALERT_TYPES.INFO}>
++    <Alert type={ALERT_TYPES.SUCCESS}>
+       <strong>
+         <FormattedMessage
+           id="learning.outline.alert.cert.title"
+-          defaultMessage="We are working on generating course certificates."
++          defaultMessage="Your grade and certificate will be ready soon!"
+         />
+       </strong>
+       <br />
+       <FormattedMessage
+         id="learning.outline.alert.cert.when"
+-        defaultMessage="If you have earned a certificate, you will be able to access it {timeRemaining}. You will also be able to view your certificates on your {profileLink}."
++        defaultMessage="This course ended on {courseEndDateFormatted}. Final grades and certificates are
++        scheduled to be available after {certificateAvailableDate}."
+         values={{
+-          profileLink: (
+-            <Hyperlink
+-              destination={`${getConfig().LMS_BASE_URL}/u/${username}`}
+-            >
+-              <FormattedMessage
+-                id="learning.outline.alert.cert.profile"
+-                defaultMessage="Learner Profile"
+-              />
+-            </Hyperlink>
+-          ),
+-          timeRemaining: (
+-            <FormattedRelative
+-              key="timeRemaining"
+-              value={certDate}
+-              {...timezoneFormatArgs}
+-            />
+-          ),
++          courseEndDateFormatted,
++          certificateAvailableDate: certificateAvailableDateFormatted,
+         }}
++        {...timezoneFormatArgs}
+       />
+     </Alert>
+   );
+@@ -54,7 +41,7 @@ function CertificateAvailableAlert({ payload }) {
+ CertificateAvailableAlert.propTypes = {
+   payload: PropTypes.shape({
+     certDate: PropTypes.string,
+-    username: PropTypes.string,
++    courseEndDate: PropTypes.string,
+     userTimezone: PropTypes.string,
+   }).isRequired,
+ };
+diff --git a/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+index ea83d37..a176572 100644
+--- a/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+@@ -18,7 +18,6 @@ function useCertificateAvailableAlert(courseId) {
+   } = useModel('outline', courseId);
+   const authenticatedUser = getAuthenticatedUser();
+   const username = authenticatedUser ? authenticatedUser.username : '';
+-
+   const certBlock = courseDateBlocks.find(b => b.dateType === 'certificate-available-date');
+   const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+   const endDate = endBlock ? new Date(endBlock.date) : null;
+@@ -26,6 +25,7 @@ function useCertificateAvailableAlert(courseId) {
+   const isVisible = isEnrolled && certBlock && hasEnded; // only show if we're between end and cert dates
+   const payload = {
+     certDate: certBlock && certBlock.date,
++    courseEndDate: endBlock && endBlock.date,
+     username,
+     userTimezone,
+   };
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 6272fa6..0fdd5d8 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -60,6 +60,7 @@ function CourseCelebration({ intl }) {
+     certStatus,
+     certWebViewUrl,
+     downloadUrl,
++    certificateAvailableDate,
+   } = certificateData || {};
+ 
+   /** [WS-1681 experiment] */
+@@ -125,25 +126,20 @@ function CourseCelebration({ intl }) {
+       break;
+     case 'earned_but_not_available': {
+       const endDate = <FormattedDate value={end} day="numeric" month="long" year="numeric" />;
++      const certAvailableDate = <FormattedDate value={certificateAvailableDate} day="numeric" month="long" year="numeric" />;
+       certHeader = intl.formatMessage(messages.certificateHeaderNotAvailable);
+       message = (
+         <>
+           <p>
+             <FormattedMessage
+               id="courseCelebration.certificateBody.notAvailable.endDate"
+-              defaultMessage="After this course officially ends on {endDate}, you will receive an
+-                email notification with your certificate. Once you have your certificate, be sure
+-                to showcase your accomplishment on LinkedIn or your resumé."
+-              values={{ endDate }}
++              defaultMessage="This course ended on {endDate} and final grades and certificates are scheduled to be
++              available after {certAvailableDate}."
++              values={{ endDate, certAvailableDate }}
+             />
+           </p>
+           <p>
+-            <FormattedMessage
+-              id="courseCelebration.certificateBody.notAvailable.accessCertificate"
+-              defaultMessage="You will be able to access your certificate any time from your
+-                {dashboardLink} and {profileLink}."
+-              values={{ dashboardLink, profileLink }}
+-            />
++            {intl.formatMessage(messages.certificateNotAvailableBodyAccessCert)}
+           </p>
+         </>
+       );
+@@ -294,7 +290,7 @@ function CourseCelebration({ intl }) {
+         </div>
+         <div className="col-12 px-0 px-md-5">
+           {certHeader && (
+-          <Alert variant="primary" className="row w-100 m-0">
++          <Alert variant="success" className="row w-100 m-0">
+             <div className="col order-1 order-md-0 pl-0 pr-0 pr-md-5">
+               <div className="h4">{certHeader}</div>
+               {message}
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 24c36a5..342fca8 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -115,9 +115,14 @@ describe('Course Exit Pages', () => {
+     });
+ 
+     it('Displays certificate is earned but unavailable message', async () => {
+-      setMetadata({ certificate_data: { cert_status: 'earned_but_not_available' } });
++      setMetadata({
++        certificate_data: {
++          cert_status: 'earned_but_not_available',
++          certificate_available_date: '2021-05-21T12:00:00Z',
++        },
++      });
+       await fetchAndRender(<CourseCelebration />);
+-      expect(screen.getByText('Your certificate will be available soon!')).toBeInTheDocument();
++      expect(screen.getByText('Your grade and certificate will be ready soon!')).toBeInTheDocument();
+     });
+ 
+     it('Displays request certificate link', async () => {
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index 58cf436..9f36d38 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -13,7 +13,12 @@ const messages = defineMessages({
+   },
+   certificateHeaderNotAvailable: {
+     id: 'courseCelebration.certificateHeader.notAvailable',
+-    defaultMessage: 'Your certificate will be available soon!',
++    defaultMessage: 'Your grade and certificate will be ready soon!',
++    description: 'Header displayed when course certificate is not yet available to be viewed',
++  },
++  certificateNotAvailableBodyAccessCert: {
++    id: 'courseCelebration.certificateBody.notAvailable.accessCertificate',
++    defaultMessage: 'If you have earned a passing grade, your certificate will be automatically issued.',
+     description: 'Text displayed when course certificate is not yet available to be viewed',
+   },
+   certificateHeaderUnverified: {
+@@ -180,6 +185,7 @@ const messages = defineMessages({
+     id: 'courseExit.viewGradesButton',
+     defaultMessage: 'View grades',
+   },
++
+ });
+ 
+ export default messages;
+diff --git a/src/generic/user-messages/Alert.jsx b/src/generic/user-messages/Alert.jsx
+index 4030331..9f8f752 100644
+--- a/src/generic/user-messages/Alert.jsx
++++ b/src/generic/user-messages/Alert.jsx
+@@ -41,6 +41,13 @@ function getAlertIcon(type) {
+   return faInfoCircle;
+ }
+ 
++function getAlertIconColor(type) {
++  if (type === ALERT_TYPES.SUCCESS) {
++    return 'text-success-500';
++  }
++  return '';
++}
++
+ function Alert({
+   type, dismissible, children, footer, intl, onDismiss,
+ }) {
+@@ -49,7 +56,7 @@ function Alert({
+       <div className="row w-100 m-0">
+         {type !== ALERT_TYPES.WELCOME && (
+           <div className="col-auto p-0 mr-3">
+-            <FontAwesomeIcon icon={getAlertIcon(type)} />
++            <FontAwesomeIcon icon={getAlertIcon(type)} className={getAlertIconColor(type)} />
+           </div>
+         )}
+         <div className="col mr-4 p-0 align-items-start">
+-- 
+2.34.1
+

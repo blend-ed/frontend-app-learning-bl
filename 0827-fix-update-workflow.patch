@@ -1,0 +1,44 @@
+From 4f2f17beb3fcfb0c8c3338e34423574487626fc2 Mon Sep 17 00:00:00 2001
+From: Jawayria <39649635+Jawayria@users.noreply.github.com>
+Date: Mon, 7 Feb 2022 15:38:18 +0500
+Subject: [PATCH 0827/1021] fix: update workflow
+
+---
+ .github/workflows/validate.yml | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/.github/workflows/validate.yml b/.github/workflows/validate.yml
+index 2eb9844..fd01df5 100644
+--- a/.github/workflows/validate.yml
++++ b/.github/workflows/validate.yml
+@@ -1,20 +1,22 @@
+ name: validate
+ on:
+-- push
+-- pull_request
++  push:
++    branches:
++    - 'master'
++  pull_request:
++    branches:
++    - '**'
+ jobs:
+   tests:
+     runs-on: ubuntu-latest
+     strategy:
+       matrix:
+-        node-version:
+-        - 12
+         node: [12, 14, 16]
+     steps:
+     - uses: actions/checkout@v2
+     - uses: actions/setup-node@v2
+       with:
+-        node-version: ${{ matrix.node-version }}
++        node-version: ${{ matrix.node }}
+     - run: make validate.ci
+     - name: Upload coverage
+       uses: codecov/codecov-action@v2
+-- 
+2.34.1
+

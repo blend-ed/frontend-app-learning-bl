@@ -1,0 +1,31 @@
+From 4f920e52d4f25f7e21ddb9f0caa90e64b0e9478a Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 10 Jan 2020 16:41:27 -0500
+Subject: [PATCH 0028/1021] camelCasing metadata response.
+
+---
+ src/learning-sequence/sub-section/data/hooks.js | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/learning-sequence/sub-section/data/hooks.js b/src/learning-sequence/sub-section/data/hooks.js
+index 87920b3..f33e1df 100644
+--- a/src/learning-sequence/sub-section/data/hooks.js
++++ b/src/learning-sequence/sub-section/data/hooks.js
+@@ -1,4 +1,5 @@
+ import { useState, useEffect } from 'react';
++import { camelCaseObject } from '@edx/frontend-platform';
+ 
+ import { getSubSectionMetadata, saveSubSectionPosition } from './api';
+ 
+@@ -9,7 +10,7 @@ export function useSubSectionMetadata(courseId, subSectionId) {
+   useEffect(() => {
+     setLoaded(false);
+     getSubSectionMetadata(courseId, subSectionId).then((data) => {
+-      setMetadata(data);
++      setMetadata(camelCaseObject(data));
+       setLoaded(true);
+     });
+   }, [courseId, subSectionId]);
+-- 
+2.34.1
+

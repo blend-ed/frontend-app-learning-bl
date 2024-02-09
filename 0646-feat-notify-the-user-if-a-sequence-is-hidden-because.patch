@@ -1,0 +1,246 @@
+From 90d6ea8137ae8946355aa6933117387d66eee370 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 10 Sep 2021 11:13:48 -0400
+Subject: [PATCH 0646/1021] feat: notify the user if a sequence is hidden
+ because of due date (#636)
+
+Normally, these sequences are skipped. But if the user manually
+goes to the section, they should be notified why they can't access
+it. That can easily happen if they bookmarked the page or something.
+
+AA-1000
+---
+ src/courseware/course/sequence/Sequence.jsx   |  7 +++
+ .../course/sequence/Sequence.test.jsx         | 31 +++++++++++
+ .../hidden-after-due/HiddenAfterDue.jsx       | 52 +++++++++++++++++++
+ .../course/sequence/hidden-after-due/index.js |  1 +
+ .../sequence/hidden-after-due/messages.js     | 23 ++++++++
+ .../__factories__/sequenceMetadata.factory.js |  1 +
+ src/courseware/data/api.js                    |  1 +
+ .../data/pact-tests/lmsPact.test.jsx          |  2 +
+ src/pacts/frontend-app-learning-lms.json      |  1 +
+ 9 files changed, 119 insertions(+)
+ create mode 100644 src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
+ create mode 100644 src/courseware/course/sequence/hidden-after-due/index.js
+ create mode 100644 src/courseware/course/sequence/hidden-after-due/messages.js
+
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 684b8b6..e78f99d 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -20,6 +20,7 @@ import { useModel } from '../../../generic/model-store';
+ 
+ import CourseLicense from '../course-license';
+ import messages from './messages';
++import HiddenAfterDue from './hidden-after-due';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import SequenceContent from './SequenceContent';
+ import NotificationTray from '../NotificationTray';
+@@ -144,6 +145,12 @@ function Sequence({
+     );
+   }
+ 
++  if (sequenceStatus === 'loaded' && sequence.isHiddenAfterDue) {
++    // Shouldn't even be here - these sequences are normally stripped out of the navigation.
++    // But we are here, so render a notice instead of the normal content.
++    return <HiddenAfterDue courseId={courseId} />;
++  }
++
+   /*
+   TODO: When the micro-frontend supports viewing special exams without redirecting to the legacy
+   experience, we can remove this whole conditional. For now, though, we show the spinner here
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index fc3272c..76ac423 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -81,6 +81,37 @@ describe('Sequence', () => {
+     expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
+   });
+ 
++  it('renders correctly for hidden after due content', async () => {
++    const sequenceBlocks = [Factory.build(
++      'block',
++      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { courseId: courseMetadata.id },
++    )];
++    const sequenceMetadata = [Factory.build(
++      'sequenceMetadata',
++      { is_hidden_after_due: true },
++      { courseId: courseMetadata.id, unitBlocks, sequenceBlock: sequenceBlocks[0] },
++    )];
++    const testStore = await initializeTestStore(
++      {
++        courseMetadata, unitBlocks, sequenceBlocks, sequenceMetadata,
++      }, false,
++    );
++    render(
++      <Sequence {...mockData} {...{ sequenceId: sequenceBlocks[0].id }} />,
++      { store: testStore },
++    );
++
++    await waitFor(() => {
++      expect(screen.queryByText('The due date for this assignment has passed.')).toBeInTheDocument();
++    });
++    expect(screen.getByRole('link', { name: 'progress page' }))
++      .toHaveAttribute('href', 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress');
++
++    // No normal content or navigation should be rendered. Just the above alert.
++    expect(screen.queryAllByRole('button').length).toEqual(0);
++  });
++
+   it('renders correctly for exam content', async () => {
+     // Exams should NOT render in the Sequence.  They should permanently show a spinner until the
+     // application redirects away from the page.  Note that this component is not responsible for
+diff --git a/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx b/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
+new file mode 100644
+index 0000000..6b770b3
+--- /dev/null
++++ b/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
+@@ -0,0 +1,52 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
++import { Alert, Hyperlink } from '@edx/paragon';
++import { Info } from '@edx/paragon/icons';
++
++import { useModel } from '../../../../generic/model-store';
++
++import messages from './messages';
++
++function HiddenAfterDue({ courseId, intl }) {
++  const { tabs } = useModel('coursewareMeta', courseId);
++
++  const progressTab = tabs.find(tab => tab.slug === 'progress');
++  const progressLink = progressTab && progressTab.url && (
++    <Hyperlink
++      style={{ textDecoration: 'underline' }}
++      destination={progressTab.url}
++      className="text-reset"
++    >
++      {intl.formatMessage(messages.progressPage)}
++    </Hyperlink>
++  );
++
++  return (
++    <Alert variant="info" icon={Info}>
++      <h3>{intl.formatMessage(messages.header)}</h3>
++      <p>
++        {intl.formatMessage(messages.description)}
++        {progressLink && (
++          <>
++            <br />
++            <FormattedMessage
++              id="learn.hiddenAfterDue.gradeAvailable"
++              defaultMessage="If you have completed this assignment, your grade is available on the {progressPage}."
++              values={{
++                progressPage: progressLink,
++              }}
++            />
++          </>
++        )}
++      </p>
++    </Alert>
++  );
++}
++
++HiddenAfterDue.propTypes = {
++  intl: intlShape.isRequired,
++  courseId: PropTypes.string.isRequired,
++};
++
++export default injectIntl(HiddenAfterDue);
+diff --git a/src/courseware/course/sequence/hidden-after-due/index.js b/src/courseware/course/sequence/hidden-after-due/index.js
+new file mode 100644
+index 0000000..41df709
+--- /dev/null
++++ b/src/courseware/course/sequence/hidden-after-due/index.js
+@@ -0,0 +1 @@
++export { default } from './HiddenAfterDue';
+diff --git a/src/courseware/course/sequence/hidden-after-due/messages.js b/src/courseware/course/sequence/hidden-after-due/messages.js
+new file mode 100644
+index 0000000..6170663
+--- /dev/null
++++ b/src/courseware/course/sequence/hidden-after-due/messages.js
+@@ -0,0 +1,23 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  header: {
++    id: 'learn.hiddenAfterDue.header',
++    defaultMessage: 'The due date for this assignment has passed.',
++  },
++  description: {
++    id: 'learn.hiddenAfterDue.description',
++    defaultMessage: 'Because the due date has passed, this assignment is no longer available.',
++  },
++  gradeAvailable: {
++    id: 'learn.hiddenAfterDue.gradeAvailable',
++    defaultMessage: 'If you have completed this assignment, your grade is available on the {progressPage}.',
++  },
++  progressPage: {
++    id: 'learn.hiddenAfterDue.progressPage',
++    defaultMessage: 'progress page',
++    description: 'This is the text for the link embedded in learn.hiddenAfterDue.gradeAvailable',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index 3ec46b8..17bca14 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -58,6 +58,7 @@ Factory.define('sequenceMetadata')
+     save_position: true,
+     prev_url: null,
+     is_time_limited: false,
++    is_hidden_after_due: false,
+     show_completion: true,
+     banner_text: null,
+     format: 'Homework',
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 4e1b10d..08d757d 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -253,6 +253,7 @@ function normalizeSequenceMetadata(sequence) {
+       gatedContent: camelCaseObject(sequence.gated_content),
+       isTimeLimited: sequence.is_time_limited,
+       isProctored: sequence.is_proctored,
++      isHiddenAfterDue: sequence.is_hidden_after_due,
+       // Position comes back from the server 1-indexed. Adjust here.
+       activeUnitIndex: sequence.position ? sequence.position - 1 : 0,
+       saveUnitPosition: sequence.save_position,
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index 60f5950..2129c32 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -331,6 +331,7 @@ describe('Courseware Service', () => {
+             item_id: string('block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions'),
+             is_time_limited: boolean(false),
+             is_proctored: boolean(false),
++            is_hidden_after_due: boolean(false),
+             position: null,
+             tag: boolean('sequential'),
+             banner_text: null,
+@@ -367,6 +368,7 @@ describe('Courseware Service', () => {
+           },
+           isTimeLimited: false,
+           isProctored: false,
++          isHiddenAfterDue: false,
+           activeUnitIndex: 0,
+           saveUnitPosition: false,
+           showCompletion: false,
+diff --git a/src/pacts/frontend-app-learning-lms.json b/src/pacts/frontend-app-learning-lms.json
+index 100a02e..2a6bc05 100644
+--- a/src/pacts/frontend-app-learning-lms.json
++++ b/src/pacts/frontend-app-learning-lms.json
+@@ -489,6 +489,7 @@
+           "item_id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions",
+           "is_time_limited": false,
+           "is_proctored": false,
++          "is_hidden_after_due": true,
+           "position": null,
+           "tag": "sequential",
+           "banner_text": null,
+-- 
+2.34.1
+

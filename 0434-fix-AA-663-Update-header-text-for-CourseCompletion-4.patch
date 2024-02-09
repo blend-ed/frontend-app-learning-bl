@@ -1,0 +1,66 @@
+From 43aa6291c34f27a1499d1e65386cc92f15974f5b Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Mon, 26 Apr 2021 07:53:54 -0700
+Subject: [PATCH 0434/1021] fix: AA-663: Update header text for
+ CourseCompletion (#421)
+
+If the marketing url is not set, we shouldn't have a message
+about sharing.
+---
+ .../course/course-exit/CourseCelebration.jsx           |  4 +++-
+ src/courseware/course/course-exit/messages.js          | 10 +++++++---
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 66491b2..f812bcc 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -45,6 +45,7 @@ function CourseCelebration({ intl }) {
+     certificateData,
+     end,
+     linkedinAddToProfileUrl,
++    marketingUrl,
+     offer,
+     org,
+     relatedPrograms,
+@@ -287,7 +288,8 @@ function CourseCelebration({ intl }) {
+           {intl.formatMessage(messages.congratulationsHeader)}
+         </div>
+         <div className="col-12 p-0 font-weight-normal lead text-center">
+-          {intl.formatMessage(messages.shareHeader)}
++          {intl.formatMessage(messages.completedCourseHeader)}
++          {marketingUrl && ` ${intl.formatMessage(messages.shareMessage)}`}
+           <SocialIcons
+             analyticsId="edx.ui.lms.course_exit.social_share.clicked"
+             className="mt-2"
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index 04dbc14..58cf436 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -35,6 +35,10 @@ const messages = defineMessages({
+     defaultMessage: 'Sample certificate',
+     description: 'Alt text used to describe an image of a certificate',
+   },
++  completedCourseHeader: {
++    id: 'courseCelebration.completedCourseHeader',
++    defaultMessage: 'You have completed your course.',
++  },
+   congratulationsHeader: {
+     id: 'courseCelebration.congratulationsHeader',
+     defaultMessage: 'Congratulations!',
+@@ -127,9 +131,9 @@ const messages = defineMessages({
+     defaultMessage: 'Search our catalog',
+     description: 'First part of a sentence that continues afterward',
+   },
+-  shareHeader: {
+-    id: 'courseCelebration.shareHeader',
+-    defaultMessage: 'You have completed your course. Share your success on social media or email.',
++  shareMessage: {
++    id: 'courseCelebration.shareMessage',
++    defaultMessage: 'Share your success on social media or email.',
+   },
+   socialMessage: {
+     id: 'courseExit.social.shareCompletionMessage',
+-- 
+2.34.1
+

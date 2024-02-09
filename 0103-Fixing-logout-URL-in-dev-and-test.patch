@@ -1,0 +1,39 @@
+From 5f0774b66ddf2a9ce60442a1d55bf7b4b48be151 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Tue, 21 Apr 2020 11:26:10 -0400
+Subject: [PATCH 0103/1021] Fixing logout URL in dev and test.
+
+---
+ .env.development | 2 +-
+ .env.test        | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/.env.development b/.env.development
+index db5888f..d5dca1e 100644
+--- a/.env.development
++++ b/.env.development
+@@ -8,7 +8,7 @@ ECOMMERCE_BASE_URL='http://localhost:18130'
+ LANGUAGE_PREFERENCE_COOKIE_NAME='openedx-language-preference'
+ LMS_BASE_URL='http://localhost:18000'
+ LOGIN_URL='http://localhost:18000/login'
+-LOGOUT_URL='http://localhost:18000/login'
++LOGOUT_URL='http://localhost:18000/logout'
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='localhost:1996/orders'
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+diff --git a/.env.test b/.env.test
+index 867fc1d..4b8d98e 100644
+--- a/.env.test
++++ b/.env.test
+@@ -6,7 +6,7 @@ ECOMMERCE_BASE_URL='http://localhost:18130'
+ LANGUAGE_PREFERENCE_COOKIE_NAME='openedx-language-preference'
+ LMS_BASE_URL='http://localhost:18000'
+ LOGIN_URL='http://localhost:18000/login'
+-LOGOUT_URL='http://localhost:18000/login'
++LOGOUT_URL='http://localhost:18000/logout'
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='localhost:1996/orders'
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+-- 
+2.34.1
+

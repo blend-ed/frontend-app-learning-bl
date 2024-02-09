@@ -1,0 +1,282 @@
+From e4d6d37c4eb6e43157bbe9c509f08240b57dab28 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 3 Aug 2020 09:53:40 -0400
+Subject: [PATCH 0201/1021] AA-124: Show course end alert (#135)
+
+This is a parity-with-LMS change, to bring their warning about
+the course ending within a couple weeks to the MFE.
+---
+ .../course-end-alert/CourseEndAlert.jsx       | 98 +++++++++++++++++++
+ src/alerts/course-end-alert/hooks.js          | 41 ++++++++
+ src/alerts/course-end-alert/index.js          |  1 +
+ src/alerts/enrollment-alert/hooks.js          |  2 +-
+ src/alerts/logistration-alert/hooks.js        |  6 +-
+ src/alerts/logistration-alert/index.js        |  3 +-
+ src/course-home/outline-tab/OutlineTab.jsx    | 21 ++--
+ 7 files changed, 161 insertions(+), 11 deletions(-)
+ create mode 100644 src/alerts/course-end-alert/CourseEndAlert.jsx
+ create mode 100644 src/alerts/course-end-alert/hooks.js
+ create mode 100644 src/alerts/course-end-alert/index.js
+
+diff --git a/src/alerts/course-end-alert/CourseEndAlert.jsx b/src/alerts/course-end-alert/CourseEndAlert.jsx
+new file mode 100644
+index 0000000..1328ff7
+--- /dev/null
++++ b/src/alerts/course-end-alert/CourseEndAlert.jsx
+@@ -0,0 +1,98 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import {
++  FormattedDate,
++  FormattedMessage,
++  FormattedRelative,
++  FormattedTime,
++} from '@edx/frontend-platform/i18n';
++
++import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++
++const DAY_MS = 24 * 60 * 60 * 1000; // in ms
++
++function CourseEndAlert({ payload }) {
++  const {
++    delta,
++    description,
++    endDate,
++    userTimezone,
++  } = payload;
++
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  const timeRemaining = (
++    <FormattedRelative
++      key="timeRemaining"
++      value={endDate}
++      {...timezoneFormatArgs}
++    />
++  );
++
++  let msg;
++  if (delta < DAY_MS) {
++    const courseEndTime = (
++      <FormattedTime
++        key="courseEndTime"
++        day="numeric"
++        month="short"
++        year="numeric"
++        hour12={false}
++        timeZoneName="short"
++        value={endDate}
++        {...timezoneFormatArgs}
++      />
++    );
++    msg = (
++      <FormattedMessage
++        id="learning.outline.alert.end.short"
++        defaultMessage="This course is ending {timeRemaining} at {courseEndTime}."
++        description="Used when the time remaining is less than a day away."
++        values={{
++          courseEndTime,
++          timeRemaining,
++        }}
++      />
++    );
++  } else {
++    const courseEndDate = (
++      <FormattedDate
++        key="courseEndDate"
++        day="numeric"
++        month="short"
++        year="numeric"
++        value={endDate}
++        {...timezoneFormatArgs}
++      />
++    );
++    msg = (
++      <FormattedMessage
++        id="learning.outline.alert.end.long"
++        defaultMessage="This course is ending {timeRemaining} on {courseEndDate}."
++        description="Used when the time remaining is more than a day away."
++        values={{
++          courseEndDate,
++          timeRemaining,
++        }}
++      />
++    );
++  }
++
++  return (
++    <Alert type={ALERT_TYPES.INFO}>
++      <strong>{msg}</strong><br />
++      {description}
++    </Alert>
++  );
++}
++
++CourseEndAlert.propTypes = {
++  payload: PropTypes.shape({
++    delta: PropTypes.number,
++    description: PropTypes.string,
++    endDate: PropTypes.string,
++    userTimezone: PropTypes.string,
++  }).isRequired,
++};
++
++export default CourseEndAlert;
+diff --git a/src/alerts/course-end-alert/hooks.js b/src/alerts/course-end-alert/hooks.js
+new file mode 100644
+index 0000000..101efee
+--- /dev/null
++++ b/src/alerts/course-end-alert/hooks.js
+@@ -0,0 +1,41 @@
++/* eslint-disable import/prefer-default-export */
++import React from 'react';
++import { useAlert } from '../../generic/user-messages';
++import { useModel } from '../../generic/model-store';
++
++const CourseEndAlert = React.lazy(() => import('./CourseEndAlert'));
++
++// period of time (in ms) before end of course during which we alert
++const WARNING_PERIOD_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
++
++export function useCourseEndAlert(courseId) {
++  const {
++    isEnrolled,
++  } = useModel('courses', courseId);
++  const {
++    datesWidget: {
++      courseDateBlocks,
++      userTimezone,
++    },
++  } = useModel('outline', courseId);
++
++  const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
++  const endDate = endBlock ? new Date(endBlock.date) : null;
++  const delta = endBlock ? endDate - new Date() : 0;
++  const isVisible = isEnrolled && endBlock && delta > 0 && delta < WARNING_PERIOD_MS;
++
++  useAlert(isVisible, {
++    code: 'clientCourseEndAlert',
++    payload: {
++      delta,
++      description: endBlock && endBlock.description,
++      endDate: endBlock && endBlock.date,
++      userTimezone,
++    },
++    topic: 'outline-course-alerts',
++  });
++
++  return {
++    clientCourseEndAlert: CourseEndAlert,
++  };
++}
+diff --git a/src/alerts/course-end-alert/index.js b/src/alerts/course-end-alert/index.js
+new file mode 100644
+index 0000000..eb25c27
+--- /dev/null
++++ b/src/alerts/course-end-alert/index.js
+@@ -0,0 +1 @@
++export { useCourseEndAlert as default } from './hooks';
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index ccc2306..0f1e44a 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -26,7 +26,7 @@ export function useEnrollmentAlert(courseId) {
+     topic: 'outline',
+   });
+ 
+-  return EnrollmentAlert;
++  return { clientEnrollmentAlert: EnrollmentAlert };
+ }
+ 
+ export function useEnrollClickHandler(courseId, successText) {
+diff --git a/src/alerts/logistration-alert/hooks.js b/src/alerts/logistration-alert/hooks.js
+index a2370a4..be804b1 100644
+--- a/src/alerts/logistration-alert/hooks.js
++++ b/src/alerts/logistration-alert/hooks.js
+@@ -1,8 +1,10 @@
+ /* eslint-disable import/prefer-default-export */
+-import { useContext } from 'react';
++import React, { useContext } from 'react';
+ import { AppContext } from '@edx/frontend-platform/react';
+ import { ALERT_TYPES, useAlert } from '../../generic/user-messages';
+ 
++const LogistrationAlert = React.lazy(() => import('./LogistrationAlert'));
++
+ export function useLogistrationAlert() {
+   const { authenticatedUser } = useContext(AppContext);
+   const isVisible = authenticatedUser === null;
+@@ -13,4 +15,6 @@ export function useLogistrationAlert() {
+     dismissible: false,
+     type: ALERT_TYPES.ERROR,
+   });
++
++  return { clientLogistrationAlert: LogistrationAlert };
+ }
+diff --git a/src/alerts/logistration-alert/index.js b/src/alerts/logistration-alert/index.js
+index 7da1670..bd6ec9f 100644
+--- a/src/alerts/logistration-alert/index.js
++++ b/src/alerts/logistration-alert/index.js
+@@ -1,2 +1 @@
+-export { default } from './LogistrationAlert';
+-export { useLogistrationAlert } from './hooks';
++export { useLogistrationAlert as default } from './hooks';
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index d171e95..af250a5 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -10,13 +10,12 @@ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
+ import messages from './messages';
+ import Section from './Section';
++import useCourseEndAlert from '../../alerts/course-end-alert';
+ import useEnrollmentAlert from '../../alerts/enrollment-alert';
+-import { useLogistrationAlert } from '../../alerts/logistration-alert';
++import useLogistrationAlert from '../../alerts/logistration-alert';
+ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+ 
+-const LogistrationAlert = React.lazy(() => import('../../alerts/logistration-alert'));
+-
+ function OutlineTab({ intl }) {
+   const {
+     courseId,
+@@ -39,8 +38,9 @@ function OutlineTab({ intl }) {
+     },
+   } = useModel('outline', courseId);
+ 
+-  const clientEnrollmentAlert = useEnrollmentAlert(courseId);
+-  useLogistrationAlert();
++  const courseEndAlert = useCourseEndAlert(courseId);
++  const enrollmentAlert = useEnrollmentAlert(courseId);
++  const logistrationAlert = useLogistrationAlert();
+ 
+   const rootCourseId = Object.keys(courses)[0];
+   const { sectionIds } = courses[rootCourseId];
+@@ -51,8 +51,8 @@ function OutlineTab({ intl }) {
+         topic="outline"
+         className="mb-3"
+         customAlerts={{
+-          clientEnrollmentAlert,
+-          clientLogistrationAlert: LogistrationAlert,
++          ...enrollmentAlert,
++          ...logistrationAlert,
+         }}
+       />
+       <div className="d-flex justify-content-between mb-3">
+@@ -62,6 +62,13 @@ function OutlineTab({ intl }) {
+       <div className="row">
+         <div className="col col-8">
+           <WelcomeMessage courseId={courseId} />
++          <AlertList
++            topic="outline-course-alerts"
++            className="mb-3"
++            customAlerts={{
++              ...courseEndAlert,
++            }}
++          />
+           {sectionIds.map((sectionId) => (
+             <Section
+               key={sectionId}
+-- 
+2.34.1
+

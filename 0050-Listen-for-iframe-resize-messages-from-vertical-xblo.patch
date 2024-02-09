@@ -1,0 +1,68 @@
+From 304850b7d11a827679d98325a7b92683fb6d8aed Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 27 Jan 2020 17:01:40 -0500
+Subject: [PATCH 0050/1021] Listen for iframe resize messages from vertical
+ xblock.
+
+---
+ src/courseware/sequence/Sequence.jsx |  2 +-
+ src/courseware/sequence/Unit.jsx     | 20 ++++++++++++++++++--
+ 2 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/sequence/Sequence.jsx b/src/courseware/sequence/Sequence.jsx
+index 014acb6..0966d44 100644
+--- a/src/courseware/sequence/Sequence.jsx
++++ b/src/courseware/sequence/Sequence.jsx
+@@ -90,7 +90,7 @@ function Sequence({
+   }, [activeUnitId]);
+ 
+   return (
+-    <div className="d-flex flex-column flex-grow-1">
++    <div className="flex-grow-1">
+       <div className="container-fluid">
+         <AlertList topic="sequence" className="mt-3" />
+         <SequenceNavigation
+diff --git a/src/courseware/sequence/Unit.jsx b/src/courseware/sequence/Unit.jsx
+index 3967633..7defb03 100644
+--- a/src/courseware/sequence/Unit.jsx
++++ b/src/courseware/sequence/Unit.jsx
+@@ -1,4 +1,4 @@
+-import React, { useRef } from 'react';
++import React, { useRef, useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+@@ -6,13 +6,29 @@ export default function Unit({ id, pageTitle }) {
+   const iframeRef = useRef(null);
+   const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}`;
+ 
++  const [iframeWidth, setIframeWidth] = useState(0);
++  const [iframeHeight, setIframeHeight] = useState(0);
++  useEffect(() => {
++    global.onmessage = (event) => {
++      const { type, payload } = event.data;
++
++      if (type === 'plugin.resize') {
++        setIframeWidth(payload.width);
++        setIframeHeight(payload.height);
++      }
++    };
++  }, []);
++
+   return (
+     <iframe
+-      className="flex-grow-1"
+       title={pageTitle}
+       ref={iframeRef}
+       src={iframeUrl}
+       allowFullScreen
++      width={iframeWidth}
++      height={iframeHeight}
++      scrolling="no"
++      referrerPolicy="origin"
+     />
+   );
+ }
+-- 
+2.34.1
+

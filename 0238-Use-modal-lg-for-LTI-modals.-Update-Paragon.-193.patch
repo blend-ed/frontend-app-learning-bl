@@ -1,0 +1,88 @@
+From aa10b3f6006e403d09cb7413c52e148e14e704b5 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Fri, 21 Aug 2020 16:28:02 -0400
+Subject: [PATCH 0238/1021] =?UTF-8?q?Use=20=E2=80=98modal-lg=E2=80=99=20fo?=
+ =?UTF-8?q?r=20LTI=20modals.=20=20Update=20Paragon.=20(#193)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The new version of Paragon includes a “dialogClassName” property on Modal which lets us set the modal width to ‘modal-lg’ or ‘modal-sm’ - we’re using the former here.
+---
+ package-lock.json                       |  6 +++---
+ package.json                            |  2 +-
+ src/courseware/course/sequence/Unit.jsx |  1 +
+ src/index.scss                          | 15 ---------------
+ 4 files changed, 5 insertions(+), 19 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 82aab18..f235e01 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1443,9 +1443,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "10.0.1",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-10.0.1.tgz",
+-      "integrity": "sha512-rUQvGYVFDCTn9Vd5jk1zTOTzQK04TCKultizipRA1OmYJongMjUYUUTpX4A6KmYNvwkOY7GHQ1Ewd2W4nXj49g==",
++      "version": "10.1.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-10.1.0.tgz",
++      "integrity": "sha512-qraC7V7yNW/+jKdgJd2qf67yGJr5jlEEUtRr95TOkicNNVTbjA4P9LtR65XOKjanXXCJsz3XomkOHKHQh89b9w==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.21",
+         "@fortawesome/free-solid-svg-icons": "^5.10.1",
+diff --git a/package.json b/package.json
+index ee4819e..a282363 100644
+--- a/package.json
++++ b/package.json
+@@ -38,7 +38,7 @@
+     "@edx/frontend-component-header": "2.0.5",
+     "@edx/frontend-enterprise": "4.2.2",
+     "@edx/frontend-platform": "1.5.2",
+-    "@edx/paragon": "10.0.1",
++    "@edx/paragon": "10.1.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.30",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 3dae041..5f03097 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -154,6 +154,7 @@ function Unit({
+           title={modalOptions.title}
+           onClose={() => { setModalOptions({ open: false }); }}
+           open
++          dialogClassName="modal-lg"
+         />
+       )}
+       <div className="unit-iframe-wrapper">
+diff --git a/src/index.scss b/src/index.scss
+index f6b6272..e29c11a 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -317,21 +317,6 @@ $primary: #1176B2;
+   }
+ }
+ 
+-.modal {
+-  max-width: 100%;
+-  height: 100vh;
+-  .modal-dialog {
+-    max-width: 100%;
+-  }
+-  .modal-body {
+-    width: 100%;
+-
+-    iframe {
+-      width: 100%;
+-      min-height:100vh;
+-    }
+-  }
+-}
+ // Import component-specific sass files
+ @import 'courseware/course/celebration/CelebrationModal.scss';
+ @import 'courseware/course/content-tools/calculator/calculator.scss';
+-- 
+2.34.1
+

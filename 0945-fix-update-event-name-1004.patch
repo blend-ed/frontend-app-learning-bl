@@ -1,0 +1,63 @@
+From 0fbb53ae86222716cf2e6ff601824d278960a26e Mon Sep 17 00:00:00 2001
+From: Mubbshar Anwar <78487564+mubbsharanwar@users.noreply.github.com>
+Date: Wed, 23 Nov 2022 11:24:20 +0500
+Subject: [PATCH 0945/1021] fix: update event name (#1004)
+
+update segment event name
+
+VAN-1168
+---
+ src/course-home/outline-tab/OutlineTab.jsx                    | 2 +-
+ src/course-home/outline-tab/OutlineTab.test.jsx               | 4 ++--
+ .../outline-tab/widgets/WeeklyLearningGoalCard.jsx            | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index cce754f..5f9b278 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -116,7 +116,7 @@ function OutlineTab({ intl }) {
+     const currentParams = new URLSearchParams(location.search);
+     const startCourse = currentParams.get('start_course');
+     if (startCourse === '1') {
+-      sendTrackEvent('welcome.email.clicked.startcourse', {});
++      sendTrackEvent('enrollment.email.clicked.startcourse', {});
+ 
+       // Deleting the course_start query param as it only needs to be set once
+       // whenever passed in query params.
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index c9e8aa6..a8a2a86 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -355,13 +355,13 @@ describe('Outline Tab', () => {
+ 
+       await fetchAndRender('http://localhost/?weekly_goal=3');
+       expect(spy).toHaveBeenCalledTimes(1);
+-      expect(sendTrackEvent).toHaveBeenCalledWith('welcome.email.clicked.setgoal', {});
++      expect(sendTrackEvent).toHaveBeenCalledWith('enrollment.email.clicked.setgoal', {});
+     });
+ 
+     it('emit start course event via query param', async () => {
+       sendTrackEvent.mockClear();
+       await fetchAndRender('http://localhost/?start_course=1');
+-      expect(sendTrackEvent).toHaveBeenCalledWith('welcome.email.clicked.startcourse', {});
++      expect(sendTrackEvent).toHaveBeenCalledWith('enrollment.email.clicked.startcourse', {});
+     });
+ 
+     describe('weekly learning goal is not set', () => {
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index a4fc8e6..1d8a0ad 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -51,7 +51,7 @@ function WeeklyLearningGoalCard({
+         reminder_selected: selectReminders,
+       });
+       if (triggeredFromEmail) {
+-        sendTrackEvent('welcome.email.clicked.setgoal', {});
++        sendTrackEvent('enrollment.email.clicked.setgoal', {});
+       }
+     }
+   }
+-- 
+2.34.1
+

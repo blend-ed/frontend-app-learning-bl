@@ -1,0 +1,68 @@
+From 64979ecaf02af509cc1815ff116e1f9747324ff1 Mon Sep 17 00:00:00 2001
+From: alangsto <46360176+alangsto@users.noreply.github.com>
+Date: Thu, 6 May 2021 15:33:55 -0400
+Subject: [PATCH 0452/1021] fix: Remove confusing language on proctoring info
+ panel (#437)
+
+MST-700. Remove language that says learners with a verified onboarding can take exams. This created confusion for learners who did not realize they must also complete IDV before taking a proctored exam.
+---
+ src/course-home/outline-tab/OutlineTab.test.jsx | 4 ++--
+ src/course-home/outline-tab/messages.js         | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index a2c1740..a625078 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -815,7 +815,7 @@ describe('Outline Tab', () => {
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+-      expect(screen.queryByText('You are eligible to take proctored exams in this course.')).toBeInTheDocument();
++      expect(screen.queryByText('Your onboarding exam has been approved in another course.')).toBeInTheDocument();
+       expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).not.toBeInTheDocument();
+     });
+ 
+@@ -831,7 +831,7 @@ describe('Outline Tab', () => {
+       });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+-      expect(screen.queryByText('Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.')).toBeInTheDocument();
++      expect(screen.queryByText('Your onboarding profile has been approved in another course. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.')).toBeInTheDocument();
+       expect(screen.queryByText('Onboarding profile review can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index 774844b..b43701a 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -166,7 +166,7 @@ const messages = defineMessages({
+   },
+   verifiedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.verified',
+-    defaultMessage: 'You can now take proctored exams in this course.',
++    defaultMessage: 'Your onboarding exam has been approved in this course.',
+   },
+   rejectedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.rejected',
+@@ -178,7 +178,7 @@ const messages = defineMessages({
+   },
+   otherCourseApprovedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.otherCourseApproved',
+-    defaultMessage: 'You are eligible to take proctored exams in this course.',
++    defaultMessage: 'Your onboarding exam has been approved in another course.',
+   },
+   otherCourseApprovedProctoringDetail: {
+     id: 'learning.proctoringPanel.detail.otherCourseApproved',
+@@ -186,7 +186,7 @@ const messages = defineMessages({
+   },
+   expiringSoonProctoringMessage: {
+     id: 'learning.proctoringPanel.message.expiringSoon',
+-    defaultMessage: 'Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.',
++    defaultMessage: 'Your onboarding profile has been approved in another course. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.',
+   },
+   proctoringPanelGeneralInfo: {
+     id: 'learning.proctoringPanel.generalInfo',
+-- 
+2.34.1
+

@@ -1,0 +1,190 @@
+From 4ebd569792fa241e8b7d182a193b79470e6b5a72 Mon Sep 17 00:00:00 2001
+From: Muhammad Adeel Tajamul
+ <77053848+muhammadadeeltajamul@users.noreply.github.com>
+Date: Tue, 28 Mar 2023 15:39:00 +0500
+Subject: [PATCH 1010/1021] feat: added open/close state of discussion sidebar
+ in local storage (#1086)
+
+---
+ src/courseware/course/Course.test.jsx         | 61 ++++++++++++++++++-
+ .../course/sidebar/SidebarContextProvider.jsx | 11 +++-
+ .../course/sidebar/common/SidebarBase.jsx     |  1 +
+ src/setupTest.js                              |  4 +-
+ 4 files changed, 74 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 4eeb4f2..5f936fe 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -1,12 +1,18 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import MockAdapter from 'axios-mock-adapter';
+ import { breakpoints } from '@edx/paragon';
+ import {
+-  fireEvent, getByRole, initializeTestStore, loadUnit, render, screen, waitFor,
++  act, fireEvent, getByRole, initializeTestStore, loadUnit, render, screen, waitFor,
+ } from '../../setupTest';
++import { buildTopicsFromUnits } from '../data/__factories__/discussionTopics.factory';
+ import { handleNextSectionCelebration } from './celebration';
+ import * as celebrationUtils from './celebration/utils';
+ import Course from './Course';
++import { executeThunk } from '../../utils';
++import * as thunks from '../data/thunks';
+ 
+ jest.mock('@edx/frontend-platform/analytics');
+ 
+@@ -43,6 +49,28 @@ describe('Course', () => {
+     setItemSpy.mockRestore();
+   });
+ 
++  const setupDiscussionSidebar = async (storageValue = false) => {
++    localStorage.clear();
++    const testStore = await initializeTestStore({ provider: 'openedx' });
++    const state = testStore.getState();
++    const { courseware: { courseId } } = state;
++    const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/discussion/v1/courses/${courseId}`).reply(200, { provider: 'openedx' });
++    const topicsResponse = buildTopicsFromUnits(state.models.units);
++    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/discussion/v2/course_topics/${courseId}`)
++      .reply(200, topicsResponse);
++
++    await executeThunk(thunks.getCourseDiscussionTopics(courseId), testStore.dispatch);
++    const [firstUnitId] = Object.keys(state.models.units);
++    mockData.unitId = firstUnitId;
++    const [firstSequenceId] = Object.keys(state.models.sequences);
++    mockData.sequenceId = firstSequenceId;
++    if (storageValue !== null) {
++      localStorage.setItem('showDiscussionSidebar', storageValue);
++    }
++    await render(<Course {...mockData} />, { store: testStore });
++  };
++
+   it('loads learning sequence', async () => {
+     render(<Course {...mockData} />);
+     expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toBeInTheDocument();
+@@ -103,6 +131,7 @@ describe('Course', () => {
+   });
+ 
+   it('displays notification trigger and toggles active class on click', async () => {
++    localStorage.setItem('showDiscussionSidebar', false);
+     render(<Course {...mockData} />);
+ 
+     const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
+@@ -114,6 +143,7 @@ describe('Course', () => {
+ 
+   it('handles click to open/close notification tray', async () => {
+     sessionStorage.clear();
++    localStorage.setItem('showDiscussionSidebar', false);
+     render(<Course {...mockData} />);
+     expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"open"');
+     const notificationShowButton = await screen.findByRole('button', { name: /Show notification tray/i });
+@@ -144,6 +174,7 @@ describe('Course', () => {
+ 
+   it('handles sessionStorage from a different course for the notification tray', async () => {
+     sessionStorage.clear();
++    localStorage.setItem('showDiscussionSidebar', false);
+     const courseMetadataSecondCourse = Factory.build('courseMetadata', { id: 'second_course' });
+ 
+     // set sessionStorage for a different course before rendering Course
+@@ -186,6 +217,34 @@ describe('Course', () => {
+     expect(screen.getByText(Object.values(models.sequences)[0].title)).toBeInTheDocument();
+   });
+ 
++  [
++    { value: true, visible: true },
++    { value: false, visible: false },
++    { value: null, visible: true },
++  ].forEach(async ({ value, visible }) => (
++    it(`discussion sidebar is ${visible ? 'shown' : 'hidden'} when localstorage value is ${value}`, async () => {
++      await setupDiscussionSidebar(value);
++      const element = await waitFor(() => screen.findByTestId('sidebar-DISCUSSIONS'));
++      if (visible) {
++        expect(element).not.toHaveClass('d-none');
++      } else {
++        expect(element).toHaveClass('d-none');
++      }
++    })));
++
++  [
++    { value: true, result: 'false' },
++    { value: false, result: 'true' },
++  ].forEach(async ({ value, result }) => (
++    it(`Discussion sidebar storage value is ${!value} when sidebar is ${value ? 'closed' : 'open'}`, async () => {
++      await setupDiscussionSidebar(value);
++      await act(async () => {
++        const button = await screen.queryByRole('button', { name: /Show discussions tray/i });
++        button.click();
++      });
++      expect(localStorage.getItem('showDiscussionSidebar')).toBe(result);
++    })));
++
+   it('passes handlers to the sequence', async () => {
+     const nextSequenceHandler = jest.fn();
+     const previousSequenceHandler = jest.fn();
+diff --git a/src/courseware/course/sidebar/SidebarContextProvider.jsx b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+index a2cde92..c9a3b88 100644
+--- a/src/courseware/course/sidebar/SidebarContextProvider.jsx
++++ b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+@@ -19,9 +19,13 @@ const SidebarProvider = ({
+   const shouldDisplayFullScreen = useWindowSize().width < breakpoints.large.minWidth;
+   const shouldDisplaySidebarOpen = useWindowSize().width > breakpoints.medium.minWidth;
+   const showNotificationsOnLoad = getSessionStorage(`notificationTrayStatus.${courseId}`) !== 'closed';
+-  const initialSidebar = (verifiedMode && shouldDisplaySidebarOpen && showNotificationsOnLoad)
++  const showDiscussionSidebar = localStorage.getItem('showDiscussionSidebar') !== 'false';
++  const showNotificationSidebar = (verifiedMode && shouldDisplaySidebarOpen && showNotificationsOnLoad)
+     ? SIDEBARS.NOTIFICATIONS.ID
+     : null;
++  const initialSidebar = showDiscussionSidebar
++    ? SIDEBARS.DISCUSSIONS.ID
++    : showNotificationSidebar;
+   const [currentSidebar, setCurrentSidebar] = useState(initialSidebar);
+   const [notificationStatus, setNotificationStatus] = useState(getLocalStorage(`notificationStatus.${courseId}`));
+   const [upgradeNotificationCurrentState, setUpgradeNotificationCurrentState] = useState(getLocalStorage(`upgradeNotificationCurrentState.${courseId}`));
+@@ -41,6 +45,11 @@ const SidebarProvider = ({
+ 
+   const toggleSidebar = useCallback((sidebarId) => {
+     // Switch to new sidebar or hide the current sidebar
++    if (currentSidebar === SIDEBARS.DISCUSSIONS.ID) {
++      localStorage.setItem('showDiscussionSidebar', false);
++    } else if (sidebarId === SIDEBARS.DISCUSSIONS.ID) {
++      localStorage.setItem('showDiscussionSidebar', true);
++    }
+     setCurrentSidebar(sidebarId === currentSidebar ? null : sidebarId);
+   }, [currentSidebar]);
+ 
+diff --git a/src/courseware/course/sidebar/common/SidebarBase.jsx b/src/courseware/course/sidebar/common/SidebarBase.jsx
+index 2e2e44f..3e581ca 100644
+--- a/src/courseware/course/sidebar/common/SidebarBase.jsx
++++ b/src/courseware/course/sidebar/common/SidebarBase.jsx
+@@ -41,6 +41,7 @@ const SidebarBase = ({
+         'min-vh-100': !shouldDisplayFullScreen,
+         'd-none': currentSidebar !== sidebarId,
+       }, className)}
++      data-testid={`sidebar-${sidebarId}`}
+       style={{ width: shouldDisplayFullScreen ? '100%' : width }}
+       aria-label={ariaLabel}
+     >
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 955440b..82aa722 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -137,10 +137,12 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
+   const discussionConfigUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/discussion/v1/courses/*`);
+   courseHomeMetadataUrl = appendBrowserTimezoneToUrl(courseHomeMetadataUrl);
+ 
++  const provider = options?.provider || 'legacy';
++
+   axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+   axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
+-  axiosMock.onGet(discussionConfigUrl).reply(200, { provider: 'legacy' });
++  axiosMock.onGet(discussionConfigUrl).reply(200, { provider });
+   sequenceMetadata.forEach(metadata => {
+     const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${metadata.item_id}`;
+     axiosMock.onGet(sequenceMetadataUrl).reply(200, metadata);
+-- 
+2.34.1
+

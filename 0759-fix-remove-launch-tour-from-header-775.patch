@@ -1,0 +1,122 @@
+From cc0c3c24d9e32251804f35af959ae9b2f629b536 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Thu, 16 Dec 2021 12:03:40 -0500
+Subject: [PATCH 0759/1021] fix: remove launch tour from header (#775)
+
+---
+ src/course-header/Header.jsx                              | 8 +-------
+ .../newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx  | 6 ++----
+ src/tab-page/TabPage.jsx                                  | 4 ++--
+ 3 files changed, 5 insertions(+), 13 deletions(-)
+
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index 2999887..ab952fa 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -7,7 +7,6 @@ import { AppContext } from '@edx/frontend-platform/react';
+ 
+ import AnonymousUserMenu from './AnonymousUserMenu';
+ import AuthenticatedUserDropdown from './AuthenticatedUserDropdown';
+-import LaunchCourseHomeTourButton from '../product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton';
+ 
+ import messages from './messages';
+ 
+@@ -31,7 +30,7 @@ LinkedLogo.propTypes = {
+ };
+ 
+ function Header({
+-  courseOrg, courseNumber, courseTitle, intl, metadataModel, showLaunchTourButton, showUserDropdown,
++  courseOrg, courseNumber, courseTitle, intl, showUserDropdown,
+ }) {
+   const { authenticatedUser } = useContext(AppContext);
+ 
+@@ -62,7 +61,6 @@ function Header({
+ 
+   return (
+     <header className="course-header">
+-      {showLaunchTourButton && (<LaunchCourseHomeTourButton metadataModel={metadataModel} srOnly />)}
+       <a className="sr-only sr-only-focusable" href="#main-content">{intl.formatMessage(messages.skipNavLink)}</a>
+       <div className="container-xl py-2 d-flex align-items-center">
+         {headerLogo}
+@@ -89,8 +87,6 @@ Header.propTypes = {
+   courseNumber: PropTypes.string,
+   courseTitle: PropTypes.string,
+   intl: intlShape.isRequired,
+-  metadataModel: PropTypes.string,
+-  showLaunchTourButton: PropTypes.bool,
+   showUserDropdown: PropTypes.bool,
+ };
+ 
+@@ -98,8 +94,6 @@ Header.defaultProps = {
+   courseOrg: null,
+   courseNumber: null,
+   courseTitle: null,
+-  metadataModel: 'courseHomeMeta',
+-  showLaunchTourButton: false,
+   showUserDropdown: true,
+ };
+ 
+diff --git a/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx b/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
+index 00ca983..1414b36 100644
+--- a/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
++++ b/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
+@@ -12,14 +12,14 @@ import { useModel } from '../../generic/model-store';
+ import { launchCourseHomeTour } from '../data/slice';
+ import messages from '../messages';
+ 
+-function LaunchCourseHomeTourButton({ intl, metadataModel, srOnly }) {
++function LaunchCourseHomeTourButton({ intl, srOnly }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+     org,
+-  } = useModel(metadataModel, courseId);
++  } = useModel('courseHomeMeta', courseId);
+ 
+   const {
+     toursEnabled,
+@@ -58,13 +58,11 @@ function LaunchCourseHomeTourButton({ intl, metadataModel, srOnly }) {
+ }
+ 
+ LaunchCourseHomeTourButton.defaultProps = {
+-  metadataModel: 'courseHomeMeta',
+   srOnly: false,
+ };
+ 
+ LaunchCourseHomeTourButton.propTypes = {
+   intl: intlShape.isRequired,
+-  metadataModel: PropTypes.string,
+   srOnly: PropTypes.bool,
+ };
+ 
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index bbc3e97..dcd7db8 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -15,6 +15,7 @@ import genericMessages from '../generic/messages';
+ import messages from './messages';
+ import LoadedTabPage from './LoadedTabPage';
+ import { setCallToActionToast } from '../course-home/data/slice';
++import LaunchCourseHomeTourButton from '../product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton';
+ 
+ function TabPage({ intl, ...props }) {
+   const {
+@@ -73,12 +74,11 @@ function TabPage({ intl, ...props }) {
+         >
+           {toastHeader}
+         </Toast>
++        {metadataModel === 'courseHomeMeta' && (<LaunchCourseHomeTourButton srOnly />)}
+         <Header
+           courseOrg={org}
+           courseNumber={number}
+           courseTitle={title}
+-          metadataModel={metadataModel}
+-          showLaunchTourLink
+         />
+         <LoadedTabPage {...props} />
+         <Footer />
+-- 
+2.34.1
+

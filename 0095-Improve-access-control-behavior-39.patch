@@ -1,0 +1,365 @@
+From 37610ab18122ea6c77418c8ba3667dcb4d941135 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Thu, 2 Apr 2020 15:12:07 -0400
+Subject: [PATCH 0095/1021] Improve access control behavior (#39)
+
+Fixes TNL-7175: Redirect to course home if a user is not unenrolled and the course is private.
+
+- Require authentication to use the app while course blocks api requires it
+- Gracefully handle course blocks api request failures allowing app to proceed to it redirection logic
+
+Notable changes:
+
+- selectors related to sequences are more resilient to missing models. In the case the course blocks api returns successfully but empty (in this case of enrolled but course not yet started).
+- `fetchCourse` thunk handles failures for fetchCourseMeta and fetchCourseBlocks separately using `Promise.allSettled` instead of `Promise.all`
+- `denied` is a new `courseStatus`
+- Access denied redirect is done using a component at a new route `redirect/course-home/:courseId`
+
+Now handles cases
+
+- User is unauthenticated > redirect to login
+- User is authenticated but not enrolled > redirects to lms course home
+- When an enrolled user attempts to access courseware before the course start date they will load the sequence (but unable to load the vertical block). This behavior should be fixed in an update to edx-platform
+---
+ src/CoursewareRedirect.jsx                  | 30 +++++++
+ src/PageLoading.jsx                         |  2 +-
+ src/courseware/CoursewareContainer.jsx      | 24 ++----
+ src/courseware/course/CourseBreadcrumbs.jsx |  2 +-
+ src/courseware/data/selectors.js            | 19 +++--
+ src/data/slice.js                           |  6 ++
+ src/data/thunks.js                          | 94 +++++++++++++--------
+ src/index.jsx                               |  5 ++
+ 8 files changed, 122 insertions(+), 60 deletions(-)
+ create mode 100644 src/CoursewareRedirect.jsx
+
+diff --git a/src/CoursewareRedirect.jsx b/src/CoursewareRedirect.jsx
+new file mode 100644
+index 0000000..f1647be
+--- /dev/null
++++ b/src/CoursewareRedirect.jsx
+@@ -0,0 +1,30 @@
++import React from 'react';
++import { Switch, Route, useRouteMatch } from 'react-router';
++import { getConfig } from '@edx/frontend-platform';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++import PageLoading from './PageLoading';
++
++export default () => {
++  const { path } = useRouteMatch();
++  return (
++    <div className="flex-grow-1">
++      <PageLoading srMessage={(
++        <FormattedMessage
++          id="learn.redirect.interstitial.message"
++          description="The screen-reader message when a page is about to redirect"
++          defaultMessage="Redirecting..."
++        />
++      )}
++      />
++
++      <Switch>
++        <Route
++          path={`${path}/course-home/:courseId`}
++          render={({ match }) => {
++            global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/course/`);
++          }}
++        />
++      </Switch>
++    </div>
++  );
++};
+diff --git a/src/PageLoading.jsx b/src/PageLoading.jsx
+index 1b1135d..d7a8129 100644
+--- a/src/PageLoading.jsx
++++ b/src/PageLoading.jsx
+@@ -33,5 +33,5 @@ export default class PageLoading extends Component {
+ }
+ 
+ PageLoading.propTypes = {
+-  srMessage: PropTypes.string.isRequired,
++  srMessage: PropTypes.node.isRequired,
+ };
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 8485559..19b8636 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -1,9 +1,9 @@
+ import React, { useEffect, useCallback } from 'react';
+ import PropTypes from 'prop-types';
+ import { useSelector, useDispatch } from 'react-redux';
+-import { history, getConfig } from '@edx/frontend-platform';
++import { history } from '@edx/frontend-platform';
+ 
+-import { useRouteMatch } from 'react-router';
++import { useRouteMatch, Redirect } from 'react-router';
+ import {
+   fetchCourse,
+   fetchSequence,
+@@ -120,21 +120,6 @@ function useSavedSequencePosition(courseId, sequenceId, unitId) {
+   }, [unitId]);
+ }
+ 
+-/**
+- * Redirects the user away from the app if they don't have access to view this course.
+- *
+- * @param {*} courseStatus
+- * @param {*} course
+- */
+-function useAccessDeniedRedirect(courseStatus, courseId) {
+-  const course = useModel('courses', courseId);
+-  useEffect(() => {
+-    if (courseStatus === 'loaded' && !course.userHasAccess && !course.isStaff) {
+-      global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${course.id}/course/`);
+-    }
+-  }, [courseStatus, course]);
+-}
+-
+ export default function CoursewareContainer() {
+   const { params } = useRouteMatch();
+   const {
+@@ -173,11 +158,14 @@ export default function CoursewareContainer() {
+   const previousSequenceHandler = usePreviousSequenceHandler(courseId, sequenceId);
+   const unitNavigationHandler = useUnitNavigationHandler(courseId, sequenceId, routeUnitId);
+ 
+-  useAccessDeniedRedirect(courseStatus, courseId);
+   useContentRedirect(courseStatus, sequenceStatus);
+   useExamRedirect(sequenceId);
+   useSavedSequencePosition(courseId, sequenceId, routeUnitId);
+ 
++  if (courseStatus === 'denied') {
++    return <Redirect to={`/redirect/course-home/${courseId}`} />;
++  }
++
+   return (
+     <main className="flex-grow-1 d-flex flex-column">
+       <Course
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 2750b1c..7118c2b 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -45,7 +45,7 @@ export default function CourseBreadcrumbs({
+ 
+   const links = useMemo(() => {
+     if (courseStatus === 'loaded' && sequenceStatus === 'loaded') {
+-      return [section, sequence].map((node) => ({
++      return [section, sequence].filter(node => !!node).map((node) => ({
+         id: node.id,
+         label: node.title,
+         url: `${getConfig().LMS_BASE_URL}/courses/${course.id}/course/#${node.id}`,
+diff --git a/src/courseware/data/selectors.js b/src/courseware/data/selectors.js
+index 50eebc6..73514b1 100644
+--- a/src/courseware/data/selectors.js
++++ b/src/courseware/data/selectors.js
+@@ -3,11 +3,11 @@ export function sequenceIdsSelector(state) {
+   if (state.courseware.courseStatus !== 'loaded') {
+     return [];
+   }
+-  const { sectionIds } = state.models.courses[state.courseware.courseId];
+-  let sequenceIds = [];
+-  sectionIds.forEach(sectionId => {
+-    sequenceIds = [...sequenceIds, ...state.models.sections[sectionId].sequenceIds];
+-  });
++  const { sectionIds = [] } = state.models.courses[state.courseware.courseId];
++
++  const sequenceIds = sectionIds
++    .flatMap(sectionId => state.models.sections[sectionId].sequenceIds);
++
+   return sequenceIds;
+ }
+ 
+@@ -15,6 +15,11 @@ export function firstSequenceIdSelector(state) {
+   if (state.courseware.courseStatus !== 'loaded') {
+     return null;
+   }
+-  const sectionId = state.models.courses[state.courseware.courseId].sectionIds[0];
+-  return state.models.sections[sectionId].sequenceIds[0];
++  const { sectionIds = [] } = state.models.courses[state.courseware.courseId];
++
++  if (sectionIds.length === 0) {
++    return null;
++  }
++
++  return state.models.sections[sectionIds[0]].sequenceIds[0];
+ }
+diff --git a/src/data/slice.js b/src/data/slice.js
+index 8166b1b..088e951 100644
+--- a/src/data/slice.js
++++ b/src/data/slice.js
+@@ -4,6 +4,7 @@ import { createSlice } from '@reduxjs/toolkit';
+ export const LOADING = 'loading';
+ export const LOADED = 'loaded';
+ export const FAILED = 'failed';
++export const DENIED = 'denied';
+ 
+ const slice = createSlice({
+   name: 'courseware',
+@@ -26,6 +27,10 @@ const slice = createSlice({
+       state.courseId = payload.courseId;
+       state.courseStatus = FAILED;
+     },
++    fetchCourseDenied: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.courseStatus = DENIED;
++    },
+     fetchSequenceRequest: (state, { payload }) => {
+       state.sequenceId = payload.sequenceId;
+       state.sequenceStatus = LOADING;
+@@ -45,6 +50,7 @@ export const {
+   fetchCourseRequest,
+   fetchCourseSuccess,
+   fetchCourseFailure,
++  fetchCourseDenied,
+   fetchSequenceRequest,
+   fetchSequenceSuccess,
+   fetchSequenceFailure,
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index 6a82ca6..ded167b 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -5,12 +5,13 @@ import {
+   getSequenceMetadata,
+ } from './api';
+ import {
+-  addModelsMap, updateModel, updateModels, updateModelsMap,
++  addModelsMap, updateModel, updateModels, updateModelsMap, addModel,
+ } from '../model-store';
+ import {
+   fetchCourseRequest,
+   fetchCourseSuccess,
+   fetchCourseFailure,
++  fetchCourseDenied,
+   fetchSequenceRequest,
+   fetchSequenceSuccess,
+   fetchSequenceFailure,
+@@ -19,39 +20,66 @@ import {
+ export function fetchCourse(courseId) {
+   return async (dispatch) => {
+     dispatch(fetchCourseRequest({ courseId }));
+-    Promise.all([
+-      getCourseBlocks(courseId),
++    Promise.allSettled([
+       getCourseMetadata(courseId),
+-    ]).then(([
+-      {
+-        courses, sections, sequences, units,
+-      },
+-      course,
+-    ]) => {
+-      dispatch(addModelsMap({
+-        modelType: 'courses',
+-        modelsMap: courses,
+-      }));
+-      dispatch(updateModel({
+-        modelType: 'courses',
+-        model: course,
+-      }));
+-      dispatch(addModelsMap({
+-        modelType: 'sections',
+-        modelsMap: sections,
+-      }));
+-      // We update for sequences and units because the sequence metadata may have come back first.
+-      dispatch(updateModelsMap({
+-        modelType: 'sequences',
+-        modelsMap: sequences,
+-      }));
+-      dispatch(updateModelsMap({
+-        modelType: 'units',
+-        modelsMap: units,
+-      }));
+-      dispatch(fetchCourseSuccess({ courseId }));
+-    }).catch((error) => {
+-      logError(error);
++      getCourseBlocks(courseId),
++    ]).then(([courseMetadataResult, courseBlocksResult]) => {
++      if (courseMetadataResult.status === 'fulfilled') {
++        dispatch(addModel({
++          modelType: 'courses',
++          model: courseMetadataResult.value,
++        }));
++      }
++
++      if (courseBlocksResult.status === 'fulfilled') {
++        const {
++          courses, sections, sequences, units,
++        } = courseBlocksResult.value;
++
++        dispatch(updateModelsMap({
++          modelType: 'courses',
++          modelsMap: courses,
++        }));
++        dispatch(addModelsMap({
++          modelType: 'sections',
++          modelsMap: sections,
++        }));
++        // We update for sequences and units because the sequence metadata may have come back first.
++        dispatch(updateModelsMap({
++          modelType: 'sequences',
++          modelsMap: sequences,
++        }));
++        dispatch(updateModelsMap({
++          modelType: 'units',
++          modelsMap: units,
++        }));
++      }
++
++      const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
++      const fetchedBlocks = courseBlocksResult.status === 'fulfilled';
++
++      // Log errors for each request if needed. Course block failures may occur
++      // even if the course metadata request is successful
++      if (!fetchedBlocks) {
++        logError(courseBlocksResult.reason);
++      }
++      if (!fetchedMetadata) {
++        logError(courseMetadataResult.reason);
++      }
++
++      if (fetchedMetadata) {
++        if (courseMetadataResult.value.userHasAccess && fetchedBlocks) {
++          // User has access
++          dispatch(fetchCourseSuccess({ courseId }));
++          return;
++        }
++        // User either doesn't have access or only has partial access
++        // (can't access course blocks)
++        dispatch(fetchCourseDenied({ courseId }));
++        return;
++      }
++
++      // Definitely an error happening
+       dispatch(fetchCourseFailure({ courseId }));
+     });
+   };
+diff --git a/src/index.jsx b/src/index.jsx
+index cffa86a..78e0c77 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -19,6 +19,7 @@ import './index.scss';
+ import './assets/favicon.ico';
+ import CoursewareContainer from './courseware';
+ import CourseHomeContainer from './course-home';
++import CoursewareRedirect from './CoursewareRedirect';
+ 
+ import store from './store';
+ 
+@@ -27,6 +28,7 @@ subscribe(APP_READY, () => {
+     <AppProvider store={store}>
+       <UserMessagesProvider>
+         <Switch>
++          <Route path="/redirect" component={CoursewareRedirect} />
+           <Route path="/course/:courseId/home" component={CourseHomeContainer} />
+           <Route
+             path={[
+@@ -49,6 +51,9 @@ subscribe(APP_INIT_ERROR, (error) => {
+ });
+ 
+ initialize({
++  // TODO: Remove this once the course blocks api supports unauthenticated
++  // access and we are prepared to support public courses in this app.
++  requireAuthenticatedUser: true,
+   messages: [
+     appMessages,
+     headerMessages,
+-- 
+2.34.1
+

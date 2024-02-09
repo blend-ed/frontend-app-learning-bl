@@ -1,0 +1,104 @@
+From c5a43524a1822fbe8fdcb673e2f1bc2d0a776e77 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 16 Sep 2020 13:46:06 -0400
+Subject: [PATCH 0252/1021] AA-368: Expand course outline section that contains
+ resume block (#212)
+
+---
+ .../data/__factories__/courseBlocks.factory.js            | 2 +-
+ src/course-home/data/__snapshots__/redux.test.js.snap     | 1 +
+ src/course-home/data/api.js                               | 1 +
+ src/course-home/outline-tab/OutlineTab.jsx                | 1 +
+ src/course-home/outline-tab/Section.jsx                   | 8 +++++++-
+ 5 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/courseBlocks.factory.js b/src/course-home/data/__factories__/courseBlocks.factory.js
+index 026cf8a..1fa6dd9 100644
+--- a/src/course-home/data/__factories__/courseBlocks.factory.js
++++ b/src/course-home/data/__factories__/courseBlocks.factory.js
+@@ -61,7 +61,7 @@ export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
+   )];
+   const sectionBlock = options.sectionBlock || Factory.build(
+     'block',
+-    { type: 'chapter', children: sequenceBlock.map(block => block.id) },
++    { type: 'chapter', children: sequenceBlock.map(block => block.id), resume_block: false },
+     { courseId },
+   );
+   const courseBlock = options.courseBlocks || Factory.build(
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index acee81c..4c95629 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -177,6 +177,7 @@ Object {
+               "complete": false,
+               "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+               "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++              "resumeBlock": false,
+               "sequenceIds": Array [
+                 "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+               ],
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 686ad62..41ba798 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -35,6 +35,7 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+           complete: block.complete,
+           id: block.id,
+           title: block.display_name,
++          resumeBlock: block.resume_block,
+           sequenceIds: block.children || [],
+         };
+         break;
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 188a55c..08978ea 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -136,6 +136,7 @@ function OutlineTab({ intl }) {
+             <Section
+               key={sectionId}
+               courseId={courseId}
++              defaultOpen={sections[sectionId].resumeBlock}
+               expand={expandAll}
+               section={sections[sectionId]}
+             />
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index e5e339a..ea931a4 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -12,6 +12,7 @@ import messages from './messages';
+ 
+ function Section({
+   courseId,
++  defaultOpen,
+   expand,
+   intl,
+   section,
+@@ -27,12 +28,16 @@ function Section({
+     },
+   } = useModel('outline', courseId);
+ 
+-  const [open, setOpen] = useState(expand);
++  const [open, setOpen] = useState(defaultOpen);
+ 
+   useEffect(() => {
+     setOpen(expand);
+   }, [expand]);
+ 
++  useEffect(() => {
++    setOpen(defaultOpen);
++  }, []);
++
+   const sectionTitle = (
+     <div>
+       {complete ? (
+@@ -96,6 +101,7 @@ function Section({
+ 
+ Section.propTypes = {
+   courseId: PropTypes.string.isRequired,
++  defaultOpen: PropTypes.bool.isRequired,
+   expand: PropTypes.bool.isRequired,
+   intl: intlShape.isRequired,
+   section: PropTypes.shape().isRequired,
+-- 
+2.34.1
+

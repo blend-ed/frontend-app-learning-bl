@@ -1,0 +1,96 @@
+From ec7166ad5d383a2191c04357f59155f4aef44f2f Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Tue, 4 Feb 2020 14:58:19 -0500
+Subject: [PATCH 0055/1021] fix: lint both js and jsx files.
+
+Updating jsx to pass linter, too.
+---
+ package.json                                   |  2 +-
+ src/courseware/CourseContainer.jsx             |  1 -
+ src/courseware/sequence/SequenceNavigation.jsx |  3 ++-
+ src/courseware/sequence/UnitButton.jsx         | 12 +++++++++---
+ 4 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/package.json b/package.json
+index 70c3194..5938377 100644
+--- a/package.json
++++ b/package.json
+@@ -14,7 +14,7 @@
+     "build": "fedx-scripts webpack",
+     "i18n_extract": "BABEL_ENV=i18n fedx-scripts babel src --quiet > /dev/null",
+     "is-es5": "es-check es5 ./dist/*.js",
+-    "lint": "fedx-scripts eslint",
++    "lint": "fedx-scripts eslint --ext .js --ext .jsx .",
+     "snapshot": "fedx-scripts jest --updateSnapshot",
+     "start": "fedx-scripts webpack-dev-server --progress",
+     "test": "fedx-scripts jest --coverage --passWithNoTests"
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index 595d782..7bcde8d 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -42,7 +42,6 @@ function useLoadCourse(courseUsageKey) {
+       setCourseId(blocksData.root);
+     });
+     getCourse(courseUsageKey).then((data) => {
+-      console.log(data);
+       setMetadata(camelCaseObject(data));
+     });
+   }, [courseUsageKey]);
+diff --git a/src/courseware/sequence/SequenceNavigation.jsx b/src/courseware/sequence/SequenceNavigation.jsx
+index f9a2b33..f20f8e2 100644
+--- a/src/courseware/sequence/SequenceNavigation.jsx
++++ b/src/courseware/sequence/SequenceNavigation.jsx
+@@ -19,7 +19,8 @@ export default function SequenceNavigation({
+       key={unit.id}
+       {...unit}
+       isComplete={showCompletion && unit.complete}
+-      onClick={onNavigate.bind(null, index)}
++      index={index}
++      clickHandler={onNavigate}
+     />
+   ));
+ 
+diff --git a/src/courseware/sequence/UnitButton.jsx b/src/courseware/sequence/UnitButton.jsx
+index ead7bef..2fb67f5 100644
+--- a/src/courseware/sequence/UnitButton.jsx
++++ b/src/courseware/sequence/UnitButton.jsx
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import React, { useCallback } from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { Button } from '@edx/paragon';
+@@ -7,12 +7,17 @@ import UnitIcon from './UnitIcon';
+ import CompleteIcon from './CompleteIcon';
+ 
+ export default function UnitButton({
+-  onClick,
++  clickHandler,
+   pageTitle,
+   type,
+   isActive,
+   isComplete,
++  index,
+ }) {
++  const onClick = useCallback(() => {
++    clickHandler(index);
++  });
++
+   return (
+     <Button
+       className={classNames({
+@@ -31,9 +36,10 @@ export default function UnitButton({
+ }
+ 
+ UnitButton.propTypes = {
++  index: PropTypes.number.isRequired,
+   isActive: PropTypes.bool,
+   isComplete: PropTypes.bool,
+-  onClick: PropTypes.func.isRequired,
++  clickHandler: PropTypes.func.isRequired,
+   pageTitle: PropTypes.string.isRequired,
+   type: PropTypes.string.isRequired,
+ };
+-- 
+2.34.1
+

@@ -1,0 +1,82 @@
+From 7e2f495f52aef787eae0edd64eb13573416598a6 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Fri, 5 Feb 2021 12:29:08 -0500
+Subject: [PATCH 0380/1021] Use contains_content_type_gated_content attribute,
+ rather than the graded attribute, to determine if the content type gating
+ paywall should be displayed. (#349)
+
+The issue was that items with the graded attribute are not always going to be paywalled by content type gating.
+AA-613
+---
+ src/courseware/course/sequence/Unit.jsx                     | 2 +-
+ src/courseware/course/sequence/Unit.test.jsx                | 6 +++---
+ .../data/__factories__/sequenceMetadata.factory.js          | 1 +
+ src/courseware/data/api.js                                  | 1 +
+ 4 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index a45b4d9..78c53be 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -130,7 +130,7 @@ function Unit({
+         isBookmarked={unit.bookmarked}
+         isProcessing={unit.bookmarkedUpdateState === 'loading'}
+       />
+-      { contentTypeGatingEnabled && unit.graded && (
++      {contentTypeGatingEnabled && unit.containsContentTypeGatedContent && (
+         <Suspense
+           fallback={(
+             <PageLoading
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 6a11b45..dfddc2a 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -17,10 +17,10 @@ describe('Unit', () => {
+     { courseId: courseMetadata.id },
+   ), Factory.build(
+     'block',
+-    { type: 'vertical', graded: true, bookmarked: true },
++    { type: 'vertical', contains_content_type_gated_content: true, bookmarked: true },
+     { courseId: courseMetadata.id },
+   )];
+-  const [unit, gradedUnit] = unitBlocks;
++  const [unit, unitThatContainsGatedContent] = unitBlocks;
+ 
+   beforeAll(async () => {
+     await initializeTestStore({ courseMetadata, unitBlocks });
+@@ -43,7 +43,7 @@ describe('Unit', () => {
+   });
+ 
+   it('renders proper message for gated content', () => {
+-    render(<Unit {...mockData} id={gradedUnit.id} />);
++    render(<Unit {...mockData} id={unitThatContainsGatedContent.id} />);
+ 
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index 95d0ad2..54d1ba7 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -48,6 +48,7 @@ Factory.define('sequenceMetadata')
+       complete: unitBlock.complete || null,
+       content: '',
+       page_title: unitBlock.display_name,
++      contains_content_type_gated_content: unitBlock.contains_content_type_gated_content,
+     }),
+   ))
+   .attrs({
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index a51d52a..85ee870 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -183,6 +183,7 @@ function normalizeSequenceMetadata(sequence) {
+       complete: unit.complete,
+       title: unit.page_title,
+       contentType: unit.type,
++      containsContentTypeGatedContent: unit.contains_content_type_gated_content,
+     })),
+   };
+ }
+-- 
+2.34.1
+

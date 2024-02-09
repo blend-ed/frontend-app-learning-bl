@@ -1,0 +1,129 @@
+From 76cf85f3d77bbda85fa11cbd66b4ea2b4653e885 Mon Sep 17 00:00:00 2001
+From: Thomas Tracy <contact@tjtracy.com>
+Date: Fri, 1 Apr 2022 12:43:05 -0400
+Subject: [PATCH 0885/1021] chore: [MICROBA-1780] Copy edits (#901)
+
+A partner was not happy with messaging for a course whose
+students were in the "earned-not-available" state. This aims to make the
+messaging more clear.
+---
+ src/course-home/outline-tab/OutlineTab.test.jsx             | 4 ++--
+ .../outline-tab/alerts/certificate-status-alert/messages.js | 4 ++--
+ .../progress-tab/certificate-status/CertificateStatus.jsx   | 2 +-
+ src/course-home/progress-tab/certificate-status/messages.js | 4 ++--
+ src/courseware/course/course-exit/CourseCelebration.jsx     | 6 +++---
+ src/courseware/course/course-exit/CourseExit.test.jsx       | 2 +-
+ src/courseware/course/course-exit/messages.js               | 2 +-
+ 7 files changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 5fc5b99..4016a3d 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -676,7 +676,7 @@ describe('Outline Tab', () => {
+           ],
+         });
+         await fetchAndRender();
+-        expect(screen.queryByText('Your grade and certificate will be ready soon!')).toBeInTheDocument();
++        expect(screen.queryByText('Your grade and certificate status will be available soon.')).toBeInTheDocument();
+       });
+       it('renders verification alert', async () => {
+         const now = new Date();
+@@ -710,7 +710,7 @@ describe('Outline Tab', () => {
+           ],
+         });
+         await fetchAndRender();
+-        expect(screen.queryByText('Verify your identity to earn a certificate!')).toBeInTheDocument();
++        expect(screen.queryByText('Verify your identity to qualify for a certificate.')).toBeInTheDocument();
+       });
+       it('renders non passing grade', async () => {
+         const now = new Date();
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js b/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+index 97023cb..d527b29 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+@@ -2,8 +2,8 @@ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+   certStatusEarnedNotAvailableHeader: {
+-    id: 'cert.alert.earned.unavailable.header',
+-    defaultMessage: 'Your grade and certificate will be ready soon!',
++    id: 'cert.alert.earned.unavailable.header.v2',
++    defaultMessage: 'Your grade and certificate status will be available soon.',
+     description: 'Header alerting the user that their certificate will be available soon.',
+   },
+   certStatusDownloadableHeader: {
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index 9855baf..e32b353 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -157,7 +157,7 @@ function CertificateStatus({ intl }) {
+         body = (
+           <FormattedMessage
+             id="courseCelebration.certificateBody.notAvailable.endDate"
+-            defaultMessage="This course ends on {endDate}. Final grades and certificates are
++            defaultMessage="This course ends on {endDate}. Final grades and any earned certificates are
+             scheduled to be available after {certAvailabilityDate}."
+             description="This shown for leaner when they are eligible for certifcate but it't not available yet, it could because leaners just finished the course quickly!"
+             values={{ endDate, certAvailabilityDate }}
+diff --git a/src/course-home/progress-tab/certificate-status/messages.js b/src/course-home/progress-tab/certificate-status/messages.js
+index f9eb1fd..332fea7 100644
+--- a/src/course-home/progress-tab/certificate-status/messages.js
++++ b/src/course-home/progress-tab/certificate-status/messages.js
+@@ -92,8 +92,8 @@ const messages = defineMessages({
+     description: 'Button text which leaner needs to upgrade to get the certifcate',
+   },
+   unverifiedHomeHeader: {
+-    id: 'progress.certificateStatus.unverifiedHomeHeader',
+-    defaultMessage: 'Verify your identity to earn a certificate!',
++    id: 'progress.certificateStatus.unverifiedHomeHeader.v2',
++    defaultMessage: 'Verify your identity to qualify for a certificate.',
+     description: 'Header text when the learner needs to do verification to earn a certifcate ',
+   },
+   unverifiedHomeButton: {
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 1b61a76..69ee717 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -130,9 +130,9 @@ function CourseCelebration({ intl }) {
+         <>
+           <p>
+             <FormattedMessage
+-              id="courseCelebration.certificateBody.notAvailable.endDate"
+-              defaultMessage="This course ended on {endDate} and final grades and certificates are scheduled to be
+-              available after {certAvailableDate}."
++              id="courseCelebration.certificateBody.notAvailable.endDate.v2"
++              defaultMessage="This course ends on {endDate}. Final grades and any earned certificates are
++              scheduled to be available after {certAvailableDate}."
+               values={{ endDate, certAvailableDate }}
+               description="This shown for leaner when they are eligible for certifcate but it't not available yet, it could because leaners just finished the course quickly!"
+             />
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 122b2b9..5c8d039 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -136,7 +136,7 @@ describe('Course Exit Pages', () => {
+         },
+       });
+       await fetchAndRender(<CourseCelebration />);
+-      expect(screen.getByText('Your grade and certificate will be ready soon!')).toBeInTheDocument();
++      expect(screen.getByText('Your grade and certificate status will be available soon.')).toBeInTheDocument();
+     });
+ 
+     it('Displays request certificate link', async () => {
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index 4a5ab1d..63bff39 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -13,7 +13,7 @@ const messages = defineMessages({
+   },
+   certificateHeaderNotAvailable: {
+     id: 'courseCelebration.certificateHeader.notAvailable',
+-    defaultMessage: 'Your grade and certificate will be ready soon!',
++    defaultMessage: 'Your grade and certificate status will be available soon.',
+     description: 'Header displayed when course certificate is not yet available to be viewed',
+   },
+   certificateNotAvailableBodyAccessCert: {
+-- 
+2.34.1
+

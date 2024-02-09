@@ -1,0 +1,115 @@
+From 3e2eebdd9b335e687e63056778eeaacd2e5b5153 Mon Sep 17 00:00:00 2001
+From: Simon Chen <schen@edx.org>
+Date: Thu, 28 Jan 2021 11:54:05 -0500
+Subject: [PATCH 0376/1021] MST-621 (#353)
+
+The text in the onboarding panel for submitted state is confusing. This PR updated the text so learners understood the wait
+---
+ .../outline-tab/OutlineTab.test.jsx           | 22 +++++++++++++++++++
+ src/course-home/outline-tab/messages.js       |  4 ++++
+ .../widgets/ProctoringInfoPanel.jsx           | 17 +++++++++++---
+ 3 files changed, 40 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index b10539b..59fa33f 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -489,6 +489,8 @@ describe('Outline Tab', () => {
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).not.toBeInTheDocument();
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).toBeInTheDocument();
++      expect(screen.queryByText('You must complete the onboarding process prior to taking any proctored exam.')).not.toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).not.toBeInTheDocument();
+     });
+ 
+     it('appears for rejected', async () => {
+@@ -497,6 +499,24 @@ describe('Outline Tab', () => {
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).toBeInTheDocument();
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).toBeInTheDocument();
++      expect(screen.queryByText('You must complete the onboarding process prior to taking any proctored exam.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
++    });
++
++    it('appears for submitted', async () => {
++      axiosMock.onGet(proctoringInfoUrl).reply(200, { onboarding_status: 'submitted', onboarding_link: 'test' });
++      await fetchAndRender();
++      await screen.findByText('This course contains proctored exams');
++      expect(screen.queryByText('Your submitted profile is in review.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
++    });
++
++    it('appears for second_review_required', async () => {
++      axiosMock.onGet(proctoringInfoUrl).reply(200, { onboarding_status: 'second_review_required', onboarding_link: 'test' });
++      await fetchAndRender();
++      await screen.findByText('This course contains proctored exams');
++      expect(screen.queryByText('Your submitted profile is in review.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
+     it('appears for no status', async () => {
+@@ -505,6 +525,8 @@ describe('Outline Tab', () => {
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).toBeInTheDocument();
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).toBeInTheDocument();
++      expect(screen.queryByText('You must complete the onboarding process prior to taking any proctored exam.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
+     it('does not appear for 404', async () => {
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index b7ddb66..c782284 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -172,6 +172,10 @@ const messages = defineMessages({
+     id: 'learning.proctoringPanel.generalInfo',
+     defaultMessage: 'You must complete the onboarding process prior to taking any proctored exam. ',
+   },
++  proctoringPanelGeneralInfoSubmitted: {
++    id: 'learning.proctoringPanel.generalInfoSubmitted',
++    defaultMessage: 'Your submitted profile is in review.',
++  },
+   proctoringPanelGeneralTime: {
+     id: 'learning.proctoringPanel.generalTime',
+     defaultMessage: 'Onboarding profile review, including identity verification, can take 2+ business days.',
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index 16d3bb8..0786818 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -27,7 +27,7 @@ function ProctoringInfoPanel({ courseId, intl }) {
+     return readableClass;
+   }
+ 
+-  function showExamLink(examStatus) {
++  function isNotYetSubmitted(examStatus) {
+     const NO_SHOW_STATES = ['submitted', 'second_review_required', 'verified'];
+     return !NO_SHOW_STATES.includes(examStatus);
+   }
+@@ -73,11 +73,22 @@ function ProctoringInfoPanel({ courseId, intl }) {
+             )}
+             {(readableStatus !== 'verified') && (
+               <>
+-                <p>{intl.formatMessage(messages.proctoringPanelGeneralInfo)}</p>
++                <p>
++                  {isNotYetSubmitted(status) && (
++                    <>
++                      {intl.formatMessage(messages.proctoringPanelGeneralInfo)}
++                    </>
++                  )}
++                  {!isNotYetSubmitted(status) && (
++                    <>
++                      {intl.formatMessage(messages.proctoringPanelGeneralInfoSubmitted)}
++                    </>
++                  )}
++                </p>
+                 <p>{intl.formatMessage(messages.proctoringPanelGeneralTime)}</p>
+               </>
+             )}
+-            {showExamLink(status) && (
++            {isNotYetSubmitted(status) && (
+               <Button variant="primary" block href={`${getConfig().LMS_BASE_URL}${link}`}>
+                 {intl.formatMessage(messages.proctoringOnboardingButton)}
+               </Button>
+-- 
+2.34.1
+

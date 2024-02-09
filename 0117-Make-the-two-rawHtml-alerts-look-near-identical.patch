@@ -1,0 +1,55 @@
+From a7932ed7304213ea2a480583f23fb120a76eaf9b Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Thu, 7 May 2020 11:57:05 -0700
+Subject: [PATCH 0117/1021] Make the two rawHtml alerts look near-identical
+
+---
+ src/access-expiration-alert/hooks.js | 10 +++++-----
+ src/offer-alert/hooks.js             |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/src/access-expiration-alert/hooks.js b/src/access-expiration-alert/hooks.js
+index 877d408..62887be 100644
+--- a/src/access-expiration-alert/hooks.js
++++ b/src/access-expiration-alert/hooks.js
+@@ -7,15 +7,15 @@ export function useAccessExpirationAlert(courseId) {
+   const course = useModel('courses', courseId);
+   const { add, remove } = useContext(UserMessagesContext);
+   const [alertId, setAlertId] = useState(null);
+-  const expiredMessage = (course && course.courseExpiredMessage) || null;
++  const rawHtml = (course && course.courseExpiredMessage) || null;
+   useEffect(() => {
+-    if (expiredMessage && alertId === null) {
++    if (rawHtml && alertId === null) {
+       setAlertId(add({
+         code: 'clientAccessExpirationAlert',
+         topic: 'course',
+-        rawHtml: expiredMessage,
++        rawHtml,
+       }));
+-    } else if (alertId !== null) {
++    } else if (!rawHtml && alertId !== null) {
+       remove(alertId);
+       setAlertId(null);
+     }
+@@ -24,5 +24,5 @@ export function useAccessExpirationAlert(courseId) {
+         remove(alertId);
+       }
+     };
+-  }, [course, expiredMessage]);
++  }, [alertId, courseId, rawHtml]);
+ }
+diff --git a/src/offer-alert/hooks.js b/src/offer-alert/hooks.js
+index 0bcbad3..d6048db 100644
+--- a/src/offer-alert/hooks.js
++++ b/src/offer-alert/hooks.js
+@@ -24,5 +24,5 @@ export function useOfferAlert(courseId) {
+         remove(alertId);
+       }
+     };
+-  }, [course, rawHtml]);
++  }, [alertId, courseId, rawHtml]);
+ }
+-- 
+2.34.1
+

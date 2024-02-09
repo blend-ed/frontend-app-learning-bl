@@ -1,0 +1,42 @@
+From a6e539dad275954d951b37d05ec0038a2cfb1b6a Mon Sep 17 00:00:00 2001
+From: "Albert (AJ) St. Aubin" <astaubin@edx.org>
+Date: Fri, 15 Oct 2021 15:18:42 -0400
+Subject: [PATCH 0693/1021] feat: update the text for unearned certificates
+
+[MICROBA-1536]
+---
+ src/course-home/outline-tab/OutlineTab.test.jsx               | 4 ++--
+ .../outline-tab/alerts/certificate-status-alert/messages.js   | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 98a31da..52c7753 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -683,8 +683,8 @@ describe('Outline Tab', () => {
+           ],
+         });
+         await fetchAndRender();
+-        screen.getAllByText('You are not eligible for a certificate');
+-        expect(screen.queryByText('You are not eligible for a certificate')).toBeInTheDocument();
++        screen.getAllByText('You are not yet eligible for a certificate');
++        expect(screen.queryByText('You are not yet eligible for a certificate')).toBeInTheDocument();
+       });
+       it('tracks request cert button', async () => {
+         sendTrackEvent.mockClear();
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js b/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+index a9756a8..97023cb 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+@@ -13,7 +13,7 @@ const messages = defineMessages({
+   },
+   certStatusNotPassingHeader: {
+     id: 'cert.alert.notPassing.header',
+-    defaultMessage: 'You are not eligible for a certificate',
++    defaultMessage: 'You are not yet eligible for a certificate',
+   },
+   certStatusNotPassingButton: {
+     id: 'cert.alert.notPassing.button',
+-- 
+2.34.1
+

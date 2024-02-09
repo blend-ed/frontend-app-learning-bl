@@ -1,0 +1,93 @@
+From ac47454b14d624a665f35b565f283ebcaac1186f Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 19 Jun 2020 14:29:13 -0400
+Subject: [PATCH 0148/1021] Don't show celebration modal too much (#89)
+
+Make sure we only show it for the first unit of a sequence.
+---
+ src/courseware/CoursewareContainer.jsx      |  5 +++--
+ src/courseware/course/Course.jsx            |  2 +-
+ src/courseware/course/celebration/utils.jsx | 11 +++++++----
+ 3 files changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 0f3405b..2eba7e2 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -60,8 +60,9 @@ function useNextSequenceHandler(courseId, sequenceId) {
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+   return useCallback(() => {
+     if (nextSequence !== null) {
++      let nextUnitId = null;
+       if (nextSequence.unitIds.length > 0) {
+-        const nextUnitId = nextSequence.unitIds[0];
++        [nextUnitId] = nextSequence.unitIds;
+         history.push(`/course/${courseId}/${nextSequence.id}/${nextUnitId}`);
+       } else {
+         // Some sequences have no units.  This will show a blank page with prev/next buttons.
+@@ -70,7 +71,7 @@ function useNextSequenceHandler(courseId, sequenceId) {
+ 
+       const celebrateFirstSection = course && course.celebrations && course.celebrations.firstSection;
+       if (celebrateFirstSection && sequence.sectionId !== nextSequence.sectionId) {
+-        handleNextSectionCelebration(sequenceId, nextSequence.id);
++        handleNextSectionCelebration(sequenceId, nextSequence.id, nextUnitId);
+       }
+     }
+   }, [courseStatus, sequenceStatus, sequenceId]);
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 1c58aec..37499c0 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -45,7 +45,7 @@ function Course({
+   } = course;
+ 
+   const celebrateFirstSection = celebrations && celebrations.firstSection;
+-  const celebrationOpen = shouldCelebrateOnSectionLoad(courseId, sequenceId, celebrateFirstSection);
++  const celebrationOpen = shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFirstSection);
+ 
+   return (
+     <>
+diff --git a/src/courseware/course/celebration/utils.jsx b/src/courseware/course/celebration/utils.jsx
+index 65c0fe5..bd55e94 100644
+--- a/src/courseware/course/celebration/utils.jsx
++++ b/src/courseware/course/celebration/utils.jsx
+@@ -7,10 +7,11 @@ import { clearLocalStorage, getLocalStorage, setLocalStorage } from '../../../da
+ const CELEBRATION_LOCAL_STORAGE_KEY = 'CelebrationModal.showOnSectionLoad';
+ 
+ // Records clicks through the end of a section, so that we can know whether we should celebrate when we finish loading
+-function handleNextSectionCelebration(sequenceId, nextSequenceId) {
++function handleNextSectionCelebration(sequenceId, nextSequenceId, nextUnitId) {
+   setLocalStorage(CELEBRATION_LOCAL_STORAGE_KEY, {
+     prevSequenceId: sequenceId,
+     nextSequenceId,
++    nextUnitId,
+   });
+ }
+ 
+@@ -28,7 +29,7 @@ function recordFirstSectionCelebration(courseId) {
+ 
+ // Looks at local storage to see whether we just came from the end of a section.
+ // Note! This does have side effects (will clear some local storage and may start an api call).
+-function shouldCelebrateOnSectionLoad(courseId, sequenceId, celebrateFirstSection) {
++function shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFirstSection) {
+   const celebrationIds = getLocalStorage(CELEBRATION_LOCAL_STORAGE_KEY);
+   if (!celebrationIds) {
+     return false;
+@@ -37,10 +38,12 @@ function shouldCelebrateOnSectionLoad(courseId, sequenceId, celebrateFirstSectio
+   const {
+     prevSequenceId,
+     nextSequenceId,
++    nextUnitId,
+   } = celebrationIds;
+-  const shouldCelebrate = sequenceId === nextSequenceId && celebrateFirstSection;
++  const onTargetUnit = sequenceId === nextSequenceId && (!nextUnitId || unitId === nextUnitId);
++  const shouldCelebrate = onTargetUnit && celebrateFirstSection;
+ 
+-  if (sequenceId !== prevSequenceId && sequenceId !== nextSequenceId) {
++  if (sequenceId !== prevSequenceId && !onTargetUnit) {
+     // Don't clear until we move off of current/prev sequence
+     clearLocalStorage(CELEBRATION_LOCAL_STORAGE_KEY);
+   }
+-- 
+2.34.1
+

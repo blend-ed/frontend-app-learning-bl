@@ -1,0 +1,49 @@
+From e3d9ff9ed3cdd386e2829e128fffff69dd13396d Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Thu, 11 Mar 2021 15:46:37 -0500
+Subject: [PATCH 0402/1021] AA-213: Redirect progress tab to legacy (#384)
+
+---
+ src/course-home/data/api.js | 26 ++++++++++++++------------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 84468b7..17adeb8 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -124,18 +124,20 @@ export async function getDatesTabData(courseId) {
+ }
+ 
+ export async function getProgressTabData(courseId) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
+-  try {
+-    const { data } = await getAuthenticatedHttpClient().get(url);
+-    return camelCaseObject(data);
+-  } catch (error) {
+-    const { httpErrorStatus } = error && error.customAttributes;
+-    if (httpErrorStatus === 404) {
+-      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
+-      return {};
+-    }
+-    throw error;
+-  }
++  global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
++  // TODO: (AA-213) update once flag is in place
++  // const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
++  // try {
++  //   const { data } = await getAuthenticatedHttpClient().get(url);
++  //   return camelCaseObject(data);
++  // } catch (error) {
++  //   const { httpErrorStatus } = error && error.customAttributes;
++  //   if (httpErrorStatus === 404) {
++  //     global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
++  //     return {};
++  //   }
++  //   throw error;
++  // }
+ }
+ 
+ export async function getProctoringInfoData(courseId) {
+-- 
+2.34.1
+

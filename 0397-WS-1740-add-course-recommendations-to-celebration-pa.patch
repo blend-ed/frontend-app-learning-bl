@@ -1,0 +1,1013 @@
+From 3450570d7e93b51ddbba5aa4c4a9d4372e05d310 Mon Sep 17 00:00:00 2001
+From: Rebecca Graber <rgraber@edx.org>
+Date: Mon, 8 Mar 2021 10:07:08 -0500
+Subject: [PATCH 0397/1021] WS-1740 add course recommendations to celebration
+ page (experiment) (#376)
+
+* WS-1740 add course recommendations to celebration page (experiment)
+---
+ .env                                          |   1 +
+ .env.development                              |   1 +
+ .env.test                                     |   1 +
+ jest.config.js                                |   1 +
+ package-lock.json                             | 193 +++++++++++------
+ package.json                                  |   3 +-
+ .../data/__snapshots__/redux.test.js.snap     |   6 +
+ .../course/course-exit/CourseCelebration.jsx  |  11 +-
+ .../CourseRecommendations.exp.jsx             | 195 ++++++++++++++++++
+ .../course_recommendations.exp.scss           | 111 ++++++++++
+ .../CourseRecommendationsExp/data/api.exp.js  |  38 ++++
+ .../data/slice.exp.js                         |  38 ++++
+ .../data/thunks.exp.js                        |  29 +++
+ src/courseware/data/slice.js                  |   3 +
+ src/index.scss                                |   1 +
+ src/store.js                                  |   2 +
+ 16 files changed, 573 insertions(+), 61 deletions(-)
+ create mode 100644 src/courseware/course/course-exit/CourseRecommendationsExp/CourseRecommendations.exp.jsx
+ create mode 100644 src/courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp.scss
+ create mode 100644 src/courseware/course/course-exit/CourseRecommendationsExp/data/api.exp.js
+ create mode 100644 src/courseware/course/course-exit/CourseRecommendationsExp/data/slice.exp.js
+ create mode 100644 src/courseware/course/course-exit/CourseRecommendationsExp/data/thunks.exp.js
+
+diff --git a/.env b/.env
+index 83803d0..4384aab 100644
+--- a/.env
++++ b/.env
+@@ -3,6 +3,7 @@ ACCESS_TOKEN_COOKIE_NAME=null
+ BASE_URL=null
+ CREDENTIALS_BASE_URL=null
+ CSRF_TOKEN_API_PATH=null
++DISCOVERY_API_BASE_URL=null
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME=null
+ ECOMMERCE_BASE_URL=null
+ INSIGHTS_BASE_URL=null
+diff --git a/.env.development b/.env.development
+index bbfa8af..9bbe198 100644
+--- a/.env.development
++++ b/.env.development
+@@ -3,6 +3,7 @@ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+ BASE_URL='http://localhost:2000'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
++DISCOVERY_API_BASE_URL='http://localhost:18381'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME='localhost:8734'
+ LANGUAGE_PREFERENCE_COOKIE_NAME='openedx-language-preference'
+diff --git a/.env.test b/.env.test
+index 09318fa..acdb816 100644
+--- a/.env.test
++++ b/.env.test
+@@ -3,6 +3,7 @@ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+ BASE_URL='http://localhost:2000'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
++DISCOVERY_API_BASE_URL='http://localhost:18381'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME='localhost:8734'
+ LANGUAGE_PREFERENCE_COOKIE_NAME='openedx-language-preference'
+diff --git a/jest.config.js b/jest.config.js
+index dc38c06..7020176 100644
+--- a/jest.config.js
++++ b/jest.config.js
+@@ -7,5 +7,6 @@ module.exports = createConfig('jest', {
+   coveragePathIgnorePatterns: [
+     'src/setupTest.js',
+     'src/i18n',
++    'src/.*\\.exp\\..*',
+   ],
+ });
+diff --git a/package-lock.json b/package-lock.json
+index e1b9f4e..0e1fa2e 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1413,13 +1413,14 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "13.9.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-13.9.0.tgz",
+-      "integrity": "sha512-8tliIUyY4yVBMjrrOLXncDHp33PYKcqMUmCpCIgjxX9mABqVj+ah4+UrRS5bcdr/xZMwCZgNvbJMQCe0726fjg==",
++      "version": "13.13.5",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-13.13.5.tgz",
++      "integrity": "sha512-6q60Lj5dbzZbcXfNrpHXqn4tKQYf1KmcISOe//un0JTSQr6/LnZjHZoZfmzDaRX/2KEDaLCTqCefvKTpB26qCQ==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+         "@fortawesome/react-fontawesome": "^0.1.11",
++        "@popperjs/core": "^2.6.0",
+         "airbnb-prop-types": "^2.12.0",
+         "bootstrap": "4.6.0",
+         "classnames": "^2.2.6",
+@@ -1429,13 +1430,14 @@
+         "prop-types": "^15.7.2",
+         "react-bootstrap": "^1.2.2",
+         "react-focus-on": "^3.5.0",
++        "react-popper": "^2.2.4",
+         "react-proptype-conditional-require": "^1.0.4",
+         "react-responsive": "^6.1.1",
+         "react-table": "^7.6.1",
+         "react-transition-group": "^4.0.0",
+         "sanitize-html": "^1.20.0",
+         "tabbable": "^4.0.0",
+-        "uncontrollable": "7.1.1"
++        "uncontrollable": "7.2.1"
+       },
+       "dependencies": {
+         "@fortawesome/free-solid-svg-icons": {
+@@ -2305,9 +2307,9 @@
+       }
+     },
+     "@popperjs/core": {
+-      "version": "2.6.0",
+-      "resolved": "https://registry.npmjs.org/@popperjs/core/-/core-2.6.0.tgz",
+-      "integrity": "sha512-cPqjjzuFWNK3BSKLm0abspP0sp/IGOli4p5I5fKFAzdS8fvjdOwDCfZqAaIiXd9lPkOWi3SUUfZof3hEb7J/uw=="
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@popperjs/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-wjtKehFAIARq2OxK8j3JrggNlEslJfNuSm2ArteIbKyRMts2g0a7KzTxfRVNUM+O0gnBJ2hNV8nWPOYBgI1sew=="
+     },
+     "@reduxjs/toolkit": {
+       "version": "1.3.6",
+@@ -3014,18 +3016,18 @@
+       "dev": true
+     },
+     "@types/react": {
+-      "version": "17.0.1",
+-      "resolved": "https://registry.npmjs.org/@types/react/-/react-17.0.1.tgz",
+-      "integrity": "sha512-w8t9f53B2ei4jeOqf/gxtc2Sswnc3LBK5s0DyJcg5xd10tMHXts2N31cKjWfH9IC/JvEPa/YF1U4YeP1t4R6HQ==",
++      "version": "17.0.2",
++      "resolved": "https://registry.npmjs.org/@types/react/-/react-17.0.2.tgz",
++      "integrity": "sha512-Xt40xQsrkdvjn1EyWe1Bc0dJLcil/9x2vAuW7ya+PuQip4UYUaXyhzWmAbwRsdMgwOFHpfp7/FFZebDU6Y8VHA==",
+       "requires": {
+         "@types/prop-types": "*",
+         "csstype": "^3.0.2"
+       }
+     },
+     "@types/react-transition-group": {
+-      "version": "4.4.0",
+-      "resolved": "https://registry.npmjs.org/@types/react-transition-group/-/react-transition-group-4.4.0.tgz",
+-      "integrity": "sha512-/QfLHGpu+2fQOqQaXh8MG9q03bFENooTb/it4jr5kKaZlDQfWvjqWZg48AwzPVMBHlRuTRAY7hRHCEOXz5kV6w==",
++      "version": "4.4.1",
++      "resolved": "https://registry.npmjs.org/@types/react-transition-group/-/react-transition-group-4.4.1.tgz",
++      "integrity": "sha512-vIo69qKKcYoJ8wKCJjwSgCTM+z3chw3g18dkrDfVX665tMH7tmbDxEAnPdey4gTlwZz5QuHGzd+hul0OVZDqqQ==",
+       "requires": {
+         "@types/react": "*"
+       }
+@@ -6559,9 +6561,9 @@
+       }
+     },
+     "csstype": {
+-      "version": "3.0.6",
+-      "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.0.6.tgz",
+-      "integrity": "sha512-+ZAmfyWMT7TiIlzdqJgjMb7S4f1beorDbWbsocyK4RaiqA5RTX3K14bnBWmmA9QEM0gRdsjyyrEmcyga8Zsxmw=="
++      "version": "3.0.7",
++      "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.0.7.tgz",
++      "integrity": "sha512-KxnUB0ZMlnUWCsx2Z8MUsr6qV6ja1w9ArPErJaJaF8a5SOWoHLIszeCTKGRGRgtLgYrs1E8CHkNSP1VZTTPc9g=="
+     },
+     "currently-unhandled": {
+       "version": "0.4.1",
+@@ -9061,35 +9063,60 @@
+       "integrity": "sha512-yIovAzMX49sF8Yl58fSCWJ5svSLuaibPxXQJFLmBObTuCr0Mf1KiPopGM9NiFjiYBCbfaa2Fh6breQ6ANVTI0A=="
+     },
+     "function.prototype.name": {
+-      "version": "1.1.3",
+-      "resolved": "https://registry.npmjs.org/function.prototype.name/-/function.prototype.name-1.1.3.tgz",
+-      "integrity": "sha512-H51qkbNSp8mtkJt+nyW1gyStBiKZxfRqySNUR99ylq6BPXHKI4SEvIlTKp4odLfjRKJV04DFWMU3G/YRlQOsag==",
++      "version": "1.1.4",
++      "resolved": "https://registry.npmjs.org/function.prototype.name/-/function.prototype.name-1.1.4.tgz",
++      "integrity": "sha512-iqy1pIotY/RmhdFZygSSlW0wko2yxkSCKqsuv4pr8QESohpYyG/Z7B/XXvPRKTJS//960rgguE5mSRUsDdaJrQ==",
+       "requires": {
+-        "call-bind": "^1.0.0",
++        "call-bind": "^1.0.2",
+         "define-properties": "^1.1.3",
+-        "es-abstract": "^1.18.0-next.1",
+-        "functions-have-names": "^1.2.1"
++        "es-abstract": "^1.18.0-next.2",
++        "functions-have-names": "^1.2.2"
+       },
+       "dependencies": {
+         "es-abstract": {
+-          "version": "1.18.0-next.2",
+-          "resolved": "https://registry.npmjs.org/es-abstract/-/es-abstract-1.18.0-next.2.tgz",
+-          "integrity": "sha512-Ih4ZMFHEtZupnUh6497zEL4y2+w8+1ljnCyaTa+adcoafI1GOvMwFlDjBLfWR7y9VLfrjRJe9ocuHY1PSR9jjw==",
++          "version": "1.18.0",
++          "resolved": "https://registry.npmjs.org/es-abstract/-/es-abstract-1.18.0.tgz",
++          "integrity": "sha512-LJzK7MrQa8TS0ja2w3YNLzUgJCGPdPOV1yVvezjNnS89D+VR08+Szt2mz3YB2Dck/+w5tfIq/RoUAFqJJGM2yw==",
+           "requires": {
+             "call-bind": "^1.0.2",
+             "es-to-primitive": "^1.2.1",
+             "function-bind": "^1.1.1",
+-            "get-intrinsic": "^1.0.2",
++            "get-intrinsic": "^1.1.1",
+             "has": "^1.0.3",
+-            "has-symbols": "^1.0.1",
+-            "is-callable": "^1.2.2",
++            "has-symbols": "^1.0.2",
++            "is-callable": "^1.2.3",
+             "is-negative-zero": "^2.0.1",
+-            "is-regex": "^1.1.1",
++            "is-regex": "^1.1.2",
++            "is-string": "^1.0.5",
+             "object-inspect": "^1.9.0",
+             "object-keys": "^1.1.1",
+             "object.assign": "^4.1.2",
+-            "string.prototype.trimend": "^1.0.3",
+-            "string.prototype.trimstart": "^1.0.3"
++            "string.prototype.trimend": "^1.0.4",
++            "string.prototype.trimstart": "^1.0.4",
++            "unbox-primitive": "^1.0.0"
++          }
++        },
++        "has-symbols": {
++          "version": "1.0.2",
++          "resolved": "https://registry.npmjs.org/has-symbols/-/has-symbols-1.0.2.tgz",
++          "integrity": "sha512-chXa79rL/UC2KlX17jo3vRGz0azaWEx5tGqZg5pO3NUyEJVB17dMruQlzCCOfUvElghKcm5194+BCRvi2Rv/Gw=="
++        },
++        "string.prototype.trimend": {
++          "version": "1.0.4",
++          "resolved": "https://registry.npmjs.org/string.prototype.trimend/-/string.prototype.trimend-1.0.4.tgz",
++          "integrity": "sha512-y9xCjw1P23Awk8EvTpcyL2NIr1j7wJ39f+k6lvRnSMz+mz9CGz9NYPelDk42kOz6+ql8xjfK8oYzy3jAP5QU5A==",
++          "requires": {
++            "call-bind": "^1.0.2",
++            "define-properties": "^1.1.3"
++          }
++        },
++        "string.prototype.trimstart": {
++          "version": "1.0.4",
++          "resolved": "https://registry.npmjs.org/string.prototype.trimstart/-/string.prototype.trimstart-1.0.4.tgz",
++          "integrity": "sha512-jh6e984OBfvxS50tdY2nRZnoC5/mLFKOREQfw8t5yytkoUsJRNxvI/E39qu1sD0OtWI3OC0XgKSmcWwziwYuZw==",
++          "requires": {
++            "call-bind": "^1.0.2",
++            "define-properties": "^1.1.3"
+           }
+         }
+       }
+@@ -9399,6 +9426,11 @@
+         }
+       }
+     },
++    "has-bigints": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/has-bigints/-/has-bigints-1.0.1.tgz",
++      "integrity": "sha512-LSBS2LjbNBTf6287JEbEzvJgftkF5qFkmCo9hDRpAzKhUOlJ+hx8dd4USs00SgsUNwc4617J9ki5YtEClM2ffA=="
++    },
+     "has-flag": {
+       "version": "3.0.0",
+       "resolved": "https://registry.npmjs.org/has-flag/-/has-flag-3.0.0.tgz",
+@@ -10579,6 +10611,11 @@
+       "integrity": "sha1-d8mYQFJ6qOyxqLppe4BkWnqSap0=",
+       "dev": true
+     },
++    "is-bigint": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/is-bigint/-/is-bigint-1.0.1.tgz",
++      "integrity": "sha512-J0ELF4yHFxHy0cmSxZuheDOz2luOdVvqjwmEcj8H/L1JHeuEDSDbeRP+Dk9kFVk5RTFzbucJ2Kb9F7ixY2QaCg=="
++    },
+     "is-binary-path": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/is-binary-path/-/is-binary-path-1.0.1.tgz",
+@@ -10588,6 +10625,14 @@
+         "binary-extensions": "^1.0.0"
+       }
+     },
++    "is-boolean-object": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/is-boolean-object/-/is-boolean-object-1.1.0.tgz",
++      "integrity": "sha512-a7Uprx8UtD+HWdyYwnD1+ExtTgqQtD2k/1yJgtXP6wnMm8byhkoTZRl+95LLThpzNZJ5aEvi46cdH+ayMFRwmA==",
++      "requires": {
++        "call-bind": "^1.0.0"
++      }
++    },
+     "is-buffer": {
+       "version": "1.1.6",
+       "resolved": "https://registry.npmjs.org/is-buffer/-/is-buffer-1.1.6.tgz",
+@@ -10830,6 +10875,11 @@
+         }
+       }
+     },
++    "is-number-object": {
++      "version": "1.0.4",
++      "resolved": "https://registry.npmjs.org/is-number-object/-/is-number-object-1.0.4.tgz",
++      "integrity": "sha512-zohwelOAur+5uXtk8O3GPQ1eAcu4ZX3UwxQhUlfFFMNpUd83gXgjbhJh6HmB6LUNV/ieOLQuDwJO3dWJosUeMw=="
++    },
+     "is-obj": {
+       "version": "2.0.0",
+       "resolved": "https://registry.npmjs.org/is-obj/-/is-obj-2.0.0.tgz",
+@@ -10932,8 +10982,7 @@
+     "is-string": {
+       "version": "1.0.5",
+       "resolved": "https://registry.npmjs.org/is-string/-/is-string-1.0.5.tgz",
+-      "integrity": "sha512-buY6VNRjhQMiF1qWDouloZlQbRhDPCebwxSjxMjxgemYT46YMd2NR0/H+fBhEfWX4A/w9TBJ+ol+okqJKFE6vQ==",
+-      "dev": true
++      "integrity": "sha512-buY6VNRjhQMiF1qWDouloZlQbRhDPCebwxSjxMjxgemYT46YMd2NR0/H+fBhEfWX4A/w9TBJ+ol+okqJKFE6vQ=="
+     },
+     "is-svg": {
+       "version": "3.0.0",
+@@ -14152,9 +14201,9 @@
+       "integrity": "sha512-PlhdFcillOINfeV7Ni6oF1TAEayyZBoZ8bcshTHqOYJYlrqzRK5hagpagky5o4HfCzzd1TRkXPMFq6cKk9rGmA=="
+     },
+     "lodash-es": {
+-      "version": "4.17.20",
+-      "resolved": "https://registry.npmjs.org/lodash-es/-/lodash-es-4.17.20.tgz",
+-      "integrity": "sha512-JD1COMZsq8maT6mnuz1UMV0jvYD0E0aUsSOdrr1/nAG3dhqQXwRRgeW0cSqH1U43INKcqxaiVIQNOUDld7gRDA=="
++      "version": "4.17.21",
++      "resolved": "https://registry.npmjs.org/lodash-es/-/lodash-es-4.17.21.tgz",
++      "integrity": "sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw=="
+     },
+     "lodash.assignin": {
+       "version": "4.2.0",
+@@ -17298,9 +17347,9 @@
+       }
+     },
+     "react-bootstrap": {
+-      "version": "1.4.3",
+-      "resolved": "https://registry.npmjs.org/react-bootstrap/-/react-bootstrap-1.4.3.tgz",
+-      "integrity": "sha512-4tYhk26KRnK0myMEp2wvNjOvnHMwWfa6pWFIiCtj9wewYaTxP7TrCf7MwcIMBgUzyX0SJXx6UbbDG0+hObiXNg==",
++      "version": "1.5.1",
++      "resolved": "https://registry.npmjs.org/react-bootstrap/-/react-bootstrap-1.5.1.tgz",
++      "integrity": "sha512-jbJNGx9n4JvKgxlvT8DLKSeF3VcqnPJXS9LFdzoZusiZCCGoYecZ9qSCBH5n2A+kjmuura9JkvxI9l7HD+bIdQ==",
+       "requires": {
+         "@babel/runtime": "^7.4.2",
+         "@restart/context": "^2.1.4",
+@@ -17316,7 +17365,7 @@
+         "invariant": "^2.2.4",
+         "prop-types": "^15.7.2",
+         "prop-types-extra": "^1.1.0",
+-        "react-overlays": "^4.1.0",
++        "react-overlays": "^5.0.0",
+         "react-transition-group": "^4.4.1",
+         "uncontrollable": "^7.0.0",
+         "warning": "^4.0.3"
+@@ -17730,9 +17779,9 @@
+       "integrity": "sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA=="
+     },
+     "react-overlays": {
+-      "version": "4.1.1",
+-      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-4.1.1.tgz",
+-      "integrity": "sha512-WtJifh081e6M24KnvTQoNjQEpz7HoLxqt8TwZM7LOYIkYJ8i/Ly1Xi7RVte87ZVnmqQ4PFaFiNHZhSINPSpdBQ==",
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-5.0.0.tgz",
++      "integrity": "sha512-TKbqfAv23TFtCJ2lzISdx76p97G/DP8Rp4TOFdqM9n8GTruVYgE3jX7Zgb8+w7YJ18slTVcDTQ1/tFzdCqjVhA==",
+       "requires": {
+         "@babel/runtime": "^7.12.1",
+         "@popperjs/core": "^2.5.3",
+@@ -17744,6 +17793,22 @@
+         "warning": "^4.0.3"
+       }
+     },
++    "react-popper": {
++      "version": "2.2.4",
++      "resolved": "https://registry.npmjs.org/react-popper/-/react-popper-2.2.4.tgz",
++      "integrity": "sha512-NacOu4zWupdQjVXq02XpTD3yFPSfg5a7fex0wa3uGKVkFK7UN6LvVxgcb+xYr56UCuWiNPMH20tntdVdJRwYew==",
++      "requires": {
++        "react-fast-compare": "^3.0.1",
++        "warning": "^4.0.2"
++      },
++      "dependencies": {
++        "react-fast-compare": {
++          "version": "3.2.0",
++          "resolved": "https://registry.npmjs.org/react-fast-compare/-/react-fast-compare-3.2.0.tgz",
++          "integrity": "sha512-rtGImPZ0YyLrscKI9xTpV8psd6I8VAtjKCzQDlzyDvqJA8XOW78TXYQwNRNd8g8JZnDu8q9Fu/1v4HPAVwVdHA=="
++        }
++      }
++    },
+     "react-proptype-conditional-require": {
+       "version": "1.0.4",
+       "resolved": "https://registry.npmjs.org/react-proptype-conditional-require/-/react-proptype-conditional-require-1.0.4.tgz",
+@@ -21014,6 +21079,17 @@
+       "integrity": "sha512-B3ZIOf1IKeH2ixgHhj6la6xdwR9QrLC5d1VKeCSY4tvkqhF2eqd9O7txNlS0PO3GrBAFIdr3L1ndNwteUbZLYg==",
+       "dev": true
+     },
++    "unbox-primitive": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/unbox-primitive/-/unbox-primitive-1.0.0.tgz",
++      "integrity": "sha512-P/51NX+JXyxK/aigg1/ZgyccdAxm5K1+n8+tvqSntjOivPt19gvm1VC49RWYetsiub8WViUchdxl/KWHHB0kzA==",
++      "requires": {
++        "function-bind": "^1.1.1",
++        "has-bigints": "^1.0.0",
++        "has-symbols": "^1.0.0",
++        "which-boxed-primitive": "^1.0.1"
++      }
++    },
+     "unbzip2-stream": {
+       "version": "1.4.3",
+       "resolved": "https://registry.npmjs.org/unbzip2-stream/-/unbzip2-stream-1.4.3.tgz",
+@@ -21026,25 +21102,14 @@
+       }
+     },
+     "uncontrollable": {
+-      "version": "7.1.1",
+-      "resolved": "https://registry.npmjs.org/uncontrollable/-/uncontrollable-7.1.1.tgz",
+-      "integrity": "sha512-EcPYhot3uWTS3w00R32R2+vS8Vr53tttrvMj/yA1uYRhf8hbTG2GyugGqWDY0qIskxn0uTTojVd6wPYW9ZEf8Q==",
++      "version": "7.2.1",
++      "resolved": "https://registry.npmjs.org/uncontrollable/-/uncontrollable-7.2.1.tgz",
++      "integrity": "sha512-svtcfoTADIB0nT9nltgjujTi7BzVmwjZClOmskKu/E8FW9BXzg9os8OLr4f8Dlnk0rYWJIWr4wv9eKUXiQvQwQ==",
+       "requires": {
+         "@babel/runtime": "^7.6.3",
+-        "@types/react": "^16.9.11",
++        "@types/react": ">=16.9.11",
+         "invariant": "^2.2.4",
+         "react-lifecycles-compat": "^3.0.4"
+-      },
+-      "dependencies": {
+-        "@types/react": {
+-          "version": "16.14.3",
+-          "resolved": "https://registry.npmjs.org/@types/react/-/react-16.14.3.tgz",
+-          "integrity": "sha512-zPrXn03hmPYqh9DznqSFQsoRtrQ4aHgnZDO+hMGvsE/PORvDTdJCHQ6XvJV31ic+0LzF73huPFXUb++W6Kri0Q==",
+-          "requires": {
+-            "@types/prop-types": "*",
+-            "csstype": "^3.0.2"
+-          }
+-        }
+       }
+     },
+     "unicode-canonical-property-names-ecmascript": {
+@@ -22304,6 +22369,18 @@
+         "isexe": "^2.0.0"
+       }
+     },
++    "which-boxed-primitive": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/which-boxed-primitive/-/which-boxed-primitive-1.0.2.tgz",
++      "integrity": "sha512-bwZdv0AKLpplFY2KZRX6TvyuN7ojjr7lwkg6ml0roIy9YeuSr7JS372qlNW18UQYzgYK9ziGcerWqZOmEn9VNg==",
++      "requires": {
++        "is-bigint": "^1.0.1",
++        "is-boolean-object": "^1.1.0",
++        "is-number-object": "^1.0.4",
++        "is-string": "^1.0.5",
++        "is-symbol": "^1.0.3"
++      }
++    },
+     "which-module": {
+       "version": "2.0.0",
+       "resolved": "https://registry.npmjs.org/which-module/-/which-module-2.0.0.tgz",
+diff --git a/package.json b/package.json
+index 5d2327e..f30783e 100644
+--- a/package.json
++++ b/package.json
+@@ -15,6 +15,7 @@
+     "i18n_extract": "BABEL_ENV=i18n fedx-scripts babel src --quiet > /dev/null",
+     "is-es5": "es-check es5 ./dist/*.js",
+     "lint": "fedx-scripts eslint --ext .js --ext .jsx .",
++    "lint:fix": "fedx-scripts eslint --fix --ext .js --ext .jsx .",
+     "snapshot": "fedx-scripts jest --updateSnapshot",
+     "start": "fedx-scripts webpack-dev-server --progress",
+     "test": "fedx-scripts jest --coverage --passWithNoTests"
+@@ -38,7 +39,7 @@
+     "@edx/frontend-component-footer": "10.1.4",
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-platform": "1.8.4",
+-    "@edx/paragon": "13.9.0",
++    "@edx/paragon": "13.13.5",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 7eeb258..130b3ea 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -283,6 +283,9 @@ Object {
+       },
+     },
+   },
++  "recommendations": Object {
++    "recommendationsStatus": "loading",
++  },
+ }
+ `;
+ 
+@@ -438,5 +441,8 @@ Object {
+       },
+     },
+   },
++  "recommendations": Object {
++    "recommendationsStatus": "loading",
++  },
+ }
+ `;
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 035854a..66491b2 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -1,4 +1,4 @@
+-import React, { useEffect } from 'react';
++import React, { useEffect, useState } from 'react';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faLinkedinIn } from '@fortawesome/free-brands-svg-icons';
+ 
+@@ -26,6 +26,7 @@ import DashboardFootnote from './DashboardFootnote';
+ import UpgradeFootnote from './UpgradeFootnote';
+ import SocialIcons from '../../social-share/SocialIcons';
+ import { logClick, logVisit } from './utils';
++import CourseRecommendations from './CourseRecommendationsExp/CourseRecommendations.exp';
+ 
+ const LINKEDIN_BLUE = '#2867B2';
+ 
+@@ -59,6 +60,10 @@ function CourseCelebration({ intl }) {
+     downloadUrl,
+   } = certificateData || {};
+ 
++  /** [WS-1681 experiment] */
++  const [showWS1681, setShowWS1681] = useState(window.experiment__courseware_celebration_bShowWS1681);
++  useEffect(() => { setShowWS1681(window.experiment__courseware_celebration_bShowWS1681); });
++
+   const { administrator, username } = getAuthenticatedUser();
+ 
+   const dashboardLink = (
+@@ -350,7 +355,9 @@ function CourseCelebration({ intl }) {
+             />
+           ))}
+           {footnote}
+-          <CatalogSuggestion variant={visitEvent} />
++          { showWS1681 && <CourseRecommendations variant={visitEvent} />}
++          { !showWS1681 && <CatalogSuggestion variant={visitEvent} /> }
++
+         </div>
+       </div>
+     </>
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/CourseRecommendations.exp.jsx b/src/courseware/course/course-exit/CourseRecommendationsExp/CourseRecommendations.exp.jsx
+new file mode 100644
+index 0000000..dc0f09b
+--- /dev/null
++++ b/src/courseware/course/course-exit/CourseRecommendationsExp/CourseRecommendations.exp.jsx
+@@ -0,0 +1,195 @@
++import React, { useEffect } from 'react';
++import { getConfig } from '@edx/frontend-platform';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import {
++  FormattedMessage, injectIntl, intlShape, defineMessages,
++} from '@edx/frontend-platform/i18n';
++import { useSelector, useDispatch } from 'react-redux';
++import { Hyperlink, DataTable, CardView } from '@edx/paragon';
++import PropTypes from 'prop-types';
++import truncate from 'truncate-html';
++import { useModel } from '../../../../generic/model-store';
++import fetchCourseRecommendations from './data/thunks.exp';
++import { FAILED, LOADED, LOADING } from './data/slice.exp';
++import CatalogSuggestion from '../CatalogSuggestion';
++import PageLoading from '../../../../generic/PageLoading';
++
++const messages = defineMessages({
++  recommendationsHeading: {
++    id: 'courseCelebration.recommendations.heading',
++    description: 'Header for recommendations section of course celebration',
++    defaultMessage: 'Check out more popular courses on edX',
++  },
++  listJoin: {
++    id: 'courseCelebration.recommendations.formatting.list_join',
++    description: 'Joining mark or word for a list of items, use the {sp} placeholder to include space before the joining word',
++    // eslint-disable-next-line prefer-template
++    defaultMessage: ('{style, select, '
++      + 'punctuation {, } ' // HACK: select keys must match ListStyles, above, but must be statically coded for extract
++      + 'conjunction { {sp}and } ' // HACK: interpolating a space character to get a leading-space here
++      + 'other { }}'),
++  },
++  browseCatalog: {
++    id: 'courseCelebration.recommendations.browse_catalog',
++    description: 'Link to course catalog in course celebration',
++    defaultMessage: 'Explore more courses',
++  },
++  loadingRecommendations: {
++    id: 'courseCelebration.recommendations.loading_recommendations',
++    description: 'Screen-reader text for the loading screen for recommendations',
++    defaultMessage: 'Loading recommendations',
++  },
++});
++
++const ListStyles = {
++  punctuation: 'punctuation',
++  conjunction: 'conjunction',
++};
++
++// TODO: replace custom card (copied from Prospectus) with Paragon Card component
++function Card({
++  original: {
++    title,
++    image,
++    owners,
++    marketingUrl,
++  },
++  intl,
++}) {
++  const formatList = (items, style) => (
++    items.join(intl.formatMessage(
++      messages.listJoin,
++      { style, sp: ' ' }, // HACK: there isn't a way to escape a leading space in the format, so pass one in
++    ))
++  );
++
++  const formattedOwners = formatList(
++    owners.map(owner => owner.key),
++    ListStyles.punctuation,
++    intl,
++  );
++
++  return (
++    <div
++      className="discovery-card"
++      role="group"
++      aria-label={title}
++    >
++      <Hyperlink
++        destination={marketingUrl}
++        className="discovery-card-link"
++      >
++        <div className="d-flex flex-column d-card-wrapper">
++          <div className="d-card-hero">
++            <img src={image.src} alt="" />
++          </div>
++          <div className="d-card-body">
++            <h3 className="name-heading">
++              {truncate(title, 70, { reserveLastWord: -1 })}
++            </h3>
++            <div className="provider">
++              <FormattedMessage
++                id="courseCelebration.recommendations.card.schools.label"
++                description="Screenreader label for the Schools and Partners running the course."
++                defaultMessage="Schools and Partners"
++              >{text => (
++                <>
++                  <span className="sr-only">{text}: </span>
++                  {truncate(formattedOwners, 40, { reserveLastWord: -1 })}
++                </>
++              )}
++              </FormattedMessage>
++            </div>
++          </div>
++          <div className="d-card-footer">
++            <div className="card-type">
++              <FormattedMessage
++                id="courseCelebration.recommendations.label"
++                description="Label on a discovery-card that lets a user know that it is a course card"
++                defaultMessage="Course"
++              />
++            </div>
++          </div>
++        </div>
++      </Hyperlink>
++    </div>
++  );
++}
++
++Card.propTypes = {
++  original: PropTypes.shape({
++    marketingUrl: PropTypes.string,
++    title: PropTypes.string,
++    image: PropTypes.shape({
++      src: PropTypes.string,
++    }),
++    owners: PropTypes.arrayOf(PropTypes.shape({
++      key: PropTypes.string,
++    })),
++  }).isRequired,
++  intl: intlShape.isRequired,
++};
++
++const IntlCard = injectIntl(Card);
++
++function CourseRecommendations({ intl, variant }) {
++  const { courseId, recommendationsStatus } = useSelector(state => ({ ...state.recommendations, ...state.courseware }));
++  const { org, number, recommendations } = useModel('coursewareMeta', courseId);
++  const dispatch = useDispatch();
++
++  const courseKey = `${org}+${number}`;
++
++  useEffect(() => {
++    dispatch(fetchCourseRecommendations(courseKey, courseId));
++  }, [dispatch]);
++
++  if (recommendationsStatus && recommendationsStatus !== LOADING) {
++    sendTrackEvent('edx.ui.lms.course_exit.recommendations.viewed', {
++      course_key: courseKey,
++      recommendations_status: recommendationsStatus,
++      recommendations_length: recommendations ? recommendations.length : 0,
++    });
++  }
++
++  if (recommendationsStatus === FAILED || (recommendationsStatus === LOADED && recommendations.length < 2)) {
++    return (<CatalogSuggestion variant={variant} />);
++  }
++
++  if (recommendationsStatus === LOADING) {
++    return <PageLoading srMessage={`${intl.formatMessage(messages.loadingRecommendations)}`} />;
++  }
++
++  return (
++    <div className="course-recommendations d-flex flex-column align-items-center">
++      <h2 className="text-center mb-4">{intl.formatMessage(messages.recommendationsHeading)}</h2>
++      <div className="my-4">
++        <DataTable
++          isPaginated
++          itemCount={recommendations.length}
++          data={recommendations}
++          columns={[{ Header: 'Title', accessor: 'title' }]}
++          initialState={{
++            pageSize: 3,
++            pageIndex: 0,
++          }}
++        >
++          <CardView CardComponent={IntlCard} />
++        </DataTable>
++      </div>
++      <Hyperlink
++        style={{ textDecoration: 'underline' }}
++        destination={getConfig().SEARCH_CATALOG_URL}
++        className="text-center mt-3"
++      >
++        {intl.formatMessage(messages.browseCatalog)}
++      </Hyperlink>
++    </div>
++  );
++}
++
++CourseRecommendations.propTypes = {
++  intl: intlShape.isRequired,
++  variant: PropTypes.string.isRequired,
++};
++
++export default injectIntl(CourseRecommendations);
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp.scss b/src/courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp.scss
+new file mode 100644
+index 0000000..d696879
+--- /dev/null
++++ b/src/courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp.scss
+@@ -0,0 +1,111 @@
++$default-border-color: $info-300;
++.course-recommendations {
++  .pgn__data-table-wrapper {
++    border: 0;
++    .pgn__card-grid {
++      .row > div[class*="col-"] {
++        justify-content: center;
++      }
++    }
++  }
++
++  .discovery-card {
++    min-width: 270px;
++    max-width: 270px;
++    width: 270px;
++    height: 270px;
++    position: relative;
++    border-bottom: 3px solid $default-border-color;
++    background-color: $white;
++    box-shadow: none;
++    padding: 0;
++    border: none;
++
++    &.custom-link {
++      background: none;
++    }
++
++    .d-card-wrapper {
++      height: 270px;
++      box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.3);
++      border: {
++        color: $primary-200;
++        width: 1px;
++        radius: 3px;
++      }
++    }
++
++    .discovery-card-link {
++      text-decoration: none;
++      position: absolute;
++      top: 0;
++      right: 0;
++      bottom: 0;
++      left: 0;
++
++      &:focus,
++      &:hover {
++        border: 0;
++        outline: none;
++
++        .d-card-wrapper {
++          box-shadow: 0 2px 4px 2px $gray-500;
++        }
++      }
++    }
++
++    .d-card-hero {
++      height: 102px;
++      background-color: $gray-200;
++      overflow: hidden;
++      border: {
++        radius: 3px 3px 0 0;
++        bottom: 1px solid $success-100;
++      }
++    }
++
++    .d-card-body {
++      padding: 28px 20px 33px;
++    }
++
++    .d-card-footer {
++      padding: 0 20px;
++    }
++
++    .name-heading {
++      height: auto;
++      line-height: 1.15;
++      color: $gray-700;
++      font: {
++        family: $font-family-sans-serif;
++        size: 1.25rem;
++        weight: 500;
++      }
++    }
++
++    .provider {
++      line-height: 0.86;
++      color: $gray-500;
++      margin-bottom: 20px;
++      font: {
++        family: $font-family-sans-serif;
++        size: 0.875rem;
++        weight: $font-weight-normal;
++      }
++    }
++
++    .card-type {
++      height: 20px;
++      line-height: 1.67;
++      letter-spacing: 0.2px;
++      color: $gray-500;
++      position: absolute;
++      bottom: 10px;
++      font: {
++        family: $font-family-sans-serif;
++        size: 0.75rem;
++        weight: $font-weight-normal;
++      }
++    }
++  }
++}
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/data/api.exp.js b/src/courseware/course/course-exit/CourseRecommendationsExp/data/api.exp.js
+new file mode 100644
+index 0000000..000f968
+--- /dev/null
++++ b/src/courseware/course/course-exit/CourseRecommendationsExp/data/api.exp.js
+@@ -0,0 +1,38 @@
++import { getConfig, camelCaseObject } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++
++function filterRecommendationsList(
++  {
++    data: {
++      uuid,
++      recommendations,
++    },
++  },
++  {
++    data: enrollments,
++  },
++) {
++  const enrollmentRunIds = enrollments.map(({
++    courseDetails: {
++      courseId,
++    },
++  }) => courseId);
++
++  return recommendations.filter(({ uuid: recUuid, courseRunKeys }) => (
++    recUuid !== uuid && courseRunKeys.every((key) => !enrollmentRunIds.includes(key))
++  ));
++}
++
++export default async function getCourseRecommendations(courseKey) {
++  const discoveryApiUrl = getConfig().DISCOVERY_API_BASE_URL;
++  if (!discoveryApiUrl) {
++    return [];
++  }
++  const recommendationsUrl = new URL(`${discoveryApiUrl}/api/v1/course_recommendations/${courseKey}?exclude_utm=true`);
++  const enrollmentsUrl = new URL(`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`);
++  const [recommendationsResponse, enrollmentsResponse] = await Promise.all([
++    getAuthenticatedHttpClient().get(recommendationsUrl),
++    getAuthenticatedHttpClient().get(enrollmentsUrl),
++  ]);
++  return filterRecommendationsList(camelCaseObject(recommendationsResponse), camelCaseObject(enrollmentsResponse));
++}
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/data/slice.exp.js b/src/courseware/course/course-exit/CourseRecommendationsExp/data/slice.exp.js
+new file mode 100644
+index 0000000..6da3f61
+--- /dev/null
++++ b/src/courseware/course/course-exit/CourseRecommendationsExp/data/slice.exp.js
+@@ -0,0 +1,38 @@
++/* eslint-disable no-param-reassign */
++import { createSlice } from '@reduxjs/toolkit';
++
++export const LOADING = 'loading';
++export const LOADED = 'loaded';
++export const FAILED = 'failed';
++
++const slice = createSlice({
++  courseId: null,
++  name: 'recommendations',
++  initialState: {
++    recommendationsStatus: LOADING,
++  },
++  reducers: {
++    fetchCourseRecommendationsRequest: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.recommendationsStatus = LOADING;
++    },
++    fetchCourseRecommendationsSuccess: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.recommendationsStatus = LOADED;
++    },
++    fetchCourseRecommendationsFailure: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.recommendationsStatus = FAILED;
++    },
++  },
++});
++
++export const {
++  fetchCourseRecommendationsRequest,
++  fetchCourseRecommendationsSuccess,
++  fetchCourseRecommendationsFailure,
++} = slice.actions;
++
++export const {
++  reducer,
++} = slice;
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/data/thunks.exp.js b/src/courseware/course/course-exit/CourseRecommendationsExp/data/thunks.exp.js
+new file mode 100644
+index 0000000..6d1e7e0
+--- /dev/null
++++ b/src/courseware/course/course-exit/CourseRecommendationsExp/data/thunks.exp.js
+@@ -0,0 +1,29 @@
++import { logError } from '@edx/frontend-platform/logging';
++
++import {
++  fetchCourseRecommendationsFailure,
++  fetchCourseRecommendationsRequest,
++  fetchCourseRecommendationsSuccess,
++} from './slice.exp';
++import getCourseRecommendations from './api.exp';
++import { updateModel } from '../../../../../generic/model-store';
++
++export default function fetchCourseRecommendations(courseKey, courseId) {
++  return async (dispatch) => {
++    dispatch(fetchCourseRecommendationsRequest({ courseId }));
++    try {
++      const recommendations = await getCourseRecommendations(courseKey);
++      dispatch(updateModel({
++        modelType: 'coursewareMeta',
++        model: {
++          id: courseId,
++          recommendations,
++        },
++      }));
++      dispatch(fetchCourseRecommendationsSuccess({ courseId }));
++    } catch (error) {
++      logError(error);
++      dispatch(fetchCourseRecommendationsFailure({ courseId }));
++    }
++  };
++}
+diff --git a/src/courseware/data/slice.js b/src/courseware/data/slice.js
+index 088e951..1067d60 100644
+--- a/src/courseware/data/slice.js
++++ b/src/courseware/data/slice.js
+@@ -54,6 +54,9 @@ export const {
+   fetchSequenceRequest,
+   fetchSequenceSuccess,
+   fetchSequenceFailure,
++  fetchCourseRecommendationsRequest,
++  fetchCourseRecommendationsSuccess,
++  fetchCourseRecommendationsFailure,
+ } = slice.actions;
+ 
+ export const {
+diff --git a/src/index.scss b/src/index.scss
+index d3858e6..507324c 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -368,3 +368,4 @@
+ @import 'course-home/dates-tab/Day.scss';
+ @import 'course-home/outline-tab/widgets/UpgradeCard.scss';
+ @import 'course-home/outline-tab/widgets/ProctoringInfoPanel.scss';
++@import 'courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp';
+diff --git a/src/store.js b/src/store.js
+index ae7cc47..a7d500e 100644
+--- a/src/store.js
++++ b/src/store.js
+@@ -1,6 +1,7 @@
+ import { configureStore } from '@reduxjs/toolkit';
+ import { reducer as courseHomeReducer } from './course-home/data';
+ import { reducer as coursewareReducer } from './courseware/data/slice';
++import { reducer as recommendationsReducer } from './courseware/course/course-exit/CourseRecommendationsExp/data/slice.exp';
+ import { reducer as modelsReducer } from './generic/model-store';
+ 
+ export default function initializeStore() {
+@@ -9,6 +10,7 @@ export default function initializeStore() {
+       models: modelsReducer,
+       courseware: coursewareReducer,
+       courseHome: courseHomeReducer,
++      recommendations: recommendationsReducer,
+     },
+   });
+ }
+-- 
+2.34.1
+

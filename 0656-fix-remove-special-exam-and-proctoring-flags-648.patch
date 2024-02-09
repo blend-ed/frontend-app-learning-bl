@@ -1,0 +1,374 @@
+From cb299021523b6c6cdb3eab8fc29b8ed0ea1de3c7 Mon Sep 17 00:00:00 2001
+From: Bianca Severino <bseverino@edx.org>
+Date: Wed, 22 Sep 2021 09:11:55 -0400
+Subject: [PATCH 0656/1021] fix: remove special exam and proctoring flags
+ (#648)
+
+---
+ .../data/__snapshots__/redux.test.js.snap     |  6 ----
+ src/courseware/CoursewareContainer.jsx        | 23 --------------
+ src/courseware/CoursewareContainer.test.jsx   | 16 ----------
+ src/courseware/course/sequence/Sequence.jsx   | 22 -------------
+ .../course/sequence/Sequence.test.jsx         | 31 -------------------
+ .../__factories__/courseMetadata.factory.js   |  2 --
+ src/courseware/data/api.js                    |  2 --
+ .../data/pact-tests/lmsPact.test.jsx          |  4 ---
+ src/courseware/data/slice.js                  | 10 ------
+ src/courseware/data/thunks.js                 |  8 -----
+ src/pacts/frontend-app-learning-lms.json      |  8 -----
+ 11 files changed, 132 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index a8c9a75..19a5bd8 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -13,10 +13,8 @@ Object {
+   "courseware": Object {
+     "courseId": null,
+     "courseStatus": "loading",
+-    "proctoredExamsEnabledWaffleFlag": false,
+     "sequenceId": null,
+     "sequenceStatus": "loading",
+-    "specialExamsEnabledWaffleFlag": false,
+   },
+   "models": Object {
+     "courseHomeMeta": Object {
+@@ -319,10 +317,8 @@ Object {
+   "courseware": Object {
+     "courseId": null,
+     "courseStatus": "loading",
+-    "proctoredExamsEnabledWaffleFlag": false,
+     "sequenceId": null,
+     "sequenceStatus": "loading",
+-    "specialExamsEnabledWaffleFlag": false,
+   },
+   "models": Object {
+     "courseHomeMeta": Object {
+@@ -501,10 +497,8 @@ Object {
+   "courseware": Object {
+     "courseId": null,
+     "courseStatus": "loading",
+-    "proctoredExamsEnabledWaffleFlag": false,
+     "sequenceId": null,
+     "sequenceStatus": "loading",
+-    "specialExamsEnabledWaffleFlag": false,
+   },
+   "models": Object {
+     "courseHomeMeta": Object {
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 3d82cfd..3fb3c73 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -57,16 +57,6 @@ const checkUnitToSequenceUnitRedirect = memoize((courseStatus, courseId, sequenc
+   }
+ });
+ 
+-const checkSpecialExamRedirect = memoize((sequenceStatus, sequence, specialExamsEnabled, proctoredExamsEnabled) => {
+-  if (sequenceStatus === 'loaded') {
+-    const shouldRedirectTimeLimited = sequence.isTimeLimited && !specialExamsEnabled;
+-    const shouldRedirectProctored = sequence.isProctored && !proctoredExamsEnabled;
+-    if ((shouldRedirectTimeLimited || shouldRedirectProctored) && sequence.legacyWebUrl !== undefined) {
+-      global.location.assign(sequence.legacyWebUrl);
+-    }
+-  }
+-});
+-
+ const checkSequenceToSequenceUnitRedirect = memoize((courseId, sequenceStatus, sequence, unitId) => {
+   if (sequenceStatus === 'loaded' && sequence.id && !unitId) {
+     if (sequence.unitIds !== undefined && sequence.unitIds.length > 0) {
+@@ -121,8 +111,6 @@ class CoursewareContainer extends Component {
+       sequenceId,
+       courseStatus,
+       sequenceStatus,
+-      specialExamsEnabledWaffleFlag,
+-      proctoredExamsEnabledWaffleFlag,
+       sequence,
+       firstSequenceId,
+       unitViaSequenceId,
+@@ -175,11 +163,6 @@ class CoursewareContainer extends Component {
+     // by filling in the ID of the parent sequence of :unitId.
+     checkUnitToSequenceUnitRedirect(courseStatus, courseId, sequenceStatus, unitViaSequenceId);
+ 
+-    // Check special exam redirect:
+-    //    /course/:courseId/:sequenceId(/:unitId) -> :legacyWebUrl
+-    // because special exams are currently still served in the legacy LMS frontend.
+-    checkSpecialExamRedirect(sequenceStatus, sequence, specialExamsEnabledWaffleFlag, proctoredExamsEnabledWaffleFlag);
+-
+     // Check to sequence to sequence-unit redirect:
+     //    /course/:courseId/:sequenceId -> /course/:courseId/:sequenceId/:unitId
+     // by filling in the ID the most-recently-active unit in the sequence, OR
+@@ -324,8 +307,6 @@ CoursewareContainer.propTypes = {
+   checkBlockCompletion: PropTypes.func.isRequired,
+   fetchCourse: PropTypes.func.isRequired,
+   fetchSequence: PropTypes.func.isRequired,
+-  specialExamsEnabledWaffleFlag: PropTypes.bool.isRequired,
+-  proctoredExamsEnabledWaffleFlag: PropTypes.bool.isRequired,
+ };
+ 
+ CoursewareContainer.defaultProps = {
+@@ -429,8 +410,6 @@ const mapStateToProps = (state) => {
+     sequenceId,
+     courseStatus,
+     sequenceStatus,
+-    specialExamsEnabledWaffleFlag,
+-    proctoredExamsEnabledWaffleFlag,
+   } = state.courseware;
+ 
+   return {
+@@ -438,8 +417,6 @@ const mapStateToProps = (state) => {
+     sequenceId,
+     courseStatus,
+     sequenceStatus,
+-    specialExamsEnabledWaffleFlag,
+-    proctoredExamsEnabledWaffleFlag,
+     course: currentCourseSelector(state),
+     sequence: currentSequenceSelector(state),
+     previousSequence: previousSequenceSelector(state),
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index e598969..304fcd1 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -397,8 +397,6 @@ describe('CoursewareContainer', () => {
+ 
+     describe('when the current sequence is an exam', () => {
+       const { location } = window;
+-      const sequenceBlock = defaultSequenceBlock;
+-      const unitBlocks = defaultUnitBlocks;
+ 
+       beforeEach(() => {
+         delete window.location;
+@@ -410,20 +408,6 @@ describe('CoursewareContainer', () => {
+       afterEach(() => {
+         window.location = location;
+       });
+-
+-      it('should redirect to the sequence legacyWebUrl', async () => {
+-        const sequenceMetadata = Factory.build(
+-          'sequenceMetadata',
+-          { is_time_limited: true }, // position index is 1-based and is converted to 0-based for activeUnitIndex
+-          { courseId, unitBlocks, sequenceBlock },
+-        );
+-        setUpMockRequests({ sequenceMetadatas: [sequenceMetadata] });
+-
+-        history.push(`/course/${courseId}/${sequenceBlock.id}/${unitBlocks[2].id}`);
+-        await loadContainer();
+-
+-        expect(global.location.assign).toHaveBeenCalledWith(sequenceBlock.legacy_web_url);
+-      });
+     });
+   });
+ 
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index e78f99d..45d444d 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -52,8 +52,6 @@ function Sequence({
+   const sequence = useModel('sequences', sequenceId);
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+-  const specialExamsEnabledWaffleFlag = useSelector(state => state.courseware.specialExamsEnabledWaffleFlag);
+-  const proctoredExamsEnabledWaffleFlag = useSelector(state => state.courseware.proctoredExamsEnabledWaffleFlag);
+   const shouldDisplayNotificationTrigger = useWindowSize().width < responsiveBreakpoints.small.minWidth;
+ 
+   const handleNext = () => {
+@@ -151,26 +149,6 @@ function Sequence({
+     return <HiddenAfterDue courseId={courseId} />;
+   }
+ 
+-  /*
+-  TODO: When the micro-frontend supports viewing special exams without redirecting to the legacy
+-  experience, we can remove this whole conditional. For now, though, we show the spinner here
+-  because we expect CoursewareContainer to be performing a redirect to the legacy experience while
+-  we're waiting. That redirect may take a few seconds, so we show the spinner in the meantime.
+-  */
+-  if (sequenceStatus === 'loaded') {
+-    const shouldRedirectSpecialExams = sequence.isTimeLimited && !specialExamsEnabledWaffleFlag;
+-    const shouldRedirectProctoredExams = sequence.isProctored && specialExamsEnabledWaffleFlag
+-      && !proctoredExamsEnabledWaffleFlag;
+-
+-    if (shouldRedirectSpecialExams || shouldRedirectProctoredExams) {
+-      return (
+-        <PageLoading
+-          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-        />
+-      );
+-    }
+-  }
+-
+   const gated = sequence && sequence.gatedContent !== undefined && sequence.gatedContent.gated;
+   const goToCourseExitPage = () => {
+     history.push(`/course/${courseId}/course-end`);
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 76ac423..44c508a 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -112,37 +112,6 @@ describe('Sequence', () => {
+     expect(screen.queryAllByRole('button').length).toEqual(0);
+   });
+ 
+-  it('renders correctly for exam content', async () => {
+-    // Exams should NOT render in the Sequence.  They should permanently show a spinner until the
+-    // application redirects away from the page.  Note that this component is not responsible for
+-    // that redirect behavior, so there's no record of it here.
+-    // See CoursewareContainer.jsx "checkExamRedirect" function.
+-    const sequenceBlocks = [Factory.build(
+-      'block',
+-      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
+-      { courseId: courseMetadata.id },
+-    )];
+-    const sequenceMetadata = [Factory.build(
+-      'sequenceMetadata',
+-      { is_time_limited: true },
+-      { courseId: courseMetadata.id, unitBlocks, sequenceBlock: sequenceBlocks[0] },
+-    )];
+-    const testStore = await initializeTestStore(
+-      {
+-        courseMetadata, unitBlocks, sequenceBlocks, sequenceMetadata,
+-      }, false,
+-    );
+-    const { container } = render(
+-      <Sequence {...mockData} {...{ sequenceId: sequenceBlocks[0].id }} />,
+-      { store: testStore },
+-    );
+-
+-    // We expect that the sequence container isn't rendering at all.
+-    expect(container.querySelector('.sequence-container')).toBeNull();
+-    // But that we're seeing a nice spinner.
+-    expect(screen.queryByText('Loading learning sequence...')).toBeInTheDocument();
+-  });
+-
+   it('displays error message on sequence load failure', async () => {
+     const testStore = await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true }, false);
+     testStore.dispatch(fetchSequenceFailure({ sequenceId: mockData.sequenceId }));
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 55bd3b3..10b180b 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -55,7 +55,5 @@ Factory.define('courseMetadata')
+     linkedin_add_to_profile_url: null,
+     related_programs: null,
+     user_needs_integrity_signature: false,
+-    is_mfe_special_exams_enabled: false,
+-    is_mfe_proctored_exams_enabled: false,
+     recommendations: null,
+   });
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 08d757d..e9df4f4 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -219,8 +219,6 @@ function normalizeMetadata(metadata) {
+     linkedinAddToProfileUrl: data.linkedin_add_to_profile_url,
+     relatedPrograms: camelCaseObject(data.related_programs),
+     userNeedsIntegritySignature: data.user_needs_integrity_signature,
+-    specialExamsEnabledWaffleFlag: data.is_mfe_special_exams_enabled,
+-    proctoredExamsEnabledWaffleFlag: data.is_mfe_proctored_exams_enabled,
+     isMasquerading: data.original_user_is_staff && !data.is_staff,
+   };
+ }
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index 2129c32..ce768fd 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -211,8 +211,6 @@ describe('Courseware Service', () => {
+             verify_identity_url: null,
+             verification_status: string('none'),
+             linkedin_add_to_profile_url: null,
+-            is_mfe_special_exams_enabled: boolean(false),
+-            is_mfe_proctored_exams_enabled: boolean(false),
+             user_needs_integrity_signature: boolean(false),
+           },
+         },
+@@ -295,8 +293,6 @@ describe('Courseware Service', () => {
+         linkedinAddToProfileUrl: null,
+         relatedPrograms: null,
+         userNeedsIntegritySignature: false,
+-        specialExamsEnabledWaffleFlag: false,
+-        proctoredExamsEnabledWaffleFlag: false,
+         isMasquerading: false,
+       };
+       const response = await getCourseMetadata(courseId);
+diff --git a/src/courseware/data/slice.js b/src/courseware/data/slice.js
+index 8a51574..1067d60 100644
+--- a/src/courseware/data/slice.js
++++ b/src/courseware/data/slice.js
+@@ -13,16 +13,8 @@ const slice = createSlice({
+     courseId: null,
+     sequenceStatus: 'loading',
+     sequenceId: null,
+-    specialExamsEnabledWaffleFlag: false,
+-    proctoredExamsEnabledWaffleFlag: false,
+   },
+   reducers: {
+-    setsSpecialExamsEnabled: (state, { payload }) => {
+-      state.specialExamsEnabledWaffleFlag = payload.specialExamsEnabledWaffleFlag;
+-    },
+-    setsProctoredExamsEnabled: (state, { payload }) => {
+-      state.proctoredExamsEnabledWaffleFlag = payload.proctoredExamsEnabledWaffleFlag;
+-    },
+     fetchCourseRequest: (state, { payload }) => {
+       state.courseId = payload.courseId;
+       state.courseStatus = LOADING;
+@@ -55,8 +47,6 @@ const slice = createSlice({
+ });
+ 
+ export const {
+-  setsSpecialExamsEnabled,
+-  setsProctoredExamsEnabled,
+   fetchCourseRequest,
+   fetchCourseSuccess,
+   fetchCourseFailure,
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index c4d5380..1eb09d3 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -12,8 +12,6 @@ import {
+   updateModel, addModel, updateModelsMap, addModelsMap, updateModels,
+ } from '../../generic/model-store';
+ import {
+-  setsSpecialExamsEnabled,
+-  setsProctoredExamsEnabled,
+   fetchCourseRequest,
+   fetchCourseSuccess,
+   fetchCourseFailure,
+@@ -145,12 +143,6 @@ export function fetchCourse(courseId) {
+           modelType: 'coursewareMeta',
+           model: courseMetadataResult.value,
+         }));
+-        dispatch(setsSpecialExamsEnabled({
+-          specialExamsEnabledWaffleFlag: courseMetadataResult.value.specialExamsEnabledWaffleFlag,
+-        }));
+-        dispatch(setsProctoredExamsEnabled({
+-          proctoredExamsEnabledWaffleFlag: courseMetadataResult.value.proctoredExamsEnabledWaffleFlag,
+-        }));
+       }
+ 
+       if (courseBlocksResult.status === 'fulfilled') {
+diff --git a/src/pacts/frontend-app-learning-lms.json b/src/pacts/frontend-app-learning-lms.json
+index 2a6bc05..c329f52 100644
+--- a/src/pacts/frontend-app-learning-lms.json
++++ b/src/pacts/frontend-app-learning-lms.json
+@@ -311,8 +311,6 @@
+           "verify_identity_url": null,
+           "verification_status": "none",
+           "linkedin_add_to_profile_url": null,
+-          "is_mfe_special_exams_enabled": false,
+-          "is_mfe_proctored_exams_enabled": false,
+           "user_needs_integrity_signature": false
+         },
+         "matchingRules": {
+@@ -449,12 +447,6 @@
+           "$.body.verification_status": {
+             "match": "type"
+           },
+-          "$.body.is_mfe_special_exams_enabled": {
+-            "match": "type"
+-          },
+-          "$.body.is_mfe_proctored_exams_enabled": {
+-            "match": "type"
+-          },
+           "$.body.user_needs_integrity_signature": {
+             "match": "type"
+           }
+-- 
+2.34.1
+

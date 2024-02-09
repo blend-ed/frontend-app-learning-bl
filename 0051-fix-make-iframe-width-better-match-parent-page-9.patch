@@ -1,0 +1,41 @@
+From 5d4d196e0b3885df27c5b725c57d01422e5da996 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Wed, 29 Jan 2020 12:45:44 -0500
+Subject: [PATCH 0051/1021] fix: make iframe width better match parent page
+ (#9)
+
+---
+ src/courseware/sequence/Unit.jsx | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/src/courseware/sequence/Unit.jsx b/src/courseware/sequence/Unit.jsx
+index 7defb03..95c415e 100644
+--- a/src/courseware/sequence/Unit.jsx
++++ b/src/courseware/sequence/Unit.jsx
+@@ -6,14 +6,12 @@ export default function Unit({ id, pageTitle }) {
+   const iframeRef = useRef(null);
+   const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}`;
+ 
+-  const [iframeWidth, setIframeWidth] = useState(0);
+   const [iframeHeight, setIframeHeight] = useState(0);
+   useEffect(() => {
+     global.onmessage = (event) => {
+       const { type, payload } = event.data;
+ 
+       if (type === 'plugin.resize') {
+-        setIframeWidth(payload.width);
+         setIframeHeight(payload.height);
+       }
+     };
+@@ -25,7 +23,7 @@ export default function Unit({ id, pageTitle }) {
+       ref={iframeRef}
+       src={iframeUrl}
+       allowFullScreen
+-      width={iframeWidth}
++      className="d-block container-fluid px-0"
+       height={iframeHeight}
+       scrolling="no"
+       referrerPolicy="origin"
+-- 
+2.34.1
+

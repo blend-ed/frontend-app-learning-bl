@@ -1,0 +1,196 @@
+From 437f50b261ac395ba2a63260c2e8085343216a85 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Thu, 30 Jan 2020 18:14:47 -0500
+Subject: [PATCH 0053/1021] Fixing linting errors.
+
+---
+ src/courseware/course/CourseBreadcrumb.jsx       |  4 ++--
+ src/courseware/course/CourseBreadcrumbs.jsx      |  2 +-
+ src/courseware/sequence/Sequence.jsx             |  9 ++++++---
+ src/courseware/sequence/UnitIcon.jsx             |  4 +++-
+ src/courseware/sequence/api.js                   |  3 +--
+ .../sequence/content-lock/ContentLock.jsx        | 15 +++++++++++----
+ src/index.jsx                                    |  4 +++-
+ src/user-messages/Alert.jsx                      | 16 +++++++++++-----
+ 8 files changed, 38 insertions(+), 19 deletions(-)
+
+diff --git a/src/courseware/course/CourseBreadcrumb.jsx b/src/courseware/course/CourseBreadcrumb.jsx
+index a758594..788c08d 100644
+--- a/src/courseware/course/CourseBreadcrumb.jsx
++++ b/src/courseware/course/CourseBreadcrumb.jsx
+@@ -9,11 +9,11 @@ export default function CourseBreadcrumb({ url, label, last }) {
+       <li className="list-inline-item">
+         {last ? label : (<a href={url}>{label}</a>)}
+       </li>
+-      {!last &&
++      {!last && (
+         <li className="list-inline-item" role="presentation" aria-label="spacer">
+           <FontAwesomeIcon icon={faChevronRight} />
+         </li>
+-      }
++      )}
+     </React.Fragment>
+   );
+ }
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 98e1fb6..6a5957c 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -27,7 +27,7 @@ export default function CourseBreadcrumbs({
+       <ol className="list-inline">
+         {links.map(({ id, url, label }, i) => (
+           <CourseBreadcrumb key={id} url={url} label={label} last={i === links.length - 1} />
+-          ))}
++        ))}
+       </ol>
+     </nav>
+   );
+diff --git a/src/courseware/sequence/Sequence.jsx b/src/courseware/sequence/Sequence.jsx
+index 0966d44..7000709 100644
+--- a/src/courseware/sequence/Sequence.jsx
++++ b/src/courseware/sequence/Sequence.jsx
+@@ -103,9 +103,12 @@ function Sequence({
+           showCompletion={showCompletion}
+         />
+         {isGated && (
+-          <Suspense fallback={<PageLoading
+-            srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
+-          />}
++          <Suspense
++            fallback={(
++              <PageLoading
++                srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
++              />
++            )}
+           >
+             <ContentLock
+               courseUsageKey={courseUsageKey}
+diff --git a/src/courseware/sequence/UnitIcon.jsx b/src/courseware/sequence/UnitIcon.jsx
+index 5568e6f..ef4d96f 100644
+--- a/src/courseware/sequence/UnitIcon.jsx
++++ b/src/courseware/sequence/UnitIcon.jsx
+@@ -1,7 +1,9 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faFilm, faBook, faPencilAlt, faTasks, faLock } from '@fortawesome/free-solid-svg-icons';
++import {
++  faFilm, faBook, faPencilAlt, faTasks, faLock,
++} from '@fortawesome/free-solid-svg-icons';
+ 
+ export default function UnitIcon({ type }) {
+   let icon = null;
+diff --git a/src/courseware/sequence/api.js b/src/courseware/sequence/api.js
+index 499403e..fd20327 100644
+--- a/src/courseware/sequence/api.js
++++ b/src/courseware/sequence/api.js
+@@ -3,8 +3,7 @@ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ 
+ /* eslint-disable import/prefer-default-export */
+ 
+-const getSequenceXModuleHandlerUrl = (courseUsageKey, sequenceId) =>
+-  `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/xblock/${sequenceId}/handler/xmodule_handler`;
++const getSequenceXModuleHandlerUrl = (courseUsageKey, sequenceId) => `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/xblock/${sequenceId}/handler/xmodule_handler`;
+ 
+ 
+ export async function saveSequencePosition(courseUsageKey, sequenceId, position) {
+diff --git a/src/courseware/sequence/content-lock/ContentLock.jsx b/src/courseware/sequence/content-lock/ContentLock.jsx
+index aa09fcb..8d04120 100644
+--- a/src/courseware/sequence/content-lock/ContentLock.jsx
++++ b/src/courseware/sequence/content-lock/ContentLock.jsx
+@@ -1,4 +1,5 @@
+ import React, { useCallback } from 'react';
++import PropTypes from 'prop-types';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faLock } from '@fortawesome/free-solid-svg-icons';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -17,13 +18,15 @@ function ContentLock({
+   return (
+     <>
+       <h3>
+-        <FontAwesomeIcon icon={faLock} />{' '}
++        <FontAwesomeIcon icon={faLock} />
++        {' '}
+         {sectionName}
+       </h3>
+       <h4>{intl.formatMessage(messages['learn.contentLock.content.locked'])}</h4>
+-      <p>{intl.formatMessage(messages['learn.contentLock.complete.prerequisite'], {
+-        prereqSectionName,
+-      })}
++      <p>
++        {intl.formatMessage(messages['learn.contentLock.complete.prerequisite'], {
++          prereqSectionName,
++        })}
+       </p>
+       <p>
+         <Button className="btn-primary" onClick={handleClick}>{intl.formatMessage(messages['learn.contentLock.goToSection'])}</Button>
+@@ -33,5 +36,9 @@ function ContentLock({
+ }
+ ContentLock.propTypes = {
+   intl: intlShape.isRequired,
++  courseUsageKey: PropTypes.string.isRequired,
++  prereqSectionName: PropTypes.string.isRequired,
++  prereqId: PropTypes.string.isRequired,
++  sectionName: PropTypes.string.isRequired,
+ };
+ export default injectIntl(ContentLock);
+diff --git a/src/index.jsx b/src/index.jsx
+index 20a662a..6591da1 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -1,7 +1,9 @@
+ import 'core-js/stable';
+ import 'regenerator-runtime/runtime';
+ 
+-import { APP_INIT_ERROR, APP_READY, subscribe, initialize } from '@edx/frontend-platform';
++import {
++  APP_INIT_ERROR, APP_READY, subscribe, initialize,
++} from '@edx/frontend-platform';
+ import { AppProvider, ErrorPage } from '@edx/frontend-platform/react';
+ import React from 'react';
+ import ReactDOM from 'react-dom';
+diff --git a/src/user-messages/Alert.jsx b/src/user-messages/Alert.jsx
+index dda6f99..9fb2281 100644
+--- a/src/user-messages/Alert.jsx
++++ b/src/user-messages/Alert.jsx
+@@ -1,16 +1,20 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+-import { faExclamationTriangle, faInfoCircle, faCheckCircle, faMinusCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
++import {
++  faExclamationTriangle, faInfoCircle, faCheckCircle, faMinusCircle, faTimes,
++} from '@fortawesome/free-solid-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { Button } from '@edx/paragon';
+ 
+ function getAlertClass(type) {
+   if (type === 'error') {
+     return 'alert-warning';
+-  } else if (type === 'danger') {
++  }
++  if (type === 'danger') {
+     return 'alert-danger';
+-  } else if (type === 'success') {
++  }
++  if (type === 'success') {
+     return 'alert-success';
+   }
+   return 'alert-info';
+@@ -19,9 +23,11 @@ function getAlertClass(type) {
+ function getAlertIcon(type) {
+   if (type === 'error') {
+     return faExclamationTriangle;
+-  } else if (type === 'danger') {
++  }
++  if (type === 'danger') {
+     return faMinusCircle;
+-  } else if (type === 'success') {
++  }
++  if (type === 'success') {
+     return faCheckCircle;
+   }
+   return faInfoCircle;
+-- 
+2.34.1
+

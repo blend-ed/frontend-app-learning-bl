@@ -1,0 +1,43 @@
+From 7bef14c32996fa38d848b3087664dced548d7f34 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Fri, 15 May 2020 12:05:42 -0700
+Subject: [PATCH 0126/1021] Add courseId to InstructorToolbar props
+
+---
+ src/courseware/course/Course.jsx            | 1 +
+ src/courseware/course/InstructorToolbar.jsx | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index d294a04..a02bba8 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -72,6 +72,7 @@ function Course({
+         />
+         {isStaff && (
+           <InstructorToolbar
++            courseId={courseId}
+             unitId={unitId}
+           />
+         )}
+diff --git a/src/courseware/course/InstructorToolbar.jsx b/src/courseware/course/InstructorToolbar.jsx
+index c73462f..5b16071 100644
+--- a/src/courseware/course/InstructorToolbar.jsx
++++ b/src/courseware/course/InstructorToolbar.jsx
+@@ -39,11 +39,13 @@ function InstructorToolbar(props) {
+ 
+ InstructorToolbar.propTypes = {
+   activeUnitLmsWebUrl: PropTypes.string,
++  courseId: PropTypes.string,
+   unitId: PropTypes.string,
+ };
+ 
+ InstructorToolbar.defaultProps = {
+   activeUnitLmsWebUrl: undefined,
++  courseId: undefined,
+   unitId: undefined,
+ };
+ 
+-- 
+2.34.1
+

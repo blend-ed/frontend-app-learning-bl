@@ -1,0 +1,129 @@
+From e46977f50d664daf63f7fb2998d2c809b85ca251 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 6 May 2021 09:38:57 -0400
+Subject: [PATCH 0446/1021] fix: use new xblock handler URLs for sequence
+ blocks (#423)
+
+They've changed to proper new-style handlers, so the URL also
+changed. This will let us get the fix for green checkmarks showing
+up as audit users pass FBE units, even though those units aren't
+actually complete.
+
+AA-409
+---
+ src/courseware/CoursewareContainer.test.jsx   |  2 +-
+ .../__factories__/sequenceMetadata.factory.js |  1 -
+ src/courseware/data/api.js                    | 40 ++++---------------
+ src/courseware/data/redux.test.js             |  4 +-
+ 4 files changed, 10 insertions(+), 37 deletions(-)
+
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 7fbdb56..f38f5de 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -374,7 +374,7 @@ describe('CoursewareContainer', () => {
+       });
+ 
+       it('should navigate between units and check block completion', async () => {
+-        axiosMock.onPost(`${courseId}/xblock/${sequenceBlock.id}/handler/xmodule_handler/get_completion`).reply(200, {
++        axiosMock.onPost(`${courseId}/xblock/${sequenceBlock.id}/handler/get_completion`).reply(200, {
+           complete: true,
+         });
+ 
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index 8055b74..ce8173e 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -29,7 +29,6 @@ Factory.define('sequenceMetadata')
+   .attr('element_id', ['sequenceBlock'], sequenceBlock => sequenceBlock.block_id)
+   .attr('item_id', ['sequenceBlock'], sequenceBlock => sequenceBlock.id)
+   .attr('display_name', ['sequenceBlock'], sequenceBlock => sequenceBlock.display_name)
+-  .attr('ajax_url', ['sequenceBlock'], sequenceBlock => `${sequenceBlock.student_view_url}/handler/xmodule_handler}`)
+   .attr('gated_content', ['sequenceBlock'], sequenceBlock => ({
+     gated: false,
+     prereq_url: null,
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 05e798a..45bad77 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -205,48 +205,22 @@ export async function getSequenceMetadata(sequenceId) {
+   return normalizeSequenceMetadata(data);
+ }
+ 
+-const getSequenceXModuleHandlerUrl = (courseId, sequenceId) => `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/xmodule_handler`;
++const getSequenceHandlerUrl = (courseId, sequenceId) => `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler`;
+ 
+ export async function getBlockCompletion(courseId, sequenceId, usageKey) {
+-  // Post data sent to this endpoint must be url encoded
+-  // TODO: Remove the need for this to be the case.
+-  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+-  const urlEncoded = new URLSearchParams();
+-  urlEncoded.append('usage_key', usageKey);
+-  const requestConfig = {
+-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+-  };
+-
+   const { data } = await getAuthenticatedHttpClient().post(
+-    `${getSequenceXModuleHandlerUrl(courseId, sequenceId)}/get_completion`,
+-    urlEncoded.toString(),
+-    requestConfig,
++    `${getSequenceHandlerUrl(courseId, sequenceId)}/get_completion`,
++    { usage_key: usageKey },
+   );
+-
+-  if (data.complete) {
+-    return true;
+-  }
+-
+-  return false;
++  return data.complete === true;
+ }
+ 
+ export async function postSequencePosition(courseId, sequenceId, activeUnitIndex) {
+-  // Post data sent to this endpoint must be url encoded
+-  // TODO: Remove the need for this to be the case.
+-  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+-  const urlEncoded = new URLSearchParams();
+-  // Position is 1-indexed on the server and 0-indexed in this app. Adjust here.
+-  urlEncoded.append('position', activeUnitIndex + 1);
+-  const requestConfig = {
+-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+-  };
+-
+   const { data } = await getAuthenticatedHttpClient().post(
+-    `${getSequenceXModuleHandlerUrl(courseId, sequenceId)}/goto_position`,
+-    urlEncoded.toString(),
+-    requestConfig,
++    `${getSequenceHandlerUrl(courseId, sequenceId)}/goto_position`,
++    // Position is 1-indexed on the server and 0-indexed in this app. Adjust here.
++    { position: activeUnitIndex + 1 },
+   );
+-
+   return data;
+ }
+ 
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index 422c893..dc04f63 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -198,7 +198,7 @@ describe('Data layer integration tests', () => {
+     });
+ 
+     describe('Test checkBlockCompletion', () => {
+-      const getCompletionURL = `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/xmodule_handler/get_completion`;
++      const getCompletionURL = `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/get_completion`;
+ 
+       it('Should fail to check completion and log error', async () => {
+         axiosMock.onPost(getCompletionURL).networkError();
+@@ -227,7 +227,7 @@ describe('Data layer integration tests', () => {
+     });
+ 
+     describe('Test saveSequencePosition', () => {
+-      const gotoPositionURL = `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/xmodule_handler/goto_position`;
++      const gotoPositionURL = `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/goto_position`;
+ 
+       it('Should change and revert sequence model activeUnitIndex in case of error', async () => {
+         axiosMock.onPost(gotoPositionURL).networkError();
+-- 
+2.34.1
+

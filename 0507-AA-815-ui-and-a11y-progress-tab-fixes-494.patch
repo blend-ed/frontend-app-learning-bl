@@ -1,0 +1,454 @@
+From d1bb46eef33f038c8e1e5c4b0939cc24d72af46e Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 23 Jun 2021 09:42:12 -0400
+Subject: [PATCH 0507/1021] AA-815: ui and a11y progress tab fixes (#494)
+
+---
+ .../data/__snapshots__/redux.test.js.snap     |  3 ++
+ src/course-home/data/slice.js                 |  5 +++
+ src/course-home/progress-tab/ProgressTab.jsx  | 17 +++++++---
+ .../CompleteDonutSegment.jsx                  | 32 +++++++++++++------
+ .../IncompleteDonutSegment.jsx                |  4 +++
+ .../course-completion/LockedDonutSegment.jsx  |  2 +-
+ .../grades/course-grade/CourseGrade.jsx       | 11 +++----
+ .../grades/course-grade/GradeBar.jsx          |  7 ++--
+ .../grades/course-grade/GradeRangeTooltip.jsx |  2 ++
+ .../grades/detailed-grades/DetailedGrades.jsx |  2 ++
+ .../detailed-grades/DetailedGradesTable.jsx   |  4 ++-
+ .../grade-summary/AssignmentTypeCell.jsx      | 12 ++++++-
+ .../DroppableAssignmentFootnote.jsx           |  8 ++++-
+ .../grade-summary/GradeSummaryHeader.jsx      |  5 +++
+ .../grade-summary/GradeSummaryTable.jsx       |  2 +-
+ 15 files changed, 84 insertions(+), 32 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 6545921..7a8a20b 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -5,6 +5,7 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
++    "gradesFeatureIsLocked": false,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+     "toastHeader": "",
+@@ -300,6 +301,7 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
++    "gradesFeatureIsLocked": false,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+     "toastHeader": "",
+@@ -476,6 +478,7 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
++    "gradesFeatureIsLocked": false,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+     "toastHeader": "",
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index 7e037d7..0cefaae 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -10,6 +10,7 @@ const slice = createSlice({
+   initialState: {
+     courseStatus: 'loading',
+     courseId: null,
++    gradesFeatureIsLocked: false,
+     toastBodyText: null,
+     toastBodyLink: null,
+     toastHeader: '',
+@@ -37,6 +38,9 @@ const slice = createSlice({
+       state.toastBodyText = linkText;
+       state.toastHeader = header;
+     },
++    setGradesFeatureStatus: (state, { payload }) => {
++      state.gradesFeatureIsLocked = payload.gradesFeatureIsLocked;
++    },
+   },
+ });
+ 
+@@ -45,6 +49,7 @@ export const {
+   fetchTabSuccess,
+   fetchTabFailure,
+   setCallToActionToast,
++  setGradesFeatureStatus,
+ } = slice.actions;
+ 
+ export const {
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index 9dbb657..f4f1a4a 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -1,6 +1,6 @@
+-import React from 'react';
++import React, { useEffect } from 'react';
+ import { layoutGenerator } from 'react-break';
+-import { useSelector } from 'react-redux';
++import { useDispatch, useSelector } from 'react-redux';
+ 
+ import CertificateStatus from './certificate-status/CertificateStatus';
+ import CourseCompletion from './course-completion/CourseCompletion';
+@@ -10,6 +10,7 @@ import GradeSummary from './grades/grade-summary/GradeSummary';
+ import ProgressHeader from './ProgressHeader';
+ import RelatedLinks from './related-links/RelatedLinks';
+ 
++import { setGradesFeatureStatus } from '../data/slice';
+ import { useModel } from '../../generic/model-store';
+ 
+ function ProgressTab() {
+@@ -22,8 +23,14 @@ function ProgressTab() {
+       lockedCount,
+     },
+   } = useModel('progress', courseId);
+-  const isLocked = lockedCount > 0;
+-  const applyLockedOverlay = isLocked ? 'locked-overlay' : '';
++
++  const gradesFeatureIsLocked = lockedCount > 0;
++  const applyLockedOverlay = gradesFeatureIsLocked ? 'locked-overlay' : '';
++
++  const dispatch = useDispatch();
++  useEffect(() => {
++    dispatch(setGradesFeatureStatus({ gradesFeatureIsLocked }));
++  }, []);
+ 
+   const layout = layoutGenerator({
+     mobile: 0,
+@@ -43,7 +50,7 @@ function ProgressTab() {
+             <CertificateStatus />
+           </OnMobile>
+           <CourseGrade />
+-          <div className={`grades my-4 p-4 rounded shadow-sm ${applyLockedOverlay}`} aria-hidden={isLocked}>
++          <div className={`grades my-4 p-4 rounded shadow-sm ${applyLockedOverlay}`} aria-hidden={gradesFeatureIsLocked}>
+             <GradeSummary />
+             <DetailedGrades />
+           </div>
+diff --git a/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx b/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
+index 03d17e4..2615b27 100644
+--- a/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
++++ b/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
+@@ -7,6 +7,10 @@ import { OverlayTrigger, Popover } from '@edx/paragon';
+ import messages from './messages';
+ 
+ function CompleteDonutSegment({ completePercentage, intl, lockedPercentage }) {
++  if (!completePercentage) {
++    return null;
++  }
++
+   const [showCompletePopover, setShowCompletePopover] = useState(false);
+ 
+   const completeSegmentOffset = (3.6 * completePercentage) / 8;
+@@ -24,15 +28,6 @@ function CompleteDonutSegment({ completePercentage, intl, lockedPercentage }) {
+       onFocus={() => setShowCompletePopover(true)}
+       tabIndex="-1"
+     >
+-      <circle
+-        className="donut-segment complete-stroke"
+-        cx="21"
+-        cy="21"
+-        r="15.91549430918954"
+-        strokeDasharray={`${completePercentage} ${100 - completePercentage}`}
+-        strokeDashoffset={lockedSegmentOffset + completePercentage}
+-      />
+-
+       {/* Tooltip */}
+       <OverlayTrigger
+         show={showCompletePopover}
+@@ -49,16 +44,33 @@ function CompleteDonutSegment({ completePercentage, intl, lockedPercentage }) {
+         <rect x="19" y="3" style={{ transform: `rotate(${completeTooltipDegree}deg)` }} />
+       </OverlayTrigger>
+ 
++      {/* Complete segment */}
++      <circle
++        className="donut-segment complete-stroke"
++        cx="21"
++        cy="21"
++        r="15.91549430918954"
++        strokeDasharray={`${completePercentage} ${100 - completePercentage}`}
++        strokeDashoffset={lockedSegmentOffset + completePercentage}
++      />
++
+       {/* Segment dividers */}
+       {lockedPercentage > 0 && lockedPercentage < 100 && (
+         <circle
++          cx="21"
++          cy="21"
++          r="15.91549430918954"
+           className="donut-segment divider-stroke"
+           strokeDasharray="0.3 99.7"
+           strokeDashoffset={0.15 + lockedSegmentOffset}
+         />
+       )}
+-      {completePercentage < 100 && lockedPercentage < 100 && lockedPercentage + completePercentage === 100 && (
++      {completePercentage < 100 && lockedPercentage > 0 && lockedPercentage < 100
++      && lockedPercentage + completePercentage === 100 && (
+         <circle
++          cx="21"
++          cy="21"
++          r="15.91549430918954"
+           className="donut-segment divider-stroke"
+           strokeDasharray="0.3 99.7"
+           strokeDashoffset="25.15"
+diff --git a/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx b/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
+index 33ebec9..e1bcc3d 100644
+--- a/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
++++ b/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
+@@ -7,6 +7,10 @@ import { OverlayTrigger, Popover } from '@edx/paragon';
+ import messages from './messages';
+ 
+ function IncompleteDonutSegment({ incompletePercentage, intl }) {
++  if (!incompletePercentage) {
++    return null;
++  }
++
+   const [showIncompletePopover, setShowIncompletePopover] = useState(false);
+ 
+   const incompleteSegmentOffset = (3.6 * incompletePercentage) / 16;
+diff --git a/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx b/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
+index 80f03db..0ad8b02 100644
+--- a/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
++++ b/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
+@@ -9,7 +9,7 @@ import messages from './messages';
+ function LockedDonutSegment({ intl, lockedPercentage }) {
+   const [showLockedPopover, setShowLockedPopover] = useState(false);
+ 
+-  if (!lockedPercentage > 0) {
++  if (!lockedPercentage) {
+     return null;
+   }
+ 
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+index 94156f1..65b5a81 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -13,12 +13,10 @@ import messages from '../messages';
+ function CourseGrade({ intl }) {
+   const {
+     courseId,
++    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+-    completionSummary: {
+-      lockedCount,
+-    },
+     gradingPolicy: {
+       gradeRange,
+     },
+@@ -26,13 +24,12 @@ function CourseGrade({ intl }) {
+ 
+   const passingGrade = Number((Math.min(...Object.values(gradeRange)) * 100).toFixed(0));
+ 
+-  const isLocked = lockedCount > 0;
+-  const applyLockedOverlay = isLocked ? 'locked-overlay' : '';
++  const applyLockedOverlay = gradesFeatureIsLocked ? 'locked-overlay' : '';
+ 
+   return (
+     <section className="text-dark-700 my-4 rounded shadow-sm">
+-      {isLocked && <CourseGradeHeader />}
+-      <div className={applyLockedOverlay}>
++      {gradesFeatureIsLocked && <CourseGradeHeader />}
++      <div className={applyLockedOverlay} aria-hidden={gradesFeatureIsLocked}>
+         <div className="row w-100 m-0 p-4">
+           <div className="col-12 col-sm-6 p-0 pr-sm-2">
+             <h2>{intl.formatMessage(messages.grades)}</h2>
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index 319528c..424c13d 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -12,12 +12,10 @@ import messages from '../messages';
+ function GradeBar({ intl, passingGrade }) {
+   const {
+     courseId,
++    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+-    completionSummary: {
+-      lockedCount,
+-    },
+     courseGrade: {
+       isPassing,
+       visiblePercent,
+@@ -26,8 +24,7 @@ function GradeBar({ intl, passingGrade }) {
+ 
+   const currentGrade = Number((visiblePercent * 100).toFixed(0));
+ 
+-  const isLocked = lockedCount > 0;
+-  const lockedTooltipClassName = isLocked ? 'locked-overlay' : '';
++  const lockedTooltipClassName = gradesFeatureIsLocked ? 'locked-overlay' : '';
+ 
+   return (
+     <div className="col-12 col-sm-6 align-self-center">
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+index 81b01ce..856fe07 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+@@ -14,6 +14,7 @@ import messages from '../messages';
+ function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+   const {
+     courseId,
++    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+@@ -67,6 +68,7 @@ function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+         src={InfoOutline}
+         iconAs={Icon}
+         size="inline"
++        disabled={gradesFeatureIsLocked}
+       />
+     </OverlayTrigger>
+   );
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 908ec65..9b579ac 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -16,6 +16,7 @@ function DetailedGrades({ intl }) {
+   const { administrator } = getAuthenticatedUser();
+   const {
+     courseId,
++    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+   const {
+     org,
+@@ -39,6 +40,7 @@ function DetailedGrades({ intl }) {
+       className="muted-link inline-link"
+       destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}
+       onClick={logOutlineLinkClick}
++      tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
+     >
+       {intl.formatMessage(messages.courseOutline)}
+     </Hyperlink>
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index 77514bb..fe8b673 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -13,6 +13,7 @@ import { useModel } from '../../../../generic/model-store';
+ function DetailedGradesTable({ intl, sectionScores }) {
+   const {
+     courseId,
++    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+   const {
+     org,
+@@ -43,10 +44,11 @@ function DetailedGradesTable({ intl, sectionScores }) {
+         const title = (
+           <a
+             href={subsection.url}
+-            className="text-dark-700 small"
++            className="muted-link small"
+             onClick={() => {
+               logSubsectionClicked(subsection.blockKey);
+             }}
++            tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
+           >
+             {subsection.displayName}
+           </a>
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+index bdb7917..2ffaa3a 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -1,13 +1,23 @@
+ import React from 'react';
++import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ 
+ function AssignmentTypeCell({ assignmentType, footnoteMarker, footnoteId }) {
++  const {
++    gradesFeatureIsLocked,
++  } = useSelector(state => state.courseHome);
+   return (
+     <div className="small">
+       {assignmentType}
+       {footnoteId && footnoteMarker && (
+         <sup>
+-          <a id={`${footnoteId}-ref`} className="text-dark-700" href={`#${footnoteId}-footnote`} aria-describedby="grade-summary-footnote-label">
++          <a
++            id={`${footnoteId}-ref`}
++            className="muted-link"
++            href={`#${footnoteId}-footnote`}
++            aria-describedby="grade-summary-footnote-label"
++            tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
++          >
+             {footnoteMarker}
+           </a>
+         </sup>
+diff --git a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+index f897b89..4d114fc 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ 
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -6,6 +7,9 @@ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/
+ import messages from '../messages';
+ 
+ function DroppableAssignmentFootnote({ footnotes, intl }) {
++  const {
++    gradesFeatureIsLocked,
++  } = useSelector(state => state.courseHome);
+   return (
+     <>
+       <span id="grade-summary-footnote-label" className="sr-only">{intl.formatMessage(messages.footnotesTitle)}</span>
+@@ -21,7 +25,9 @@ function DroppableAssignmentFootnote({ footnotes, intl }) {
+                 assignmentType: footnote.assignmentType,
+               }}
+             />
+-            <a className="sr-only" href={`#${footnote.id}-ref`}>{intl.formatMessage(messages.backToContent)}</a>
++            <a className="sr-only" href={`#${footnote.id}-ref`} tabIndex={gradesFeatureIsLocked ? '-1' : '0'}>
++              {intl.formatMessage(messages.backToContent)}
++            </a>
+           </li>
+         ))}
+       </ul>
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+index f13de05..8ee6292 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+@@ -1,4 +1,5 @@
+ import React, { useState } from 'react';
++import { useSelector } from 'react-redux';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import {
+@@ -9,6 +10,9 @@ import { InfoOutline } from '@edx/paragon/icons';
+ import messages from '../messages';
+ 
+ function GradeSummaryHeader({ intl }) {
++  const {
++    gradesFeatureIsLocked,
++  } = useSelector(state => state.courseHome);
+   const [showTooltip, setShowTooltip] = useState(false);
+   return (
+     <div className="row w-100 m-0 align-items-center">
+@@ -33,6 +37,7 @@ function GradeSummaryHeader({ intl }) {
+           iconAs={Icon}
+           className="mb-3"
+           size="sm"
++          disabled={gradesFeatureIsLocked}
+         />
+       </OverlayTrigger>
+     </div>
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index 9e22943..09a0edb 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -46,7 +46,7 @@ function GradeSummaryTable({ intl }) {
+ 
+     return {
+       type: { footnoteId, footnoteMarker, type: assignment.type },
+-      weight: `${assignment.weight * 100}%`,
++      weight: `${(assignment.weight * 100).toFixed(0)}%`,
+       grade: `${(assignment.averageGrade * 100).toFixed(0)}%`,
+       weightedGrade: `${(assignment.weightedGrade * 100).toFixed(0)}%`,
+     };
+-- 
+2.34.1
+

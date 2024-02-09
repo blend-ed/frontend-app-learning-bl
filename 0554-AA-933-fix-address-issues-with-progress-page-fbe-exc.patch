@@ -1,0 +1,365 @@
+From e2b00d6684febf3aa1141660957a53aa5f9bdef7 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Tue, 27 Jul 2021 10:59:23 -0400
+Subject: [PATCH 0554/1021] [AA-933] fix: address issues with progress page fbe
+ exception UI (#561)
+
+* fix: address issues with progress page fbe exception UI
+
+* address comments
+---
+ .../grades/detailed-grades/DetailedGrades.jsx  |  4 ++--
+ .../detailed-grades/DetailedGradesTable.jsx    |  2 +-
+ .../detailed-grades/ProblemScoreDrawer.jsx     |  6 ++++--
+ .../detailed-grades/SubsectionTitleCell.jsx    |  9 +++++----
+ .../grade-summary/AssignmentTypeCell.jsx       | 10 +++++++---
+ .../grades/grade-summary/GradeSummary.jsx      |  8 +++++---
+ .../grade-summary/GradeSummaryHeader.jsx       | 12 +++++++-----
+ .../grades/grade-summary/GradeSummaryTable.jsx | 18 ++++++++++++------
+ .../progress-tab/grades/messages.js            |  8 ++++++++
+ src/index.scss                                 |  4 ++++
+ 10 files changed, 55 insertions(+), 26 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 9a5a0a5..51c24ce 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -52,8 +52,8 @@ function DetailedGrades({ intl }) {
+     <section className="text-dark-700">
+       <h3 className="h4 mb-3">{intl.formatMessage(messages.detailedGrades)}</h3>
+       {gradesFeatureIsPartiallyLocked && (
+-        <div className="mb-3 small row ml-0">
+-          <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />
++        <div className="mb-3 small ml-0 d-inline">
++          <Icon className="mr-1 mt-1 d-inline-flex" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />
+           {intl.formatMessage(messages.gradeSummaryLimitedAccessExplanation)}
+         </div>
+       )}
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index e9d5e36..0f5e561 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -32,7 +32,7 @@ function DetailedGradesTable({ intl }) {
+ 
+       const detailedGradesData = subsectionScores.map((subsection) => ({
+         subsectionTitle: <SubsectionTitleCell subsection={subsection} />,
+-        score: <span className={subsection.learnerHasAccess ? '' : 'locked-overlay'}>{subsection.numPointsEarned}/{subsection.numPointsPossible}</span>,
++        score: <span className={subsection.learnerHasAccess ? '' : 'greyed-out'}>{subsection.numPointsEarned}/{subsection.numPointsPossible}</span>,
+       }));
+ 
+       return (
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+index 68018fc..29179f7 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+@@ -1,15 +1,16 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import classNames from 'classnames';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from '../messages';
+ 
+-function ProblemScoreDrawer({ intl, problemScores }) {
++function ProblemScoreDrawer({ intl, problemScores, subsection }) {
+   return (
+     <span className="row w-100 m-0 x-small ml-4 pt-2 pl-1 text-gray-700 flex-nowrap">
+       <span id="problem-score-label" className="col-auto p-0">{intl.formatMessage(messages.problemScoreLabel)}</span>
+-      <div className="col p-0">
++      <div className={classNames('col', 'p-0', { 'greyed-out': subsection.learnerHasAccess })}>
+         <ul className="list-unstyled row w-100 m-0" aria-labelledby="problem-score-label">
+           {problemScores.map(problemScore => (
+             <li className="ml-3">{problemScore.earned}/{problemScore.possible}</li>
+@@ -26,6 +27,7 @@ ProblemScoreDrawer.propTypes = {
+     earned: PropTypes.number.isRequired,
+     possible: PropTypes.number.isRequired,
+   })).isRequired,
++  subsection: PropTypes.shape({ learnerHasAccess: PropTypes.bool }).isRequired,
+ };
+ 
+ export default injectIntl(ProblemScoreDrawer);
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+index d74b5a1..2ab2783 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+@@ -44,21 +44,22 @@ function SubsectionTitleCell({ intl, subsection }) {
+     <Collapsible.Advanced>
+       <Row className="w-100 m-0">
+         <Collapsible.Trigger
+-          className="mr-1"
++          className="mr-1 position-absolute"
+           aria-label={intl.formatMessage(messages.problemScoreToggleAltText, { subsectionTitle: displayName })}
+           tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+         >
+           <Collapsible.Visible whenClosed><Icon src={ArrowDropDown} /></Collapsible.Visible>
+           <Collapsible.Visible whenOpen><Icon src={ArrowDropUp} /></Collapsible.Visible>
+         </Collapsible.Trigger>
+-        <span className="small row ml-0">
+-          {gradesFeatureIsFullyLocked || subsection.learnerHasAccess ? '' : <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />}
++        <span className="small d-inline ml-4 pl-1">
++          {gradesFeatureIsFullyLocked || subsection.learnerHasAccess ? '' : <Icon id={`detailedGradesBlockedIcon${subsection.blockKey}`} aria-label={intl.formatMessage(messages.noAcessToSubsection, { displayName })} className="mr-1 mt-1 d-inline-flex" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />}
+           {url ? (
+             <a
+               href={url}
+               className="muted-link small"
+               onClick={logSubsectionClicked}
+               tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
++              aria-labelledby={`detailedGradesBlockedIcon${subsection.blockKey}`}
+             >
+               {displayName}
+             </a>
+@@ -68,7 +69,7 @@ function SubsectionTitleCell({ intl, subsection }) {
+         </span>
+       </Row>
+       <Collapsible.Body>
+-        <ProblemScoreDrawer problemScores={problemScores} />
++        <ProblemScoreDrawer problemScores={problemScores} subsection={subsection} />
+       </Collapsible.Body>
+     </Collapsible.Advanced>
+   );
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+index 6a16638..015e39c 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -1,12 +1,14 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Blocked } from '@edx/paragon/icons';
+ import { Icon } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
++import messages from '../messages';
+ 
+ function AssignmentTypeCell({
+-  assignmentType, footnoteMarker, footnoteId, locked,
++  intl, assignmentType, footnoteMarker, footnoteId, locked,
+ }) {
+   const {
+     courseId,
+@@ -16,7 +18,7 @@ function AssignmentTypeCell({
+     gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+ 
+-  const lockedIcon = locked ? <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" /> : '';
++  const lockedIcon = locked ? <Icon id={`assignmentTypeBlockedIcon${assignmentType}`} aria-label={intl.formatMessage(messages.noAcessToAssignmentType, { assignmentType })} className="mr-1 mt-1 d-inline-flex" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" /> : '';
+ 
+   return (
+     <div className="small">
+@@ -29,6 +31,7 @@ function AssignmentTypeCell({
+             href={`#${footnoteId}-footnote`}
+             aria-describedby="grade-summary-footnote-label"
+             tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
++            aria-labelledby={`assignmentTypeBlockedIcon${assignmentType}`}
+           >
+             {footnoteMarker}
+           </a>
+@@ -39,6 +42,7 @@ function AssignmentTypeCell({
+ }
+ 
+ AssignmentTypeCell.propTypes = {
++  intl: intlShape.isRequired,
+   assignmentType: PropTypes.string.isRequired,
+   footnoteId: PropTypes.string,
+   footnoteMarker: PropTypes.number,
+@@ -51,4 +55,4 @@ AssignmentTypeCell.defaultProps = {
+   locked: false,
+ };
+ 
+-export default AssignmentTypeCell;
++export default injectIntl(AssignmentTypeCell);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+index 4b9d96c..b937652 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import { useSelector } from 'react-redux';
+ import { useModel } from '../../../../generic/model-store';
+ 
+@@ -16,14 +16,16 @@ function GradeSummary() {
+     },
+   } = useModel('progress', courseId);
+ 
++  const [allOfSomeAssignmentTypeIsLocked, setAllOfSomeAssignmentTypeIsLocked] = useState(false);
++
+   if (assignmentPolicies.length === 0) {
+     return null;
+   }
+ 
+   return (
+     <section className="text-dark-700 mb-4">
+-      <GradeSummaryHeader />
+-      <GradeSummaryTable />
++      <GradeSummaryHeader allOfSomeAssignmentTypeIsLocked={allOfSomeAssignmentTypeIsLocked} />
++      <GradeSummaryTable setAllOfSomeAssignmentTypeIsLocked={setAllOfSomeAssignmentTypeIsLocked} />
+     </section>
+   );
+ }
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+index e2b355c..230d205 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+@@ -1,5 +1,6 @@
+ import React, { useState } from 'react';
+ import { useSelector } from 'react-redux';
++import PropTypes from 'prop-types';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import {
+@@ -10,15 +11,15 @@ import { Blocked, InfoOutline } from '@edx/paragon/icons';
+ import messages from '../messages';
+ import { useModel } from '../../../../generic/model-store';
+ 
+-function GradeSummaryHeader({ intl }) {
++function GradeSummaryHeader({ intl, allOfSomeAssignmentTypeIsLocked }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+   const {
+     gradesFeatureIsFullyLocked,
+-    gradesFeatureIsPartiallyLocked,
+   } = useModel('progress', courseId);
+   const [showTooltip, setShowTooltip] = useState(false);
++
+   return (
+     <div className="row w-100 m-0 align-items-center">
+       <h3 className="h4 mb-3 mr-1">{intl.formatMessage(messages.gradeSummary)}</h3>
+@@ -45,9 +46,9 @@ function GradeSummaryHeader({ intl }) {
+           disabled={gradesFeatureIsFullyLocked}
+         />
+       </OverlayTrigger>
+-      {gradesFeatureIsPartiallyLocked && (
+-        <div className="mb-3 small row ml-0">
+-          <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />
++      {!gradesFeatureIsFullyLocked && allOfSomeAssignmentTypeIsLocked && (
++        <div className="mb-3 small ml-0 d-inline">
++          <Icon className="mr-1 mt-1 d-inline-flex" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />
+           {intl.formatMessage(messages.gradeSummaryLimitedAccessExplanation)}
+         </div>
+       )}
+@@ -57,6 +58,7 @@ function GradeSummaryHeader({ intl }) {
+ 
+ GradeSummaryHeader.propTypes = {
+   intl: intlShape.isRequired,
++  allOfSomeAssignmentTypeIsLocked: PropTypes.bool.isRequired,
+ };
+ 
+ export default injectIntl(GradeSummaryHeader);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index 670e447..591c162 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import PropTypes from 'prop-types';
+ import { useSelector } from 'react-redux';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -11,7 +12,7 @@ import GradeSummaryTableFooter from './GradeSummaryTableFooter';
+ 
+ import messages from '../messages';
+ 
+-function GradeSummaryTable({ intl }) {
++function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -37,9 +38,13 @@ function GradeSummaryTable({ intl }) {
+       && (subsection.numPointsPossible > 0 || subsection.numPointsEarned > 0)
+     ))).flat();
+     if (subsectionAssignmentsOfType.length) {
+-      return !subsectionAssignmentsOfType.some((subsection) => (
++      const noAccessToAssignmentsOfType = !subsectionAssignmentsOfType.some((subsection) => (
+         subsection.learnerHasAccess === true
+       ));
++      if (noAccessToAssignmentsOfType) {
++        setAllOfSomeAssignmentTypeIsLocked(true);
++        return true;
++      }
+     }
+     return false;
+   };
+@@ -59,7 +64,7 @@ function GradeSummaryTable({ intl }) {
+       footnoteMarker = footnotes.length;
+     }
+ 
+-    const locked = !gradesFeatureIsFullyLocked && hasNoAccessToAssignmentsOfType(assignment.type) ? 'locked-overlay' : '';
++    const locked = !gradesFeatureIsFullyLocked && hasNoAccessToAssignmentsOfType(assignment.type) ? 'greyed-out' : '';
+ 
+     return {
+       type: {
+@@ -97,7 +102,7 @@ function GradeSummaryTable({ intl }) {
+             headerClassName: 'justify-content-end h5 mb-0',
+             // eslint-disable-next-line react/prop-types
+             Cell: ({ value }) => (
+-              <span className={value.locked ? 'locked-overlay' : ''}>{value.weight}</span> // eslint-disable-line react/prop-types
++              <span className={value.locked ? 'greyed-out' : ''}>{value.weight}</span> // eslint-disable-line react/prop-types
+             ),
+             cellClassName: 'float-right small',
+           },
+@@ -107,7 +112,7 @@ function GradeSummaryTable({ intl }) {
+             headerClassName: 'justify-content-end h5 mb-0',
+             // eslint-disable-next-line react/prop-types
+             Cell: ({ value }) => (
+-              <span className={value.locked ? 'locked-overlay' : ''}>{value.grade}</span> // eslint-disable-line react/prop-types
++              <span className={value.locked ? 'greyed-out' : ''}>{value.grade}</span> // eslint-disable-line react/prop-types
+             ),
+             cellClassName: 'float-right small',
+           },
+@@ -117,7 +122,7 @@ function GradeSummaryTable({ intl }) {
+             headerClassName: 'justify-content-end h5 mb-0 text-right',
+             // eslint-disable-next-line react/prop-types
+             Cell: ({ value }) => (
+-              <span className={value.locked ? 'locked-overlay' : ''}>{value.weightedGrade}</span> // eslint-disable-line react/prop-types
++              <span className={value.locked ? 'greyed-out' : ''}>{value.weightedGrade}</span> // eslint-disable-line react/prop-types
+             ),
+             cellClassName: 'float-right font-weight-bold small',
+           },
+@@ -136,6 +141,7 @@ function GradeSummaryTable({ intl }) {
+ 
+ GradeSummaryTable.propTypes = {
+   intl: intlShape.isRequired,
++  setAllOfSomeAssignmentTypeIsLocked: PropTypes.func.isRequired,
+ };
+ 
+ export default injectIntl(GradeSummaryTable);
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 652684c..1d6efda 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -139,6 +139,14 @@ const messages = defineMessages({
+     id: 'progress.weightedGradeSummary',
+     defaultMessage: 'Your current weighted grade summary',
+   },
++  noAcessToAssignmentType: {
++    id: 'progress.noAcessToAssignmentType',
++    defaultMessage: 'You do not have access to assignments of type {assignmentType}',
++  },
++  noAcessToSubsection: {
++    id: 'progress.noAcessToSubsection',
++    defaultMessage: 'You do not have access to subsection {displayName}',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/index.scss b/src/index.scss
+index c905358..c6bda56 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -357,6 +357,10 @@
+   }
+ }
+ 
++.greyed-out {
++  opacity: .3;
++}
++
+ .locked-overlay {
+   opacity: .3;
+   pointer-events: none;
+-- 
+2.34.1
+

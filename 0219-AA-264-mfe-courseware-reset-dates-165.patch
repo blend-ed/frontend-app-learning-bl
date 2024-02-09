@@ -1,0 +1,671 @@
+From 9a315aa29d79182a0ff551e15954f68b7ddb565d Mon Sep 17 00:00:00 2001
+From: Nick <ndalfonso@edx.org>
+Date: Thu, 6 Aug 2020 15:20:53 -0400
+Subject: [PATCH 0219/1021] AA-264 mfe courseware reset dates (#165)
+
+- add toast display after successful reset of dates via banner.
+---
+ package-lock.json                             | 205 +++++++++++++++---
+ package.json                                  |   2 +-
+ .../data/__snapshots__/redux.test.js.snap     |   3 +
+ src/course-home/data/slice.js                 |   5 +
+ src/course-home/data/thunks.js                |   2 +
+ src/courseware/course/sequence/Unit.jsx       |  12 +
+ src/tab-page/TabPage.jsx                      |  20 +-
+ src/tab-page/messages.js                      |   8 +
+ src/toast/LearningToast.jsx                   |  57 +++++
+ src/toast/LearningToast.scss                  |  19 ++
+ 10 files changed, 305 insertions(+), 28 deletions(-)
+ create mode 100644 src/toast/LearningToast.jsx
+ create mode 100644 src/toast/LearningToast.scss
+
+diff --git a/package-lock.json b/package-lock.json
+index 433766d..af95343 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1408,9 +1408,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "7.2.1",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-7.2.1.tgz",
+-      "integrity": "sha512-5TUrMj4Wry0PAFF/uZp8xWBzNOCc6UB4W04NqjmTlJyPRI0fZgKc7+aIQeI6jIHR8GsjTUwUzEMgZ2+aMyCu4A==",
++      "version": "9.1.1",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-9.1.1.tgz",
++      "integrity": "sha512-kSnALJeIBEtGb7GiEq1pOihQlNesLFwYoHovxAatyteZYcjOF1I27W3VJdx1mE07ZjfUUwrzY2czvvPXMWKP8A==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.21",
+         "@fortawesome/free-solid-svg-icons": "^5.10.1",
+@@ -1422,6 +1422,7 @@
+         "font-awesome": "^4.7.0",
+         "mailto-link": "^1.0.0",
+         "prop-types": "^15.7.2",
++        "react-bootstrap": "^1.2.2",
+         "react-proptype-conditional-require": "^1.0.4",
+         "react-responsive": "^6.1.1",
+         "react-transition-group": "^4.0.0",
+@@ -2416,6 +2417,11 @@
+         "fastq": "^1.6.0"
+       }
+     },
++    "@popperjs/core": {
++      "version": "2.4.4",
++      "resolved": "https://registry.npmjs.org/@popperjs/core/-/core-2.4.4.tgz",
++      "integrity": "sha512-1oO6+dN5kdIA3sKPZhRGJTfGVP4SWV6KqlMOwry4J3HfyD68sl/3KmG7DeYUzvN+RbhXDnv/D8vNNB8168tAMg=="
++    },
+     "@reduxjs/toolkit": {
+       "version": "1.3.6",
+       "resolved": "https://registry.npmjs.org/@reduxjs/toolkit/-/toolkit-1.3.6.tgz",
+@@ -2427,6 +2433,20 @@
+         "reselect": "^4.0.0"
+       }
+     },
++    "@restart/context": {
++      "version": "2.1.4",
++      "resolved": "https://registry.npmjs.org/@restart/context/-/context-2.1.4.tgz",
++      "integrity": "sha512-INJYZQJP7g+IoDUh/475NlGiTeMfwTXUEr3tmRneckHIxNolGOW9CTq83S8cxq0CgJwwcMzMJFchxvlwe7Rk8Q=="
++    },
++    "@restart/hooks": {
++      "version": "0.3.25",
++      "resolved": "https://registry.npmjs.org/@restart/hooks/-/hooks-0.3.25.tgz",
++      "integrity": "sha512-m2v3N5pxTsIiSH74/sb1yW8D9RxkJidGW+5Mfwn/lHb2QzhZNlaU1su7abSyT9EGf0xS/0waLjrf7/XxQHUk7w==",
++      "requires": {
++        "lodash": "^4.17.15",
++        "lodash-es": "^4.17.15"
++      }
++    },
+     "@sindresorhus/is": {
+       "version": "0.7.0",
+       "resolved": "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz",
+@@ -2899,6 +2919,11 @@
+         "@babel/types": "^7.3.0"
+       }
+     },
++    "@types/classnames": {
++      "version": "2.2.10",
++      "resolved": "https://registry.npmjs.org/@types/classnames/-/classnames-2.2.10.tgz",
++      "integrity": "sha512-1UzDldn9GfYYEsWWnn/P4wkTlkZDH7lDb0wBMGbtIQc9zXEQq7FlKBdZUn6OBqD8sKZZ2RQO2mAjGpXiDGoRmQ=="
++    },
+     "@types/color-name": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/@types/color-name/-/color-name-1.1.1.tgz",
+@@ -2935,6 +2960,11 @@
+       "integrity": "sha512-iYCgjm1dGPRuo12+BStjd1HiVQqhlRhWDOQigNxn023HcjnhsiFz9pc6CzJj4HwDCSQca9bxTL4PxJDbkdm3PA==",
+       "dev": true
+     },
++    "@types/invariant": {
++      "version": "2.2.33",
++      "resolved": "https://registry.npmjs.org/@types/invariant/-/invariant-2.2.33.tgz",
++      "integrity": "sha512-/jUNmS8d4bCKdqslfxW6dg/9Gksfzxz67IYfqApHn+HvHlMVXwYv2zpTDnS/yaK9BB0i0GlBTaYci0EFE62Hmw=="
++    },
+     "@types/istanbul-lib-coverage": {
+       "version": "2.0.3",
+       "resolved": "https://registry.npmjs.org/@types/istanbul-lib-coverage/-/istanbul-lib-coverage-2.0.3.tgz",
+@@ -3111,12 +3141,41 @@
+       "integrity": "sha512-boy4xPNEtiw6N3abRhBi/e7hNvy3Tt8E9ZRAQrwAGzoCGZS/1wjo9KY7JHhnfnEsG5wSjDbymCozUM9a3ea7OQ==",
+       "dev": true
+     },
++    "@types/prop-types": {
++      "version": "15.7.3",
++      "resolved": "https://registry.npmjs.org/@types/prop-types/-/prop-types-15.7.3.tgz",
++      "integrity": "sha512-KfRL3PuHmqQLOG+2tGpRO26Ctg+Cq1E01D2DMriKEATHgWLfeNDmq9e29Q9WIky0dQ3NPkd1mzYH8Lm936Z9qw=="
++    },
+     "@types/q": {
+       "version": "1.5.4",
+       "resolved": "https://registry.npmjs.org/@types/q/-/q-1.5.4.tgz",
+       "integrity": "sha512-1HcDas8SEj4z1Wc696tH56G8OlRaH/sqZOynNNB+HF0WOeXPaxTtbYzJY2oEfiUxjSKjhCKr+MvR7dCHcEelug==",
+       "dev": true
+     },
++    "@types/react": {
++      "version": "16.9.44",
++      "resolved": "https://registry.npmjs.org/@types/react/-/react-16.9.44.tgz",
++      "integrity": "sha512-BtLoJrXdW8DVZauKP+bY4Kmiq7ubcJq+H/aCpRfvPF7RAT3RwR73Sg8szdc2YasbAlWBDrQ6Q+AFM0KwtQY+WQ==",
++      "requires": {
++        "@types/prop-types": "*",
++        "csstype": "^3.0.2"
++      },
++      "dependencies": {
++        "csstype": {
++          "version": "3.0.2",
++          "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.0.2.tgz",
++          "integrity": "sha512-ofovWglpqoqbfLNOTBNZLSbMuGrblAf1efvvArGKOZMBrIoJeu5UsAipQolkijtyQx5MtAzT/J9IHj/CEY1mJw=="
++        }
++      }
++    },
++    "@types/react-transition-group": {
++      "version": "4.4.0",
++      "resolved": "https://registry.npmjs.org/@types/react-transition-group/-/react-transition-group-4.4.0.tgz",
++      "integrity": "sha512-/QfLHGpu+2fQOqQaXh8MG9q03bFENooTb/it4jr5kKaZlDQfWvjqWZg48AwzPVMBHlRuTRAY7hRHCEOXz5kV6w==",
++      "requires": {
++        "@types/react": "*"
++      }
++    },
+     "@types/schema-utils": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/@types/schema-utils/-/schema-utils-1.0.0.tgz",
+@@ -3159,6 +3218,11 @@
+         "source-map": "^0.6.1"
+       }
+     },
++    "@types/warning": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/@types/warning/-/warning-3.0.0.tgz",
++      "integrity": "sha1-DSUBJorY+ZYrdA04fEZU9fjiPlI="
++    },
+     "@types/webpack": {
+       "version": "4.41.17",
+       "resolved": "https://registry.npmjs.org/@types/webpack/-/webpack-4.41.17.tgz",
+@@ -3524,20 +3588,19 @@
+       }
+     },
+     "airbnb-prop-types": {
+-      "version": "2.15.0",
+-      "resolved": "https://registry.npmjs.org/airbnb-prop-types/-/airbnb-prop-types-2.15.0.tgz",
+-      "integrity": "sha512-jUh2/hfKsRjNFC4XONQrxo/n/3GG4Tn6Hl0WlFQN5PY9OMC9loSCoAYKnZsWaP8wEfd5xcrPloK0Zg6iS1xwVA==",
++      "version": "2.16.0",
++      "resolved": "https://registry.npmjs.org/airbnb-prop-types/-/airbnb-prop-types-2.16.0.tgz",
++      "integrity": "sha512-7WHOFolP/6cS96PhKNrslCLMYAI8yB1Pp6u6XmxozQOiZbsI5ycglZr5cHhBFfuRcQQjzCMith5ZPZdYiJCxUg==",
+       "requires": {
+-        "array.prototype.find": "^2.1.0",
+-        "function.prototype.name": "^1.1.1",
+-        "has": "^1.0.3",
+-        "is-regex": "^1.0.4",
+-        "object-is": "^1.0.1",
++        "array.prototype.find": "^2.1.1",
++        "function.prototype.name": "^1.1.2",
++        "is-regex": "^1.1.0",
++        "object-is": "^1.1.2",
+         "object.assign": "^4.1.0",
+-        "object.entries": "^1.1.0",
++        "object.entries": "^1.1.2",
+         "prop-types": "^15.7.2",
+         "prop-types-exact": "^1.2.0",
+-        "react-is": "^16.9.0"
++        "react-is": "^16.13.1"
+       }
+     },
+     "ajv": {
+@@ -14037,6 +14100,11 @@
+       "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.15.tgz",
+       "integrity": "sha512-8xOcRHvCjnocdS5cpwXQXVzmmh5e5+saE2QGoeQmbKmRS6J3VQppPOIt0MnmE+4xlZoumy0GPG0D0MVIQbNA1A=="
+     },
++    "lodash-es": {
++      "version": "4.17.15",
++      "resolved": "https://registry.npmjs.org/lodash-es/-/lodash-es-4.17.15.tgz",
++      "integrity": "sha512-rlrc3yU3+JNOpZ9zj5pQtxnx2THmvRykwL4Xlxoa8I9lHBlVbbyPhgyPMioxVZ4NqyxaVVtaJnzsyOidQIhyyQ=="
++    },
+     "lodash.camelcase": {
+       "version": "4.3.0",
+       "resolved": "https://registry.npmjs.org/lodash.camelcase/-/lodash.camelcase-4.3.0.tgz",
+@@ -15762,6 +15830,11 @@
+       "integrity": "sha1-bVuTSkVpk7I9N/QKOC1vFmao5cY=",
+       "dev": true
+     },
++    "parse-srcset": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/parse-srcset/-/parse-srcset-1.0.2.tgz",
++      "integrity": "sha1-8r0iH2zJcKk42IVWq8WJyqqiveE="
++    },
+     "parse5": {
+       "version": "5.1.1",
+       "resolved": "https://registry.npmjs.org/parse5/-/parse5-5.1.1.tgz",
+@@ -16841,6 +16914,15 @@
+         "reflect.ownkeys": "^0.2.0"
+       }
+     },
++    "prop-types-extra": {
++      "version": "1.1.1",
++      "resolved": "https://registry.npmjs.org/prop-types-extra/-/prop-types-extra-1.1.1.tgz",
++      "integrity": "sha512-59+AHNnHYCdiC+vMwY52WmvP5dM3QLeoumYuEyceQDi9aEhtwN9zIQ2ZNo25sMyXnbh32h+P1ezDsUpUH3JAew==",
++      "requires": {
++        "react-is": "^16.3.2",
++        "warning": "^4.0.0"
++      }
++    },
+     "proto-list": {
+       "version": "1.2.4",
+       "resolved": "https://registry.npmjs.org/proto-list/-/proto-list-1.2.4.tgz",
+@@ -17027,6 +17109,44 @@
+         "prop-types": "^15.6.2"
+       }
+     },
++    "react-bootstrap": {
++      "version": "1.3.0",
++      "resolved": "https://registry.npmjs.org/react-bootstrap/-/react-bootstrap-1.3.0.tgz",
++      "integrity": "sha512-GYj0c6FO9mx7DaO8Xyz2zs0IcQ6CGCtM3O6/feIoCaG4N8B0+l4eqL7stlMcLpqO4d8NG2PoMO/AbUOD+MO7mg==",
++      "requires": {
++        "@babel/runtime": "^7.4.2",
++        "@restart/context": "^2.1.4",
++        "@restart/hooks": "^0.3.21",
++        "@types/classnames": "^2.2.10",
++        "@types/invariant": "^2.2.33",
++        "@types/prop-types": "^15.7.3",
++        "@types/react": "^16.9.35",
++        "@types/react-transition-group": "^4.4.0",
++        "@types/warning": "^3.0.0",
++        "classnames": "^2.2.6",
++        "dom-helpers": "^5.1.2",
++        "invariant": "^2.2.4",
++        "prop-types": "^15.7.2",
++        "prop-types-extra": "^1.1.0",
++        "react-overlays": "^4.1.0",
++        "react-transition-group": "^4.4.1",
++        "uncontrollable": "^7.0.0",
++        "warning": "^4.0.3"
++      },
++      "dependencies": {
++        "react-transition-group": {
++          "version": "4.4.1",
++          "resolved": "https://registry.npmjs.org/react-transition-group/-/react-transition-group-4.4.1.tgz",
++          "integrity": "sha512-Djqr7OQ2aPUiYurhPalTrVy9ddmFCCzwhqQmtN+J3+3DzLO209Fdr70QrN8Z3DsglWql6iY1lDWAfpFiBtuKGw==",
++          "requires": {
++            "@babel/runtime": "^7.5.5",
++            "dom-helpers": "^5.0.1",
++            "loose-envify": "^1.4.0",
++            "prop-types": "^15.6.2"
++          }
++        }
++      }
++    },
+     "react-break": {
+       "version": "1.3.2",
+       "resolved": "https://registry.npmjs.org/react-break/-/react-break-1.3.2.tgz",
+@@ -17392,6 +17512,26 @@
+       "resolved": "https://registry.npmjs.org/react-is/-/react-is-16.13.1.tgz",
+       "integrity": "sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ=="
+     },
++    "react-lifecycles-compat": {
++      "version": "3.0.4",
++      "resolved": "https://registry.npmjs.org/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz",
++      "integrity": "sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA=="
++    },
++    "react-overlays": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-4.1.0.tgz",
++      "integrity": "sha512-vdRpnKe0ckWOOD9uWdqykLUPHLPndIiUV7XfEKsi5008xiyHCfL8bxsx4LbMrfnxW1LzRthLyfy50XYRFNQqqw==",
++      "requires": {
++        "@babel/runtime": "^7.4.5",
++        "@popperjs/core": "^2.0.0",
++        "@restart/hooks": "^0.3.12",
++        "@types/warning": "^3.0.0",
++        "dom-helpers": "^5.1.0",
++        "prop-types": "^15.7.2",
++        "uncontrollable": "^7.0.0",
++        "warning": "^4.0.3"
++      }
++    },
+     "react-proptype-conditional-require": {
+       "version": "1.0.4",
+       "resolved": "https://registry.npmjs.org/react-proptype-conditional-require/-/react-proptype-conditional-require-1.0.4.tgz",
+@@ -18316,16 +18456,14 @@
+       }
+     },
+     "sanitize-html": {
+-      "version": "1.27.0",
+-      "resolved": "https://registry.npmjs.org/sanitize-html/-/sanitize-html-1.27.0.tgz",
+-      "integrity": "sha512-U1btucGeYVpg0GoK43jPpe/bDCV4cBOGuxzv5NBd0bOjyZdMKY0n98S/vNlO1wVwre0VCj8H3hbzE7gD2+RjKA==",
++      "version": "1.27.2",
++      "resolved": "https://registry.npmjs.org/sanitize-html/-/sanitize-html-1.27.2.tgz",
++      "integrity": "sha512-REZETvhFFChM3zyQS8XoR02j5U56HtyQkxsc8cb5HEi3XU0AAX9TuKvWe3ESR0F0IA81ZghA+5YpJg8C35AFyQ==",
+       "requires": {
+-        "chalk": "^2.4.1",
+         "htmlparser2": "^4.1.0",
+         "lodash": "^4.17.15",
+-        "postcss": "^7.0.27",
+-        "srcset": "^2.0.1",
+-        "xtend": "^4.0.1"
++        "parse-srcset": "^1.0.2",
++        "postcss": "^7.0.27"
+       }
+     },
+     "sass-graph": {
+@@ -19505,11 +19643,6 @@
+         }
+       }
+     },
+-    "srcset": {
+-      "version": "2.0.1",
+-      "resolved": "https://registry.npmjs.org/srcset/-/srcset-2.0.1.tgz",
+-      "integrity": "sha512-00kZI87TdRKwt+P8jj8UZxbfp7mK2ufxcIMWvhAOZNJTRROimpHeruWrGvCZneiuVDLqdyHefVp748ECTnyUBQ=="
+-    },
+     "sshpk": {
+       "version": "1.16.1",
+       "resolved": "https://registry.npmjs.org/sshpk/-/sshpk-1.16.1.tgz",
+@@ -20648,6 +20781,17 @@
+         "through": "^2.3.8"
+       }
+     },
++    "uncontrollable": {
++      "version": "7.1.1",
++      "resolved": "https://registry.npmjs.org/uncontrollable/-/uncontrollable-7.1.1.tgz",
++      "integrity": "sha512-EcPYhot3uWTS3w00R32R2+vS8Vr53tttrvMj/yA1uYRhf8hbTG2GyugGqWDY0qIskxn0uTTojVd6wPYW9ZEf8Q==",
++      "requires": {
++        "@babel/runtime": "^7.6.3",
++        "@types/react": "^16.9.11",
++        "invariant": "^2.2.4",
++        "react-lifecycles-compat": "^3.0.4"
++      }
++    },
+     "unicode-canonical-property-names-ecmascript": {
+       "version": "1.0.4",
+       "resolved": "https://registry.npmjs.org/unicode-canonical-property-names-ecmascript/-/unicode-canonical-property-names-ecmascript-1.0.4.tgz",
+@@ -21031,6 +21175,14 @@
+         "makeerror": "1.0.x"
+       }
+     },
++    "warning": {
++      "version": "4.0.3",
++      "resolved": "https://registry.npmjs.org/warning/-/warning-4.0.3.tgz",
++      "integrity": "sha512-rpJyN222KWIvHJ/F53XSZv0Zl/accqHR8et1kpaMTD/fLCRxtV8iX8czMzY7sVZupTI3zcUTg8eycS2kNF9l6w==",
++      "requires": {
++        "loose-envify": "^1.0.0"
++      }
++    },
+     "watchpack": {
+       "version": "1.7.2",
+       "resolved": "https://registry.npmjs.org/watchpack/-/watchpack-1.7.2.tgz",
+@@ -22206,7 +22358,8 @@
+     "xtend": {
+       "version": "4.0.2",
+       "resolved": "https://registry.npmjs.org/xtend/-/xtend-4.0.2.tgz",
+-      "integrity": "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ=="
++      "integrity": "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==",
++      "dev": true
+     },
+     "y18n": {
+       "version": "4.0.0",
+diff --git a/package.json b/package.json
+index 5509a8c..978f330 100644
+--- a/package.json
++++ b/package.json
+@@ -37,7 +37,7 @@
+     "@edx/frontend-component-footer": "10.0.11",
+     "@edx/frontend-component-header": "2.0.5",
+     "@edx/frontend-platform": "1.5.2",
+-    "@edx/paragon": "7.2.1",
++    "@edx/paragon": "^9.1.1",
+     "@fortawesome/fontawesome-svg-core": "1.2.30",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 4d58e06..48e6635 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -5,6 +5,7 @@ Object {
+   "courseHome": Object {
+     "courseId": null,
+     "courseStatus": "loading",
++    "displayResetDatesToast": false,
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -21,6 +22,7 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
++    "displayResetDatesToast": false,
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -104,6 +106,7 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
++    "displayResetDatesToast": false,
+   },
+   "courseware": Object {
+     "courseId": null,
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index 2e3572a..a136802 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -10,6 +10,7 @@ const slice = createSlice({
+   initialState: {
+     courseStatus: 'loading',
+     courseId: null,
++    displayResetDatesToast: false,
+   },
+   reducers: {
+     fetchTabRequest: (state, { payload }) => {
+@@ -24,6 +25,9 @@ const slice = createSlice({
+       state.courseId = payload.courseId;
+       state.courseStatus = FAILED;
+     },
++    toggleResetDatesToast: (state, { payload }) => {
++      state.displayResetDatesToast = payload.displayResetDatesToast;
++    },
+   },
+ });
+ 
+@@ -31,6 +35,7 @@ export const {
+   fetchTabRequest,
+   fetchTabSuccess,
+   fetchTabFailure,
++  toggleResetDatesToast,
+ } = slice.actions;
+ 
+ export const {
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index 4b822fd..8768a85 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -17,6 +17,7 @@ import {
+   fetchTabFailure,
+   fetchTabRequest,
+   fetchTabSuccess,
++  toggleResetDatesToast,
+ } from './slice';
+ 
+ export function fetchTab(courseId, tab, getTabData) {
+@@ -78,6 +79,7 @@ export function resetDeadlines(courseId, getTabData) {
+   return async (dispatch) => {
+     postCourseDeadlines(courseId).then(() => {
+       dispatch(getTabData(courseId));
++      dispatch(toggleResetDatesToast({ displayResetDatesToast: true }));
+     });
+   };
+ }
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 5709e4d..9c39255 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -5,6 +5,7 @@ import React, {
+   useState,
+   useLayoutEffect,
+ } from 'react';
++import { useDispatch } from 'react-redux';
+ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -12,6 +13,8 @@ import messages from './messages';
+ import BookmarkButton from '../bookmark/BookmarkButton';
+ import { useModel } from '../../../generic/model-store';
+ import PageLoading from '../../../generic/PageLoading';
++import { resetDeadlines } from '../../../course-home/data/thunks';
++import { fetchCourse } from '../../data/thunks';
+ 
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
+ 
+@@ -64,6 +67,8 @@ function Unit({
+     contentTypeGatingEnabled,
+   } = course;
+ 
++  const dispatch = useDispatch();
++
+   // Do not remove this hook.  See function description.
+   useLoadBearingHook(id);
+ 
+@@ -130,6 +135,13 @@ function Unit({
+           height={iframeHeight}
+           scrolling="no"
+           referrerPolicy="origin"
++          onLoad={() => {
++            window.onmessage = function (e) {
++              if (e.data === 'reset_dates') {
++                dispatch(resetDeadlines(courseId, fetchCourse));
++              }
++            };
++          }}
+         />
+       </div>
+     </div>
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index 2683a5d..1f5bce0 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -1,18 +1,27 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { useDispatch, useSelector } from 'react-redux';
+ 
+ import { Header } from '../course-header';
+ import PageLoading from '../generic/PageLoading';
+ 
+ import messages from './messages';
+ import LoadedTabPage from './LoadedTabPage';
++import LearningToast from '../toast/LearningToast';
++import { toggleResetDatesToast } from '../course-home/data/slice';
+ 
+ function TabPage({
+   intl,
+   courseStatus,
+   ...passthroughProps
+ }) {
++  const courseId = useSelector(state => state.courseHome.courseId || state.courseware.courseId);
++  const {
++    displayResetDatesToast,
++  } = useSelector(state => state.courseHome);
++  const dispatch = useDispatch();
++
+   if (courseStatus === 'loading') {
+     return (
+       <>
+@@ -26,7 +35,16 @@ function TabPage({
+ 
+   if (courseStatus === 'loaded') {
+     return (
+-      <LoadedTabPage {...passthroughProps} />
++      <>
++        <LearningToast
++          body={messages.datesResetSuccessBody}
++          header={messages.datesResetSuccessHeader}
++          link={`/course/${courseId}/dates`}
++          onClose={() => dispatch(toggleResetDatesToast({ displayResetDatesToast: false }))}
++          show={displayResetDatesToast}
++        />
++        <LoadedTabPage {...passthroughProps} />
++      </>
+     );
+   }
+ 
+diff --git a/src/tab-page/messages.js b/src/tab-page/messages.js
+index 3e913c0..c5b4366 100644
+--- a/src/tab-page/messages.js
++++ b/src/tab-page/messages.js
+@@ -9,6 +9,14 @@ const messages = defineMessages({
+     id: 'learning.loading',
+     defaultMessage: 'Loading course page…',
+   },
++  datesResetSuccessBody: {
++    id: 'learning.datesResetSuccessBody',
++    defaultMessage: 'View all dates',
++  },
++  datesResetSuccessHeader: {
++    id: 'learning.datesResetSuccessHeader',
++    defaultMessage: 'Your due dates have been successfully shifted to help you stay on track.',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/toast/LearningToast.jsx b/src/toast/LearningToast.jsx
+new file mode 100644
+index 0000000..83bb0bf
+--- /dev/null
++++ b/src/toast/LearningToast.jsx
+@@ -0,0 +1,57 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Toast } from '@edx/paragon';
++import { Link } from 'react-router-dom';
++
++import './LearningToast.scss';
++
++function LearningToast({
++  intl,
++  body,
++  header,
++  link,
++  onClose,
++  show,
++}) {
++  return (
++    <Toast
++      onClose={onClose}
++      show={show}
++      delay={3000}
++      autohide
++      style={{
++        boxShadow: 'none',
++        position: 'fixed',
++        bottom: '1rem',
++        left: '1rem',
++        zIndex: 2,
++      }}
++    >
++      <Toast.Header className="bg-gray-700 border-bottom-0 text-light">
++        <div className="mr-auto">{intl.formatMessage(header)}</div>
++      </Toast.Header>
++      <Toast.Body className="bg-gray-700 text-light">
++        <Link className="text-light" to={link}>{intl.formatMessage(body)}</Link>
++      </Toast.Body>
++    </Toast>
++  );
++}
++
++LearningToast.propTypes = {
++  body: PropTypes.shape({
++    possible: PropTypes.number,
++    earned: PropTypes.number,
++    graded: PropTypes.bool,
++  }).isRequired,
++  header: PropTypes.shape({
++    id: PropTypes.string,
++    defaultMessage: PropTypes.string,
++  }).isRequired,
++  intl: intlShape.isRequired,
++  link: PropTypes.string.isRequired,
++  onClose: PropTypes.func.isRequired,
++  show: PropTypes.bool.isRequired,
++};
++
++export default injectIntl(LearningToast);
+diff --git a/src/toast/LearningToast.scss b/src/toast/LearningToast.scss
+new file mode 100644
+index 0000000..437e916
+--- /dev/null
++++ b/src/toast/LearningToast.scss
+@@ -0,0 +1,19 @@
++.toast-header {
++  div {
++    margin-top: 10px;
++  }
++
++  button {
++    align-self: flex-start;
++    color: #FFFFFF;
++    &:hover {
++      color: #FFFFFF;
++    }
++  }
++}
++
++.toast-body {
++  a {
++    text-decoration: underline;
++  }
++}
+-- 
+2.34.1
+

@@ -1,0 +1,120 @@
+From 2d5e1caae7a10f687d1a6135ff419bdc2d040c8c Mon Sep 17 00:00:00 2001
+From: Diane Kaplan <dianekaplan@gmail.com>
+Date: Mon, 23 Aug 2021 15:26:08 -0400
+Subject: [PATCH 0620/1021] feat: cleanup tracking code for obsolete upsell
+ link (#531)
+
+Co-authored-by: Diane Kaplan <dkaplan@edx.org>
+See: https://openedx.atlassian.net/browse/REV-2305
+---
+ .../__factories__/outlineTabData.factory.js   |  5 ----
+ .../data/__snapshots__/redux.test.js.snap     |  5 ----
+ .../outline-tab/OutlineTab.test.jsx           | 29 -------------------
+ .../outline-tab/widgets/CourseTools.jsx       | 12 +-------
+ 4 files changed, 1 insertion(+), 50 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 0a740c3..132ba42 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -48,11 +48,6 @@ Factory.define('outlineTabData')
+         title: 'Bookmarks',
+         url: 'https://example.com/bookmarks',
+       },
+-      {
+-        analytics_id: 'edx.tool.verified_upgrade',
+-        title: 'Upgrade to Verified',
+-        url: 'https://example.com/upgrade',
+-      },
+     ],
+     dates_banner_info: {
+       content_type_gating_enabled: false,
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index e5aa549..590239a 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -442,11 +442,6 @@ Object {
+             "title": "Bookmarks",
+             "url": "https://example.com/bookmarks",
+           },
+-          Object {
+-            "analyticsId": "edx.tool.verified_upgrade",
+-            "title": "Upgrade to Verified",
+-            "url": "https://example.com/upgrade",
+-          },
+         ],
+         "datesBannerInfo": Object {
+           "contentTypeGatingEnabled": false,
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 400e55d..bc0a3b8 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -437,35 +437,6 @@ describe('Outline Tab', () => {
+       await fetchAndRender();
+       expect(screen.queryByRole('heading', { name: 'Course Tools' })).not.toBeInTheDocument();
+     });
+-
+-    it('analytics sent when upgrade link clicked', async () => {
+-      await fetchAndRender();
+-      expect(screen.getByRole('heading', { name: 'Course Tools' })).toBeInTheDocument();
+-      sendTrackEvent.mockClear();
+-      sendTrackingLogEvent.mockClear();
+-
+-      const upgradeLink = screen.getByRole('link', { name: 'Upgrade to Verified' });
+-      fireEvent.click(upgradeLink);
+-
+-      expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+-      expect(sendTrackEvent).toHaveBeenCalledWith('edx.bi.ecommerce.upsell_links_clicked', {
+-        org_key: 'edX',
+-        courserun_key: courseId,
+-        linkCategory: '(none)',
+-        linkName: 'course_home_course_tools',
+-        linkType: 'link',
+-        pageName: 'course_home',
+-      });
+-
+-      expect(sendTrackingLogEvent).toHaveBeenCalledTimes(1);
+-      expect(sendTrackingLogEvent).toHaveBeenCalledWith('edx.course.tool.accessed', {
+-        org_key: 'edX',
+-        courserun_key: courseId,
+-        course_id: courseId,
+-        is_staff: false,
+-        tool_name: 'edx.tool.verified_upgrade',
+-      });
+-    });
+   });
+ 
+   describe('Alert List', () => {
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 85c8736..876dece 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
++import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+@@ -36,16 +36,6 @@ function CourseTools({ courseId, intl }) {
+       is_staff: administrator,
+       tool_name: analyticsId,
+     });
+-
+-    if (analyticsId === 'edx.tool.verified_upgrade') {
+-      sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
+-        ...eventProperties,
+-        linkCategory: '(none)',
+-        linkName: 'course_home_course_tools',
+-        linkType: 'link',
+-        pageName: 'course_home',
+-      });
+-    }
+   };
+ 
+   const renderIcon = (iconClasses) => {
+-- 
+2.34.1
+

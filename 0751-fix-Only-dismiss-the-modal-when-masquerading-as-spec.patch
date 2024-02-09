@@ -1,0 +1,179 @@
+From 436c05487ae57ce01e9c13a906e1107fe08e5c7a Mon Sep 17 00:00:00 2001
+From: Simon Chen <schen@edx.org>
+Date: Thu, 2 Dec 2021 10:08:49 -0500
+Subject: [PATCH 0751/1021] fix: Only dismiss the modal when masquerading as
+ specific learner (#759)
+
+if the user is masquerading as a specific learner, then dismiss the modal and do not post back and save the Honor Code signature
+
+Co-authored-by: Simon Chen <schen@edX-C02FW0GUML85.local>
+---
+ .../course/sequence/honor-code/HonorCode.jsx  | 15 +++-
+ .../sequence/honor-code/HonorCode.test.jsx    | 81 ++++++++++++++++---
+ src/courseware/data/thunks.js                 |  6 +-
+ 3 files changed, 88 insertions(+), 14 deletions(-)
+
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.jsx b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+index 6817da6..5c3d916 100644
+--- a/src/courseware/course/sequence/honor-code/HonorCode.jsx
++++ b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+@@ -2,6 +2,7 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { useDispatch } from 'react-redux';
+ import { getConfig, history } from '@edx/frontend-platform';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { ActionRow, Alert, Button } from '@edx/paragon';
+ 
+@@ -11,13 +12,23 @@ import messages from './messages';
+ 
+ function HonorCode({ intl, courseId }) {
+   const dispatch = useDispatch();
+-  const { isMasquerading } = useModel('coursewareMeta', courseId);
++  const coursewareMetaData = useModel('coursewareMeta', courseId);
++  const authUser = getAuthenticatedUser();
+   const siteName = getConfig().SITE_NAME;
+   const honorCodeUrl = `${getConfig().TERMS_OF_SERVICE_URL}#honor-code`;
+ 
+   const handleCancel = () => history.push(`/course/${courseId}/home`);
+ 
+-  const handleAgree = () => dispatch(saveIntegritySignature(courseId, isMasquerading));
++  const handleAgree = () => dispatch(
++    // If the request is made by a staff user masquerading as a specific learner,
++    // don't actually create a signature for them on the backend.
++    // Only the modal dialog will be dismissed.
++    // Otherwise, even for staff users, we want to record the signature.
++    saveIntegritySignature(
++      courseId,
++      coursewareMetaData.isMasquerading && coursewareMetaData.username !== authUser.username,
++    ),
++  );
+ 
+   return (
+     <Alert variant="light" aria-live="off">
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.test.jsx b/src/courseware/course/sequence/honor-code/HonorCode.test.jsx
+index 2708dcb..6b972e2 100644
+--- a/src/courseware/course/sequence/honor-code/HonorCode.test.jsx
++++ b/src/courseware/course/sequence/honor-code/HonorCode.test.jsx
+@@ -1,8 +1,11 @@
+ import React from 'react';
+-import { history } from '@edx/frontend-platform';
++import MockAdapter from 'axios-mock-adapter';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { getConfig, history } from '@edx/frontend-platform';
++import { Factory } from 'rosie';
+ 
+ import {
+-  fireEvent, initializeTestStore, render, screen,
++  authenticatedUser, fireEvent, initializeTestStore, render, screen, waitFor,
+ } from '../../../../setupTest';
+ import HonorCode from './HonorCode';
+ 
+@@ -14,20 +17,80 @@ jest.mock('@edx/frontend-platform', () => ({
+ }));
+ 
+ describe('Honor Code', () => {
++  let axiosMock;
+   let store;
++  let honorCodePostUrl;
+   const mockData = {};
+ 
+-  beforeAll(async () => {
+-    store = await initializeTestStore();
+-    const { courseware } = store.getState();
+-    mockData.courseId = courseware.courseId;
+-  });
++  async function setupStoreState(coursewareMetaOptions) {
++    if (coursewareMetaOptions) {
++      const courseMetadata = Factory.build(
++        'courseMetadata',
++        coursewareMetaOptions,
++      );
++      store = await initializeTestStore({ courseMetadata });
++    } else {
++      store = await initializeTestStore();
++    }
++    const storeState = store.getState();
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    mockData.courseId = storeState.courseware.courseId;
++    honorCodePostUrl = `${getConfig().LMS_BASE_URL}/api/agreements/v1/integrity_signature/${mockData.courseId}`;
++  }
+ 
+-  it('cancel button links to course home ', () => {
++  it('cancel button links to course home ', async () => {
++    await setupStoreState();
+     render(<HonorCode {...mockData} />);
+-
+     const cancelButton = screen.getByText('Cancel');
+     fireEvent.click(cancelButton);
+     expect(history.push).toHaveBeenCalledWith(`/course/${mockData.courseId}/home`);
+   });
++
++  it('calls to save integrity_signature when agreeing', async () => {
++    await setupStoreState({ username: authenticatedUser.username });
++    render(<HonorCode {...mockData} />);
++    const agreeButton = screen.getByText('I agree');
++    fireEvent.click(agreeButton);
++    await waitFor(() => {
++      expect(axiosMock.history.post.length).toBe(1);
++      expect(axiosMock.history.post[0].url).toBe(honorCodePostUrl);
++    });
++  });
++
++  it('still calls to save integrity_signature if masquerading', async () => {
++    await setupStoreState(
++      {
++        is_staff: false,
++        original_user_is_staff: true,
++        username: authenticatedUser.username,
++      },
++    );
++    render(<HonorCode {...mockData} />);
++    const agreeButton = screen.getByText('I agree');
++    fireEvent.click(agreeButton);
++    await waitFor(() => {
++      expect(axiosMock.history.post.length).toBe(1);
++      expect(axiosMock.history.post[0].url).toBe(honorCodePostUrl);
++    });
++  });
++
++  it('will not call to save integrity_signature if masquerading a specific student', async () => {
++    await setupStoreState(
++      {
++        is_staff: false,
++        original_user_is_staff: true,
++        username: 'otheruser',
++      },
++    );
++    render(<HonorCode {...mockData} />);
++    const agreeButton = screen.getByText('I agree');
++    fireEvent.click(agreeButton);
++    await waitFor(() => {
++      expect(axiosMock.history.post.length).toBe(0);
++    });
++  });
++
++  afterEach(async () => {
++    axiosMock.resetHistory();
++  });
+ });
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 406a66b..210954c 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -306,9 +306,9 @@ export function saveSequencePosition(courseId, sequenceId, activeUnitIndex) {
+ export function saveIntegritySignature(courseId, isMasquerading) {
+   return async (dispatch) => {
+     try {
+-      // If the request is made by a staff user masquerading as a learner,
+-      // don't actually create a signature for them on the backend. Only
+-      // frontend state will be updated.
++      // If the request is made by a staff user masquerading as a specific learner,
++      // don't actually create a signature for them on the backend,
++      // only the modal dialog will be dismissed
+       if (!isMasquerading) {
+         await postIntegritySignature(courseId);
+       }
+-- 
+2.34.1
+

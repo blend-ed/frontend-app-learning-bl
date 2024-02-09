@@ -1,0 +1,138 @@
+From fa5cf8f204534593fed51015ebd3521a03a74ef8 Mon Sep 17 00:00:00 2001
+From: Abderraouf Mehdi Bouhali <armbouhali@gmail.com>
+Date: Thu, 15 Sep 2022 17:16:54 +0100
+Subject: [PATCH 0935/1021] fix(rtl): force (%) symbol to follow text direction
+
+---
+ .../course-completion/CompletionDonutChart.jsx       |  8 ++++++--
+ .../grades/course-grade/CurrentGradeTooltip.jsx      |  2 +-
+ .../grades/course-grade/PassingGradeTooltip.jsx      |  2 +-
+ .../grades/grade-summary/GradeSummaryTable.jsx       | 12 ++++++++----
+ .../grades/grade-summary/GradeSummaryTableFooter.jsx |  8 ++++++--
+ 5 files changed, 22 insertions(+), 10 deletions(-)
+
+diff --git a/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx b/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+index 95f0848..fe62189 100644
+--- a/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
++++ b/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+@@ -1,6 +1,8 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  getLocale, injectIntl, intlShape, isRtl,
++} from '@edx/frontend-platform/i18n';
+ import { useModel } from '../../../generic/model-store';
+ 
+ import CompleteDonutSegment from './CompleteDonutSegment';
+@@ -26,6 +28,8 @@ function CompletionDonutChart({ intl }) {
+   const lockedPercentage = lockedCount ? Number(((lockedCount / numTotalUnits) * 100).toFixed(0)) : 0;
+   const incompletePercentage = 100 - completePercentage - lockedPercentage;
+ 
++  const isLocaleRtl = isRtl(getLocale());
++
+   return (
+     <>
+       <svg role="img" width="50%" height="100%" viewBox="0 0 42 42" className="donut" style={{ maxWidth: '178px' }} aria-hidden="true">
+@@ -35,7 +39,7 @@ function CompletionDonutChart({ intl }) {
+         <circle className="donut-hole" fill="#fff" cx="21" cy="21" r="15.91549430918954" />
+         <g className="donut-chart-text">
+           <text x="50%" y="50%" className="donut-chart-number">
+-            {completePercentage}%
++            {completePercentage}{isLocaleRtl && '\u200f'}%
+           </text>
+           <text x="50%" y="50%" className="donut-chart-label">
+             {intl.formatMessage(messages.donutLabel)}
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index cd63718..c778bb3 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -41,7 +41,7 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+         overlay={(
+           <Popover id={`${isPassing ? 'passing' : 'non-passing'}-grade-tooltip`} aria-hidden="true" className={tooltipClassName}>
+             <Popover.Content data-testid="currentGradeTooltipContent" className={isPassing ? 'text-white' : 'text-dark-700'}>
+-              {currentGrade.toFixed(0)}%
++              {currentGrade.toFixed(0)}{isLocaleRtl ? '\u200f' : ''}%
+             </Popover.Content>
+           </Popover>
+         )}
+diff --git a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+index cc0f049..3b5cabe 100644
+--- a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+@@ -25,7 +25,7 @@ function PassingGradeTooltip({ intl, passingGrade, tooltipClassName }) {
+         overlay={(
+           <Popover id="minimum-grade-tooltip" className={`bg-primary-500 ${tooltipClassName}`} aria-hidden="true">
+             <Popover.Content className="text-white">
+-              {passingGrade}%
++              {passingGrade}{isLocaleRtl && '\u200f'}%
+             </Popover.Content>
+           </Popover>
+         )}
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index f5f6e78..e9cf260 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -2,7 +2,9 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { useSelector } from 'react-redux';
+ 
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  getLocale, injectIntl, intlShape, isRtl,
++} from '@edx/frontend-platform/i18n';
+ import { DataTable } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+ 
+@@ -66,13 +68,15 @@ function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+ 
+     const locked = !gradesFeatureIsFullyLocked && hasNoAccessToAssignmentsOfType(assignment.type);
+ 
++    const isLocaleRtl = isRtl(getLocale());
++
+     return {
+       type: {
+         footnoteId, footnoteMarker, type: assignment.type, locked,
+       },
+-      weight: { weight: `${(assignment.weight * 100).toFixed(0)}%`, locked },
+-      grade: { grade: `${(assignment.averageGrade * 100).toFixed(0)}%`, locked },
+-      weightedGrade: { weightedGrade: `${(assignment.weightedGrade * 100).toFixed(0)}%`, locked },
++      weight: { weight: `${(assignment.weight * 100).toFixed(0)}${isLocaleRtl ? '\u200f' : ''}%`, locked },
++      grade: { grade: `${(assignment.averageGrade * 100).toFixed(0)}${isLocaleRtl ? '\u200f' : ''}%`, locked },
++      weightedGrade: { weightedGrade: `${(assignment.weightedGrade * 100).toFixed(0)}${isLocaleRtl ? '\u200f' : ''}%`, locked },
+     };
+   });
+ 
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+index c6ec0a3..d30dde0 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+@@ -1,7 +1,9 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ 
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  getLocale, injectIntl, intlShape, isRtl,
++} from '@edx/frontend-platform/i18n';
+ import { DataTable } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+ 
+@@ -22,11 +24,13 @@ function GradeSummaryTableFooter({ intl }) {
+   const bgColor = isPassing ? 'bg-success-100' : 'bg-warning-100';
+   const totalGrade = (percent * 100).toFixed(0);
+ 
++  const isLocaleRtl = isRtl(getLocale());
++
+   return (
+     <DataTable.TableFooter className={`border-top border-primary ${bgColor}`}>
+       <div className="row w-100 m-0">
+         <div id="weighted-grade-summary" className="col-8 p-0 small">{intl.formatMessage(messages.weightedGradeSummary)}</div>
+-        <div data-testid="gradeSummaryFooterTotalWeightedGrade" aria-labelledby="weighted-grade-summary" className="col-4 p-0 text-right font-weight-bold small">{totalGrade}%</div>
++        <div data-testid="gradeSummaryFooterTotalWeightedGrade" aria-labelledby="weighted-grade-summary" className="col-4 p-0 text-right font-weight-bold small">{totalGrade}{isLocaleRtl && '\u200f'}%</div>
+       </div>
+     </DataTable.TableFooter>
+   );
+-- 
+2.34.1
+

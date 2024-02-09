@@ -1,0 +1,140 @@
+From c9f299eadaa2dc6db474d680db017cc3ee84ce3f Mon Sep 17 00:00:00 2001
+From: Kristin Aoki <42981026+KristinAoki@users.noreply.github.com>
+Date: Wed, 23 Jun 2021 12:57:47 -0400
+Subject: [PATCH 0508/1021] fix: Autoscroll on page when using jump_to_id
+
+This PR adds a URL hash check to useEffect. Previously the anchor tags
+that use jump_to_id would remain at the top of the page. As a result,
+users would have to manually scroll to the target location or just read
+the full page. Now when the page has a URL hash, it will send the hash
+to the listener in the iframe. Using the message listener, it receives
+an object with offset in the event.data and the page will scroll to the
+location provided by offset. This change will impact the Learner in the
+New Experience view.
+---
+ src/courseware/course/sequence/Unit.jsx      | 13 +++++--
+ src/courseware/course/sequence/Unit.test.jsx | 38 +++++++++++++++++---
+ 2 files changed, 45 insertions(+), 6 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 1e80ff7..2c11e00 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -70,6 +70,15 @@ function useLoadBearingHook(id) {
+   }, [id]);
+ }
+ 
++export function sendUrlHashToFrame(frame) {
++  const { hash } = window.location;
++  if (hash) {
++    // The url hash will be sent to LMS-served iframe in order to find the location of the
++    // hash within the iframe.
++    frame.contentWindow.postMessage({ hashName: hash }, `${getConfig().LMS_BASE_URL}`);
++  }
++}
++
+ function Unit({
+   courseId,
+   format,
+@@ -98,13 +107,13 @@ function Unit({
+   } = course;
+ 
+   const dispatch = useDispatch();
+-
+   // Do not remove this hook.  See function description.
+   useLoadBearingHook(id);
+ 
+   // We use this ref so that we can hold a reference to the currently active event listener.
+   const messageEventListenerRef = useRef(null);
+   useEffect(() => {
++    sendUrlHashToFrame(document.getElementById('unit-iframe'));
+     function receiveMessage(event) {
+       const { type, payload } = event.data;
+       if (type === 'plugin.resize') {
+@@ -120,7 +129,7 @@ function Unit({
+         setModalOptions(payload);
+       } else if (event.data.offset) {
+         // We listen for this message from LMS to know when the page needs to
+-        // be scroll to another location on the page.
++        // be scrolled to another location on the page.
+         window.scrollTo(0, event.data.offset);
+       }
+     }
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 02ba79a..e3ee314 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -3,7 +3,7 @@ import { Factory } from 'rosie';
+ import {
+   initializeTestStore, loadUnit, messageEvent, render, screen, waitFor,
+ } from '../../../setupTest';
+-import Unit from './Unit';
++import Unit, { sendUrlHashToFrame } from './Unit';
+ 
+ describe('Unit', () => {
+   let mockData;
+@@ -38,7 +38,6 @@ describe('Unit', () => {
+ 
+   it('renders correctly', () => {
+     render(<Unit {...mockData} />);
+-
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+     const renderedUnit = screen.getByTitle(unit.display_name);
+     expect(renderedUnit).toHaveAttribute('height', String(0));
+@@ -49,7 +48,6 @@ describe('Unit', () => {
+ 
+   it('renders proper message for gated content', () => {
+     render(<Unit {...mockData} id={unitThatContainsGatedContent.id} />);
+-
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+   });
+@@ -75,7 +73,6 @@ describe('Unit', () => {
+   it('handles receiving MessageEvent', async () => {
+     render(<Unit {...mockData} />);
+     loadUnit();
+-
+     // Loading message is gone now.
+     await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+     // Iframe's height is set via message.
+@@ -125,4 +122,37 @@ describe('Unit', () => {
+       { timeout: 100 },
+     )).rejects.toThrowError(/Expected the element to have attribute/);
+   });
++
++  it('scrolls to correct place onLoad', () => {
++    document.body.innerHTML = "<iframe id='unit-iframe' />";
++
++    const mockHashCheck = jest.fn(frameVar => sendUrlHashToFrame(frameVar));
++    const frame = document.getElementById('unit-iframe');
++    const originalWindow = { ...window };
++    const windowSpy = jest.spyOn(global, 'window', 'get');
++    windowSpy.mockImplementation(() => ({
++      ...originalWindow,
++      location: {
++        ...originalWindow.location,
++        hash: '#test',
++      },
++    }));
++    const messageSpy = jest.spyOn(frame.contentWindow, 'postMessage');
++    messageSpy.mockImplementation(() => ({ hashName: originalWindow.location.hash }));
++    mockHashCheck(frame);
++
++    expect(mockHashCheck).toHaveBeenCalled();
++    expect(messageSpy).toHaveBeenCalled();
++
++    windowSpy.mockRestore();
++  });
++
++  it('calls useEffect and checkForHash', () => {
++    const mockHashCheck = jest.fn(() => sendUrlHashToFrame());
++    const effectSpy = jest.spyOn(React, 'useEffect');
++    effectSpy.mockImplementation(() => mockHashCheck());
++    render(<Unit {...mockData} />);
++    expect(React.useEffect).toHaveBeenCalled();
++    expect(mockHashCheck).toHaveBeenCalled();
++  });
+ });
+-- 
+2.34.1
+

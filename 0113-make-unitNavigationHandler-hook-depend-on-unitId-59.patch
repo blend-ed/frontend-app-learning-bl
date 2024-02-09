@@ -1,0 +1,27 @@
+From 18426dd313137601795842a7b95a049e18fa74b3 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Mon, 4 May 2020 16:55:16 -0400
+Subject: [PATCH 0113/1021] make unitNavigationHandler hook depend on unitId
+ (#59)
+
+This should fix intermittent bugs in checking block completions. Prior we were checking the completion only for the first unit loaded in a given sequence no matter the current unit.
+---
+ src/courseware/CoursewareContainer.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 8486903..09afb13 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -23,7 +23,7 @@ function useUnitNavigationHandler(courseId, sequenceId, unitId) {
+   return useCallback((nextUnitId) => {
+     dispatch(checkBlockCompletion(courseId, sequenceId, unitId));
+     history.push(`/course/${courseId}/${sequenceId}/${nextUnitId}`);
+-  }, [courseId, sequenceId]);
++  }, [courseId, sequenceId, unitId]);
+ }
+ 
+ function usePreviousSequence(sequenceId) {
+-- 
+2.34.1
+

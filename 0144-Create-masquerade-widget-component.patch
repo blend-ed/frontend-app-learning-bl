@@ -1,0 +1,262 @@
+From dee512844863badfc7846bfe36807edaa96342d1 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Thu, 7 May 2020 14:08:43 -0700
+Subject: [PATCH 0144/1021] Create masquerade widget component
+
+on the Staff Instructor Toolbar
+---
+ src/courseware/course/InstructorToolbar.jsx   |  4 +-
+ .../masquerade-widget/MasqueradeWidget.jsx    | 73 +++++++++++++++
+ .../MasqueradeWidgetOption.jsx                | 90 +++++++++++++++++++
+ .../course/masquerade-widget/index.js         |  3 +
+ src/courseware/course/sequence/Unit.jsx       |  1 -
+ src/data/api.js                               | 12 +++
+ 6 files changed, 181 insertions(+), 2 deletions(-)
+ create mode 100644 src/courseware/course/masquerade-widget/MasqueradeWidget.jsx
+ create mode 100644 src/courseware/course/masquerade-widget/MasqueradeWidgetOption.jsx
+ create mode 100644 src/courseware/course/masquerade-widget/index.js
+
+diff --git a/src/courseware/course/InstructorToolbar.jsx b/src/courseware/course/InstructorToolbar.jsx
+index 0fbe536..d233467 100644
+--- a/src/courseware/course/InstructorToolbar.jsx
++++ b/src/courseware/course/InstructorToolbar.jsx
+@@ -4,6 +4,8 @@ import { connect } from 'react-redux';
+ 
+ import { getConfig } from '@edx/frontend-platform';
+ 
++import MasqueradeWidget from './masquerade-widget';
++
+ function getInsightsUrl(courseId) {
+   const urlBase = getConfig().INSIGHTS_BASE_URL;
+   let urlFull;
+@@ -44,7 +46,7 @@ function InstructorToolbar(props) {
+     <div className="bg-primary text-light">
+       <div className="container-fluid py-3 d-md-flex justify-content-end align-items-center">
+         <div className="flex-grow-1">
+-          &nbsp;
++          <MasqueradeWidget courseId={courseId} />
+         </div>
+         {urlLms && (
+           <div className="flex-shrink-0">
+diff --git a/src/courseware/course/masquerade-widget/MasqueradeWidget.jsx b/src/courseware/course/masquerade-widget/MasqueradeWidget.jsx
+new file mode 100644
+index 0000000..864a571
+--- /dev/null
++++ b/src/courseware/course/masquerade-widget/MasqueradeWidget.jsx
+@@ -0,0 +1,73 @@
++import React, {
++  Component,
++} from 'react';
++import PropTypes from 'prop-types';
++
++import { Dropdown } from '@edx/paragon';
++
++import { getMasqueradeOptions } from '../../../data/api';
++import MasqueradeWidgetOption from './MasqueradeWidgetOption';
++
++class MasqueradeWidget extends Component {
++  constructor(props) {
++    super(props);
++    this.courseId = props.courseId;
++    this.state = {
++      options: [],
++    };
++  }
++
++  componentDidMount() {
++    getMasqueradeOptions(this.courseId).then((data) => {
++      if (data.success) {
++        const options = this.parseAvailableOptions(data);
++        this.setState({
++          options,
++        });
++      } else {
++        console.warn('Unable to get masquerade options', data);
++      }
++    }).catch((response) => {
++      console.error('Unable to get masquerade options', response);
++    });
++  }
++
++  parseAvailableOptions(payload) {
++    const data = payload || {};
++    const active = data.active || {};
++    const available = data.available || [];
++    const options = available.map((group) => (
++      <MasqueradeWidgetOption
++        courseId={this.courseId}
++        groupId={group.groupId}
++        groupName={group.name}
++        key={group.name}
++        role={group.role}
++        selected={active}
++        userName={group.userName}
++        userPartitionId={group.userPartitionId}
++      />
++    ));
++    return options;
++  }
++
++  render() {
++    const {
++      options,
++    } = this.state;
++    return (
++      <Dropdown>
++        <Dropdown.Button>
++          View this course as
++        </Dropdown.Button>
++        <Dropdown.Menu>
++          {options}
++        </Dropdown.Menu>
++      </Dropdown>
++    );
++  }
++}
++MasqueradeWidget.propTypes = {
++  courseId: PropTypes.string.isRequired,
++};
++export default MasqueradeWidget;
+diff --git a/src/courseware/course/masquerade-widget/MasqueradeWidgetOption.jsx b/src/courseware/course/masquerade-widget/MasqueradeWidgetOption.jsx
+new file mode 100644
+index 0000000..b7a2d1a
+--- /dev/null
++++ b/src/courseware/course/masquerade-widget/MasqueradeWidgetOption.jsx
+@@ -0,0 +1,90 @@
++import React, {
++  Component,
++} from 'react';
++import PropTypes from 'prop-types';
++import { Dropdown } from '@edx/paragon';
++
++import { postMasqueradeOptions } from '../../../data/api';
++
++class MasqueradeWidgetOption extends Component {
++  handleClick() {
++    const {
++      courseId,
++      groupId,
++      role,
++      userName,
++      userPartitionId,
++    } = this.props;
++    const payload = {};
++    if (role) {
++      payload.role = role;
++    }
++    if (groupId) {
++      payload.group_id = parseInt(groupId, 10);
++      payload.user_partition_id = parseInt(userPartitionId, 10);
++    }
++    if (userName) {
++      payload.user_name = userName;
++    }
++    postMasqueradeOptions(courseId, payload).then(() => {
++      global.location.reload();
++    });
++  }
++
++  isSelected() {
++    const selected = this.props.selected || {};
++    const isEqual = (
++      selected.userPartitionId === (this.props.userPartitionId || null)
++      && selected.groupId === (this.props.groupId || null)
++      && selected.role === this.props.role
++    );
++    return isEqual;
++  }
++
++  render() {
++    const {
++      groupName,
++    } = this.props;
++    if (!groupName) {
++      return null;
++    }
++    const selected = this.isSelected();
++    let className;
++    if (selected) {
++      className = 'active';
++    }
++    return (
++      <Dropdown.Item
++        className={className}
++        href="#"
++        onClick={(event) => this.handleClick(event)}
++      >
++        {groupName}
++      </Dropdown.Item>
++    );
++  }
++}
++MasqueradeWidgetOption.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  groupId: PropTypes.number,
++  groupName: PropTypes.string.isRequired,
++  role: PropTypes.string,
++  selected: PropTypes.shape({
++    courseKey: PropTypes.string.isRequired,
++    groupId: PropTypes.number,
++    role: PropTypes.string,
++    userName: PropTypes.string,
++    userPartitionId: PropTypes.number,
++  }),
++  userName: PropTypes.string,
++  userPartitionId: PropTypes.number,
++};
++MasqueradeWidgetOption.defaultProps = {
++  groupId: null,
++  role: null,
++  selected: null,
++  userName: null,
++  userPartitionId: null,
++};
++
++export default MasqueradeWidgetOption;
+diff --git a/src/courseware/course/masquerade-widget/index.js b/src/courseware/course/masquerade-widget/index.js
+new file mode 100644
+index 0000000..f3dcff4
+--- /dev/null
++++ b/src/courseware/course/masquerade-widget/index.js
+@@ -0,0 +1,3 @@
++import MasqueradeWidget from './MasqueradeWidget';
++
++export default MasqueradeWidget;
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 8331c54..1f8f874 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -62,7 +62,6 @@ function Unit({
+   const course = useModel('courses', courseId);
+   const {
+     contentTypeGatingEnabled,
+-    enrollmentMode,
+   } = course;
+ 
+   // Do not remove this hook.  See function description.
+diff --git a/src/data/api.js b/src/data/api.js
+index 38ad54f..e721fa5 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -227,6 +227,18 @@ export async function getResumeBlock(courseId) {
+   return camelCaseObject(data);
+ }
+ 
++export async function getMasqueradeOptions(courseId) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`);
++  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
++  return camelCaseObject(data);
++}
++
++export async function postMasqueradeOptions(courseId, data) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`);
++  const { response } = await getAuthenticatedHttpClient().post(url.href, data);
++  return camelCaseObject(response);
++}
++
+ export async function updateCourseDeadlines(courseId) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`);
+   await getAuthenticatedHttpClient().post(url.href, { course_key: courseId });
+-- 
+2.34.1
+

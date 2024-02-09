@@ -1,0 +1,269 @@
+From 15975fdd78227ace4e8160021bcc2e9dd0c63caf Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 10 Nov 2020 10:24:33 -0500
+Subject: [PATCH 0303/1021] AA-356: add more config overrides for branding
+ (#270)
+
+Remove some edX-specific branding / links (like support URLs) in
+favor of values from configuration.
+
+Images (sample certificates) are still branded for now. We can get
+them later.
+---
+ .env                                          |  7 ++++-
+ .env.development                              |  7 ++++-
+ .env.test                                     |  7 ++++-
+ .../content-tools/calculator/Calculator.jsx   | 16 +++-------
+ .../course/course-exit/CourseCelebration.jsx  | 10 +++----
+ .../course/course-sock/CourseSock.jsx         | 30 ++++++++++++++-----
+ src/courseware/social-share/SocialIcons.jsx   |  8 +++--
+ src/index.jsx                                 |  5 ++++
+ 8 files changed, 59 insertions(+), 31 deletions(-)
+
+diff --git a/.env b/.env
+index 0007e59..005f74a 100644
+--- a/.env
++++ b/.env
+@@ -15,7 +15,12 @@ ORDER_HISTORY_URL=null
+ REFRESH_ACCESS_TOKEN_ENDPOINT=null
+ SEGMENT_KEY=null
+ SITE_NAME=null
+-TWITTER_URL=null
++SOCIAL_UTM_MILESTONE_CAMPAIGN=null
+ STUDIO_BASE_URL=
+ SUPPORT_URL=null
++SUPPORT_URL_CALCULATOR_MATH=null
++SUPPORT_URL_ID_VERIFICATION=null
++SUPPORT_URL_VERIFIED_CERTIFICATE=null
++TWITTER_HASHTAG=null
++TWITTER_URL=null
+ USER_INFO_COOKIE_NAME=null
+diff --git a/.env.development b/.env.development
+index ff8c88d..fde4b07 100644
+--- a/.env.development
++++ b/.env.development
+@@ -15,7 +15,12 @@ PORT=2000
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+ SEGMENT_KEY=null
+ SITE_NAME='edX'
+-TWITTER_URL='https://twitter.com/edXOnline'
++SOCIAL_UTM_MILESTONE_CAMPAIGN='edxmilestone'
+ STUDIO_BASE_URL='http://localhost:18010'
+ SUPPORT_URL='https://support.edx.org'
++SUPPORT_URL_CALCULATOR_MATH='https://support.edx.org/hc/en-us/articles/360000038428-Entering-math-expressions-in-assignments-or-the-calculator'
++SUPPORT_URL_ID_VERIFICATION='https://support.edx.org/hc/en-us/articles/206503858-How-do-I-verify-my-identity'
++SUPPORT_URL_VERIFIED_CERTIFICATE='https://support.edx.org/hc/en-us/articles/206502008-What-is-a-verified-certificate'
++TWITTER_HASHTAG='myedxjourney'
++TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+diff --git a/.env.test b/.env.test
+index b742116..cabc027 100644
+--- a/.env.test
++++ b/.env.test
+@@ -14,7 +14,12 @@ PORT=2000
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+ SEGMENT_KEY=null
+ SITE_NAME='edX'
+-TWITTER_URL='https://twitter.com/edXOnline'
++SOCIAL_UTM_MILESTONE_CAMPAIGN='edxmilestone'
+ STUDIO_BASE_URL='http://localhost:18010'
+ SUPPORT_URL='https://support.edx.org'
++SUPPORT_URL_CALCULATOR_MATH='https://support.edx.org/hc/en-us/articles/360000038428-Entering-math-expressions-in-assignments-or-the-calculator'
++SUPPORT_URL_ID_VERIFICATION='https://support.edx.org/hc/en-us/articles/206503858-How-do-I-verify-my-identity'
++SUPPORT_URL_VERIFIED_CERTIFICATE='https://support.edx.org/hc/en-us/articles/206502008-What-is-a-verified-certificate'
++TWITTER_HASHTAG='myedxjourney'
++TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+diff --git a/src/courseware/course/content-tools/calculator/Calculator.jsx b/src/courseware/course/content-tools/calculator/Calculator.jsx
+index cac2651..7784287 100644
+--- a/src/courseware/course/content-tools/calculator/Calculator.jsx
++++ b/src/courseware/course/content-tools/calculator/Calculator.jsx
+@@ -98,21 +98,13 @@ class Calculator extends Component {
+               <FormattedMessage
+                 tagName="h6"
+                 id="calculator.instructions"
+-                defaultMessage="For detailed information, see {expressions_link} in the {edx_guide}."
++                defaultMessage="For detailed information, see the {expressions_link}."
+                 values={{
+                   expressions_link: (
+-                    <a href="https://edx.readthedocs.io/projects/edx-guide-for-students/en/latest/completing_assignments/SFD_mathformatting.html#math-formatting">
++                    <a href={getConfig().SUPPORT_URL_CALCULATOR_MATH}>
+                       <FormattedMessage
+-                        id="calculator.instructions.expressions.link.title"
+-                        defaultMessage="Entering Mathematical and Scientific Expressions"
+-                      />
+-                    </a>
+-                  ),
+-                  edx_guide: (
+-                    <a href="https://edx-guide-for-students.readthedocs.io/en/latest/index.html">
+-                      <FormattedMessage
+-                        id="calculator.instructions.edx.guide.link.title"
+-                        defaultMessage="edX Guide for Students"
++                        id="calculator.instructions.support.title"
++                        defaultMessage="Help Center"
+                       />
+                     </a>
+                   ),
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 67933ff..eb71c62 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -61,12 +61,11 @@ function CourseCelebration({ intl }) {
+       {intl.formatMessage(messages.dashboardLink)}
+     </Hyperlink>
+   );
+-  // todo: remove this hardcoded link to edX support
+-  const idVerificationSupportLink = getConfig().SUPPORT_URL && (
++  const idVerificationSupportLink = getConfig().SUPPORT_URL_ID_VERIFICATION && (
+     <Hyperlink
+       className="text-gray-700"
+       style={{ textDecoration: 'underline' }}
+-      destination={`${getConfig().SUPPORT_URL}/hc/en-us/articles/206503858-How-do-I-verify-my-identity`}
++      destination={getConfig().SUPPORT_URL_ID_VERIFICATION}
+     >
+       {intl.formatMessage(messages.idVerificationSupportLink)}
+     </Hyperlink>
+@@ -188,12 +187,11 @@ function CourseCelebration({ intl }) {
+               values={{ price: verifiedMode.currencySymbol + verifiedMode.price }}
+             />
+             <br />
+-            { /* todo: remove this hardcoded link to edX support */ }
+-            {getConfig().SUPPORT_URL && (
++            {getConfig().SUPPORT_URL_VERIFIED_CERTIFICATE && (
+               <Hyperlink
+                 className="text-gray-700"
+                 style={{ textDecoration: 'underline' }}
+-                destination={`${getConfig().SUPPORT_URL}/hc/en-us/articles/206502008-What-is-a-verified-certificate`}
++                destination={getConfig().SUPPORT_URL_VERIFIED_CERTIFICATE}
+               >
+                 {intl.formatMessage(messages.verifiedCertificateSupportLink)}
+               </Hyperlink>
+diff --git a/src/courseware/course/course-sock/CourseSock.jsx b/src/courseware/course/course-sock/CourseSock.jsx
+index 3a637cf..6040723 100644
+--- a/src/courseware/course/course-sock/CourseSock.jsx
++++ b/src/courseware/course/course-sock/CourseSock.jsx
+@@ -1,5 +1,6 @@
+ import React, { Component } from 'react';
+ import PropTypes from 'prop-types';
++import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import LearnerQuote1 from './assets/learner-quote.png';
+ import LearnerQuote2 from './assets/learner-quote2.png';
+@@ -36,7 +37,10 @@ export default class CourseSock extends Component {
+             <h2 className="mt-3 mb-4">
+               <FormattedMessage
+                 id="coursesock.upsell.verifiedcert"
+-                defaultMessage="edX Verified Certificate"
++                defaultMessage="{siteName} Verified Certificate"
++                values={{
++                  siteName: getConfig().SITE_NAME,
++                }}
+               />
+             </h2>
+             <div className="row flex-row-reverse">
+@@ -94,7 +98,10 @@ export default class CourseSock extends Component {
+                   <li>
+                     <FormattedMessage
+                       id="coursesock.upsell.reason4"
+-                      defaultMessage="Certificate purchases help edX continue to offer free courses"
++                      defaultMessage="Certificate purchases help {siteName} continue to offer free courses"
++                      values={{
++                        siteName: getConfig().SITE_NAME,
++                      }}
+                     />
+                   </li>
+                 </ul>
+@@ -134,7 +141,10 @@ export default class CourseSock extends Component {
+                 <h3 className="h5">
+                   <FormattedMessage
+                     id="coursesock.upsell.storytitle"
+-                    defaultMessage="edX Learner Stories"
++                    defaultMessage="{siteName} Learner Stories"
++                    values={{
++                      siteName: getConfig().SITE_NAME,
++                    }}
+                   />
+                 </h3>
+                 <div className="media my-3">
+@@ -150,8 +160,11 @@ export default class CourseSock extends Component {
+                       &mdash; <FormattedMessage
+                         id="coursesock.upsell.learner"
+                         description="Name of learner"
+-                        defaultMessage="{ name }, edX Learner"
+-                        values={{ name: 'Christina Fong' }}
++                        defaultMessage="{name}, {siteName} Learner"
++                        values={{
++                          name: 'Christina Fong',
++                          siteName: getConfig().SITE_NAME,
++                        }}
+                       />
+                     </p>
+                   </div>
+@@ -169,8 +182,11 @@ export default class CourseSock extends Component {
+                       &mdash; <FormattedMessage
+                         id="coursesock.upsell.learner"
+                         description="Name of learner"
+-                        defaultMessage="{ name }, edX Learner"
+-                        values={{ name: 'Cheryl Troell' }}
++                        defaultMessage="{name}, {siteName} Learner"
++                        values={{
++                          name: 'Cheryl Troell',
++                          siteName: getConfig().SITE_NAME,
++                        }}
+                       />
+                     </p>
+                   </div>
+diff --git a/src/courseware/social-share/SocialIcons.jsx b/src/courseware/social-share/SocialIcons.jsx
+index b093a33..72ebdd2 100644
+--- a/src/courseware/social-share/SocialIcons.jsx
++++ b/src/courseware/social-share/SocialIcons.jsx
+@@ -54,7 +54,9 @@ function SocialIcons({
+     });
+   };
+ 
+-  const socialUtmMarketingUrl = `${marketingUrl}?utm_campaign=edxmilestone&utm_medium=social`;
++  const socialUtmCampaign = getConfig().SOCIAL_UTM_MILESTONE_CAMPAIGN
++    ? `utm_campaign=${getConfig().SOCIAL_UTM_MILESTONE_CAMPAIGN}&` : '';
++  const socialUtmMarketingUrl = `${marketingUrl}?${socialUtmCampaign}utm_medium=social`;
+ 
+   return (
+     <div className={`social-icons ${className}`}>
+@@ -91,7 +93,7 @@ function SocialIcons({
+         body={emailBody ? `${intl.formatMessage(emailBody)}\n\n` : ''}
+         className="ml-2"
+         subject={emailSubject ? intl.formatMessage(emailSubject, { platform: getConfig().SITE_NAME, title }) : ''}
+-        url={`${marketingUrl}?utm_campaign=edxmilestone&utm_medium=email&utm_source=email`}
++        url={`${marketingUrl}?${socialUtmCampaign}utm_medium=email&utm_source=email`}
+       >
+         <EmailIcon round size={32} />
+         <span className="sr-only">{intl.formatMessage(messages.shareEmail)}</span>
+@@ -105,7 +107,7 @@ SocialIcons.defaultProps = {
+   className: '',
+   emailBody: messages.defaultEmailBody,
+   emailSubject: null,
+-  hashtags: ['myedxjourney'],
++  hashtags: [getConfig().TWITTER_HASHTAG],
+   socialMessage: null,
+ };
+ 
+diff --git a/src/index.jsx b/src/index.jsx
+index e3f63a0..cf6bf63 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -81,8 +81,13 @@ initialize({
+     config: () => {
+       mergeConfig({
+         INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
++        SOCIAL_UTM_MILESTONE_CAMPAIGN: process.env.SOCIAL_UTM_MILESTONE_CAMPAIGN || null,
+         STUDIO_BASE_URL: process.env.STUDIO_BASE_URL || null,
+         SUPPORT_URL: process.env.SUPPORT_URL || null,
++        SUPPORT_URL_CALCULATOR_MATH: process.env.SUPPORT_URL_CALCULATOR_MATH || null,
++        SUPPORT_URL_ID_VERIFICATION: process.env.SUPPORT_URL_ID_VERIFICATION || null,
++        SUPPORT_URL_VERIFIED_CERTIFICATE: process.env.SUPPORT_URL_VERIFIED_CERTIFICATE || null,
++        TWITTER_HASHTAG: process.env.TWITTER_HASHTAG || null,
+         TWITTER_URL: process.env.TWITTER_URL || null,
+         ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
+       }, 'LearnerAppConfig');
+-- 
+2.34.1
+

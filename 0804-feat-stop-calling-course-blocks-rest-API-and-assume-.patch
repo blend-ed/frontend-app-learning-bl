@@ -1,0 +1,1773 @@
+From 3c52eb2e8d70192df99a9ee3855a0a996dd279c8 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 17 Feb 2022 14:10:24 -0500
+Subject: [PATCH 0804/1021] feat: stop calling course blocks rest API and
+ assume LS exists (#803)
+
+- Assume that Learning Sequences is available (waffle has been
+  removed)
+- Stop calling course blocks API, which provided mostly duplicated
+  information now.
+- Refactor a bit to avoid needing to globally know which units
+  exist in sequences. That is now provided just-in-time for only
+  the current sequence.
+- Add /first and /last URLs that you can use instead of unit IDs
+  in URL paths, in service of the above point.
+
+AA-1040
+AA-1153
+---
+ .../data/__snapshots__/redux.test.js.snap     |   3 +
+ src/courseware/CoursewareContainer.jsx        | 135 +++++++++++------
+ src/courseware/CoursewareContainer.test.jsx   |  44 ++++--
+ src/courseware/CoursewareRedirect.jsx         |  14 --
+ .../CoursewareRedirectLandingPage.jsx         |   5 +-
+ src/courseware/course/Course.jsx              |   2 +-
+ src/courseware/course/JumpNavMenuItem.jsx     |  23 +--
+ .../course/JumpNavMenuItem.test.jsx           |  31 ----
+ src/courseware/course/celebration/utils.jsx   |  12 +-
+ .../course/course-exit/CourseExit.test.jsx    |  12 +-
+ src/courseware/course/sequence/Sequence.jsx   |   6 +-
+ .../course/sequence/Sequence.test.jsx         |  12 +-
+ src/courseware/course/sequence/Unit.test.jsx  |   4 +-
+ .../SequenceNavigation.test.jsx               |   6 +-
+ .../UnitNavigationEffortEstimate.jsx          |  10 ++
+ src/courseware/data/__factories__/index.js    |   1 +
+ .../learningSequencesOutline.factory.js       |   8 +-
+ src/courseware/data/api.js                    | 127 ++--------------
+ src/courseware/data/index.js                  |   1 +
+ .../data/pact-tests/lmsPact.test.jsx          |  69 ++-------
+ src/courseware/data/redux.test.js             |  19 +--
+ src/courseware/data/slice.js                  |   4 +
+ src/courseware/data/thunks.js                 | 142 ++----------------
+ src/instructor-toolbar/InstructorToolbar.jsx  |  22 ++-
+ .../InstructorToolbar.test.jsx                |  17 ++-
+ src/product-tours/ProductTours.test.jsx       |   6 +-
+ src/setupTest.js                              |  11 +-
+ .../__factories__/courseBlocks.factory.js     |   9 +-
+ 28 files changed, 256 insertions(+), 499 deletions(-)
+ delete mode 100644 src/courseware/CoursewareRedirect.jsx
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index b9d86e3..e317371 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -15,6 +15,7 @@ Object {
+     "courseId": null,
+     "courseStatus": "loading",
+     "sequenceId": null,
++    "sequenceMightBeUnit": false,
+     "sequenceStatus": "loading",
+   },
+   "models": Object {
+@@ -329,6 +330,7 @@ Object {
+     "courseId": null,
+     "courseStatus": "loading",
+     "sequenceId": null,
++    "sequenceMightBeUnit": false,
+     "sequenceStatus": "loading",
+   },
+   "models": Object {
+@@ -523,6 +525,7 @@ Object {
+     "courseId": null,
+     "courseStatus": "loading",
+     "sequenceId": null,
++    "sequenceMightBeUnit": false,
+     "sequenceStatus": "loading",
+   },
+   "models": Object {
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 3fb3c73..f22d840 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -10,6 +10,7 @@ import {
+   fetchCourse,
+   fetchSequence,
+   getResumeBlock,
++  getSequenceForUnitDeprecated,
+   saveSequencePosition,
+ } from './data';
+ import { TabPage } from '../tab-page';
+@@ -17,6 +18,7 @@ import { TabPage } from '../tab-page';
+ import Course from './course';
+ import { handleNextSectionCelebration } from './course/celebration';
+ 
++// Look at where this is called in componentDidUpdate for more info about its usage
+ const checkResumeRedirect = memoize((courseStatus, courseId, sequenceId, firstSequenceId) => {
+   if (courseStatus === 'loaded' && !sequenceId) {
+     // Note that getResumeBlock is just an API call, not a redux thunk.
+@@ -31,12 +33,14 @@ const checkResumeRedirect = memoize((courseStatus, courseId, sequenceId, firstSe
+   }
+ });
+ 
++// Look at where this is called in componentDidUpdate for more info about its usage
+ const checkSectionUnitToUnitRedirect = memoize((courseStatus, courseId, sequenceStatus, section, unitId) => {
+   if (courseStatus === 'loaded' && sequenceStatus === 'failed' && section && unitId) {
+     history.replace(`/course/${courseId}/${unitId}`);
+   }
+ });
+ 
++// Look at where this is called in componentDidUpdate for more info about its usage
+ const checkSectionToSequenceRedirect = memoize((courseStatus, courseId, sequenceStatus, section, unitId) => {
+   if (courseStatus === 'loaded' && sequenceStatus === 'failed' && section && !unitId) {
+     // If the section is non-empty, redirect to its first sequence.
+@@ -49,14 +53,35 @@ const checkSectionToSequenceRedirect = memoize((courseStatus, courseId, sequence
+   }
+ });
+ 
+-const checkUnitToSequenceUnitRedirect = memoize((courseStatus, courseId, sequenceStatus, unit) => {
+-  if (courseStatus === 'loaded' && sequenceStatus === 'failed' && unit) {
+-    // If the sequence failed to load as a sequence, but it *did* load as a unit, then
+-    // insert the unit's parent sequenceId into the URL.
+-    history.replace(`/course/${courseId}/${unit.sequenceId}/${unit.id}`);
++// Look at where this is called in componentDidUpdate for more info about its usage
++const checkUnitToSequenceUnitRedirect = memoize((
++  courseStatus, courseId, sequenceStatus, sequenceMightBeUnit, sequenceId, section, routeUnitId,
++) => {
++  if (courseStatus === 'loaded' && sequenceStatus === 'failed' && !section && !routeUnitId) {
++    if (sequenceMightBeUnit) {
++      // If the sequence failed to load as a sequence, but it is marked as a possible unit, then we need to look up the
++      // correct parent sequence for it, and redirect there.
++      const unitId = sequenceId; // just for clarity during the rest of this method
++      getSequenceForUnitDeprecated(courseId, unitId).then(
++        parentId => {
++          if (parentId) {
++            history.replace(`/course/${courseId}/${parentId}/${unitId}`);
++          } else {
++            history.replace(`/course/${courseId}`);
++          }
++        },
++        () => { // error case
++          history.replace(`/course/${courseId}`);
++        },
++      );
++    } else {
++      // Invalid sequence that isn't a unit either. Redirect up to main course.
++      history.replace(`/course/${courseId}`);
++    }
+   }
+ });
+ 
++// Look at where this is called in componentDidUpdate for more info about its usage
+ const checkSequenceToSequenceUnitRedirect = memoize((courseId, sequenceStatus, sequence, unitId) => {
+   if (sequenceStatus === 'loaded' && sequence.id && !unitId) {
+     if (sequence.unitIds !== undefined && sequence.unitIds.length > 0) {
+@@ -67,6 +92,33 @@ const checkSequenceToSequenceUnitRedirect = memoize((courseId, sequenceStatus, s
+   }
+ });
+ 
++// Look at where this is called in componentDidUpdate for more info about its usage
++const checkSequenceUnitMarkerToSequenceUnitRedirect = memoize((courseId, sequenceStatus, sequence, unitId) => {
++  if (sequenceStatus !== 'loaded' || !sequence.id) {
++    return;
++  }
++
++  const hasUnits = sequence.unitIds?.length > 0;
++
++  if (unitId === 'first') {
++    if (hasUnits) {
++      const firstUnitId = sequence.unitIds[0];
++      history.replace(`/course/${courseId}/${sequence.id}/${firstUnitId}`);
++    } else {
++      // No units... go to general sequence page
++      history.replace(`/course/${courseId}/${sequence.id}`);
++    }
++  } else if (unitId === 'last') {
++    if (hasUnits) {
++      const lastUnitId = sequence.unitIds[sequence.unitIds.length - 1];
++      history.replace(`/course/${courseId}/${sequence.id}/${lastUnitId}`);
++    } else {
++      // No units... go to general sequence page
++      history.replace(`/course/${courseId}/${sequence.id}`);
++    }
++  }
++});
++
+ class CoursewareContainer extends Component {
+   checkSaveSequencePosition = memoize((unitId) => {
+     const {
+@@ -111,9 +163,9 @@ class CoursewareContainer extends Component {
+       sequenceId,
+       courseStatus,
+       sequenceStatus,
++      sequenceMightBeUnit,
+       sequence,
+       firstSequenceId,
+-      unitViaSequenceId,
+       sectionViaSequenceId,
+       match: {
+         params: {
+@@ -128,12 +180,24 @@ class CoursewareContainer extends Component {
+     this.checkFetchCourse(routeCourseId);
+     this.checkFetchSequence(routeSequenceId);
+ 
++    // Check if we should save our sequence position.  Only do this when the route unit ID changes.
++    this.checkSaveSequencePosition(routeUnitId);
++
++    // Coerce the route ids into null here because they can be undefined, but the redux ids would be null instead.
++    if (courseId !== (routeCourseId || null) || sequenceId !== (routeSequenceId || null)) {
++      // The non-route ids are pulled from redux state - they are changed at the same time as the status variables.
++      // But the route ids are pulled directly from the route. So if the route changes, and we start a fetch above,
++      // there's a race condition where the route ids are for one course, but the status and the other ids are for a
++      // different course. Since all the logic below depends on the status variables and the route unit id, we'll wait
++      // until the ids match and thus the redux states got updated. So just bail for now.
++      return;
++    }
++
+     // All courseware URLs should normalize to the format /course/:courseId/:sequenceId/:unitId
+     // via the series of redirection rules below.
+     // See docs/decisions/0008-liberal-courseware-path-handling.md for more context.
+     // (It would be ideal to move this logic into the thunks layer and perform
+-    //  all URL-changing checks at once. This should be done once the MFE is moved
+-    //  to the new Outlines API. See TNL-8182.)
++    //  all URL-changing checks at once. See TNL-8182.)
+ 
+     // Check resume redirect:
+     //   /course/:courseId -> /course/:courseId/:sequenceId/:unitId
+@@ -161,16 +225,22 @@ class CoursewareContainer extends Component {
+     // Check unit to sequence-unit redirect:
+     //    /course/:courseId/:unitId -> /course/:courseId/:sequenceId/:unitId
+     // by filling in the ID of the parent sequence of :unitId.
+-    checkUnitToSequenceUnitRedirect(courseStatus, courseId, sequenceStatus, unitViaSequenceId);
++    checkUnitToSequenceUnitRedirect(
++      courseStatus, courseId, sequenceStatus, sequenceMightBeUnit, sequenceId, sectionViaSequenceId, routeUnitId,
++    );
+ 
+-    // Check to sequence to sequence-unit redirect:
++    // Check sequence to sequence-unit redirect:
+     //    /course/:courseId/:sequenceId -> /course/:courseId/:sequenceId/:unitId
+     // by filling in the ID the most-recently-active unit in the sequence, OR
+     // the ID of the first unit the sequence if none is active.
+     checkSequenceToSequenceUnitRedirect(courseId, sequenceStatus, sequence, routeUnitId);
+ 
+-    // Check if we should save our sequence position.  Only do this when the route unit ID changes.
+-    this.checkSaveSequencePosition(routeUnitId);
++    // Check sequence-unit marker to sequence-unit redirect:
++    //    /course/:courseId/:sequenceId/first -> /course/:courseId/:sequenceId/:unitId
++    //    /course/:courseId/:sequenceId/last -> /course/:courseId/:sequenceId/:unitId
++    // by filling in the ID the first or last unit in the sequence.
++    // "Sequence unit marker" is an invented term used only in this component.
++    checkSequenceUnitMarkerToSequenceUnitRedirect(courseId, sequenceStatus, sequence, routeUnitId);
+   }
+ 
+   handleUnitNavigationClick = (nextUnitId) => {
+@@ -197,18 +267,11 @@ class CoursewareContainer extends Component {
+     } = this.props;
+ 
+     if (nextSequence !== null) {
+-      let nextUnitId = null;
+-      if (nextSequence.unitIds.length > 0) {
+-        [nextUnitId] = nextSequence.unitIds;
+-        history.push(`/course/${courseId}/${nextSequence.id}/${nextUnitId}`);
+-      } else {
+-        // Some sequences have no units.  This will show a blank page with prev/next buttons.
+-        history.push(`/course/${courseId}/${nextSequence.id}`);
+-      }
++      history.push(`/course/${courseId}/${nextSequence.id}/first`);
+ 
+       const celebrateFirstSection = course && course.celebrations && course.celebrations.firstSection;
+       if (celebrateFirstSection && sequence.sectionId !== nextSequence.sectionId) {
+-        handleNextSectionCelebration(sequenceId, nextSequence.id, nextUnitId);
++        handleNextSectionCelebration(sequenceId, nextSequence.id);
+       }
+     }
+   }
+@@ -216,13 +279,7 @@ class CoursewareContainer extends Component {
+   handlePreviousSequenceClick = () => {
+     const { previousSequence, courseId } = this.props;
+     if (previousSequence !== null) {
+-      if (previousSequence.unitIds.length > 0) {
+-        const previousUnitId = previousSequence.unitIds[previousSequence.unitIds.length - 1];
+-        history.push(`/course/${courseId}/${previousSequence.id}/${previousUnitId}`);
+-      } else {
+-        // Some sequences have no units.  This will show a blank page with prev/next buttons.
+-        history.push(`/course/${courseId}/${previousSequence.id}`);
+-      }
++      history.push(`/course/${courseId}/${previousSequence.id}/last`);
+     }
+   }
+ 
+@@ -259,18 +316,10 @@ class CoursewareContainer extends Component {
+   }
+ }
+ 
+-const unitShape = PropTypes.shape({
+-  id: PropTypes.string.isRequired,
+-  sequenceId: PropTypes.string.isRequired,
+-});
+-
+ const sequenceShape = PropTypes.shape({
+   id: PropTypes.string.isRequired,
+-  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++  unitIds: PropTypes.arrayOf(PropTypes.string),
+   sectionId: PropTypes.string.isRequired,
+-  isTimeLimited: PropTypes.bool,
+-  isProctored: PropTypes.bool,
+-  legacyWebUrl: PropTypes.string,
+ });
+ 
+ const sectionShape = PropTypes.shape({
+@@ -297,9 +346,9 @@ CoursewareContainer.propTypes = {
+   firstSequenceId: PropTypes.string,
+   courseStatus: PropTypes.oneOf(['loaded', 'loading', 'failed', 'denied']).isRequired,
+   sequenceStatus: PropTypes.oneOf(['loaded', 'loading', 'failed']).isRequired,
++  sequenceMightBeUnit: PropTypes.bool.isRequired,
+   nextSequence: sequenceShape,
+   previousSequence: sequenceShape,
+-  unitViaSequenceId: unitShape,
+   sectionViaSequenceId: sectionShape,
+   course: courseShape,
+   sequence: sequenceShape,
+@@ -315,7 +364,6 @@ CoursewareContainer.defaultProps = {
+   firstSequenceId: null,
+   nextSequence: null,
+   previousSequence: null,
+-  unitViaSequenceId: null,
+   sectionViaSequenceId: null,
+   course: null,
+   sequence: null,
+@@ -398,18 +446,13 @@ const sectionViaSequenceIdSelector = createSelector(
+   (sectionsById, sequenceId) => (sectionsById[sequenceId] ? sectionsById[sequenceId] : null),
+ );
+ 
+-const unitViaSequenceIdSelector = createSelector(
+-  (state) => state.models.units || {},
+-  (state) => state.courseware.sequenceId,
+-  (unitsById, sequenceId) => (unitsById[sequenceId] ? unitsById[sequenceId] : null),
+-);
+-
+ const mapStateToProps = (state) => {
+   const {
+     courseId,
+     sequenceId,
+     courseStatus,
+     sequenceStatus,
++    sequenceMightBeUnit,
+   } = state.courseware;
+ 
+   return {
+@@ -417,13 +460,13 @@ const mapStateToProps = (state) => {
+     sequenceId,
+     courseStatus,
+     sequenceStatus,
++    sequenceMightBeUnit,
+     course: currentCourseSelector(state),
+     sequence: currentSequenceSelector(state),
+     previousSequence: previousSequenceSelector(state),
+     nextSequence: nextSequenceSelector(state),
+     firstSequenceId: firstSequenceIdSelector(state),
+     sectionViaSequenceId: sectionViaSequenceIdSelector(state),
+-    unitViaSequenceId: unitViaSequenceIdSelector(state),
+   };
+ };
+ 
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 05d65da..233fc5a 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -17,6 +17,7 @@ import CoursewareContainer from './CoursewareContainer';
+ import { buildSimpleCourseBlocks, buildBinaryCourseBlocks } from '../shared/data/__factories__/courseBlocks.factory';
+ import initializeStore from '../store';
+ import { appendBrowserTimezoneToUrl } from '../utils';
++import { buildOutlineFromBlocks } from './data/__factories__/learningSequencesOutline.factory';
+ 
+ // NOTE: Because the unit creates an iframe, we choose to mock it out as its rendering isn't
+ // pertinent to this test.  Instead, we render a simple div that displays the properties we expect
+@@ -101,6 +102,7 @@ describe('CoursewareContainer', () => {
+   function setUpMockRequests(options = {}) {
+     // If we weren't given course blocks or metadata, use the defaults.
+     const courseBlocks = options.courseBlocks || defaultCourseBlocks;
++    const courseOutline = buildOutlineFromBlocks(courseBlocks);
+     const courseMetadata = options.courseMetadata || defaultCourseMetadata;
+     const courseHomeMetadata = options.courseHomeMetadata || defaultCourseHomeMetadata;
+     const courseId = courseMetadata.id;
+@@ -120,11 +122,8 @@ describe('CoursewareContainer', () => {
+         ))
+     );
+ 
+-    const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+-    axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+-
+     const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+-    axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++    axiosMock.onGet(learningSequencesUrlRegExp).reply(200, courseOutline);
+ 
+     const courseMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+@@ -138,6 +137,16 @@ describe('CoursewareContainer', () => {
+       const proctoredExamApiUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/proctored_exam/attempt/course_id/${courseId}/content_id/${sequenceMetadata.item_id}?is_learning_mfe=true`;
+       axiosMock.onGet(proctoredExamApiUrl).reply(200, { exam: {}, active_attempt: {} });
+     });
++
++    // Set up handlers for noticing when units are in the sequence spot
++    const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
++    axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++    Object.values(courseBlocks.blocks)
++      .filter(block => block.type === 'vertical')
++      .forEach(unitBlock => {
++        const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${unitBlock.id}`;
++        axiosMock.onGet(sequenceMetadataUrl).reply(422, {});
++      });
+   }
+ 
+   async function loadContainer() {
+@@ -193,7 +202,7 @@ describe('CoursewareContainer', () => {
+       const sequenceBlock = defaultSequenceBlock;
+       const unitBlocks = defaultUnitBlocks;
+ 
+-      it('should use the resume block repsonse to pick a unit if it contains one', async () => {
++      it('should use the resume block response to pick a unit if it contains one', async () => {
+         axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/courseware/resume/${courseId}`).reply(200, {
+           sectionId: sequenceBlock.id,
+           unitId: unitBlocks[1].id,
+@@ -264,6 +273,12 @@ describe('CoursewareContainer', () => {
+           assertSequenceNavigation(container, 2);
+           assertLocation(container, sequenceTree[1][1].id, urlUnit.id);
+         });
++
++        it('should ignore invalid unit IDs and redirect to the course root', async () => {
++          setUrl(sectionTree[1].id, 'foobar');
++          await loadContainer();
++          expect(global.location.href).toEqual(`http://localhost/course/${courseId}`);
++        });
+       });
+ 
+       describe('when the URL does not contain a unit ID', () => {
+@@ -300,13 +315,20 @@ describe('CoursewareContainer', () => {
+           await loadContainer();
+           expect(global.location.href).toEqual(`http://localhost/course/${courseId}`);
+         });
++      });
++    });
+ 
+-        it('should ignore the section and unit IDs and instead to the course root', async () => {
+-          // Specific unit ID used here shouldn't matter; is ignored due to empty section.
+-          setUrl(sectionTree[1].id, unitTree[0][0][0]);
+-          await loadContainer();
+-          expect(global.location.href).toEqual(`http://localhost/course/${courseId}`);
+-        });
++    describe('when the URL contains a unit marker', () => {
++      it('should redirect /first to the first unit', async () => {
++        history.push(`/course/${courseId}/${defaultSequenceBlock.id}/first`);
++        await loadContainer();
++        expect(global.location.href).toEqual(`http://localhost/course/${courseId}/${defaultSequenceBlock.id}/${defaultUnitBlocks[0].id}`);
++      });
++
++      it('should redirect /last to the last unit', async () => {
++        history.push(`/course/${courseId}/${defaultSequenceBlock.id}/last`);
++        await loadContainer();
++        expect(global.location.href).toEqual(`http://localhost/course/${courseId}/${defaultSequenceBlock.id}/${defaultUnitBlocks[2].id}`);
+       });
+     });
+ 
+diff --git a/src/courseware/CoursewareRedirect.jsx b/src/courseware/CoursewareRedirect.jsx
+deleted file mode 100644
+index 57eb396..0000000
+--- a/src/courseware/CoursewareRedirect.jsx
++++ /dev/null
+@@ -1,14 +0,0 @@
+-import { getConfig } from '@edx/frontend-platform';
+-
+-import { useModel } from '../generic/model-store';
+-
+-export default function CourseRedirect({ match }) {
+-  const {
+-    courseId,
+-    unitId,
+-  } = match.params;
+-  const unit = useModel('units', unitId) || {};
+-  const coursewareUrl = unit.legacyWebUrl || `${getConfig().LMS_BASE_URL}/courses/${courseId}/courseware/`;
+-  global.location.assign(coursewareUrl);
+-  return null;
+-}
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index f63ce4a..f0306f9 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -5,7 +5,6 @@ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { PageRoute } from '@edx/frontend-platform/react';
+ 
+ import PageLoading from '../generic/PageLoading';
+-import CoursewareRedirect from './CoursewareRedirect';
+ 
+ export default () => {
+   const { path } = useRouteMatch();
+@@ -23,7 +22,9 @@ export default () => {
+       <Switch>
+         <PageRoute
+           path={`${path}/courseware/:courseId/unit/:unitId`}
+-          component={CoursewareRedirect}
++          render={({ match }) => {
++            global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/jump_to/${match.params.unitId}?experience=legacy`);
++          }}
+         />
+         <PageRoute
+           path={`${path}/course-home/:courseId`}
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 55f2a63..a9a681d 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -49,7 +49,7 @@ function Course({
+   const dispatch = useDispatch();
+   const celebrateFirstSection = celebrations && celebrations.firstSection;
+   const [firstSectionCelebrationOpen, setFirstSectionCelebrationOpen] = useState(shouldCelebrateOnSectionLoad(
+-    courseId, sequenceId, unitId, celebrateFirstSection, dispatch, celebrations,
++    courseId, sequenceId, celebrateFirstSection, dispatch, celebrations,
+   ));
+   // If streakLengthToCelebrate is populated, that modal takes precedence. Wait til the next load to display
+   // the weekly goal celebration modal.
+diff --git a/src/courseware/course/JumpNavMenuItem.jsx b/src/courseware/course/JumpNavMenuItem.jsx
+index dbcf710..37077f2 100644
+--- a/src/courseware/course/JumpNavMenuItem.jsx
++++ b/src/courseware/course/JumpNavMenuItem.jsx
+@@ -1,4 +1,3 @@
+-/* eslint-disable consistent-return */
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { history } from '@edx/frontend-platform';
+@@ -8,8 +7,6 @@ import {
+   sendTrackingLogEvent,
+   sendTrackEvent,
+ } from '@edx/frontend-platform/analytics';
+-import { useDispatch } from 'react-redux';
+-import { checkBlockCompletion } from '../data';
+ 
+ export default function JumpNavMenuItem({
+   title,
+@@ -19,7 +16,6 @@ export default function JumpNavMenuItem({
+   sequences,
+   isDefault,
+ }) {
+-  const dispatch = useDispatch();
+   function logEvent(targetUrl) {
+     const eventName = 'edx.ui.lms.jump_nav.selected';
+     const payload = {
+@@ -32,22 +28,14 @@ export default function JumpNavMenuItem({
+     sendTrackingLogEvent(eventName, payload);
+   }
+ 
+-  function lazyloadUrl() {
++  function destinationUrl() {
+     if (isDefault) {
+       return `/course/${courseId}/${currentSequence}/${currentUnit}`;
+     }
+-    const destinationString = sequences.forEach(sequence => sequence.unitIds.forEach(unitId => {
+-      const complete = dispatch(checkBlockCompletion(
+-        courseId,
+-        sequence.id, unitId,
+-      ))
+-        .then(value => value);
+-      if (!complete) { return `/course/${courseId}/${sequence.id}/${unitId}`; }
+-    }));
+-    return destinationString || `/course/${courseId}/${sequences[0].id}/${sequences[0].unitIds[0]}`;
++    return `/course/${courseId}/${sequences[0].id}`;
+   }
+   function handleClick() {
+-    const url = lazyloadUrl();
++    const url = destinationUrl();
+     logEvent(url);
+     history.push(url);
+   }
+@@ -64,11 +52,6 @@ export default function JumpNavMenuItem({
+ 
+ const sequenceShape = PropTypes.shape({
+   id: PropTypes.string.isRequired,
+-  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+-  sectionId: PropTypes.string.isRequired,
+-  isTimeLimited: PropTypes.bool,
+-  isProctored: PropTypes.bool,
+-  legacyWebUrl: PropTypes.string,
+ });
+ 
+ JumpNavMenuItem.propTypes = {
+diff --git a/src/courseware/course/JumpNavMenuItem.test.jsx b/src/courseware/course/JumpNavMenuItem.test.jsx
+index 4bdf832..cb56472 100644
+--- a/src/courseware/course/JumpNavMenuItem.test.jsx
++++ b/src/courseware/course/JumpNavMenuItem.test.jsx
+@@ -6,12 +6,6 @@ import { fireEvent } from '../../setupTest';
+ jest.mock('@edx/frontend-platform');
+ jest.mock('@edx/frontend-platform/analytics');
+ 
+-const mockCheckBlock = jest.fn(() => Promise.resolve(true)); // check all units
+-
+-jest.mock('react-redux', () => ({
+-  useDispatch: () => mockCheckBlock,
+-}));
+-
+ const mockData = {
+   sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
+   sequenceId: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions',
+@@ -22,33 +16,9 @@ const mockData = {
+   sequences: [
+     {
+       id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@19a30717eff543078a5d94ae9d6c18a5',
+-      blockType: 'sequential',
+-      unitIds: [
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@867dddb6f55d410caaa9c1eb9c6743ec',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@4f6c1b4e316a419ab5b6bf30e6c708e9',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@3dc16db8d14842e38324e95d4030b8a0',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@4a1bba2a403f40bca5ec245e945b0d76',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@256f17a44983429fb1a60802203ee4e0',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@e3601c0abee6427d8c17e6d6f8fdddd1',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@134df56c516a4a0dbb24dd5facef746e',
+-      ],
+-      legacyWebUrl: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@19a30717eff543078a5d94ae9d6c18a5?experience=legacy',
+-      sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
+     },
+     {
+       id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions',
+-      title: 'Homework - Question Styles',
+-      legacyWebUrl: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions?experience=legacy',
+-      unitIds: [
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@2152d4a4aadc4cb0af5256394a3d1fc7',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@47dbd5f836544e61877a483c0b75606c',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@54bb9b142c6c4c22afc62bcb628f0e68',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0c92347a5c00',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_1fef54c2b23b',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@2889db1677a549abb15eb4d886f95d1c',
+-        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@e8a5cc2aed424838853defab7be45e42',
+-      ],
+-      sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
+     },
+   ],
+   isDefault: false,
+@@ -64,6 +34,5 @@ describe('JumpNavMenuItem', () => {
+     expect(screen.getByText('Demo Menu Item'));
+     const navButton = screen.queryAllByRole('button')[0];
+     fireEvent.click(navButton);
+-    expect(mockCheckBlock).toBeCalledTimes(14); // number of units to check on load.
+   });
+ });
+diff --git a/src/courseware/course/celebration/utils.jsx b/src/courseware/course/celebration/utils.jsx
+index 1c1c687..bf4a76a 100644
+--- a/src/courseware/course/celebration/utils.jsx
++++ b/src/courseware/course/celebration/utils.jsx
+@@ -8,11 +8,10 @@ import { updateModel } from '../../../generic/model-store';
+ const CELEBRATION_LOCAL_STORAGE_KEY = 'CelebrationModal.showOnSectionLoad';
+ 
+ // Records clicks through the end of a section, so that we can know whether we should celebrate when we finish loading
+-function handleNextSectionCelebration(sequenceId, nextSequenceId, nextUnitId) {
++function handleNextSectionCelebration(sequenceId, nextSequenceId) {
+   setLocalStorage(CELEBRATION_LOCAL_STORAGE_KEY, {
+     prevSequenceId: sequenceId,
+     nextSequenceId,
+-    nextUnitId,
+   });
+ }
+ 
+@@ -45,7 +44,7 @@ function recordWeeklyGoalCelebration(org, courseId) {
+ 
+ // Looks at local storage to see whether we just came from the end of a section.
+ // Note! This does have side effects (will clear some local storage and may start an api call).
+-function shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFirstSection, dispatch, celebrations) {
++function shouldCelebrateOnSectionLoad(courseId, sequenceId, celebrateFirstSection, dispatch, celebrations) {
+   const celebrationIds = getLocalStorage(CELEBRATION_LOCAL_STORAGE_KEY);
+   if (!celebrationIds) {
+     return false;
+@@ -54,10 +53,9 @@ function shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFir
+   const {
+     prevSequenceId,
+     nextSequenceId,
+-    nextUnitId,
+   } = celebrationIds;
+-  const onTargetUnit = sequenceId === nextSequenceId && (!nextUnitId || unitId === nextUnitId);
+-  let shouldCelebrate = onTargetUnit && celebrateFirstSection;
++  const onTargetSequence = sequenceId === nextSequenceId;
++  let shouldCelebrate = onTargetSequence && celebrateFirstSection;
+ 
+   if (shouldCelebrate && celebrations.streakLengthToCelebrate) {
+     // We don't want two modals to show up on the same page.
+@@ -67,7 +65,7 @@ function shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFir
+     postCelebrationComplete(courseId, { first_section: false });
+   }
+ 
+-  if (sequenceId !== prevSequenceId && !onTargetUnit) {
++  if (sequenceId !== prevSequenceId && !onTargetSequence) {
+     // Don't clear until we move off of current/prev sequence
+     clearLocalStorage(CELEBRATION_LOCAL_STORAGE_KEY);
+ 
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 55f0d10..ac44c0d 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -7,6 +7,7 @@ import { waitFor } from '@testing-library/react';
+ 
+ import { fetchCourse } from '../../data';
+ import { buildSimpleCourseBlocks } from '../../../shared/data/__factories__/courseBlocks.factory';
++import { buildOutlineFromBlocks } from '../../data/__factories__/learningSequencesOutline.factory';
+ import {
+   initializeMockApp, logUnhandledRequests, render, screen,
+ } from '../../../setupTest';
+@@ -27,11 +28,10 @@ describe('Course Exit Pages', () => {
+     user_has_passing_grade: true,
+     end: '2014-02-05T05:00:00Z',
+   });
+-  const defaultCourseBlocks = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name);
++  const { courseBlocks: defaultCourseBlocks } = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name);
+ 
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${defaultMetadata.id}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+-  const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+   const discoveryRecommendationsUrl = new RegExp(`${getConfig().DISCOVERY_API_BASE_URL}/api/v1/course_recommendations/*`);
+   const enrollmentsUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment*`);
+   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+@@ -50,11 +50,10 @@ describe('Course Exit Pages', () => {
+     store = initializeStore();
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
+-    axiosMock.onGet(courseBlocksUrlRegExp).reply(200, defaultCourseBlocks);
+     axiosMock.onGet(discoveryRecommendationsUrl).reply(200,
+       Factory.build('courseRecommendations', {}, { numRecs: 2 }));
+     axiosMock.onGet(enrollmentsUrl).reply(200, []);
+-    axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++    axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(defaultCourseBlocks));
+ 
+     logUnhandledRequests(axiosMock);
+   });
+@@ -368,10 +367,9 @@ describe('Course Exit Pages', () => {
+   describe('Course in progress experience', () => {
+     it('Displays link to dates tab', async () => {
+       setMetadata({ user_has_passing_grade: false });
+-      const courseBlocks = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name,
++      const { courseBlocks } = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name,
+         { hasScheduledContent: true });
+-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+-      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
+ 
+       await fetchAndRender(<CourseInProgress />);
+       expect(screen.getByText('More content is coming soon!')).toBeInTheDocument();
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index fcf461f..90ebb57 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -52,6 +52,7 @@ function Sequence({
+   const sequence = useModel('sequences', sequenceId);
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
++  const sequenceMightBeUnit = useSelector(state => state.courseware.sequenceMightBeUnit);
+   const shouldDisplayNotificationTriggerInSequence = useWindowSize().width < responsiveBreakpoints.small.minWidth;
+ 
+   const handleNext = () => {
+@@ -132,7 +133,10 @@ function Sequence({
+     }
+   }, [(unit || {}).id]);
+ 
+-  if (sequenceStatus === 'loading') {
++  // If sequence might be a unit, we want to keep showing a spinner - the courseware container will redirect us when
++  // it knows which sequence to actually go to.
++  const loading = sequenceStatus === 'loading' || (sequenceStatus === 'failed' && sequenceMightBeUnit);
++  if (loading) {
+     if (!sequenceId) {
+       return (<div> {intl.formatMessage(messages['learn.sequence.no.content'])} </div>);
+     }
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index de4761a..f1215dc 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -47,7 +47,7 @@ describe('Sequence', () => {
+   it('renders correctly for gated content', async () => {
+     const sequenceBlocks = [Factory.build(
+       'block',
+-      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { type: 'sequential', children: unitBlocks.map(block => block.id) },
+       { courseId: courseMetadata.id },
+     )];
+     const gatedContent = {
+@@ -86,7 +86,7 @@ describe('Sequence', () => {
+   it('renders correctly for hidden after due content', async () => {
+     const sequenceBlocks = [Factory.build(
+       'block',
+-      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { type: 'sequential', children: unitBlocks.map(block => block.id) },
+       { courseId: courseMetadata.id },
+     )];
+     const sequenceMetadata = [Factory.build(
+@@ -138,11 +138,11 @@ describe('Sequence', () => {
+     let testStore;
+     const sequenceBlocks = [Factory.build(
+       'block',
+-      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { type: 'sequential', children: unitBlocks.map(block => block.id) },
+       { courseId: courseMetadata.id },
+     ), Factory.build(
+       'block',
+-      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { type: 'sequential', children: unitBlocks.map(block => block.id) },
+       { courseId: courseMetadata.id },
+     )];
+ 
+@@ -291,7 +291,7 @@ describe('Sequence', () => {
+     it('handles the navigation buttons for empty sequence', async () => {
+       const testSequenceBlocks = [Factory.build(
+         'block',
+-        { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++        { type: 'sequential', children: unitBlocks.map(block => block.id) },
+         { courseId: courseMetadata.id },
+       ), Factory.build(
+         'block',
+@@ -299,7 +299,7 @@ describe('Sequence', () => {
+         { courseId: courseMetadata.id },
+       ), Factory.build(
+         'block',
+-        { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++        { type: 'sequential', children: unitBlocks.map(block => block.id) },
+         { courseId: courseMetadata.id },
+       )];
+       const testSequenceMetadata = testSequenceBlocks.map(block => Factory.build(
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 20bb9d5..402c620 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -18,7 +18,7 @@ describe('Unit', () => {
+   const unitBlocks = [
+     Factory.build(
+       'block',
+-      { type: 'problem', graded: 'true' },
++      { type: 'vertical', graded: 'true' },
+       { courseId: courseMetadata.id },
+     ), Factory.build(
+       'block',
+@@ -32,7 +32,7 @@ describe('Unit', () => {
+     ),
+     Factory.build(
+       'block',
+-      { type: 'problem', graded: false },
++      { type: 'vertical', graded: false },
+       { courseId: courseMetadata.id },
+     ),
+   ];
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index 58ac8c5..8432dfd 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -15,7 +15,7 @@ describe('Sequence Navigation', () => {
+   const courseMetadata = Factory.build('courseMetadata');
+   const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
+     'block',
+-    { type: 'problem' },
++    { type: 'vertical' },
+     { courseId: courseMetadata.id },
+   ));
+ 
+@@ -48,7 +48,7 @@ describe('Sequence Navigation', () => {
+   it('renders locked button for gated content', async () => {
+     const sequenceBlocks = [Factory.build(
+       'block',
+-      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { type: 'sequential', children: unitBlocks.map(block => block.id) },
+       { courseId: courseMetadata.id },
+     )];
+     const sequenceMetadata = [Factory.build(
+@@ -70,7 +70,7 @@ describe('Sequence Navigation', () => {
+     expect(testData.onNavigate).not.toHaveBeenCalled();
+     // TODO: Not sure if this is working as expected, because the `contentType="lock"` will be overridden by the value
+     //  from Redux. To make this provide a `fa-icon` lock we could introduce something like `overriddenContentType`.
+-    expect(unitButton.firstChild).toHaveClass('fa-edit');
++    expect(unitButton.firstChild).toHaveClass('fa-tasks');
+   });
+ 
+   it('renders correctly and handles unit button clicks', () => {
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+index 2a9c551..a110a38 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+@@ -12,6 +12,16 @@ import messages from './messages';
+ // This component exists to peek ahead at the next sequence and grab its estimated effort.
+ // If we should be showing the next sequence's effort, we display the title and effort instead of "Next".
+ 
++/**
++ * Note: this component is basically ignored and just acts as a pass-through to children components right now because
++ * effort estimation is no longer attached to the sequence model. It used to be attached, via the LMS blocks API and
++ * its block transformers. But as part of the effort to remove reliance on modulestore blocks on the LMS side, we
++ * stopped calling that API and we lost effort estimation in the deal.
++ *
++ * See https://openedx.atlassian.net/browse/AA-930 for the initiative to refactor Effort Estimation to avoid the
++ * modulestore, which would allow us to revive the usefulness of this component again.
++ */
++
+ function UnitNavigationEffortEstimate({
+   children,
+   intl,
+diff --git a/src/courseware/data/__factories__/index.js b/src/courseware/data/__factories__/index.js
+index d3bb1b2..f7d2b0f 100644
+--- a/src/courseware/data/__factories__/index.js
++++ b/src/courseware/data/__factories__/index.js
+@@ -1,3 +1,4 @@
+ import './courseMetadata.factory';
+ import './sequenceMetadata.factory';
+ import './courseRecommendations.factory';
++import './learningSequencesOutline.factory';
+diff --git a/src/courseware/data/__factories__/learningSequencesOutline.factory.js b/src/courseware/data/__factories__/learningSequencesOutline.factory.js
+index d69e64b..92f3ad6 100644
+--- a/src/courseware/data/__factories__/learningSequencesOutline.factory.js
++++ b/src/courseware/data/__factories__/learningSequencesOutline.factory.js
+@@ -29,6 +29,10 @@ export function buildEmptyOutline(courseId) {
+ 
+ // Given courseBlocks (output from buildSimpleCourseBlocks), create a matching
+ // Learning Sequences API outline (what the REST API would return to us).
++// Ideally this method would go away at some point, and we'd use a learning
++// sequence factory directly. But this method exists as a bridge-gap from
++// when course blocks were always used anyway. Now that they are rarely used,
++// this can probably go away.
+ export function buildOutlineFromBlocks(courseBlocks) {
+   const sections = {};
+   const sequences = {};
+@@ -40,14 +44,14 @@ export function buildOutlineFromBlocks(courseBlocks) {
+     } else if (block.type === 'chapter') {
+       sections[block.id] = {
+         id: block.id,
+-        title: block.title,
++        title: block.display_name,
+         start: null,
+         sequence_ids: [...block.children],
+       };
+     } else if (block.type === 'sequential') {
+       sequences[block.id] = {
+         id: block.id,
+-        title: block.title,
++        title: block.display_name,
+         accessible: true,
+         start: null,
+       };
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 3919cdc..897cef8 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -1,96 +1,8 @@
+ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-import { logInfo } from '@edx/frontend-platform/logging';
+ import { getTimeOffsetMillis } from '../../course-home/data/api';
+ import { appendBrowserTimezoneToUrl } from '../../utils';
+ 
+-export function normalizeBlocks(courseId, blocks) {
+-  const models = {
+-    courses: {},
+-    sections: {},
+-    sequences: {},
+-    units: {},
+-  };
+-
+-  Object.values(blocks).forEach(block => {
+-    switch (block.type) {
+-      case 'course':
+-        models.courses[block.id] = {
+-          id: courseId,
+-          title: block.display_name,
+-          sectionIds: block.children || [],
+-          hasScheduledContent: block.has_scheduled_content || false,
+-        };
+-        break;
+-      case 'chapter':
+-        models.sections[block.id] = {
+-          id: block.id,
+-          title: block.display_name,
+-          sequenceIds: block.children || [],
+-        };
+-        break;
+-
+-      case 'sequential':
+-        models.sequences[block.id] = {
+-          effortActivities: block.effort_activities,
+-          effortTime: block.effort_time,
+-          id: block.id,
+-          title: block.display_name,
+-          legacyWebUrl: block.legacy_web_url,
+-          unitIds: block.children || [],
+-        };
+-        break;
+-      case 'vertical':
+-        models.units[block.id] = {
+-          graded: block.graded,
+-          id: block.id,
+-          title: block.display_name,
+-          legacyWebUrl: block.legacy_web_url,
+-        };
+-        break;
+-      default:
+-        logInfo(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, and vertical.`);
+-    }
+-  });
+-
+-  // Next go through each list and use their child lists to decorate those children with a
+-  // reference back to their parent.
+-  Object.values(models.courses).forEach(course => {
+-    if (Array.isArray(course.sectionIds)) {
+-      course.sectionIds.forEach(sectionId => {
+-        const section = models.sections[sectionId];
+-        section.courseId = course.id;
+-      });
+-    }
+-  });
+-
+-  Object.values(models.sections).forEach(section => {
+-    if (Array.isArray(section.sequenceIds)) {
+-      section.sequenceIds.forEach(sequenceId => {
+-        if (sequenceId in models.sequences) {
+-          models.sequences[sequenceId].sectionId = section.id;
+-        } else {
+-          logInfo(`Section ${section.id} has child block ${sequenceId}, but that block is not in the list of sequences.`);
+-        }
+-      });
+-    }
+-  });
+-
+-  Object.values(models.sequences).forEach(sequence => {
+-    if (Array.isArray(sequence.unitIds)) {
+-      sequence.unitIds.forEach(unitId => {
+-        if (unitId in models.units) {
+-          models.units[unitId].sequenceId = sequence.id;
+-        } else {
+-          logInfo(`Sequence ${sequence.id} has child block ${unitId}, but that block is not in the list of units.`);
+-        }
+-      });
+-    }
+-  });
+-
+-  return models;
+-}
+-
+ export function normalizeLearningSequencesData(learningSequencesData) {
+   const models = {
+     courses: {},
+@@ -108,14 +20,16 @@ export function normalizeLearningSequencesData(learningSequencesData) {
+     models.sequences[seqId] = {
+       id: seqId,
+       title: sequence.title,
++      legacyWebUrl: `${getConfig().LMS_BASE_URL}/courses/${learningSequencesData.course_key}/jump_to/${seqId}?experience=legacy`,
+     };
+   });
+ 
+   // Sections
+   learningSequencesData.outline.sections.forEach(section => {
+     // Skipping sections with only inaccessible sequences replicates the behavior of the legacy course blocks API
++    // (But keep it if it was already empty, again to replicate legacy blocks API.)
+     const accessibleSequenceIds = section.sequence_ids.filter(seqId => seqId in models.sequences);
+-    if (accessibleSequenceIds.length === 0) {
++    if (section.sequence_ids.length > 0 && accessibleSequenceIds.length === 0) {
+       return;
+     }
+ 
+@@ -123,7 +37,13 @@ export function normalizeLearningSequencesData(learningSequencesData) {
+       id: section.id,
+       title: section.title,
+       sequenceIds: accessibleSequenceIds,
++      courseId: learningSequencesData.course_key,
+     };
++
++    // Add back-references to this section for all child sequences.
++    accessibleSequenceIds.forEach(childSeqId => {
++      models.sequences[childSeqId].sectionId = section.id;
++    });
+   });
+ 
+   // Course
+@@ -144,39 +64,24 @@ export function normalizeLearningSequencesData(learningSequencesData) {
+   return models;
+ }
+ 
+-export async function getCourseBlocks(courseId) {
++// Do not add further calls to this API - we don't like making use of the modulestore if we can help it
++export async function getSequenceForUnitDeprecated(courseId, unitId) {
+   const authenticatedUser = getAuthenticatedUser();
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+   url.searchParams.append('course_id', courseId);
+   url.searchParams.append('username', authenticatedUser ? authenticatedUser.username : '');
+   url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children,effort_activities,effort_time,show_gated_sections,graded,special_exam_info,has_scheduled_content');
++  url.searchParams.append('requested_fields', 'children');
+ 
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+-  return normalizeBlocks(courseId, data.blocks);
++  const parent = Object.values(data.blocks).find(block => block.type === 'sequential' && block.children.includes(unitId));
++  return parent?.id;
+ }
+ 
+-// Returns the output of the Learning Sequences API, or null if that API is not
+-// currently available for this user in this course.
+ export async function getLearningSequencesOutline(courseId) {
+   const outlineUrl = new URL(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/${courseId}`);
+-
+-  try {
+-    const { data } = await getAuthenticatedHttpClient().get(outlineUrl.href, {});
+-    return normalizeLearningSequencesData(data);
+-  } catch (error) {
+-    // This is not a critical API to use at the moment. If it errors for any
+-    // reason, just send back a null so the higher layers know to ignore it.
+-    if (error.response) {
+-      if (error.response.status === 403) {
+-        logInfo('Learning Sequences API not enabled for this user.');
+-      } else {
+-        logInfo(`Unexpected error calling Learning Sequences API (${error.response.status}). Ignoring.`);
+-      }
+-      return null;
+-    }
+-    throw error;
+-  }
++  const { data } = await getAuthenticatedHttpClient().get(outlineUrl.href, {});
++  return normalizeLearningSequencesData(data);
+ }
+ 
+ function normalizeTabUrls(id, tabs) {
+diff --git a/src/courseware/data/index.js b/src/courseware/data/index.js
+index 72fe2bc..cf2b7ff 100644
+--- a/src/courseware/data/index.js
++++ b/src/courseware/data/index.js
+@@ -7,6 +7,7 @@ export {
+ } from './thunks';
+ export {
+   getResumeBlock,
++  getSequenceForUnitDeprecated,
+   sendActivationEmail,
+ } from './api';
+ export {
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index 63e8234..16f23b3 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -1,10 +1,8 @@
+ import { Pact, Matchers } from '@pact-foundation/pact';
+ import path from 'path';
+ import { mergeConfig, getConfig } from '@edx/frontend-platform';
+-import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+ import {
+-  getCourseBlocks,
+   getCourseMetadata,
+   getLearningSequencesOutline,
+   getSequenceMetadata,
+@@ -33,7 +31,6 @@ const provider = new Pact({
+ });
+ 
+ describe('Courseware Service', () => {
+-  let authenticatedUser;
+   beforeAll(async () => {
+     initializeMockApp();
+     await provider
+@@ -41,62 +38,11 @@ describe('Courseware Service', () => {
+       .then((options) => mergeConfig({
+         LMS_BASE_URL: `http://localhost:${options.port}`,
+       }, 'Custom app config for pact tests'));
+-    authenticatedUser = getAuthenticatedUser();
+   });
+ 
+   afterEach(() => provider.verify());
+   afterAll(() => provider.finalize());
+ 
+-  describe('When a request to get course blocks is made', () => {
+-    it('returns normalized course blocks', async () => {
+-      await provider.addInteraction({
+-        state: `Blocks data exists for course_id ${courseId}`,
+-        uponReceiving: 'a request to get course blocks',
+-        withRequest: {
+-          method: 'GET',
+-          path: '/api/courses/v2/blocks/',
+-          query: {
+-            course_id: courseId,
+-            username: authenticatedUser ? authenticatedUser.username : '',
+-            depth: '3',
+-            requested_fields: 'children,effort_activities,effort_time,show_gated_sections,graded,special_exam_info,has_scheduled_content',
+-          },
+-        },
+-        willRespondWith: {
+-          status: 200,
+-          body: {
+-            root: string('block-v1:edX+DemoX+Demo_Course+type@course+block@course'),
+-            blocks: like({
+-              'block-v1:edX+DemoX+Demo_Course+type@course+block@course': {
+-                id: 'block-v1:edX+DemoX+Demo_Course+type@course+block@course',
+-                block_id: 'course',
+-                lms_web_url: '/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@course+block@course',
+-                legacy_web_url: '/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@course+block@course?experience=legacy',
+-                student_view_url: '/xblock/block-v1:edX+DemoX+Demo_Course+type@course+block@course',
+-                type: 'course',
+-                display_name: 'Demonstration Course',
+-              },
+-            }),
+-          },
+-        },
+-      });
+-      const normalizedCourseBlock = {
+-        'block-v1:edX+DemoX+Demo_Course+type@course+block@course': {
+-          id: 'course-v1:edX+DemoX+Demo_Course',
+-          title: 'Demonstration Course',
+-          sectionIds: [],
+-          hasScheduledContent: false,
+-        },
+-      };
+-      const response = await getCourseBlocks(courseId);
+-      expect(response).toBeTruthy();
+-      expect(response.courses).toEqual(normalizedCourseBlock);
+-      expect(response.sections).toEqual({});
+-      expect(response.sequences).toEqual({});
+-      expect(response.units).toEqual({});
+-    });
+-  });
+-
+   describe('When a request to get a learning sequence outline is made', () => {
+     it('returns a normalized outline', async () => {
+       await provider.addInteraction({
+@@ -109,7 +55,7 @@ describe('Courseware Service', () => {
+         willRespondWith: {
+           status: 200,
+           body: {
+-            course_key: string('block-v1:edX+DemoX+Demo_Course'),
++            course_key: string('course-v1:edX+DemoX+Demo_Course'),
+             title: string('Demo Course'),
+             outline: {
+               sections: [],
+@@ -120,8 +66,8 @@ describe('Courseware Service', () => {
+       });
+       const normalizedOutline = {
+         courses: {
+-          'block-v1:edX+DemoX+Demo_Course': {
+-            id: 'block-v1:edX+DemoX+Demo_Course',
++          'course-v1:edX+DemoX+Demo_Course': {
++            id: 'course-v1:edX+DemoX+Demo_Course',
+             title: 'Demo Course',
+             sectionIds: [],
+             hasScheduledContent: false,
+@@ -145,7 +91,7 @@ describe('Courseware Service', () => {
+         willRespondWith: {
+           status: 200,
+           body: {
+-            course_key: string('block-v1:edX+DemoX+Demo_Course'),
++            course_key: string('course-v1:edX+DemoX+Demo_Course'),
+             title: string('Demo Course'),
+             outline: like({
+               sections: [
+@@ -191,8 +137,8 @@ describe('Courseware Service', () => {
+       });
+       const normalizedOutline = {
+         courses: {
+-          'block-v1:edX+DemoX+Demo_Course': {
+-            id: 'block-v1:edX+DemoX+Demo_Course',
++          'course-v1:edX+DemoX+Demo_Course': {
++            id: 'course-v1:edX+DemoX+Demo_Course',
+             title: 'Demo Course',
+             sectionIds: [
+               'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial',
+@@ -204,6 +150,7 @@ describe('Courseware Service', () => {
+           'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial': {
+             id: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial',
+             title: 'Partially accessible',
++            courseId: 'course-v1:edX+DemoX+Demo_Course',
+             sequenceIds: [
+               'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible',
+             ],
+@@ -213,6 +160,8 @@ describe('Courseware Service', () => {
+           'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible': {
+             id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible',
+             title: 'Can access',
++            sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial',
++            legacyWebUrl: `${getConfig().LMS_BASE_URL}/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible?experience=legacy`,
+           },
+         },
+       };
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index 2343ce2..e5f0d98 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -19,7 +19,6 @@ const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+ 
+ describe('Data layer integration tests', () => {
+   const courseBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course`;
+-  const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+   const sequenceBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence`;
+ 
+@@ -57,7 +56,6 @@ describe('Data layer integration tests', () => {
+   describe('Test fetchCourse', () => {
+     it('Should fail to fetch course and blocks if request error happens', async () => {
+       axiosMock.onGet(courseUrl).networkError();
+-      axiosMock.onGet(courseBlocksUrlRegExp).networkError();
+       axiosMock.onGet(learningSequencesUrlRegExp).networkError();
+ 
+       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
+@@ -87,8 +85,7 @@ describe('Data layer integration tests', () => {
+ 
+       axiosMock.onGet(forbiddenCourseHomeUrl).reply(200, forbiddenCourseHomeMetadata);
+       axiosMock.onGet(forbiddenCourseUrl).reply(200, forbiddenCourseMetadata);
+-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, forbiddenCourseBlocks);
+-      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(forbiddenCourseBlocks));
+ 
+       await executeThunk(thunks.fetchCourse(forbiddenCourseMetadata.id), store.dispatch);
+ 
+@@ -103,8 +100,7 @@ describe('Data layer integration tests', () => {
+     it('Should fetch, normalize, and save metadata', async () => {
+       axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+-      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
+ 
+       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
+ 
+@@ -124,7 +120,6 @@ describe('Data layer integration tests', () => {
+       // (even though it won't actually filter down in this case).
+       axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+       axiosMock.onGet(learningSequencesUrlRegExp).reply(200, simpleOutline);
+ 
+       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
+@@ -148,7 +143,6 @@ describe('Data layer integration tests', () => {
+       // (even though it won't actually filter down in this case).
+       axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+ 
+       // Create an outline with basic matching metadata, but then empty it out...
+       const emptyOutline = buildOutlineFromBlocks(courseBlocks);
+@@ -201,8 +195,7 @@ describe('Data layer integration tests', () => {
+     it('Should fetch and normalize metadata, and then update existing models with sequence metadata', async () => {
+       axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+-      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
+       axiosMock.onGet(sequenceUrl).reply(200, sequenceMetadata);
+ 
+       // setting course with blocks before sequence to check that blocks receive
+@@ -217,12 +210,6 @@ describe('Data layer integration tests', () => {
+           activeUnitIndex: expect.any(Number),
+         }),
+       });
+-      expect(state.models.units).toEqual({
+-        [unitId]: expect.not.objectContaining({
+-          complete: null,
+-          bookmarked: expect.any(Boolean),
+-        }),
+-      });
+ 
+       // Update our state variable again.
+       state = store.getState();
+diff --git a/src/courseware/data/slice.js b/src/courseware/data/slice.js
+index 1067d60..ee6a2de 100644
+--- a/src/courseware/data/slice.js
++++ b/src/courseware/data/slice.js
+@@ -13,6 +13,7 @@ const slice = createSlice({
+     courseId: null,
+     sequenceStatus: 'loading',
+     sequenceId: null,
++    sequenceMightBeUnit: false,
+   },
+   reducers: {
+     fetchCourseRequest: (state, { payload }) => {
+@@ -34,14 +35,17 @@ const slice = createSlice({
+     fetchSequenceRequest: (state, { payload }) => {
+       state.sequenceId = payload.sequenceId;
+       state.sequenceStatus = LOADING;
++      state.sequenceMightBeUnit = false;
+     },
+     fetchSequenceSuccess: (state, { payload }) => {
+       state.sequenceId = payload.sequenceId;
+       state.sequenceStatus = LOADED;
++      state.sequenceMightBeUnit = false;
+     },
+     fetchSequenceFailure: (state, { payload }) => {
+       state.sequenceId = payload.sequenceId;
+       state.sequenceStatus = FAILED;
++      state.sequenceMightBeUnit = payload.sequenceMightBeUnit || false;
+     },
+   },
+ });
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index a3c8472..c1ff21a 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -1,7 +1,6 @@
+ import { logError, logInfo } from '@edx/frontend-platform/logging';
+ import {
+   getBlockCompletion,
+-  getCourseBlocks,
+   getCourseMetadata,
+   getLearningSequencesOutline,
+   getSequenceMetadata,
+@@ -22,119 +21,15 @@ import {
+   fetchSequenceFailure,
+ } from './slice';
+ 
+-/**
+- * Combines the models from the Course Blocks and Learning Sequences API into a
+- * new models obj that is returned. Does not mutate the models passed in.
+- *
+- * For performance and long term maintainability, we want to switch as much of
+- * the Courseware MFE to use the Learning Sequences API as possible, and
+- * eventually remove calls to the Course Blocks API. However, right now, certain
+- * data still has to come form the Course Blocks API. This function is a
+- * transitional step to help build out some of the data from the new API, while
+- * falling back to the Course Blocks API for other things.
+- *
+- * Overall performance gains will not be realized until we completely remove
+- * this call to the Course Blocks API (and the need for this function).
+- *
+- * @param {*} learningSequencesModels  Normalized model from normalizeLearningSequencesData
+- * @param {*} courseBlocksModels       Normalized model from normalizeBlocks
+- */
+-function mergeLearningSequencesWithCourseBlocks(learningSequencesModels, courseBlocksModels) {
+-  // If there's no Learning Sequences API data yet (not active for this course),
+-  // send back the course blocks model as-is.
+-  if (learningSequencesModels === null) {
+-    return courseBlocksModels;
+-  }
+-  const mergedModels = {
+-    courses: {},
+-    sections: {},
+-    sequences: {},
+-
+-    // Units are now copied over verbatim from Course Blocks API, but they
+-    // should eventually come just-in-time, once the Sequence Metadata API is
+-    // made to be acceptably fast.
+-    units: courseBlocksModels.units,
+-  };
+-
+-  // Top level course information
+-  //
+-  // It is not at all clear to me why courses is a dict when there's only ever
+-  // one course, but I'm not going to make that model change right now.
+-  const lsCourse = Object.values(learningSequencesModels.courses)[0];
+-  const [courseBlockId, courseBlock] = Object.entries(courseBlocksModels.courses)[0];
+-
+-  // The Learning Sequences API never exposes the usage key of the root course
+-  // block, which is used as the key here (instead of the CourseKey). It doesn't
+-  // look like anything actually queries for this value though, and even the
+-  // courseBlocksModels.courses uses the CourseKey as the "id" in the value. So
+-  // I'm imitating the form here to minimize the chance of things breaking, but
+-  // I think we should just forget the keys and replace courses with a singular
+-  // course. I might end up doing that before my refactoring is done here. >_<
+-  mergedModels.courses[courseBlockId] = {
+-    // Learning Sequences API Data
+-    id: lsCourse.id,
+-    title: lsCourse.title,
+-    sectionIds: lsCourse.sectionIds,
+-    hasScheduledContent: lsCourse.hasScheduledContent,
+-
+-    // Still pulling from Course Blocks API
+-    effortActivities: courseBlock.effortActivities,
+-    effortTime: courseBlock.effortTime,
+-  };
+-
+-  // List of Sequences comes from Learning Sequences. Course Blocks will have
+-  // extra sequences that we don't want to display to the user, like ones that
+-  // are empty because all the enclosed units are in user partition groups that
+-  // the user is not a part of (e.g. Verified Track).
+-  Object.entries(learningSequencesModels.sequences).forEach(([sequenceId, sequence]) => {
+-    const blocksSequence = courseBlocksModels.sequences[sequenceId];
+-    mergedModels.sequences[sequenceId] = {
+-      // Learning Sequences API Data
+-      id: sequenceId,
+-      title: sequence.title,
+-
+-      // Still pulling from Course Blocks API Data:
+-      effortActivities: blocksSequence.effortActivities,
+-      effortTime: blocksSequence.effortTime,
+-      legacyWebUrl: blocksSequence.legacyWebUrl,
+-      unitIds: blocksSequence.unitIds,
+-    };
+-  });
+-
+-  // List of Sections comes from Learning Sequences.
+-  Object.entries(learningSequencesModels.sections).forEach(([sectionId, section]) => {
+-    const blocksSection = courseBlocksModels.sections[sectionId];
+-    mergedModels.sections[sectionId] = {
+-      // Learning Sequences API Data
+-      id: sectionId,
+-      title: section.title,
+-      sequenceIds: section.sequenceIds,
+-      courseId: lsCourse.id,
+-
+-      // Still pulling from Course Blocks API Data:
+-      effortActivities: blocksSection.effortActivities,
+-      effortTime: blocksSection.effortTime,
+-    };
+-    // Add back-references to this section for all child sequences.
+-    section.sequenceIds.forEach(childSeqId => {
+-      mergedModels.sequences[childSeqId].sectionId = sectionId;
+-    });
+-  });
+-
+-  return mergedModels;
+-}
+-
+ export function fetchCourse(courseId) {
+   return async (dispatch) => {
+     dispatch(fetchCourseRequest({ courseId }));
+     Promise.allSettled([
+       getCourseMetadata(courseId),
+-      getCourseBlocks(courseId),
+       getLearningSequencesOutline(courseId),
+       getCourseHomeCourseMetadata(courseId),
+     ]).then(([
+       courseMetadataResult,
+-      courseBlocksResult,
+       learningSequencesOutlineResult,
+       courseHomeMetadataResult]) => {
+       if (courseMetadataResult.status === 'fulfilled') {
+@@ -154,15 +49,12 @@ export function fetchCourse(courseId) {
+         }));
+       }
+ 
+-      if (courseBlocksResult.status === 'fulfilled') {
++      if (learningSequencesOutlineResult.status === 'fulfilled') {
+         const {
+-          courses, sections, sequences, units,
+-        } = mergeLearningSequencesWithCourseBlocks(
+-          learningSequencesOutlineResult.value,
+-          courseBlocksResult.value,
+-        );
++          courses, sections, sequences,
++        } = learningSequencesOutlineResult.value;
+ 
+-        // This updates the course with a sectionIds array from the blocks data.
++        // This updates the course with a sectionIds array from the Learning Sequence data.
+         dispatch(updateModelsMap({
+           modelType: 'coursewareMeta',
+           modelsMap: courses,
+@@ -171,31 +63,27 @@ export function fetchCourse(courseId) {
+           modelType: 'sections',
+           modelsMap: sections,
+         }));
+-        // We update for sequences and units because the sequence metadata may have come back first.
++        // We update for sequences because the sequence metadata may have come back first.
+         dispatch(updateModelsMap({
+           modelType: 'sequences',
+           modelsMap: sequences,
+         }));
+-        dispatch(updateModelsMap({
+-          modelType: 'units',
+-          modelsMap: units,
+-        }));
+       }
+ 
+       const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
+       const fetchedCourseHomeMetadata = courseHomeMetadataResult.status === 'fulfilled';
+-      const fetchedBlocks = courseBlocksResult.status === 'fulfilled';
++      const fetchedOutline = learningSequencesOutlineResult.status === 'fulfilled';
+ 
+-      // Log errors for each request if needed. Course block failures may occur
++      // Log errors for each request if needed. Outline failures may occur
+       // even if the course metadata request is successful
+-      if (!fetchedBlocks) {
+-        const { response } = courseBlocksResult.reason;
++      if (!fetchedOutline) {
++        const { response } = learningSequencesOutlineResult.reason;
+         if (response && response.status === 403) {
+           // 403 responses are normal - they happen when the learner is logged out.
+           // We'll redirect them in a moment to the outline tab by calling fetchCourseDenied() below.
+-          logInfo(courseBlocksResult.reason);
++          logInfo(learningSequencesOutlineResult.reason);
+         } else {
+-          logError(courseBlocksResult.reason);
++          logError(learningSequencesOutlineResult.reason);
+         }
+       }
+       if (!fetchedMetadata) {
+@@ -205,7 +93,7 @@ export function fetchCourse(courseId) {
+         logError(courseHomeMetadataResult.reason);
+       }
+       if (fetchedMetadata && fetchedCourseHomeMetadata) {
+-        if (courseHomeMetadataResult.value.courseAccess.hasAccess && fetchedBlocks) {
++        if (courseHomeMetadataResult.value.courseAccess.hasAccess && fetchedOutline) {
+           // User has access
+           dispatch(fetchCourseSuccess({ courseId }));
+           return;
+@@ -251,11 +139,11 @@ export function fetchSequence(sequenceId) {
+       // Some errors are expected - for example, CoursewareContainer may request sequence metadata for a unit and rely
+       // on the request failing to notice that it actually does have a unit (mostly so it doesn't have to know anything
+       // about the opaque key structure). In such cases, the backend gives us a 422.
+-      const isExpected = error.response && error.response.status === 422;
+-      if (!isExpected) {
++      const sequenceMightBeUnit = error?.response?.status === 422;
++      if (!sequenceMightBeUnit) {
+         logError(error);
+       }
+-      dispatch(fetchSequenceFailure({ sequenceId }));
++      dispatch(fetchSequenceFailure({ sequenceId, sequenceMightBeUnit }));
+     }
+   };
+ }
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 81643d0..1957a05 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -1,6 +1,5 @@
+ import React, { useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
+-import { useSelector } from 'react-redux';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+ import { ALERT_TYPES, AlertList } from '../generic/user-messages';
+@@ -37,6 +36,14 @@ function getStudioUrl(courseId, unitId) {
+   return urlFull;
+ }
+ 
++function getLegacyWebUrl(canViewLegacyCourseware, courseId, unitId) {
++  if (!canViewLegacyCourseware || !unitId) {
++    return undefined;
++  }
++
++  return `${getConfig().LMS_BASE_URL}/courses/${courseId}/jump_to/${unitId}?experience=legacy`;
++}
++
+ export default function InstructorToolbar(props) {
+   // This didMount logic became necessary once we had a page that does a redirect on a quick exit.
+   // As a result, it unmounts the InstructorToolbar (which will be remounted by the new component),
+@@ -60,18 +67,7 @@ export default function InstructorToolbar(props) {
+   } = props;
+ 
+   const urlInsights = getInsightsUrl(courseId);
+-  const urlLegacy = useSelector((state) => {
+-    if (!canViewLegacyCourseware) {
+-      return undefined;
+-    }
+-
+-    if (!unitId) {
+-      return undefined;
+-    }
+-
+-    const activeUnit = state.models.units[props.unitId];
+-    return activeUnit ? activeUnit.legacyWebUrl : undefined;
+-  });
++  const urlLegacy = getLegacyWebUrl(canViewLegacyCourseware, courseId, unitId);
+   const urlStudio = getStudioUrl(courseId, unitId);
+   const [masqueradeErrorMessage, showMasqueradeError] = useState(null);
+ 
+diff --git a/src/instructor-toolbar/InstructorToolbar.test.jsx b/src/instructor-toolbar/InstructorToolbar.test.jsx
+index ae15731..a926275 100644
+--- a/src/instructor-toolbar/InstructorToolbar.test.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.test.jsx
+@@ -15,24 +15,27 @@ jest.mock('@edx/frontend-platform', () => ({
+ getConfig.mockImplementation(() => originalConfig);
+ 
+ describe('Instructor Toolbar', () => {
++  let courseware;
++  let models;
+   let mockData;
+   let axiosMock;
+   let masqueradeUrl;
+ 
+   beforeAll(async () => {
+-    const store = await initializeTestStore({ excludeFetchSequence: true });
+-    const { courseware, models } = store.getState();
+-    mockData = {
+-      courseId: courseware.courseId,
+-      unitId: Object.values(models.units)[0].id,
+-      canViewLegacyCourseware: true,
+-    };
++    const store = await initializeTestStore();
++    courseware = store.getState().courseware;
++    models = store.getState().models;
+ 
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+     masqueradeUrl = `${getConfig().LMS_BASE_URL}/courses/${courseware.courseId}/masquerade`;
+   });
+ 
+   beforeEach(() => {
++    mockData = {
++      courseId: courseware.courseId,
++      unitId: Object.values(models.units)[0].id,
++      canViewLegacyCourseware: true,
++    };
+     axiosMock.reset();
+     axiosMock.onGet(masqueradeUrl).reply(200, { success: true });
+     logUnhandledRequests(axiosMock);
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+index 561f379..e1befff 100644
+--- a/src/product-tours/ProductTours.test.jsx
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -22,6 +22,7 @@ import LoadedTabPage from '../tab-page/LoadedTabPage';
+ import OutlineTab from '../course-home/outline-tab/OutlineTab';
+ import * as courseHomeThunks from '../course-home/data/thunks';
+ import { buildSimpleCourseBlocks } from '../shared/data/__factories__/courseBlocks.factory';
++import { buildOutlineFromBlocks } from '../courseware/data/__factories__/learningSequencesOutline.factory';
+ 
+ import { UserMessagesProvider } from '../generic/user-messages';
+ 
+@@ -263,11 +264,8 @@ describe('Courseware Tour', () => {
+           ))
+       );
+ 
+-      const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+-
+       const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+-      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
+ 
+       const courseMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`);
+       axiosMock.onGet(courseMetadataUrl).reply(200, defaultCourseMetadata);
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 63bb0e1..9e6c251 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -25,6 +25,7 @@ import appMessages from './i18n';
+ import { fetchCourse, fetchSequence } from './courseware/data';
+ import { appendBrowserTimezoneToUrl, executeThunk } from './utils';
+ import buildSimpleCourseAndSequenceMetadata from './courseware/data/__factories__/sequenceMetadata.factory';
++import { buildOutlineFromBlocks } from './courseware/data/__factories__/learningSequencesOutline.factory';
+ 
+ class MockLoggingService {
+   // eslint-disable-next-line no-console
+@@ -151,18 +152,16 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
+     courseBlocks, sequenceBlocks, courseMetadata, sequenceMetadata, courseHomeMetadata,
+   } = buildSimpleCourseAndSequenceMetadata(options);
+ 
+-  let forbiddenCourseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseMetadata.id}`;
+-  forbiddenCourseUrl = appendBrowserTimezoneToUrl(forbiddenCourseUrl);
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseMetadata.id}`;
++  courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
+-  const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+   let courseHomeMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseMetadata.id}`;
+   courseHomeMetadataUrl = appendBrowserTimezoneToUrl(courseHomeMetadataUrl);
+ 
+-  axiosMock.onGet(forbiddenCourseUrl).reply(200, courseMetadata);
++  axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+-  axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+-  axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++  axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
+   sequenceMetadata.forEach(metadata => {
+     const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${metadata.item_id}`;
+     axiosMock.onGet(sequenceMetadataUrl).reply(200, metadata);
+diff --git a/src/shared/data/__factories__/courseBlocks.factory.js b/src/shared/data/__factories__/courseBlocks.factory.js
+index 86eefd8..842b78e 100644
+--- a/src/shared/data/__factories__/courseBlocks.factory.js
++++ b/src/shared/data/__factories__/courseBlocks.factory.js
+@@ -1,6 +1,11 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ import './block.factory';
+ 
++// Most of this file can be removed at some point, now that we rarely use course blocks
++// in favor of learning sequences. But for now, these are mostly used to then feed into
++// buildOutlineFromBlocks, which is an awkward flow if we don't really care about the
++// course blocks themselves. A future cleanup to do.
++
+ // Generates an Array of block IDs, either from a single block or an array of blocks.
+ const getIds = (attr) => {
+   const blocks = Array.isArray(attr) ? attr : [attr];
+@@ -84,7 +89,7 @@ export function buildSimpleCourseBlocks(courseId, title, options = {}) {
+       {
+         courseId,
+         hasScheduledContent: options.hasScheduledContent || false,
+-        title: 'Demo Course',
++        title,
+       },
+       {
+         units: unitBlocks,
+@@ -225,7 +230,7 @@ export function buildBinaryCourseBlocks(courseId, title) {
+     // work with.
+     courseBlocks: Factory.build(
+       'courseBlocks',
+-      { courseId },
++      { courseId, title },
+       {
+         units: unitBlocks,
+         sequences: sequenceBlocks,
+-- 
+2.34.1
+

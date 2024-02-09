@@ -1,0 +1,46 @@
+From 4abf6ebdce58d91ba761095fa3e8e76d9452985d Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Wed, 27 Oct 2021 16:55:41 -0400
+Subject: [PATCH 0713/1021] fix: [AA-1078] weekly learning goals a11y nav
+ (#711)
+
+- Add radio role and aria-checked to button to enable screen reader use
+---
+ src/course-home/outline-tab/widgets/FlagButton.jsx           | 5 ++---
+ .../outline-tab/widgets/WeeklyLearningGoalCard.jsx           | 4 ----
+ 2 files changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/src/course-home/outline-tab/widgets/FlagButton.jsx b/src/course-home/outline-tab/widgets/FlagButton.jsx
+index 91b2994..8401fab 100644
+--- a/src/course-home/outline-tab/widgets/FlagButton.jsx
++++ b/src/course-home/outline-tab/widgets/FlagButton.jsx
+@@ -14,9 +14,8 @@ function FlagButton({
+       type="button"
+       className={classnames('flag-button m-1.5 pt-3 pb-md-3 pb-xl-0',
+         isSelected ? 'flag-button-selected' : '')}
+-      // aria-checked={isSelected}
+-      // role="radio"
+-      // tabIndex={isSelected ? '0' : '-1'}
++      aria-checked={isSelected}
++      role="radio"
+       onClick={() => handleSelect()}
+       data-testid={`weekly-learning-goal-input-${title}`}
+     >
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index d4a61b3..051816f 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -64,10 +64,6 @@ function WeeklyLearningGoalCard({
+           </Card.Text>
+           <div
+             className="flag-button-container m-0 p-0"
+-              // making this work as a radio button for keyboard nav
+-              // is not working
+-              // role="radiogroup"
+-              // aria-labelledby="learning_goal_choices_label"
+           >
+             <LearningGoalButton
+               level="casual"
+-- 
+2.34.1
+

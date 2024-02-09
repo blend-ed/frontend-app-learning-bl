@@ -1,0 +1,120 @@
+From edba1600dc7eb068cfd4da4c0805d461351ca263 Mon Sep 17 00:00:00 2001
+From: Ghassan Maslamani <ghassan.maslamani@gmail.com>
+Date: Tue, 6 Dec 2022 12:16:23 +0200
+Subject: [PATCH 0949/1021] fix: fix tabs urls on progress tab
+
+ This fix does fixes the url links by getting them from the state
+ simliar to how tabs navigation gets them.
+
+ This would allow it work for PUBLIC_PATH is not '/', i.e. in
+ tutor.
+
+  This was reported in openedx/build-test-release-wg/issues/222
+---
+ .../grades/detailed-grades/DetailedGrades.jsx | 26 ++++++++++++-------
+ .../related-links/RelatedLinks.jsx            | 14 ++++++++--
+ 2 files changed, 28 insertions(+), 12 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 8a7f455..62c0e1d 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -19,6 +19,7 @@ function DetailedGrades({ intl }) {
+   } = useSelector(state => state.courseHome);
+   const {
+     org,
++    tabs,
+   } = useModel('courseHomeMeta', courseId);
+   const {
+     gradesFeatureIsFullyLocked,
+@@ -36,11 +37,14 @@ function DetailedGrades({ intl }) {
+     });
+   };
+ 
+-  const outlineLink = (
++  const overviewTab = tabs.find(tab => tab.slug === 'outline');
++  const overviewTabUrl = overviewTab && overviewTab.url;
++
++  const outlineLink = overviewTabUrl && (
+     <Hyperlink
+       variant="muted"
+       isInline
+-      destination={`/course/${courseId}/home`}
++      destination={overviewTabUrl}
+       onClick={logOutlineLinkClick}
+       tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+     >
+@@ -63,14 +67,16 @@ function DetailedGrades({ intl }) {
+       {!hasSectionScores && (
+         <p className="small">{intl.formatMessage(messages.detailedGradesEmpty)}</p>
+       )}
+-      <p className="x-small m-0">
+-        <FormattedMessage
+-          id="progress.ungradedAlert"
+-          defaultMessage="For progress on ungraded aspects of the course, view your {outlineLink}."
+-          description="Text that precede link that redirect to course outline page"
+-          values={{ outlineLink }}
+-        />
+-      </p>
++      {overviewTabUrl && (
++        <p className="x-small m-0">
++          <FormattedMessage
++            id="progress.ungradedAlert"
++            defaultMessage="For progress on ungraded aspects of the course, view your {outlineLink}."
++            description="Text that precede link that redirect to course outline page"
++            values={{ outlineLink }}
++          />
++        </p>
++      )}
+     </section>
+   );
+ }
+diff --git a/src/course-home/progress-tab/related-links/RelatedLinks.jsx b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+index ac514d0..2392e9e 100644
+--- a/src/course-home/progress-tab/related-links/RelatedLinks.jsx
++++ b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+@@ -15,6 +15,7 @@ function RelatedLinks({ intl }) {
+   } = useSelector(state => state.courseHome);
+   const {
+     org,
++    tabs,
+   } = useModel('courseHomeMeta', courseId);
+ 
+   const { administrator } = getAuthenticatedUser();
+@@ -27,22 +28,31 @@ function RelatedLinks({ intl }) {
+     });
+   };
+ 
++  const overviewTab = tabs.find(tab => tab.slug === 'outline');
++  const overviewTabUrl = overviewTab && overviewTab.url;
++  const datesTab = tabs.find(tab => tab.slug === 'dates');
++  const datesTabUrl = datesTab && datesTab.url;
++
+   return (
+     <section className="mb-4 x-small">
+       <h3 className="h4">{intl.formatMessage(messages.relatedLinks)}</h3>
+       <ul className="pl-4">
++        {datesTabUrl && (
+         <li>
+-          <Hyperlink destination={`/course/${courseId}/dates`} onClick={() => logLinkClicked('dates')}>
++          <Hyperlink destination={datesTabUrl} onClick={() => logLinkClicked('dates')}>
+             {intl.formatMessage(messages.datesCardLink)}
+           </Hyperlink>
+           <p>{intl.formatMessage(messages.datesCardDescription)}</p>
+         </li>
++        )}
++        {overviewTabUrl && (
+         <li>
+-          <Hyperlink destination={`/course/${courseId}/home`} onClick={() => logLinkClicked('course_outline')}>
++          <Hyperlink destination={overviewTabUrl} onClick={() => logLinkClicked('course_outline')}>
+             {intl.formatMessage(messages.outlineCardLink)}
+           </Hyperlink>
+           <p>{intl.formatMessage(messages.outlineCardDescription)}</p>
+         </li>
++        )}
+       </ul>
+     </section>
+   );
+-- 
+2.34.1
+

@@ -1,0 +1,667 @@
+From d0bcb19754eb5b9d888db8a09e43ae3c143e34f2 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Tue, 11 May 2021 14:06:03 -0400
+Subject: [PATCH 0458/1021] feat: Set up streak celebration discount experiment
+ (#431)
+
+As part of this work, the streak celebration has been migrated from a Paragon Modal to a Modal Dialog
+AA-759
+---
+ .../data/__snapshots__/redux.test.js.snap     |  10 ++
+ .../outline-tab/widgets/UpgradeCard.test.jsx  |   8 +-
+ .../upgrade-button/FormattedPricing.jsx       |   8 +-
+ src/generic/upgrade-button/UpgradeButton.jsx  |   5 +-
+ .../upgrade-button/UpgradeNowButton.jsx       |  62 +++++++
+ src/generic/upgrade-button/index.js           |   2 +
+ src/setupTest.js                              |   6 +
+ .../courseMetadataBase.factory.js             |   5 +
+ .../StreakCelebrationModal.jsx                | 154 ++++++++++++++----
+ .../StreakCelebrationModal.scss               |   8 +-
+ .../StreakCelebrationModal.test.jsx           |  37 ++++-
+ src/shared/streak-celebration/messages.js     |  21 ++-
+ src/tab-page/LoadedTabPage.jsx                |  22 ++-
+ 13 files changed, 283 insertions(+), 65 deletions(-)
+ create mode 100644 src/generic/upgrade-button/UpgradeNowButton.jsx
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 3f60ebe..62fd74d 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -59,6 +59,11 @@ Object {
+           },
+         ],
+         "title": "Demonstration Course",
++        "verifiedMode": Object {
++          "currencySymbol": "$",
++          "price": 10,
++          "upgradeUrl": "test",
++        },
+       },
+     },
+     "dates": Object {
+@@ -347,6 +352,11 @@ Object {
+           },
+         ],
+         "title": "Demonstration Course",
++        "verifiedMode": Object {
++          "currencySymbol": "$",
++          "price": 10,
++          "upgradeUrl": "test",
++        },
+       },
+     },
+     "outline": Object {
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+index 4e80aae..ff54f21 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+@@ -145,7 +145,7 @@ describe('Upgrade Card', () => {
+     expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
+     expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
+     expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+-    expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
+ 
+@@ -174,7 +174,7 @@ describe('Upgrade Card', () => {
+     expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
+     expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
+     expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+-    expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
+ 
+@@ -203,7 +203,7 @@ describe('Upgrade Card', () => {
+     expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
+     expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
+     expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
+-    expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
+ 
+@@ -230,7 +230,7 @@ describe('Upgrade Card', () => {
+     expect(screen.getByText('5 days left')).toBeInTheDocument(); // setting the time to 12 will mean that it's slightly less than 12
+     expect(screen.getByText(/You will lose all access to this course.*?on/s).textContent).toMatch('You will lose all access to this course, including any progress, on April 18.');
+     expect(screen.getByText(/Upgrading your course enables you/s).textContent).toMatch('Upgrading your course enables you to pursue a verified certificate and unlocks numerous features. Learn more about the benefits of upgrading.');
+-    expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
+ });
+diff --git a/src/generic/upgrade-button/FormattedPricing.jsx b/src/generic/upgrade-button/FormattedPricing.jsx
+index a1e061f..d13bc47 100644
+--- a/src/generic/upgrade-button/FormattedPricing.jsx
++++ b/src/generic/upgrade-button/FormattedPricing.jsx
+@@ -12,9 +12,13 @@ function FormattedPricing(props) {
+     verifiedMode,
+   } = props;
+ 
++  let currencySymbol;
++  if (verifiedMode) {
++    currencySymbol = verifiedMode.currencySymbol;
++  }
++
+   if (!offer) {
+     const {
+-      currencySymbol,
+       price,
+     } = verifiedMode;
+     return `${currencySymbol}${price}`;
+@@ -49,7 +53,7 @@ function FormattedPricing(props) {
+         {intl.formatMessage(messages.srPrices, { discountedPrice, originalPrice })}
+       </span>
+       <span aria-hidden="true">
+-        <span>{discountedPrice}</span> (<del>{originalPrice}</del>)
++        <span>{currencySymbol}{discountedPrice}</span> (<del>{currencySymbol}{originalPrice}</del>)
+       </span>
+     </>
+   );
+diff --git a/src/generic/upgrade-button/UpgradeButton.jsx b/src/generic/upgrade-button/UpgradeButton.jsx
+index 84ff94e..6be38d5 100644
+--- a/src/generic/upgrade-button/UpgradeButton.jsx
++++ b/src/generic/upgrade-button/UpgradeButton.jsx
+@@ -9,6 +9,7 @@ function UpgradeButton(props) {
+   const {
+     intl,
+     offer,
++    variant,
+     onClick,
+     verifiedMode,
+     ...rest
+@@ -19,7 +20,7 @@ function UpgradeButton(props) {
+ 
+   return (
+     <Button
+-      variant="primary"
++      variant={variant}
+       href={url}
+       onClick={onClick}
+       {...rest}
+@@ -43,6 +44,7 @@ function UpgradeButton(props) {
+ UpgradeButton.defaultProps = {
+   offer: null,
+   onClick: null,
++  variant: 'primary',
+ };
+ 
+ UpgradeButton.propTypes = {
+@@ -54,6 +56,7 @@ UpgradeButton.propTypes = {
+   verifiedMode: PropTypes.shape({
+     upgradeUrl: PropTypes.string.isRequired,
+   }).isRequired,
++  variant: PropTypes.string,
+ };
+ 
+ export default injectIntl(UpgradeButton);
+diff --git a/src/generic/upgrade-button/UpgradeNowButton.jsx b/src/generic/upgrade-button/UpgradeNowButton.jsx
+new file mode 100644
+index 0000000..c262fd4
+--- /dev/null
++++ b/src/generic/upgrade-button/UpgradeNowButton.jsx
+@@ -0,0 +1,62 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button } from '@edx/paragon';
++
++import FormattedPricing from './FormattedPricing';
++
++function UpgradeNowButton(props) {
++  const {
++    intl,
++    offer,
++    variant,
++    onClick,
++    verifiedMode,
++    ...rest
++  } = props;
++
++  // Prefer offer's url in case it is ever different (though it is not at time of this writing)
++  const url = offer ? offer.upgradeUrl : verifiedMode.upgradeUrl;
++
++  return (
++    <Button
++      variant={variant}
++      href={url}
++      onClick={onClick}
++      {...rest}
++    >
++      <FormattedMessage
++        id="learning.upgradeNowButton.buttonText"
++        defaultMessage="Upgrade now for {pricing}"
++        values={{
++          pricing: (
++            <FormattedPricing
++              offer={offer}
++              verifiedMode={verifiedMode}
++            />
++          ),
++        }}
++      />
++    </Button>
++  );
++}
++
++UpgradeNowButton.defaultProps = {
++  offer: null,
++  onClick: null,
++  variant: 'primary',
++};
++
++UpgradeNowButton.propTypes = {
++  intl: intlShape.isRequired,
++  offer: PropTypes.shape({
++    upgradeUrl: PropTypes.string.isRequired,
++  }),
++  onClick: PropTypes.func,
++  verifiedMode: PropTypes.shape({
++    upgradeUrl: PropTypes.string.isRequired,
++  }).isRequired,
++  variant: PropTypes.string,
++};
++
++export default injectIntl(UpgradeNowButton);
+diff --git a/src/generic/upgrade-button/index.js b/src/generic/upgrade-button/index.js
+index 845dc5c..0d81f3a 100644
+--- a/src/generic/upgrade-button/index.js
++++ b/src/generic/upgrade-button/index.js
+@@ -1,7 +1,9 @@
+ import FormattedPricing from './FormattedPricing';
+ import UpgradeButton from './UpgradeButton';
++import UpgradeNowButton from './UpgradeNowButton';
+ 
+ export {
+   FormattedPricing,
+   UpgradeButton,
++  UpgradeNowButton,
+ };
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 7f35ba4..745bb50 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -36,6 +36,12 @@ window.getComputedStyle = jest.fn(() => ({
+   getPropertyValue: jest.fn(),
+ }));
+ 
++// Mock Intersection Observer which is unavailable in the context of a test.
++global.IntersectionObserver = jest.fn(function mockIntersectionObserver() {
++  this.observe = jest.fn();
++  this.disconnect = jest.fn();
++});
++
+ // Mock media queries because any component that uses `react-break` for responsive breakpoints will
+ // run into `TypeError: window.matchMedia is not a function`. This avoids that for all of our tests now.
+ Object.defineProperty(window, 'matchMedia', {
+diff --git a/src/shared/data/__factories__/courseMetadataBase.factory.js b/src/shared/data/__factories__/courseMetadataBase.factory.js
+index a5914b9..9c822cf 100644
+--- a/src/shared/data/__factories__/courseMetadataBase.factory.js
++++ b/src/shared/data/__factories__/courseMetadataBase.factory.js
+@@ -12,6 +12,11 @@ export default new Factory()
+     original_user_is_staff: false,
+     number: 'DemoX',
+     org: 'edX',
++    verifiedMode: {
++      upgradeUrl: 'test',
++      price: 10,
++      currencySymbol: '$',
++    },
+   })
+   .attr(
+     'tabs', ['id', 'host'], (id, host) => {
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index 3489410..f4d6020 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -1,10 +1,15 @@
+ import React, { useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
+-import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Lightbulb } from '@edx/paragon/icons';
+-import { Icon, Modal } from '@edx/paragon';
++import {
++  FormattedMessage, injectIntl, intlShape,
++} from '@edx/frontend-platform/i18n';
++import { Lightbulb, MoneyFilled } from '@edx/paragon/icons';
++import {
++  Alert, Icon, ModalDialog,
++} from '@edx/paragon';
+ import { layoutGenerator } from 'react-break';
+ import { useDispatch } from 'react-redux';
++import { UpgradeNowButton } from '../../generic/upgrade-button';
+ 
+ import { useModel } from '../../generic/model-store';
+ import StreakMobileImage from './assets/Streak_mobile.png';
+@@ -37,7 +42,8 @@ function getRandomFactoid(intl, streakLength) {
+ }
+ 
+ function StreakModal({
+-  courseId, metadataModel, streakLengthToCelebrate, intl, open, ...rest
++  courseId, metadataModel, streakLengthToCelebrate, intl, isStreakCelebrationOpen,
++  closeStreakCelebration, AA759ExperimentEnabled, verifiedMode, ...rest
+ }) {
+   const { org, celebrations } = useModel(metadataModel, courseId);
+   const factoid = getRandomFactoid(intl, streakLengthToCelebrate);
+@@ -54,10 +60,10 @@ function StreakModal({
+   const dispatch = useDispatch();
+ 
+   useEffect(() => {
+-    if (open) {
++    if (isStreakCelebrationOpen) {
+       recordStreakCelebration(org, courseId);
+     }
+-  }, [open, org, courseId]);
++  }, [isStreakCelebrationOpen, org, courseId]);
+ 
+   function CloseText() {
+     return (
+@@ -68,43 +74,112 @@ function StreakModal({
+     );
+   }
+ 
++  const upgradeUrl = `${verifiedMode.upgradeUrl}&code=3DayStreak`;
++  const mode = {
++    currencySymbol: verifiedMode.currencySymbol,
++    price: verifiedMode.price,
++    upgradeUrl,
++  };
++
++  const offer = {
++    discountedPrice: (mode.price * 0.85).toFixed(2).toString(),
++    originalPrice: mode.price.toString(),
++    upgradeUrl: mode.upgradeUrl,
++  };
++
++  const title = `${streakLengthToCelebrate} ${intl.formatMessage(messages.streakHeader)}`;
++
+   return (
+-    <div>
+-      <Modal
+-        dialogClassName="streak-modal modal-dialog-centered"
+-        body={(
+-          <>
+-            <p>{intl.formatMessage(messages.streakBody)}</p>
+-            <p className="modal-image">
+-              <OnMobile>
+-                <img src={StreakMobileImage} alt="" className="img-fluid" />
+-              </OnMobile>
+-              <OnDesktop>
+-                <img src={StreakDesktopImage} alt="" className="img-fluid" />
+-              </OnDesktop>
+-            </p>
+-            <div className="row mt-3 mx-3 py-3 bg-light-300">
+-              <Icon className="col-small ml-3" src={Lightbulb} />
+-              <div className="col-11 factoid-wrapper">
+-                {randomFactoid}
+-              </div>
++    <ModalDialog
++      className="streak-modal modal-dialog-centered"
++      title={title}
++      onClose={() => {
++        closeStreakCelebration();
++        recordModalClosing(metadataModel, celebrations, org, courseId, dispatch);
++      }}
++      isOpen={isStreakCelebrationOpen}
++      isFullscreenScroll
++      {...rest}
++    >
++      <ModalDialog.Header className="modal-header">
++        <ModalDialog.Title className="mr-0 modal-title">
++          {title}
++        </ModalDialog.Title>
++      </ModalDialog.Header>
++      <ModalDialog.Body className="modal-body">
++        <p>{intl.formatMessage(messages.streakBody)}</p>
++        <p className="modal-image">
++          <OnMobile>
++            <img src={StreakMobileImage} alt="" className="img-fluid" />
++          </OnMobile>
++          <OnDesktop>
++            <img src={StreakDesktopImage} alt="" className="img-fluid" />
++          </OnDesktop>
++        </p>
++        { !AA759ExperimentEnabled && (
++          <div className="d-flex py-3 bg-light-300">
++            <Icon className="col-small ml-3" src={Lightbulb} />
++            <div className="col-11 factoid-wrapper">
++              {randomFactoid}
+             </div>
++          </div>
++        )}
++        { AA759ExperimentEnabled && (
++          <Alert variant="success" className="px-0 d-flex">
++            <Icon className="col-small ml-3 text-success-500" src={MoneyFilled} />
++            <div className="col-11 factoid-wrapper">
++              <b>{intl.formatMessage(messages.congratulations)}</b>
++              &nbsp;{intl.formatMessage(messages.streakDiscountMessage)}&nbsp;
++              <FormattedMessage
++                id="learning.streakCelebration.streakAA759EndDateMessage"
++                defaultMessage="Ends {date}."
++                values={{
++                  date: new Date('2021-6-25 00:00').toLocaleDateString({ timeZone: 'UTC' }),
++                }}
++              />
++            </div>
++          </Alert>
++        )}
++      </ModalDialog.Body>
++      <ModalDialog.Footer className="modal-footer d-block">
++        { AA759ExperimentEnabled && (
++          <>
++            <OnMobile>
++              <UpgradeNowButton
++                className="upgrade mb-3"
++                size="sm"
++                offer={offer}
++                variant="brand"
++                verifiedMode={mode}
++              />
++              <ModalDialog.CloseButton variant="outline-brand" className="btn-sm">
++                {intl.formatMessage(messages.streakButtonAA759)}
++              </ModalDialog.CloseButton>
++            </OnMobile>
++            <OnDesktop>
++              <UpgradeNowButton
++                className="upgrade mb-3"
++                offer={offer}
++                variant="brand"
++                verifiedMode={mode}
++              />
++              <ModalDialog.CloseButton variant="outline-brand">
++                {intl.formatMessage(messages.streakButtonAA759)}
++              </ModalDialog.CloseButton>
++            </OnDesktop>
+           </>
+         )}
+-        closeText={<CloseText />}
+-        onClose={() => {
+-          recordModalClosing(metadataModel, celebrations, org, courseId, dispatch);
+-        }}
+-        open={open}
+-        title={`${streakLengthToCelebrate} ${intl.formatMessage(messages.streakHeader)}`}
+-        {...rest}
+-      />
+-    </div>
++        { !AA759ExperimentEnabled && (
++          <ModalDialog.CloseButton className="px-5" variant="primary"><CloseText /></ModalDialog.CloseButton>
++        )}
++      </ModalDialog.Footer>
++    </ModalDialog>
+   );
+ }
+ 
+ StreakModal.defaultProps = {
+-  open: false,
++  isStreakCelebrationOpen: false,
++  AA759ExperimentEnabled: false,
+ };
+ 
+ StreakModal.propTypes = {
+@@ -112,7 +187,14 @@ StreakModal.propTypes = {
+   metadataModel: PropTypes.string.isRequired,
+   streakLengthToCelebrate: PropTypes.number.isRequired,
+   intl: intlShape.isRequired,
+-  open: PropTypes.bool,
++  isStreakCelebrationOpen: PropTypes.bool,
++  closeStreakCelebration: PropTypes.func.isRequired,
++  AA759ExperimentEnabled: PropTypes.bool,
++  verifiedMode: PropTypes.shape({
++    currencySymbol: PropTypes.string.isRequired,
++    price: PropTypes.number.isRequired,
++    upgradeUrl: PropTypes.string.isRequired,
++  }).isRequired,
+ };
+ 
+ export default injectIntl(StreakModal);
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.scss b/src/shared/streak-celebration/StreakCelebrationModal.scss
+index 60d2039..e04aa9e 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.scss
++++ b/src/shared/streak-celebration/StreakCelebrationModal.scss
+@@ -2,6 +2,7 @@
+   text-align: center;
+ 
+   .modal-header {
++    padding-top: 1.875rem;
+     padding-bottom: 0;
+     border-bottom: 0; // override default hr line
+     justify-content: center;
+@@ -19,6 +20,7 @@
+ 
+   .modal-title {
+     padding-top: 1.25rem;
++    font-size: 2rem;
+   }
+ 
+   .modal-body {
+@@ -29,12 +31,6 @@
+   .modal-footer {
+     border-top: 0; // override default hr line
+     justify-content: center;
+-
+-    button {
+-      @extend .btn-primary;
+-      font-size: 1.2rem;
+-      width: 50%;
+-    }
+   }
+ 
+   .modal-image {
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index 4243c9d..04d3d03 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -10,18 +10,19 @@ describe('Loaded Tab Page', () => {
+   const mockData = { metadataModel: 'coursewareMeta' };
+ 
+   beforeAll(async () => {
+-    mockData.open = true;
++    mockData.isStreakCelebrationOpen = true;
+     mockData.streakLengthToCelebrate = 3;
+   });
+ 
+   it('shows streak celebration modal', async () => {
+-    const courseMetadata = Factory.build('courseMetadata', { celebrations: { shouldCelebrateStreak: true } });
++    const courseMetadata = Factory.build('courseMetadata', { celebrations: { streakLengthToCelebrate: 3 } });
+     mockData.courseId = courseMetadata.id;
++    mockData.verifiedMode = courseMetadata.verifiedMode;
+     const testStore = await initializeTestStore({ courseMetadata }, false);
+     render(<StreakModal {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+ 
+-    await screen.findByText('3 day streak');
+-    await screen.findByText('Keep it up, you’re on a roll!');
++    expect(screen.getByText('3 day streak')).toBeInTheDocument();
++    expect(screen.getByText('Keep it up, you’re on a roll!')).toBeInTheDocument();
+     expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+     expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.celebration.streak.opened', {
+       org_key: courseMetadata.org,
+@@ -29,4 +30,32 @@ describe('Loaded Tab Page', () => {
+       is_staff: false,
+     });
+   });
++
++  it('shows streak celebration modal AA-759 experiment', async () => {
++    Object.defineProperty(window, 'matchMedia', {
++      writable: true,
++      value: jest.fn().mockImplementation(query => {
++        const matches = !!(query === 'screen and (min-width: 575px)');
++        return {
++          matches,
++          media: query,
++          onchange: null,
++          addListener: jest.fn(), // deprecated
++          removeListener: jest.fn(), // deprecated
++          addEventListener: jest.fn(),
++          removeEventListener: jest.fn(),
++          dispatchEvent: jest.fn(),
++        };
++      }),
++    });
++    const courseMetadata = Factory.build('courseMetadata', { celebrations: { shouldCelebrateStreak: 3 } });
++    mockData.courseId = courseMetadata.id;
++    mockData.verifiedMode = courseMetadata.verifiedMode;
++    mockData.AA759ExperimentEnabled = true;
++    const testStore = await initializeTestStore({ courseMetadata }, false);
++    render(<StreakModal {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++    expect(screen.getByText('You’ve unlocked a 15% off discount when you upgrade this course for a limited time only.')).toBeInTheDocument();
++    expect(screen.getByText('Ends 6/25/2021.')).toBeInTheDocument();
++    expect(screen.getByText('Continue with course')).toBeInTheDocument();
++  });
+ });
+diff --git a/src/shared/streak-celebration/messages.js b/src/shared/streak-celebration/messages.js
+index 46e7dc7..dcff6e9 100644
+--- a/src/shared/streak-celebration/messages.js
++++ b/src/shared/streak-celebration/messages.js
+@@ -1,10 +1,9 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  streakHeader: {
+-    id: 'learning.streakCelebration.header',
+-    defaultMessage: 'day streak',
+-    description: 'Will come after a number. For example, 3 day streak',
++  congratulations: {
++    id: 'learning.streakCelebration.congratulations',
++    defaultMessage: 'Congratulations!',
+   },
+   streakBody: {
+     id: 'learning.streakCelebration.body',
+@@ -19,6 +18,15 @@ const messages = defineMessages({
+     defaultMessage: 'Close modal and continue',
+     description: 'Screenreader label for streakButton text',
+   },
++  streakButtonAA759: {
++    id: 'learning.streakCelebration.buttonAA759',
++    defaultMessage: 'Continue with course',
++  },
++  streakHeader: {
++    id: 'learning.streakCelebration.header',
++    defaultMessage: 'day streak',
++    description: 'Will come after a number. For example, 3 day streak',
++  },
+   streakFactoidABoldedSection: {
+     id: 'learning.streakCelebration.factoidABoldedSection',
+     defaultMessage: 'are 20x more likely to pass their course',
+@@ -29,6 +37,11 @@ const messages = defineMessages({
+     defaultMessage: 'complete 5x as much course content on average',
+     description: 'This bolded section is in the following sentence: Users who learn 3 days in a row {bolded_section} vs. those who don\'t.',
+   },
++  streakDiscountMessage: {
++    id: 'learning.streakCelebration.streakDiscountMessage',
++    defaultMessage: 'You’ve unlocked a 15% off discount when you upgrade this course for a limited time only.',
++    description: 'This message describes a discount the user becomes eligible for when they hit their three day streak',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 029c1a9..df38d2f 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
+ import { Helmet } from 'react-helmet';
+ 
+ import { getConfig } from '@edx/frontend-platform';
++import { useToggle } from '@edx/paragon';
+ 
+ import { Header, CourseTabsNavigation } from '../course-header';
+ import { useModel } from '../generic/model-store';
+@@ -37,6 +38,10 @@ function LoadedTabPage({
+   const activeTab = tabs.filter(tab => tab.slug === activeTabSlug)[0];
+ 
+   const streakLengthToCelebrate = celebrations && celebrations.streakLengthToCelebrate;
++  const AA759ExperimentEnabled = celebrations && celebrations.streakDiscountExperimentEnabled;
++  const [isStreakCelebrationOpen,, closeStreakCelebration] = useToggle(streakLengthToCelebrate);
++
++  const { verifiedMode } = useModel(metadataModel, courseId);
+ 
+   return (
+     <>
+@@ -55,14 +60,15 @@ function LoadedTabPage({
+           canViewLegacyCourseware={canViewLegacyCourseware}
+         />
+       )}
+-      {streakLengthToCelebrate && (
+-        <StreakModal
+-          courseId={courseId}
+-          metadataModel={metadataModel}
+-          streakLengthToCelebrate={streakLengthToCelebrate}
+-          open
+-        />
+-      )}
++      <StreakModal
++        courseId={courseId}
++        metadataModel={metadataModel}
++        streakLengthToCelebrate={streakLengthToCelebrate}
++        isStreakCelebrationOpen={isStreakCelebrationOpen}
++        closeStreakCelebration={closeStreakCelebration}
++        AA759ExperimentEnabled={AA759ExperimentEnabled}
++        verifiedMode={verifiedMode}
++      />
+       <main id="main-content" className="d-flex flex-column flex-grow-1">
+         <AlertList
+           topic="outline"
+-- 
+2.34.1
+

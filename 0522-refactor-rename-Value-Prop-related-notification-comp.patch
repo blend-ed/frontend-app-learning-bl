@@ -1,0 +1,1205 @@
+From 4f1c8a4671bcec524bccbb3bdff07761957cee6d Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Tue, 6 Jul 2021 12:43:49 -0400
+Subject: [PATCH 0522/1021] refactor: rename Value Prop related notification
+ components (#516)
+
+Part 3 of REV-2130
+---
+ src/course-home/data/__factories__/index.js   |  2 +-
+ ....js => upgradeNotificationData.factory.js} |  2 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |  4 +-
+ src/courseware/course/Course.jsx              | 26 ++---
+ src/courseware/course/Course.test.jsx         | 16 ++--
+ src/courseware/course/NotificationIcon.jsx    |  2 +-
+ .../{Sidebar.jsx => NotificationTray.jsx}     | 32 +++----
+ .../{Sidebar.scss => NotificationTray.scss}   |  8 +-
+ ...bar.test.jsx => NotificationTray.test.jsx} | 28 +++---
+ ...tionButton.jsx => NotificationTrigger.jsx} | 16 ++--
+ ...onButton.scss => NotificationTrigger.scss} |  2 +-
+ .../course/NotificationTrigger.test.jsx       | 43 +++++++++
+ .../course/SidebarNotificationButton.test.jsx | 43 ---------
+ src/courseware/course/messages.js             | 32 +++----
+ src/courseware/course/sequence/Sequence.jsx   | 42 ++++----
+ .../course/sequence/Sequence.test.jsx         |  6 +-
+ .../SequenceNavigation.jsx                    |  8 +-
+ .../UpgradeNotification.jsx}                  | 96 +++++++++----------
+ .../UpgradeNotification.scss}                 | 14 +--
+ .../UpgradeNotification.test.jsx}             |  8 +-
+ src/index.scss                                |  6 +-
+ 21 files changed, 218 insertions(+), 218 deletions(-)
+ rename src/course-home/data/__factories__/{upgradeCardData.factory.js => upgradeNotificationData.factory.js} (93%)
+ rename src/courseware/course/{Sidebar.jsx => NotificationTray.jsx} (60%)
+ rename src/courseware/course/{Sidebar.scss => NotificationTray.scss} (89%)
+ rename src/courseware/course/{Sidebar.test.jsx => NotificationTray.test.jsx} (77%)
+ rename src/courseware/course/{SidebarNotificationButton.jsx => NotificationTrigger.jsx} (51%)
+ rename src/courseware/course/{SidebarNotificationButton.scss => NotificationTrigger.scss} (92%)
+ create mode 100644 src/courseware/course/NotificationTrigger.test.jsx
+ delete mode 100644 src/courseware/course/SidebarNotificationButton.test.jsx
+ rename src/generic/{upgrade-card/UpgradeCard.jsx => upgrade-notification/UpgradeNotification.jsx} (78%)
+ rename src/generic/{upgrade-card/UpgradeCard.scss => upgrade-notification/UpgradeNotification.scss} (74%)
+ rename src/generic/{upgrade-card/UpgradeCard.test.jsx => upgrade-notification/UpgradeNotification.test.jsx} (98%)
+
+diff --git a/src/course-home/data/__factories__/index.js b/src/course-home/data/__factories__/index.js
+index e8ebf46..e421d00 100644
+--- a/src/course-home/data/__factories__/index.js
++++ b/src/course-home/data/__factories__/index.js
+@@ -2,4 +2,4 @@ import './courseHomeMetadata.factory';
+ import './datesTabData.factory';
+ import './outlineTabData.factory';
+ import './progressTabData.factory';
+-import './upgradeCardData.factory';
++import './upgradeNotificationData.factory';
+diff --git a/src/course-home/data/__factories__/upgradeCardData.factory.js b/src/course-home/data/__factories__/upgradeNotificationData.factory.js
+similarity index 93%
+rename from src/course-home/data/__factories__/upgradeCardData.factory.js
+rename to src/course-home/data/__factories__/upgradeNotificationData.factory.js
+index fcabc3d..fcb7524 100644
+--- a/src/course-home/data/__factories__/upgradeCardData.factory.js
++++ b/src/course-home/data/__factories__/upgradeNotificationData.factory.js
+@@ -1,6 +1,6 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ 
+-Factory.define('upgradeCardData')
++Factory.define('upgradeNotificationData')
+   .option('host', 'http://localhost:18000')
+   .option('dateBlocks', [])
+   .option('offer', null)
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index a4a2f05..d7d6571 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -16,7 +16,7 @@ import messages from './messages';
+ import Section from './Section';
+ import ShiftDatesAlert from '../suggested-schedule-messaging/ShiftDatesAlert';
+ import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+-import UpgradeCard from '../../generic/upgrade-card/UpgradeCard';
++import UpgradeNotification from '../../generic/upgrade-notification/UpgradeNotification';
+ import { useAccessExpirationAlertMasquerade } from '../../alerts/access-expiration-alert';
+ import UpgradeToShiftDatesAlert from '../suggested-schedule-messaging/UpgradeToShiftDatesAlert';
+ import useCertificateAvailableAlert from './alerts/certificate-status-alert';
+@@ -216,7 +216,7 @@ function OutlineTab({ intl }) {
+             { MMP2P.state.isEnabled
+               ? <MMP2PFlyover isStatic options={MMP2P} />
+               : (
+-                <UpgradeCard
++                <UpgradeNotification
+                   offer={offer}
+                   verifiedMode={verifiedMode}
+                   accessExpiration={accessExpiration}
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index b43c8c7..d64a7f6 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -14,7 +14,7 @@ import Sequence from './sequence';
+ import { CelebrationModal, shouldCelebrateOnSectionLoad } from './celebration';
+ import ContentTools from './content-tools';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+-import SidebarNotificationButton from './SidebarNotificationButton';
++import NotificationTrigger from './NotificationTrigger';
+ 
+ import CourseSock from '../../generic/course-sock';
+ import { useModel } from '../../generic/model-store';
+@@ -66,12 +66,12 @@ function Course({
+   // the browser console and refresh: document.cookie = 'value_prop_cookie=true';
+   const isValuePropCookieSet = Cookies.get('value_prop_cookie') === 'true';
+ 
+-  const shouldDisplaySidebarButton = useWindowSize().width >= responsiveBreakpoints.small.minWidth;
++  const shouldDisplayNotificationTrigger = useWindowSize().width >= responsiveBreakpoints.small.minWidth;
+ 
+-  const [sidebarVisible, setSidebar] = useState(true);
+-  const isSidebarVisible = () => sidebarVisible && setSidebar;
+-  const toggleSidebar = () => {
+-    if (sidebarVisible) { setSidebar(false); } else { setSidebar(true); }
++  const [notificationTrayVisible, setNotificationTray] = verifiedMode ? useState(true) : useState(false);
++  const isNotificationTrayVisible = () => notificationTrayVisible && setNotificationTray;
++  const toggleNotificationTray = () => {
++    if (notificationTrayVisible) { setNotificationTray(false); } else { setNotificationTray(true); }
+   };
+ 
+   /** [MM-P2P] Experiment */
+@@ -102,10 +102,10 @@ function Course({
+           mmp2p={MMP2P}
+         />
+ 
+-        { isValuePropCookieSet && shouldDisplaySidebarButton ? (
+-          <SidebarNotificationButton
+-            toggleSidebar={toggleSidebar}
+-            isSidebarVisible={isSidebarVisible}
++        { isValuePropCookieSet && shouldDisplayNotificationTrigger ? (
++          <NotificationTrigger
++            toggleNotificationTray={toggleNotificationTray}
++            isNotificationTrayVisible={isNotificationTrayVisible}
+           />
+         ) : null}
+       </div>
+@@ -118,9 +118,9 @@ function Course({
+         unitNavigationHandler={unitNavigationHandler}
+         nextSequenceHandler={nextSequenceHandler}
+         previousSequenceHandler={previousSequenceHandler}
+-        toggleSidebar={toggleSidebar}
+-        isSidebarVisible={isSidebarVisible}
+-        sidebarVisible={sidebarVisible}
++        toggleNotificationTray={toggleNotificationTray}
++        isNotificationTrayVisible={isNotificationTrayVisible}
++        notificationTrayVisible={notificationTrayVisible}
+         isValuePropCookieSet={isValuePropCookieSet}
+         //* * [MM-P2P] Experiment */
+         mmp2p={MMP2P}
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 418a633..5b795e5 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -20,7 +20,7 @@ describe('Course', () => {
+     nextSequenceHandler: () => {},
+     previousSequenceHandler: () => {},
+     unitNavigationHandler: () => {},
+-    toggleSidebar: () => {},
++    toggleNotificationTray: () => {},
+   };
+ 
+   beforeAll(async () => {
+@@ -87,9 +87,9 @@ describe('Course', () => {
+     expect(screen.getByRole('button', { name: 'Learn About Verified Certificates' })).toBeInTheDocument();
+   });
+ 
+-  it('displays sidebar notification button', async () => {
+-    const toggleSidebar = jest.fn();
+-    const isSidebarVisible = jest.fn();
++  it('displays notification trigger', async () => {
++    const toggleNotificationTray = jest.fn();
++    const isNotificationTrayVisible = jest.fn();
+ 
+     // REV-2297 TODO: remove cookie related code once temporary value prop cookie code is removed.
+     const cookieName = 'value_prop_cookie';
+@@ -101,15 +101,15 @@ describe('Course', () => {
+     const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
+     const testData = {
+       ...mockData,
+-      toggleSidebar,
+-      isSidebarVisible,
++      toggleNotificationTray,
++      isNotificationTrayVisible,
+     };
+     render(<Course {...testData} courseId={courseMetadata.id} />, { store: testStore });
+ 
+-    const sidebarOpenButton = screen.getByRole('button', { name: /Show sidebar notification/i });
++    const notificationOpenButton = screen.getByRole('button', { name: /Show notification tray/i });
+ 
+     expect(getSpy).toBeCalledWith(cookieName);
+-    expect(sidebarOpenButton).toBeInTheDocument();
++    expect(notificationOpenButton).toBeInTheDocument();
+   });
+ 
+   it('displays offer and expiration alert', async () => {
+diff --git a/src/courseware/course/NotificationIcon.jsx b/src/courseware/course/NotificationIcon.jsx
+index 7f982ed..da8f011 100644
+--- a/src/courseware/course/NotificationIcon.jsx
++++ b/src/courseware/course/NotificationIcon.jsx
+@@ -11,7 +11,7 @@ import messages from './messages';
+ function NotificationIcon({ intl, status, notificationColor }) {
+   return (
+     <div className="icon-container">
+-      <Icon src={WatchOutline} className="m-0 m-auto" alt={intl.formatMessage(messages.openSidebarButton)} />
++      <Icon src={WatchOutline} className="m-0 m-auto" alt={intl.formatMessage(messages.openNotificationTrigger)} />
+       {status === 'active'
+         ? <span className={classNames(notificationColor, 'notification-dot')} data-testid="notification-dot" />
+         : null}
+diff --git a/src/courseware/course/Sidebar.jsx b/src/courseware/course/NotificationTray.jsx
+similarity index 60%
+rename from src/courseware/course/Sidebar.jsx
+rename to src/courseware/course/NotificationTray.jsx
+index 4721e9d..85b83d1 100644
+--- a/src/courseware/course/Sidebar.jsx
++++ b/src/courseware/course/NotificationTray.jsx
+@@ -9,10 +9,10 @@ import { ArrowBackIos, Close } from '@edx/paragon/icons';
+ import messages from './messages';
+ import { useModel } from '../../generic/model-store';
+ import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWindowSize';
+-import UpgradeCard from '../../generic/upgrade-card/UpgradeCard';
++import UpgradeNotification from '../../generic/upgrade-notification/UpgradeNotification';
+ 
+-function Sidebar({
+-  intl, toggleSidebar,
++function NotificationTray({
++  intl, toggleNotificationTray,
+ }) {
+   const {
+     courseId,
+@@ -33,23 +33,23 @@ function Sidebar({
+   const shouldDisplayFullScreen = useWindowSize().width < responsiveBreakpoints.large.minWidth;
+ 
+   return (
+-    <section className={classNames('sidebar-container ml-0 ml-lg-4', { 'no-notification': !verifiedMode && !shouldDisplayFullScreen })} aria-label={intl.formatMessage(messages.sidebarNotification)}>
++    <section className={classNames('notification-tray-container ml-0 ml-lg-4', { 'no-notification': !verifiedMode && !shouldDisplayFullScreen })} aria-label={intl.formatMessage(messages.notificationTray)}>
+       {shouldDisplayFullScreen ? (
+-        <div className="mobile-close-container" onClick={() => { toggleSidebar(); }} onKeyDown={() => { toggleSidebar(); }} role="button" tabIndex="0" alt={intl.formatMessage(messages.responsiveCloseSidebar)}>
++        <div className="mobile-close-container" onClick={() => { toggleNotificationTray(); }} onKeyDown={() => { toggleNotificationTray(); }} role="button" tabIndex="0" alt={intl.formatMessage(messages.responsiveCloseNotificationTray)}>
+           <Icon src={ArrowBackIos} />
+-          <span className="mobile-close">{intl.formatMessage(messages.responsiveCloseSidebar)}</span>
++          <span className="mobile-close">{intl.formatMessage(messages.responsiveCloseNotificationTray)}</span>
+         </div>
+       ) : null}
+-      <div className="sidebar-header px-3">
++      <div className="notification-tray-header px-3">
+         <span>{intl.formatMessage(messages.notificationTitle)}</span>
+         {shouldDisplayFullScreen
+           ? null
+-          : <Icon src={Close} className="close-btn" onClick={() => { toggleSidebar(); }} onKeyDown={() => { toggleSidebar(); }} role="button" tabIndex="0" alt={intl.formatMessage(messages.closeSidebarButton)} />}
++          : <Icon src={Close} className="close-btn" onClick={() => { toggleNotificationTray(); }} onKeyDown={() => { toggleNotificationTray(); }} role="button" tabIndex="0" alt={intl.formatMessage(messages.closeNotificationTrigger)} />}
+       </div>
+-      <div className="sidebar-divider" />
++      <div className="notification-tray-divider" />
+       <div>{verifiedMode
+         ? (
+-          <UpgradeCard
++          <UpgradeNotification
+             offer={offer}
+             verifiedMode={verifiedMode}
+             accessExpiration={accessExpiration}
+@@ -60,19 +60,19 @@ function Sidebar({
+             org={org}
+             shouldDisplayBorder={false}
+           />
+-        ) : <p className="sidebar-content">{intl.formatMessage(messages.noNotificationsMessage)}</p>}
++        ) : <p className="notification-tray-content">{intl.formatMessage(messages.noNotificationsMessage)}</p>}
+       </div>
+     </section>
+   );
+ }
+ 
+-Sidebar.propTypes = {
++NotificationTray.propTypes = {
+   intl: intlShape.isRequired,
+-  toggleSidebar: PropTypes.func,
++  toggleNotificationTray: PropTypes.func,
+ };
+ 
+-Sidebar.defaultProps = {
+-  toggleSidebar: null,
++NotificationTray.defaultProps = {
++  toggleNotificationTray: null,
+ };
+ 
+-export default injectIntl(Sidebar);
++export default injectIntl(NotificationTray);
+diff --git a/src/courseware/course/Sidebar.scss b/src/courseware/course/NotificationTray.scss
+similarity index 89%
+rename from src/courseware/course/Sidebar.scss
+rename to src/courseware/course/NotificationTray.scss
+index 2417e32..b3471a8 100644
+--- a/src/courseware/course/Sidebar.scss
++++ b/src/courseware/course/NotificationTray.scss
+@@ -1,4 +1,4 @@
+-.sidebar-container {
++.notification-tray-container {
+     border: 1px solid $light-400;
+     border-radius: 4px;
+     width: 31rem;
+@@ -23,7 +23,7 @@
+     height: 15rem;
+ }
+ 
+-.sidebar-header {
++.notification-tray-header {
+     padding: 0.625rem 0;
+ 
+     span {
+@@ -35,7 +35,7 @@
+     float: right;
+ }
+ 
+-.sidebar-divider {
++.notification-tray-divider {
+     width: 100.5%;
+     height: 0.5rem;
+     background: $gray-100;
+@@ -43,7 +43,7 @@
+     border-left: 0;
+ }
+ 
+-.sidebar-content {
++.notification-tray-content {
+     padding: 1rem;
+     font-size: 0.875rem;
+ }
+diff --git a/src/courseware/course/Sidebar.test.jsx b/src/courseware/course/NotificationTray.test.jsx
+similarity index 77%
+rename from src/courseware/course/Sidebar.test.jsx
+rename to src/courseware/course/NotificationTray.test.jsx
+index fdb4473..acbcf0a 100644
+--- a/src/courseware/course/Sidebar.test.jsx
++++ b/src/courseware/course/NotificationTray.test.jsx
+@@ -10,14 +10,14 @@ import {
+ } from '../../setupTest';
+ import initializeStore from '../../store';
+ import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
+-import Sidebar from './Sidebar';
++import NotificationTray from './NotificationTray';
+ import useWindowSize from '../../generic/tabs/useWindowSize';
+ 
+ initializeMockApp();
+ jest.mock('../../generic/tabs/useWindowSize');
+ jest.mock('@edx/frontend-platform/analytics');
+ 
+-describe('Sidebar', () => {
++describe('NotificationTray', () => {
+   let mockData;
+   let axiosMock;
+   let store;
+@@ -43,45 +43,45 @@ describe('Sidebar', () => {
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
+     mockData = {
+-      toggleSidebar: () => {},
++      toggleNotificationTray: () => {},
+     };
+   });
+ 
+-  it('renders sidebar', async () => {
++  it('renders notification tray', async () => {
+     useWindowSize.mockReturnValue({ width: 1200, height: 422 });
+-    await fetchAndRender(<Sidebar />);
++    await fetchAndRender(<NotificationTray />);
+     expect(screen.getByText('Notifications')).toBeInTheDocument();
+     expect(screen.queryByText('Back to course')).not.toBeInTheDocument();
+   });
+ 
+   it('renders upgrade card', async () => {
+-    await fetchAndRender(<Sidebar />);
+-    const upgradeCard = document.querySelector('.upgrade-card');
++    await fetchAndRender(<NotificationTray />);
++    const UpgradeNotification = document.querySelector('.upgrade-notification');
+ 
+-    expect(upgradeCard).toBeInTheDocument();
++    expect(UpgradeNotification).toBeInTheDocument();
+     expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+     expect(screen.queryByText('You have no new notifications at this time.')).not.toBeInTheDocument();
+   });
+ 
+   it('renders no notifications message if no verified mode', async () => {
+     setMetadata({ verified_mode: null });
+-    await fetchAndRender(<Sidebar />);
++    await fetchAndRender(<NotificationTray />);
+     expect(screen.queryByText('You have no new notifications at this time.')).toBeInTheDocument();
+   });
+ 
+-  it('renders sidebar with full screen "Back to course" at response width', async () => {
++  it('renders notification tray with full screen "Back to course" at response width', async () => {
+     useWindowSize.mockReturnValue({ width: 991, height: 422 });
+-    const toggleSidebar = jest.fn();
++    const toggleNotificationTray = jest.fn();
+     const testData = {
+       ...mockData,
+-      toggleSidebar,
++      toggleNotificationTray,
+     };
+-    await fetchAndRender(<Sidebar {...testData} />);
++    await fetchAndRender(<NotificationTray {...testData} />);
+ 
+     const responsiveCloseButton = screen.getByRole('button', { name: 'Back to course' });
+     await waitFor(() => expect(responsiveCloseButton).toBeInTheDocument());
+ 
+     fireEvent.click(responsiveCloseButton);
+-    expect(toggleSidebar).toHaveBeenCalledTimes(1);
++    expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
+   });
+ });
+diff --git a/src/courseware/course/SidebarNotificationButton.jsx b/src/courseware/course/NotificationTrigger.jsx
+similarity index 51%
+rename from src/courseware/course/SidebarNotificationButton.jsx
+rename to src/courseware/course/NotificationTrigger.jsx
+index 4ff7ccc..183a35a 100644
+--- a/src/courseware/course/SidebarNotificationButton.jsx
++++ b/src/courseware/course/NotificationTrigger.jsx
+@@ -6,13 +6,13 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import NotificationIcon from './NotificationIcon';
+ import messages from './messages';
+ 
+-function SidebarNotificationButton({ intl, toggleSidebar, isSidebarVisible }) {
++function NotificationTrigger({ intl, toggleNotificationTray, isNotificationTrayVisible }) {
+   return (
+     <button
+-      className={classNames('sidebar-notification-btn', { active: isSidebarVisible() })}
++      className={classNames('notification-trigger-btn', { active: isNotificationTrayVisible() })}
+       type="button"
+-      onClick={() => { toggleSidebar(); }}
+-      aria-label={intl.formatMessage(messages.openSidebarButton)}
++      onClick={() => { toggleNotificationTray(); }}
++      aria-label={intl.formatMessage(messages.openNotificationTrigger)}
+     >
+       {/* REV-2297 TODO: add logic for status "active" if red dot should display */}
+       <NotificationIcon status="inactive" notificationColor="bg-danger-500" />
+@@ -20,10 +20,10 @@ function SidebarNotificationButton({ intl, toggleSidebar, isSidebarVisible }) {
+   );
+ }
+ 
+-SidebarNotificationButton.propTypes = {
++NotificationTrigger.propTypes = {
+   intl: intlShape.isRequired,
+-  toggleSidebar: PropTypes.func.isRequired,
+-  isSidebarVisible: PropTypes.func.isRequired,
++  toggleNotificationTray: PropTypes.func.isRequired,
++  isNotificationTrayVisible: PropTypes.func.isRequired,
+ };
+ 
+-export default injectIntl(SidebarNotificationButton);
++export default injectIntl(NotificationTrigger);
+diff --git a/src/courseware/course/SidebarNotificationButton.scss b/src/courseware/course/NotificationTrigger.scss
+similarity index 92%
+rename from src/courseware/course/SidebarNotificationButton.scss
+rename to src/courseware/course/NotificationTrigger.scss
+index 1502f70..15297a9 100644
+--- a/src/courseware/course/SidebarNotificationButton.scss
++++ b/src/courseware/course/NotificationTrigger.scss
+@@ -1,4 +1,4 @@
+-.sidebar-notification-btn {
++.notification-trigger-btn {
+     border: 1px solid $light-400;
+     background: none;
+     margin-top: 0.625rem;
+diff --git a/src/courseware/course/NotificationTrigger.test.jsx b/src/courseware/course/NotificationTrigger.test.jsx
+new file mode 100644
+index 0000000..918bb73
+--- /dev/null
++++ b/src/courseware/course/NotificationTrigger.test.jsx
+@@ -0,0 +1,43 @@
++import React from 'react';
++import { Factory } from 'rosie';
++import {
++  render, initializeTestStore, screen, fireEvent,
++} from '../../setupTest';
++import NotificationTrigger from './NotificationTrigger';
++
++describe('Notification Trigger', () => {
++  let mockData;
++  const courseMetadata = Factory.build('courseMetadata');
++
++  beforeAll(async () => {
++    await initializeTestStore({ courseMetadata, excludeFetchCourse: true, excludeFetchSequence: true });
++    mockData = {
++      toggleNotificationTray: () => {},
++      isNotificationTrayVisible: () => {},
++    };
++  });
++
++  it('renders notification trigger with icon', async () => {
++    const { container } = render(<NotificationTrigger {...mockData} />);
++    expect(container).toBeInTheDocument();
++    const buttonIcon = container.querySelectorAll('svg');
++    expect(buttonIcon).toHaveLength(1);
++
++    // REV-2297 TODO: update below test once the status=active or inactive is implemented
++    // expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
++  });
++
++  it('handles onClick event toggling the notification tray', async () => {
++    const toggleNotificationTray = jest.fn();
++    const testData = {
++      ...mockData,
++      toggleNotificationTray,
++    };
++    render(<NotificationTrigger {...testData} />);
++
++    const notificationOpenButton = screen.getByRole('button', { name: /Show notification tray/i });
++    expect(notificationOpenButton).toBeInTheDocument();
++    fireEvent.click(notificationOpenButton);
++    expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/src/courseware/course/SidebarNotificationButton.test.jsx b/src/courseware/course/SidebarNotificationButton.test.jsx
+deleted file mode 100644
+index f311750..0000000
+--- a/src/courseware/course/SidebarNotificationButton.test.jsx
++++ /dev/null
+@@ -1,43 +0,0 @@
+-import React from 'react';
+-import { Factory } from 'rosie';
+-import {
+-  render, initializeTestStore, screen, fireEvent,
+-} from '../../setupTest';
+-import SidebarNotificationButton from './SidebarNotificationButton';
+-
+-describe('Sidebar Notification Button', () => {
+-  let mockData;
+-  const courseMetadata = Factory.build('courseMetadata');
+-
+-  beforeAll(async () => {
+-    await initializeTestStore({ courseMetadata, excludeFetchCourse: true, excludeFetchSequence: true });
+-    mockData = {
+-      toggleSidebar: () => {},
+-      isSidebarVisible: () => {},
+-    };
+-  });
+-
+-  it('renders sidebar notification button with icon', async () => {
+-    const { container } = render(<SidebarNotificationButton {...mockData} />);
+-    expect(container).toBeInTheDocument();
+-    const buttonIcon = container.querySelectorAll('svg');
+-    expect(buttonIcon).toHaveLength(1);
+-
+-    // REV-2297 TODO: update below test once the status=active or inactive is implemented
+-    // expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
+-  });
+-
+-  it('handles onClick event toggling the sidebar', async () => {
+-    const toggleSidebar = jest.fn();
+-    const testData = {
+-      ...mockData,
+-      toggleSidebar,
+-    };
+-    render(<SidebarNotificationButton {...testData} />);
+-
+-    const sidebarOpenButton = screen.getByRole('button', { name: /Show sidebar notification/i });
+-    expect(sidebarOpenButton).toBeInTheDocument();
+-    fireEvent.click(sidebarOpenButton);
+-    expect(toggleSidebar).toHaveBeenCalledTimes(1);
+-  });
+-});
+diff --git a/src/courseware/course/messages.js b/src/courseware/course/messages.js
+index 98c3c9f..1295797 100644
+--- a/src/courseware/course/messages.js
++++ b/src/courseware/course/messages.js
+@@ -1,33 +1,33 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  sidebarNotification: {
+-    id: 'sidebar.notification.container',
+-    defaultMessage: 'Sidebar notification',
+-    description: 'Sidebar notification section container',
++  notificationTray: {
++    id: 'notification.tray.container',
++    defaultMessage: 'Notification tray',
++    description: 'Notification tray container',
+   },
+-  openSidebarButton: {
+-    id: 'sidebar.open.button',
+-    defaultMessage: 'Show sidebar notification',
+-    description: 'Button to open the sidebar and show notifications',
++  openNotificationTrigger: {
++    id: 'notification.open.button',
++    defaultMessage: 'Show notification tray',
++    description: 'Button to open the notification tray and show notifications',
+   },
+-  closeSidebarButton: {
+-    id: 'sidebar.close.button',
++  closeNotificationTrigger: {
++    id: 'notification.close.button',
+     defaultMessage: 'Close sidebar notification',
+     description: 'Button for the learner to close the sidebar',
+   },
+-  responsiveCloseSidebar: {
+-    id: 'sidebar.responsive.close.button',
++  responsiveCloseNotificationTray: {
++    id: 'responsive.close.notification',
+     defaultMessage: 'Back to course',
+-    description: 'Responsive button for the learner to go back to course and close the sidebar',
++    description: 'Responsive button to go back to course and close the notification tray',
+   },
+   notificationTitle: {
+-    id: 'sidebar.notification.title',
++    id: 'notification.tray.title',
+     defaultMessage: 'Notifications',
+-    description: 'Title text displayed for sidebar notifications',
++    description: 'Title text displayed for the notification tray',
+   },
+   noNotificationsMessage: {
+-    id: 'sidebar.notification.no.message',
++    id: 'notification.tray.no.message',
+     defaultMessage: 'You have no new notifications at this time.',
+     description: 'Text displayed when the learner has no notifications',
+   },
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 5b7d3de..5be4abb 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -22,8 +22,8 @@ import CourseLicense from '../course-license';
+ import messages from './messages';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import SequenceContent from './SequenceContent';
+-import Sidebar from '../Sidebar';
+-import SidebarNotificationButton from '../SidebarNotificationButton';
++import NotificationTray from '../NotificationTray';
++import NotificationTrigger from '../NotificationTrigger';
+ 
+ /** [MM-P2P] Experiment */
+ import { isMobile } from '../../../experiments/mm-p2p/utils';
+@@ -37,9 +37,9 @@ function Sequence({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   intl,
+-  toggleSidebar,
+-  sidebarVisible,
+-  isSidebarVisible,
++  toggleNotificationTray,
++  notificationTrayVisible,
++  isNotificationTrayVisible,
+   isValuePropCookieSet,
+   mmp2p,
+ }) {
+@@ -49,7 +49,7 @@ function Sequence({
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+   const specialExamsEnabledWaffleFlag = useSelector(state => state.courseware.specialExamsEnabledWaffleFlag);
+   const proctoredExamsEnabledWaffleFlag = useSelector(state => state.courseware.proctoredExamsEnabledWaffleFlag);
+-  const shouldDisplaySidebarButton = useWindowSize().width < responsiveBreakpoints.small.minWidth;
++  const shouldDisplayNotificationTrigger = useWindowSize().width < responsiveBreakpoints.small.minWidth;
+ 
+   const handleNext = () => {
+     const nextIndex = sequence.unitIds.indexOf(unitId) + 1;
+@@ -167,7 +167,7 @@ function Sequence({
+ 
+   const defaultContent = (
+     <div className="sequence-container" style={{ display: 'inline-flex', flexDirection: 'row' }}>
+-      <div className={classNames('sequence', { 'position-relative': shouldDisplaySidebarButton })} style={{ width: '100%' }}>
++      <div className={classNames('sequence', { 'position-relative': shouldDisplayNotificationTrigger })} style={{ width: '100%' }}>
+         <SequenceNavigation
+           sequenceId={sequenceId}
+           unitId={unitId}
+@@ -192,10 +192,10 @@ function Sequence({
+           isValuePropCookieSet={isValuePropCookieSet}
+         />
+ 
+-        {isValuePropCookieSet && shouldDisplaySidebarButton ? (
+-          <SidebarNotificationButton
+-            toggleSidebar={toggleSidebar}
+-            isSidebarVisible={isSidebarVisible}
++        {isValuePropCookieSet && shouldDisplayNotificationTrigger ? (
++          <NotificationTrigger
++            toggleNotificationTray={toggleNotificationTray}
++            isNotificationTrayVisible={isNotificationTrayVisible}
+           />
+         ) : null}
+ 
+@@ -226,10 +226,10 @@ function Sequence({
+           )}
+         </div>
+       </div>
+-      {isValuePropCookieSet && sidebarVisible ? (
+-        <Sidebar
+-          toggleSidebar={toggleSidebar}
+-          sidebarVisible={sidebarVisible}
++      {isValuePropCookieSet && notificationTrayVisible ? (
++        <NotificationTray
++          toggleNotificationTray={toggleNotificationTray}
++          notificationTrayVisible={notificationTrayVisible}
+         />
+       ) : null }
+ 
+@@ -269,9 +269,9 @@ Sequence.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   intl: intlShape.isRequired,
+-  toggleSidebar: PropTypes.func,
+-  sidebarVisible: PropTypes.bool,
+-  isSidebarVisible: PropTypes.func,
++  toggleNotificationTray: PropTypes.func,
++  notificationTrayVisible: PropTypes.bool,
++  isNotificationTrayVisible: PropTypes.func,
+   isValuePropCookieSet: PropTypes.bool,
+ 
+   /** [MM-P2P] Experiment */
+@@ -291,9 +291,9 @@ Sequence.propTypes = {
+ Sequence.defaultProps = {
+   sequenceId: null,
+   unitId: null,
+-  toggleSidebar: null,
+-  sidebarVisible: null,
+-  isSidebarVisible: null,
++  toggleNotificationTray: null,
++  notificationTrayVisible: null,
++  isNotificationTrayVisible: null,
+   isValuePropCookieSet: null,
+ 
+   /** [MM-P2P] Experiment */
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index f602cec..883ef79 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -28,7 +28,7 @@ describe('Sequence', () => {
+       unitNavigationHandler: () => {},
+       nextSequenceHandler: () => {},
+       previousSequenceHandler: () => {},
+-      sidebarVisible: false,
++      notificationTrayVisible: false,
+     };
+   });
+ 
+@@ -130,10 +130,10 @@ describe('Sequence', () => {
+     expect(screen.getAllByRole('button', { name: /previous|next/i }).length).toEqual(4);
+   });
+ 
+-  it('renders sidebar in sequence', async () => {
++  it('renders notification tray in sequence', async () => {
+     const testData = {
+       ...mockData,
+-      sidebarVisible: true,
++      notificationTrayVisible: true,
+       isValuePropCookieSet: true,
+     };
+ 
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 7eb5246..c723708 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -40,7 +40,7 @@ function SequenceNavigation({
+     sequence.gatedContent !== undefined && sequence.gatedContent.gated
+   ) : undefined;
+ 
+-  const shouldDisplaySidebarButton = useWindowSize().width < responsiveBreakpoints.small.minWidth;
++  const shouldDisplayNotificationTrigger = useWindowSize().width < responsiveBreakpoints.small.minWidth;
+ 
+   const renderUnitButtons = () => {
+     if (isLocked) {
+@@ -70,15 +70,15 @@ function SequenceNavigation({
+     const disabled = isLastUnit && !exitActive;
+     return (
+       <Button variant="link" className="next-btn" onClick={buttonOnClick} disabled={disabled} iconAfter={ChevronRight}>
+-        {isValuePropCookieSet && shouldDisplaySidebarButton ? null : buttonText}
++        {isValuePropCookieSet && shouldDisplayNotificationTrigger ? null : buttonText}
+       </Button>
+     );
+   };
+ 
+   return sequenceStatus === LOADED && (
+-    <nav className={classNames('sequence-navigation', className)} style={{ width: isValuePropCookieSet && shouldDisplaySidebarButton ? '90%' : null }}>
++    <nav className={classNames('sequence-navigation', className)} style={{ width: isValuePropCookieSet && shouldDisplayNotificationTrigger ? '90%' : null }}>
+       <Button variant="link" className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit} iconBefore={ChevronLeft}>
+-        {isValuePropCookieSet && shouldDisplaySidebarButton ? null : intl.formatMessage(messages.previousButton)}
++        {isValuePropCookieSet && shouldDisplayNotificationTrigger ? null : intl.formatMessage(messages.previousButton)}
+       </Button>
+       {renderUnitButtons()}
+       {renderNextButton()}
+diff --git a/src/generic/upgrade-card/UpgradeCard.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+similarity index 78%
+rename from src/generic/upgrade-card/UpgradeCard.jsx
+rename to src/generic/upgrade-notification/UpgradeNotification.jsx
+index 5fe848f..2123df5 100644
+--- a/src/generic/upgrade-card/UpgradeCard.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -14,26 +14,26 @@ function UpsellNoFBECardContent() {
+   const verifiedCertLink = (
+     <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href={`${getConfig().MARKETING_SITE_BASE_URL}/verified-certificate`}>
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.verifiedCertLink"
++        id="learning.generic.upgradeNotification.verifiedCertLink"
+         defaultMessage="verified certificate"
+       />
+     </a>
+   );
+ 
+   return (
+-    <ul className="fa-ul upgrade-card-ul pt-0">
++    <ul className="fa-ul upgrade-notification-ul pt-0">
+       <li>
+-        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.verifiedCertMessage"
++          id="learning.generic.upgradeNotification.verifiedCertMessage"
+           defaultMessage="Earn a {verifiedCertLink} of completion to showcase on your resume"
+           values={{ verifiedCertLink }}
+         />
+       </li>
+       <li>
+-        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.nonProfitMission"
++          id="learning.generic.upgradeNotification.noFBE.nonProfitMission"
+           defaultMessage="Support our {nonProfitMission} at edX"
+           values={{
+             nonProfitMission: (
+@@ -50,7 +50,7 @@ function UpsellFBEFarAwayCardContent() {
+   const verifiedCertLink = (
+     <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href={`${getConfig().MARKETING_SITE_BASE_URL}/verified-certificate`}>
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.verifiedCertLink"
++        id="learning.generic.upgradeNotification.verifiedCertLink"
+         defaultMessage="verified certificate"
+       />
+     </a>
+@@ -59,7 +59,7 @@ function UpsellFBEFarAwayCardContent() {
+   const gradedAssignments = (
+     <span className="font-weight-bold">
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.gradedAssignments"
++        id="learning.generic.upgradeNotification.gradedAssignments"
+         defaultMessage="graded assignments"
+       />
+     </span>
+@@ -68,7 +68,7 @@ function UpsellFBEFarAwayCardContent() {
+   const fullAccess = (
+     <span className="font-weight-bold">
+       <FormattedMessage
+-        id="learning.upgradeCard.verifiedCertLink"
++        id="learning.generic.upgradeNotification.verifiedCertLink.fullAccess"
+         defaultMessage="Full access"
+       />
+     </span>
+@@ -77,42 +77,42 @@ function UpsellFBEFarAwayCardContent() {
+   const nonProfitMission = (
+     <span className="font-weight-bold">
+       <FormattedMessage
+-        id="learning.upgradeCard.nonProfitMission"
++        id="learning.generic.upgradeNotification.FBE.nonProfitMission"
+         defaultMessage="non-profit mission"
+       />
+     </span>
+   );
+ 
+   return (
+-    <ul className="fa-ul upgrade-card-ul">
++    <ul className="fa-ul upgrade-notification-ul">
+       <li>
+-        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.verifiedCertMessage"
++          id="learning.generic.upgradeNotification.verifiedCertMessage"
+           defaultMessage="Earn a {verifiedCertLink} of completion to showcase on your resume"
+           values={{ verifiedCertLink }}
+         />
+       </li>
+       <li>
+-        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.unlockGraded"
++          id="learning.generic.upgradeNotification.unlockGraded"
+           defaultMessage="Unlock your access to all course activities, including {gradedAssignments}"
+           values={{ gradedAssignments }}
+         />
+       </li>
+       <li>
+-        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.fullAccess"
++          id="learning.generic.upgradeNotification.fullAccess"
+           defaultMessage="{fullAccess} to course content and materials, even after the course ends"
+           values={{ fullAccess }}
+         />
+       </li>
+       <li>
+-        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <span className="fa-li upgrade-notification-li"><FontAwesomeIcon icon={faCheck} /></span>
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.nonProfitMission"
++          id="learning.generic.upgradeNotification.nonProfitMission"
+           defaultMessage="Support our {nonProfitMission} at edX"
+           values={{ nonProfitMission }}
+         />
+@@ -125,7 +125,7 @@ function UpsellFBESoonCardContent({ accessExpirationDate, timezoneFormatArgs })
+   const includingAnyProgress = (
+     <span className="font-weight-bold">
+       <FormattedMessage
+-        id="learning.upgradeCard.expirationAccessLoss.progress"
++        id="learning.generic.upgradeNotification.expirationAccessLoss.progress"
+         defaultMessage="including any progress"
+       />
+     </span>
+@@ -144,17 +144,17 @@ function UpsellFBESoonCardContent({ accessExpirationDate, timezoneFormatArgs })
+   const benefitsOfUpgrading = (
+     <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href="https://support.edx.org/hc/en-us/articles/360013426573-What-are-the-differences-between-audit-free-and-verified-paid-courses-">
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.expirationVerifiedCert.benefits"
++        id="learning.generic.upgradeNotification.expirationVerifiedCert.benefits"
+         defaultMessage="benefits of upgrading"
+       />
+     </a>
+   );
+ 
+   return (
+-    <div className="upgrade-card-text">
++    <div className="upgrade-notification-text">
+       <p>
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.expirationAccessLoss"
++          id="learning.generic.upgradeNotification.expirationAccessLoss"
+           defaultMessage="You will lose all access to this course, {includingAnyProgress}, on {date}."
+           values={{
+             includingAnyProgress,
+@@ -164,7 +164,7 @@ function UpsellFBESoonCardContent({ accessExpirationDate, timezoneFormatArgs })
+       </p>
+       <p>
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.expirationVerifiedCert"
++          id="learning.generic.upgradeNotification.expirationVerifiedCert"
+           defaultMessage="Upgrading your course enables you to pursue a verified certificate and unlocks numerous features. Learn more about the {benefitsOfUpgrading}."
+           values={{ benefitsOfUpgrading }}
+         />
+@@ -190,7 +190,7 @@ function ExpirationCountdown({ hoursToExpiration }) {
+   if (hoursToExpiration >= 24) {
+     expirationText = (
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.expirationDays"
++        id="learning.generic.upgradeNotification.expirationDays"
+         defaultMessage={`{dayCount, number} {dayCount, plural, 
+           one {day}
+           other {days}} left`}
+@@ -202,7 +202,7 @@ function ExpirationCountdown({ hoursToExpiration }) {
+   } else if (hoursToExpiration >= 1) {
+     expirationText = (
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.expirationHours"
++        id="learning.generic.upgradeNotification.expirationHours"
+         defaultMessage={`{hourCount, number} {hourCount, plural,
+           one {hour}
+           other {hours}} left`}
+@@ -214,7 +214,7 @@ function ExpirationCountdown({ hoursToExpiration }) {
+   } else {
+     expirationText = (
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.expirationMinutes"
++        id="learning.generic.upgradeNotification.expirationMinutes"
+         defaultMessage="Less than 1 hour left"
+       />
+     );
+@@ -230,7 +230,7 @@ function AccessExpirationDateBanner({ accessExpirationDate, timezoneFormatArgs }
+   return (
+     <div className="upsell-warning-light">
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.expiration"
++        id="learning.generic.upgradeNotification.expiration"
+         defaultMessage="Course access will expire {date}"
+         values={{
+           date: (
+@@ -259,7 +259,7 @@ AccessExpirationDateBanner.defaultProps = {
+   timezoneFormatArgs: {},
+ };
+ 
+-function UpgradeCard({
++function UpgradeNotification({
+   accessExpiration,
+   contentTypeGatingEnabled,
+   courseId,
+@@ -313,12 +313,12 @@ function UpgradeCard({
+ 
+   /*
+   There are 4 parts that change in the upgrade card:
+-    upgradeCardHeaderText
++    upgradeNotificationHeaderText
+     expirationBanner
+     upsellMessage
+     offerCode
+   */
+-  let upgradeCardHeaderText;
++  let upgradeNotificationHeaderText;
+   let expirationBanner;
+   let upsellMessage;
+   let offerCode;
+@@ -331,7 +331,7 @@ function UpgradeCard({
+       offerCode = (
+         <div className="text-center discount-info">
+           <FormattedMessage
+-            id="learning.outline.widgets.upgradeCard.code"
++            id="learning.generic.upgradeNotification.code"
+             defaultMessage="Use code {code} at checkout"
+             values={{
+               code: (<span className="font-weight-bold">{offer.code}</span>),
+@@ -344,9 +344,9 @@ function UpgradeCard({
+     if (hoursToAccessExpiration >= (7 * 24)) {
+       if (offer) { // countdown to the first purchase discount if there is one
+         const hoursToDiscountExpiration = Math.floor((new Date(offer.expirationDate) - correctedTime) / 1000 / 60 / 60);
+-        upgradeCardHeaderText = (
++        upgradeNotificationHeaderText = (
+           <FormattedMessage
+-            id="learning.outline.widgets.upgradeCard.firstTimeLearnerDiscount"
++            id="learning.generic.upgradeNotification.firstTimeLearnerDiscount"
+             defaultMessage="{percentage}% First-Time Learner Discount"
+             values={{
+               percentage: (offer.percentage),
+@@ -355,9 +355,9 @@ function UpgradeCard({
+         );
+         expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToDiscountExpiration} />;
+       } else {
+-        upgradeCardHeaderText = (
++        upgradeNotificationHeaderText = (
+           <FormattedMessage
+-            id="learning.outline.widgets.upgradeCard.accessExpiration"
++            id="learning.generic.upgradeNotification.accessExpiration"
+             defaultMessage="Upgrade your course today"
+           />
+         );
+@@ -370,9 +370,9 @@ function UpgradeCard({
+       }
+       upsellMessage = <UpsellFBEFarAwayCardContent />;
+     } else { // more urgent messaging if there's less than 7 days left to access expiration
+-      upgradeCardHeaderText = (
++      upgradeNotificationHeaderText = (
+         <FormattedMessage
+-          id="learning.outline.widgets.upgradeCard.accessExpirationUrgent"
++          id="learning.generic.upgradeNotification.accessExpirationUrgent"
+           defaultMessage="Course Access Expiration"
+         />
+       );
+@@ -385,9 +385,9 @@ function UpgradeCard({
+       );
+     }
+   } else { // FBE is turned off
+-    upgradeCardHeaderText = (
++    upgradeNotificationHeaderText = (
+       <FormattedMessage
+-        id="learning.outline.widgets.upgradeCard.pursueAverifiedCertificate"
++        id="learning.generic.upgradeNotification.pursueAverifiedCertificate"
+         defaultMessage="Pursue a verified certificate"
+       />
+     );
+@@ -395,26 +395,26 @@ function UpgradeCard({
+   }
+ 
+   return (
+-    <section className={classNames('upgrade-card small', { 'card mb-4': shouldDisplayBorder })}>
+-      <h2 className="h5 upgrade-card-header" id="outline-sidebar-upgrade-header">
+-        {upgradeCardHeaderText}
++    <section className={classNames('upgrade-notification small', { 'card mb-4': shouldDisplayBorder })}>
++      <h2 className="h5 upgrade-notification-header" id="outline-sidebar-upgrade-header">
++        {upgradeNotificationHeaderText}
+       </h2>
+       {expirationBanner}
+-      <div className="upgrade-card-message">
++      <div className="upgrade-notification-message">
+         {upsellMessage}
+       </div>
+       <UpgradeButton
+         offer={offer}
+         onClick={logClick}
+         verifiedMode={verifiedMode}
+-        className="upgrade-card-button"
++        className="upgrade-notification-button"
+       />
+       {offerCode}
+     </section>
+   );
+ }
+ 
+-UpgradeCard.propTypes = {
++UpgradeNotification.propTypes = {
+   courseId: PropTypes.string.isRequired,
+   org: PropTypes.string.isRequired,
+   accessExpiration: PropTypes.shape({
+@@ -436,7 +436,7 @@ UpgradeCard.propTypes = {
+   shouldDisplayBorder: PropTypes.bool,
+ };
+ 
+-UpgradeCard.defaultProps = {
++UpgradeNotification.defaultProps = {
+   accessExpiration: null,
+   contentTypeGatingEnabled: false,
+   offer: null,
+@@ -446,4 +446,4 @@ UpgradeCard.defaultProps = {
+   shouldDisplayBorder: null,
+ };
+ 
+-export default injectIntl(UpgradeCard);
++export default injectIntl(UpgradeNotification);
+diff --git a/src/generic/upgrade-card/UpgradeCard.scss b/src/generic/upgrade-notification/UpgradeNotification.scss
+similarity index 74%
+rename from src/generic/upgrade-card/UpgradeCard.scss
+rename to src/generic/upgrade-notification/UpgradeNotification.scss
+index 4ced0ce..159158f 100644
+--- a/src/generic/upgrade-card/UpgradeCard.scss
++++ b/src/generic/upgrade-notification/UpgradeNotification.scss
+@@ -1,8 +1,8 @@
+-.upgrade-card {
++.upgrade-notification {
+   border-radius: 0 !important;
+ }
+ 
+-.upgrade-card-header {
++.upgrade-notification-header {
+   margin: 1.25rem;
+ }
+ 
+@@ -18,22 +18,22 @@
+   padding: 0.5rem 1.25rem;
+ }
+ 
+-.upgrade-card-ul {
++.upgrade-notification-ul {
+   margin-left: 3rem;
+   padding-top: 0.875rem;
+   padding-right: 1.25rem;
+ }
+ 
+-.upgrade-card-li {
++.upgrade-notification-li {
+   left: -2.125rem;
+   top: 0 !important;
+ }
+ 
+-.upgrade-card-text {
++.upgrade-notification-text {
+   padding: 0.875rem 1.25rem 0 1.25rem;
+ }
+ 
+-.upgrade-card-button {
++.upgrade-notification-button {
+   width: 90%;
+   margin: 0 auto;
+   margin-bottom: 1.25rem;
+@@ -49,6 +49,6 @@
+   text-decoration: underline;
+ }
+ 
+-.upgrade-card .upgrade-card-message a {
++.upgrade-notification .upgrade-notification-message a {
+   color: $primary-500;
+ }
+\ No newline at end of file
+diff --git a/src/generic/upgrade-card/UpgradeCard.test.jsx b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+similarity index 98%
+rename from src/generic/upgrade-card/UpgradeCard.test.jsx
+rename to src/generic/upgrade-notification/UpgradeNotification.test.jsx
+index 370bf78..4f82736 100644
+--- a/src/generic/upgrade-card/UpgradeCard.test.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+@@ -2,7 +2,7 @@ import React from 'react';
+ import { Factory } from 'rosie';
+ 
+ import { initializeMockApp, render, screen } from '../../setupTest';
+-import UpgradeCard from './UpgradeCard';
++import UpgradeNotification from './UpgradeNotification';
+ 
+ initializeMockApp();
+ jest.mock('@edx/frontend-platform/analytics');
+@@ -11,10 +11,10 @@ jest
+   .spyOn(global.Date, 'now')
+   .mockImplementation(() => dateNow.valueOf());
+ 
+-describe('Upgrade Card', () => {
++describe('Upgrade Notification', () => {
+   function buildAndRender(attributes) {
+-    const upgradeCardData = Factory.build('upgradeCardData', { ...attributes });
+-    render(<UpgradeCard {...upgradeCardData} />);
++    const upgradeNotificationData = Factory.build('upgradeNotificationData', { ...attributes });
++    render(<UpgradeNotification {...upgradeNotificationData} />);
+   }
+ 
+   it('does not render when there is no verified mode', async () => {
+diff --git a/src/index.scss b/src/index.scss
+index 01cb551..9426fc6 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -372,14 +372,14 @@
+ 
+ // Import component-specific sass files
+ @import 'courseware/course/celebration/CelebrationModal.scss';
+-@import 'courseware/course/Sidebar.scss';
+-@import 'courseware/course/SidebarNotificationButton.scss';
++@import 'courseware/course/NotificationTray.scss';
++@import 'courseware/course/NotificationTrigger.scss';
+ @import 'courseware/course/NotificationIcon.scss';
+ @import 'shared/streak-celebration/StreakCelebrationModal.scss';
+ @import 'courseware/course/content-tools/calculator/calculator.scss';
+ @import 'courseware/course/content-tools/contentTools.scss';
+ @import 'course-home/dates-tab/timeline/Day.scss';
+-@import 'generic/upgrade-card/UpgradeCard.scss';
++@import 'generic/upgrade-notification/UpgradeNotification.scss';
+ @import 'course-home/outline-tab/widgets/ProctoringInfoPanel.scss';
+ @import 'course-home/progress-tab/course-completion/CompletionDonutChart.scss';
+ @import 'course-home/progress-tab/grades/course-grade/GradeBar.scss';
+-- 
+2.34.1
+

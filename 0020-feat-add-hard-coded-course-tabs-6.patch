@@ -1,0 +1,204 @@
+From 0db7cabf29b257c865e865edef5df5ef4682b85b Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Fri, 10 Jan 2020 11:32:25 -0500
+Subject: [PATCH 0020/1021] feat: add hard-coded course tabs (#6)
+
+* feat: add hard-coded course tabs
+
+* fix: add key to course nav tabs
+
+* refactor: split NavTab from CourseTabsNavigation
+
+* refactor: alphabetize props
+---
+ src/components/CourseTabsNavigation.jsx | 74 +++++++++++++++++++++++++
+ src/components/NavTab.jsx               | 30 ++++++++++
+ src/components/messages.js              | 11 ++++
+ src/index.jsx                           |  4 ++
+ src/index.scss                          | 15 +++++
+ 5 files changed, 134 insertions(+)
+ create mode 100644 src/components/CourseTabsNavigation.jsx
+ create mode 100644 src/components/NavTab.jsx
+ create mode 100644 src/components/messages.js
+
+diff --git a/src/components/CourseTabsNavigation.jsx b/src/components/CourseTabsNavigation.jsx
+new file mode 100644
+index 0000000..7ef35b6
+--- /dev/null
++++ b/src/components/CourseTabsNavigation.jsx
+@@ -0,0 +1,74 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import messages from './messages';
++import NavTab from './NavTab';
++
++function CourseTabsNavigation({ activeTabSlug, courseTabs, intl }) {
++  const courseNavTabs = courseTabs.map(({ slug, ...courseTab }) => (
++    <NavTab
++      isActive={slug === activeTabSlug}
++      key={slug}
++      {...courseTab}
++    />
++  ));
++
++  return (
++    <nav
++      aria-label={intl.formatMessage(messages['learn.navigation.course.tabs.label'])}
++      className="nav nav-underline-tabs"
++    >
++      {courseNavTabs}
++    </nav>
++  );
++}
++
++CourseTabsNavigation.propTypes = {
++  activeTabSlug: PropTypes.string,
++  courseTabs: PropTypes.arrayOf(PropTypes.shape({
++    title: PropTypes.string.isRequired,
++    priority: PropTypes.number.isRequired,
++    slug: PropTypes.string.isRequired,
++    url: PropTypes.string.isRequired,
++  })),
++  intl: intlShape.isRequired,
++};
++
++CourseTabsNavigation.defaultProps = {
++  activeTabSlug: undefined,
++  courseTabs: [
++    {
++      title: 'Course',
++      slug: 'course',
++      priority: 1,
++      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course/',
++    },
++
++    {
++      title: 'Discussion',
++      slug: 'discussion',
++      priority: 2,
++      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/discussion/forum/',
++    },
++    {
++      title: 'Wiki',
++      slug: 'wiki',
++      priority: 3,
++      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course_wiki',
++    },
++    {
++      title: 'Progress',
++      slug: 'progress',
++      priority: 4,
++      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/progress',
++    },
++    {
++      title: 'Instructor',
++      slug: 'instructor',
++      priority: 5,
++      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/instructor',
++    },
++  ],
++};
++
++export default injectIntl(CourseTabsNavigation);
+diff --git a/src/components/NavTab.jsx b/src/components/NavTab.jsx
+new file mode 100644
+index 0000000..6f01712
+--- /dev/null
++++ b/src/components/NavTab.jsx
+@@ -0,0 +1,30 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++
++
++export default function NavTab(props) {
++  const {
++    isActive, url, title, ...attrs
++  } = props;
++
++  const className = classNames(
++    'nav-item nav-link',
++    { active: isActive },
++    attrs.className,
++  );
++
++  return <a {...attrs} className={className} href={url}>{title}</a>;
++}
++
++NavTab.propTypes = {
++  className: PropTypes.string,
++  isActive: PropTypes.bool,
++  title: PropTypes.string.isRequired,
++  url: PropTypes.string.isRequired,
++};
++
++NavTab.defaultProps = {
++  className: undefined,
++  isActive: false,
++};
+diff --git a/src/components/messages.js b/src/components/messages.js
+new file mode 100644
+index 0000000..defda27
+--- /dev/null
++++ b/src/components/messages.js
+@@ -0,0 +1,11 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learn.navigation.course.tabs.label': {
++    id: 'learn.navigation.course.tabs.label',
++    defaultMessage: 'Course Material',
++    description: 'The accessible label for course tabs navigation',
++  },
++});
++
++export default messages;
+diff --git a/src/index.jsx b/src/index.jsx
+index 50acc91..85a5a1f 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -10,6 +10,7 @@ import Header, { messages as headerMessages } from '@edx/frontend-component-head
+ import Footer, { messages as footerMessages } from '@edx/frontend-component-footer';
+ 
+ import appMessages from './i18n';
++import CourseTabsNavigation from './components/CourseTabsNavigation';
+ import LearningSequencePage from './learning-sequence/LearningSequencePage';
+ 
+ import './index.scss';
+@@ -19,6 +20,9 @@ subscribe(APP_READY, () => {
+   ReactDOM.render(
+     <AppProvider>
+       <Header />
++      <div className="container pt-2">
++        <CourseTabsNavigation activeTabSlug="course" />
++      </div>
+       <Switch>
+         {/* Staging: course-v1:UBCx+Water201x_2+2T2015 */}
+         <Route
+diff --git a/src/index.scss b/src/index.scss
+index 4f14c9c..8c50f36 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -43,3 +43,18 @@
+     flex: 0;
+   }
+ }
++
++.nav-underline-tabs {
++  .nav-link {
++    border-bottom: 4px solid transparent;
++    color: theme-color('gray', 700);
++
++    &:hover,
++    &:focus,
++    &.active {
++      font-weight: $font-weight-normal;
++      color: theme-color('primary', 500);
++      border-color: theme-color('primary', 500);
++    }
++  }
++}
+-- 
+2.34.1
+

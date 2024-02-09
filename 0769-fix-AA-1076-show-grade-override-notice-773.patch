@@ -1,0 +1,205 @@
+From edf9e58d6dc5721515fc03607161b8426491e2b2 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 21 Dec 2021 14:07:44 -0500
+Subject: [PATCH 0769/1021] fix: [AA-1076] show grade override notice (#773)
+
+* fix: [AA-1076] show grade override notice
+
+- Progress page indicates if a grade has been overridden
+- add unit test
+---
+ .../progress-tab/ProgressTab.test.jsx         | 67 ++++++++++++++++++-
+ .../detailed-grades/SubsectionTitleCell.jsx   | 24 ++++++-
+ .../progress-tab/grades/messages.js           | 21 +++---
+ 3 files changed, 101 insertions(+), 11 deletions(-)
+
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 2bacafc..fa6c38e 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -13,6 +13,7 @@ import * as thunks from '../data/thunks';
+ import initializeStore from '../../store';
+ import ProgressTab from './ProgressTab';
+ import LoadedTabPage from '../../tab-page/LoadedTabPage';
++import messages from './grades/messages';
+ 
+ initializeMockApp();
+ jest.mock('@edx/frontend-platform/analytics');
+@@ -702,6 +703,70 @@ describe('Progress Tab', () => {
+       await fetchAndRender();
+       expect(screen.getByTestId('gradeSummaryFooterTotalWeightedGrade').innerHTML).toEqual('50%');
+     });
++
++    it('renders override notice', async () => {
++      setTabData({
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++                display_name: 'First subsection',
++                has_graded_assignment: true,
++                learner_has_access: true,
++                num_points_earned: 1,
++                num_points_possible: 2,
++                percent_graded: 1.0,
++                problem_scores: [{
++                  earned: 1,
++                  possible: 2,
++                }],
++                show_correctness: 'always',
++                show_grades: true,
++              },
++            ],
++          },
++          {
++            display_name: 'Second section',
++            subsections: [
++              {
++                assignment_type: 'Exam',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@98765',
++                display_name: 'Second subsection',
++                learner_has_access: true,
++                has_graded_assignment: true,
++                num_points_earned: 0,
++                num_points_possible: 1,
++                override: {
++                  system: 'PROCTORING',
++                  reason: 'Suspicious activity',
++                },
++                percent_graded: 1.0,
++                problem_scores: [{
++                  earned: 0,
++                  possible: 1,
++                }],
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection',
++              },
++            ],
++          },
++        ],
++      });
++
++      await fetchAndRender();
++
++      const problemScoreDrawerToggle = screen.getByRole('button', { name: 'Toggle individual problem scores for Second subsection' });
++      expect(problemScoreDrawerToggle).toBeInTheDocument();
++
++      // Open the problem score drawer
++      fireEvent.click(problemScoreDrawerToggle);
++
++      expect(screen.getByText(messages.sectionGradeOverridden.defaultMessage)).toBeInTheDocument();
++    });
+   });
+ 
+   describe('Detailed Grades', () => {
+@@ -775,7 +840,7 @@ describe('Progress Tab', () => {
+       Object.defineProperty(window, 'matchMedia', {
+         writable: true,
+         value: jest.fn().mockImplementation(query => {
+-          const matches = !!(query === 'screen and (min-width: 992px)');
++          const matches = (query === 'screen and (min-width: 992px)');
+           return {
+             matches,
+             media: query,
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+index e51006b..0b086e3 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+@@ -6,7 +6,9 @@ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Collapsible, Icon, Row } from '@edx/paragon';
+-import { ArrowDropDown, ArrowDropUp, Blocked } from '@edx/paragon/icons';
++import {
++  ArrowDropDown, ArrowDropUp, Blocked, Info,
++} from '@edx/paragon/icons';
+ 
+ import messages from '../messages';
+ import { useModel } from '../../../../generic/model-store';
+@@ -79,7 +81,21 @@ function SubsectionTitleCell({ intl, subsection }) {
+         </span>
+       </Row>
+       <Collapsible.Body className="d-flex w-100">
+-        <ProblemScoreDrawer problemScores={problemScores} subsection={subsection} />
++        <div className="col">
++          { subsection.override && (
++            <div className="row w-100 m-0 x-small ml-4 pt-2 pl-1 text-gray-700 flex-nowrap">
++              <div>
++                <Icon
++                  src={Info}
++                  className="x-small mr-1 text-primary-500"
++                  style={{ height: '1.3em', width: '1.3em' }}
++                />
++              </div>
++              <div>{intl.formatMessage(messages.sectionGradeOverridden)}</div>
++            </div>
++          )}
++          <ProblemScoreDrawer problemScores={problemScores} subsection={subsection} />
++        </div>
+       </Collapsible.Body>
+     </Collapsible.Advanced>
+   );
+@@ -91,6 +107,10 @@ SubsectionTitleCell.propTypes = {
+     blockKey: PropTypes.string.isRequired,
+     displayName: PropTypes.string.isRequired,
+     learnerHasAccess: PropTypes.bool.isRequired,
++    override: PropTypes.shape({
++      system: PropTypes.string,
++      reason: PropTypes.string,
++    }),
+     problemScores: PropTypes.arrayOf(PropTypes.shape({
+       earned: PropTypes.number.isRequired,
+       possible: PropTypes.number.isRequired,
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 1f7a65e..2d3f73f 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -115,6 +115,14 @@ const messages = defineMessages({
+       + 'By multiplying your grade by the weight for that assignment type, your weighted grade is calculated. '
+       + "Your weighted grade is what's used to determine if you pass the course.",
+   },
++  noAccessToAssignmentType: {
++    id: 'progress.noAcessToAssignmentType',
++    defaultMessage: 'You do not have access to assignments of type {assignmentType}',
++  },
++  noAccessToSubsection: {
++    id: 'progress.noAcessToSubsection',
++    defaultMessage: 'You do not have access to subsection {displayName}',
++  },
+   passingGradeLabel: {
+     id: 'progress.courseGrade.label.passingGrade',
+     defaultMessage: 'Passing grade',
+@@ -127,6 +135,10 @@ const messages = defineMessages({
+     id: 'progress.detailedGrades.problemScore.toggleButton',
+     defaultMessage: 'Toggle individual problem scores for {subsectionTitle}',
+   },
++  sectionGradeOverridden: {
++    id: 'progress.detailedGrades.overridden',
++    defaultMessage: 'Section grade has been overridden.',
++  },
+   score: {
+     id: 'progress.score',
+     defaultMessage: 'Score',
+@@ -143,14 +155,7 @@ const messages = defineMessages({
+     id: 'progress.weightedGradeSummary',
+     defaultMessage: 'Your current weighted grade summary',
+   },
+-  noAccessToAssignmentType: {
+-    id: 'progress.noAcessToAssignmentType',
+-    defaultMessage: 'You do not have access to assignments of type {assignmentType}',
+-  },
+-  noAccessToSubsection: {
+-    id: 'progress.noAcessToSubsection',
+-    defaultMessage: 'You do not have access to subsection {displayName}',
+-  },
++
+ });
+ 
+ export default messages;
+-- 
+2.34.1
+

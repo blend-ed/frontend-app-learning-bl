@@ -1,0 +1,49 @@
+From ed2d816bbe89e838f41debf24ae71a31cd1009c4 Mon Sep 17 00:00:00 2001
+From: Leangseu Kim <lkim@edx.org>
+Date: Tue, 20 Dec 2022 15:54:18 -0500
+Subject: [PATCH 0970/1021] fix: upgrade discount space
+
+---
+ src/generic/upgrade-button/UpgradeButton.jsx | 26 +++++++++++---------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
+
+diff --git a/src/generic/upgrade-button/UpgradeButton.jsx b/src/generic/upgrade-button/UpgradeButton.jsx
+index 6be38d5..dea6aa3 100644
+--- a/src/generic/upgrade-button/UpgradeButton.jsx
++++ b/src/generic/upgrade-button/UpgradeButton.jsx
+@@ -25,18 +25,20 @@ function UpgradeButton(props) {
+       onClick={onClick}
+       {...rest}
+     >
+-      <FormattedMessage
+-        id="learning.upgradeButton.buttonText"
+-        defaultMessage="Upgrade for {pricing}"
+-        values={{
+-          pricing: (
+-            <FormattedPricing
+-              offer={offer}
+-              verifiedMode={verifiedMode}
+-            />
+-          ),
+-        }}
+-      />
++      <div>
++        <FormattedMessage
++          id="learning.upgradeButton.buttonText"
++          defaultMessage="Upgrade for {pricing}"
++          values={{
++            pricing: (
++              <FormattedPricing
++                offer={offer}
++                verifiedMode={verifiedMode}
++              />
++            ),
++          }}
++        />
++      </div>
+     </Button>
+   );
+ }
+-- 
+2.34.1
+

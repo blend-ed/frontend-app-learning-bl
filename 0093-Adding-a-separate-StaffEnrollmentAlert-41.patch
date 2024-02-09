@@ -1,0 +1,156 @@
+From 1dc069dbbfde4c95b0970419764756bea3682259 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Wed, 1 Apr 2020 15:59:05 -0400
+Subject: [PATCH 0093/1021] Adding a separate StaffEnrollmentAlert (#41)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This is a separate component because we have no mechanism for passing context/state into these alerts right now, and I’m not sure it’s worth building.  Easier to just use different codes for different situations.
+---
+ src/course-home/CourseHome.jsx                |  7 +++++-
+ src/courseware/course/Course.jsx              |  8 ++++++-
+ src/enrollment-alert/StaffEnrollmentAlert.jsx | 24 +++++++++++++++++++
+ src/enrollment-alert/hooks.js                 | 17 ++++++++-----
+ src/enrollment-alert/index.js                 |  3 ++-
+ src/enrollment-alert/messages.js              |  5 ++++
+ 6 files changed, 55 insertions(+), 9 deletions(-)
+ create mode 100644 src/enrollment-alert/StaffEnrollmentAlert.jsx
+
+diff --git a/src/course-home/CourseHome.jsx b/src/course-home/CourseHome.jsx
+index c59faed..1deda22 100644
+--- a/src/course-home/CourseHome.jsx
++++ b/src/course-home/CourseHome.jsx
+@@ -11,7 +11,11 @@ import CourseDates from './CourseDates';
+ import Section from './Section';
+ import { useModel } from '../model-store';
+ 
+-const EnrollmentAlert = React.lazy(() => import('../enrollment-alert'));
++// Note that we import from the component files themselves in the enrollment-alert package.
++// This is because Reacy.lazy() requires that we import() from a file with a Component as it's
++// default export.
++// See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
++const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../enrollment-alert'));
+ const LogistrationAlert = React.lazy(() => import('../logistration-alert'));
+ 
+ export default function CourseHome({
+@@ -49,6 +53,7 @@ export default function CourseHome({
+             className="mb-3"
+             customAlerts={{
+               clientEnrollmentAlert: EnrollmentAlert,
++              clientStaffEnrollmentAlert: StaffEnrollmentAlert,
+               clientLogistrationAlert: LogistrationAlert,
+             }}
+           />
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index a7ad803..1b71081 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -18,7 +18,12 @@ import Calculator from './calculator';
+ import messages from './messages';
+ import { useModel } from '../../model-store';
+ 
+-const EnrollmentAlert = React.lazy(() => import('../../enrollment-alert'));
++// Note that we import from the component files themselves in the enrollment-alert package.
++// This is because Reacy.lazy() requires that we import() from a file with a Component as it's
++// default export.
++// See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
++const EnrollmentAlert = React.lazy(() => import('../../enrollment-alert/EnrollmentAlert'));
++const StaffEnrollmentAlert = React.lazy(() => import('../../enrollment-alert/StaffEnrollmentAlert'));
+ const LogistrationAlert = React.lazy(() => import('../../logistration-alert'));
+ 
+ function Course({
+@@ -70,6 +75,7 @@ function Course({
+             topic="course"
+             customAlerts={{
+               clientEnrollmentAlert: EnrollmentAlert,
++              clientStaffEnrollmentAlert: StaffEnrollmentAlert,
+               clientLogistrationAlert: LogistrationAlert,
+             }}
+           />
+diff --git a/src/enrollment-alert/StaffEnrollmentAlert.jsx b/src/enrollment-alert/StaffEnrollmentAlert.jsx
+new file mode 100644
+index 0000000..0e297a3
+--- /dev/null
++++ b/src/enrollment-alert/StaffEnrollmentAlert.jsx
+@@ -0,0 +1,24 @@
++import React from 'react';
++import { getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import Alert from '../user-messages/Alert';
++import messages from './messages';
++
++function StaffEnrollmentAlert({ intl }) {
++  return (
++    <Alert type="info" dismissible>
++      {intl.formatMessage(messages['learning.staff.enrollment.alert'])}
++      {' '}
++      <a href={`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`}>
++        {intl.formatMessage(messages['learning.enrollment.enroll.now'])}
++      </a>
++    </Alert>
++  );
++}
++
++StaffEnrollmentAlert.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(StaffEnrollmentAlert);
+diff --git a/src/enrollment-alert/hooks.js b/src/enrollment-alert/hooks.js
+index 569f272..587292a 100644
+--- a/src/enrollment-alert/hooks.js
++++ b/src/enrollment-alert/hooks.js
+@@ -11,12 +11,17 @@ export function useEnrollmentAlert(courseId) {
+   useEffect(() => {
+     if (course && course.isEnrolled !== undefined) {
+       if (!course.isEnrolled) {
+-        setAlertId(add({
+-          code: 'clientEnrollmentAlert',
+-          dismissible: false,
+-          type: 'error',
+-          topic: 'course',
+-        }));
++        if (course.isStaff) {
++          setAlertId(add({
++            code: 'clientStaffEnrollmentAlert',
++            topic: 'course',
++          }));
++        } else {
++          setAlertId(add({
++            code: 'clientEnrollmentAlert',
++            topic: 'course',
++          }));
++        }
+       } else if (alertId !== null) {
+         remove(alertId);
+         setAlertId(null);
+diff --git a/src/enrollment-alert/index.js b/src/enrollment-alert/index.js
+index 12b5339..72585cd 100644
+--- a/src/enrollment-alert/index.js
++++ b/src/enrollment-alert/index.js
+@@ -1,2 +1,3 @@
+-export { default } from './EnrollmentAlert';
++export { default as EnrollmentAlert } from './EnrollmentAlert';
++export { default as StaffEnrollmentAlert } from './StaffEnrollmentAlert';
+ export { useEnrollmentAlert } from './hooks';
+diff --git a/src/enrollment-alert/messages.js b/src/enrollment-alert/messages.js
+index b6e96ba..4546ff2 100644
+--- a/src/enrollment-alert/messages.js
++++ b/src/enrollment-alert/messages.js
+@@ -6,6 +6,11 @@ const messages = defineMessages({
+     defaultMessage: 'You must be enrolled in the course to see course content.',
+     description: 'Message shown to indicate that a user needs to enroll in a course prior to viewing the course content.  Shown as part of an alert, along with a link to enroll.',
+   },
++  'learning.staff.enrollment.alert': {
++    id: 'learning.staff.enrollment.alert',
++    defaultMessage: 'You are viewing this course as staff, and are not enrolled.',
++    description: 'Message shown to indicate that a user is not enrolled, but is able to view a course anyway because they are staff. Shown as part of an alert, along with a link to enroll.',
++  },
+   'learning.enrollment.enroll.now': {
+     id: 'learning.enrollment.enroll.now',
+     defaultMessage: 'Enroll Now',
+-- 
+2.34.1
+

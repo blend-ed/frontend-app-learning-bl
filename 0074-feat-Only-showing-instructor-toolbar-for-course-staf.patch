@@ -1,0 +1,95 @@
+From d145c45a3bdbd77ba6b4b0073a12d80e671121a7 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Tue, 10 Mar 2020 09:33:36 -0400
+Subject: [PATCH 0074/1021] feat: Only showing instructor toolbar for course
+ staff. (#25)
+
+---
+ src/courseware/CourseContainer.jsx |  1 +
+ src/courseware/course/Course.jsx   | 17 +++++++++++------
+ src/data/course-meta/slice.js      |  2 ++
+ 3 files changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index b30ec0a..051c54a 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -61,6 +61,7 @@ function CourseContainer(props) {
+               courseUsageKey={courseUsageKey}
+               courseId={courseId}
+               isEnrolled={props.metadata.isEnrolled}
++              isStaff={props.metadata.isStaff}
+               sequenceId={sequenceId}
+               unitId={unitId}
+               models={models}
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 7ba061a..9f3e099 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -23,6 +23,7 @@ export default function Course({
+   courseOrg,
+   courseUsageKey,
+   isEnrolled,
++  isStaff,
+   models,
+   sequenceId,
+   tabs,
+@@ -61,12 +62,14 @@ export default function Course({
+         courseNumber={courseNumber}
+         courseName={courseName}
+       />
+-      <InstructorToolbar
+-        courseUsageKey={courseUsageKey}
+-        courseId={courseId}
+-        sequenceId={sequenceId}
+-        unitId={unitId}
+-      />
++      {isStaff && (
++        <InstructorToolbar
++          courseUsageKey={courseUsageKey}
++          courseId={courseId}
++          sequenceId={sequenceId}
++          unitId={unitId}
++        />
++      )}
+       <CourseTabsNavigation tabs={tabs} activeTabSlug="courseware" />
+       <div className="container-fluid flex-grow-1 d-flex flex-column">
+         <AlertList
+@@ -109,6 +112,7 @@ Course.propTypes = {
+   sequenceId: PropTypes.string.isRequired,
+   unitId: PropTypes.string,
+   isEnrolled: PropTypes.bool,
++  isStaff: PropTypes.bool,
+   models: PropTypes.objectOf(PropTypes.shape({
+     id: PropTypes.string.isRequired,
+     displayName: PropTypes.string.isRequired,
+@@ -134,5 +138,6 @@ Course.propTypes = {
+ Course.defaultProps = {
+   unitId: undefined,
+   isEnrolled: false,
++  isStaff: false,
+   verifiedMode: null,
+ };
+diff --git a/src/data/course-meta/slice.js b/src/data/course-meta/slice.js
+index 49e11cd..f4cc31d 100644
+--- a/src/data/course-meta/slice.js
++++ b/src/data/course-meta/slice.js
+@@ -36,6 +36,7 @@ const courseMetaSlice = createSlice({
+       enrollmentMode: payload.enrollment.mode,
+       isEnrolled: payload.enrollment.isActive,
+       userHasAccess: payload.userHasAccess,
++      isStaff: payload.userHasStaffAccess,
+       verifiedMode: payload.verifiedMode,
+ 
+       // Misc
+@@ -70,6 +71,7 @@ export const courseMetadataShape = PropTypes.shape({
+   enrollmentMode: PropTypes.string,
+   isEnrolled: PropTypes.bool,
+   userHasAccess: PropTypes.bool,
++  isStaff: PropTypes.bool,
+   verifiedMode: PropTypes.shape({
+     price: PropTypes.number.isRequired,
+     currency: PropTypes.string.isRequired,
+-- 
+2.34.1
+

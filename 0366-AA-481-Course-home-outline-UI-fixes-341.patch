@@ -1,0 +1,445 @@
+From d74557d681c4a1d4c14f3d7e6bdcaeb9eca45584 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 11 Jan 2021 15:30:49 -0500
+Subject: [PATCH 0366/1021] AA-481: Course home outline UI fixes (#341)
+
+---
+ package-lock.json                             |  6 +-
+ package.json                                  |  2 +-
+ src/course-home/dates-tab/DatesTab.jsx        |  2 +-
+ src/course-home/outline-tab/DateSummary.jsx   |  4 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |  2 +-
+ src/course-home/outline-tab/Section.jsx       |  4 +-
+ src/course-home/outline-tab/SequenceLink.jsx  |  6 +-
+ .../outline-tab/widgets/CourseDates.jsx       |  4 +-
+ .../outline-tab/widgets/CourseGoalCard.jsx    |  4 +-
+ .../outline-tab/widgets/CourseHandouts.jsx    |  2 +-
+ .../outline-tab/widgets/CourseTools.jsx       |  4 +-
+ .../widgets/UpdateGoalSelector.jsx            |  2 +-
+ .../outline-tab/widgets/UpgradeCard.jsx       | 56 +++++++++++--------
+ .../outline-tab/widgets/UpgradeCard.scss      |  4 +-
+ .../course/course-exit/CourseCelebration.jsx  |  3 +-
+ .../course/course-exit/CourseInProgress.jsx   |  4 +-
+ .../course/course-exit/CourseNonPassing.jsx   |  4 +-
+ src/generic/course-sock/CourseSock.jsx        |  2 +-
+ src/generic/upgrade-button/UpgradeButton.jsx  |  2 +-
+ src/generic/user-messages/Alert.jsx           |  8 +--
+ 20 files changed, 68 insertions(+), 57 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 33f40c2..ebe18f6 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2367,9 +2367,9 @@
+       }
+     },
+     "@edx/frontend-component-footer": {
+-      "version": "10.1.1",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-component-footer/-/frontend-component-footer-10.1.1.tgz",
+-      "integrity": "sha512-NF64Dgznzy4A4nsfzC+HXAmtcmHwAAQCp17qtyUQ8a+LJhXUi/eXbrYhD8t0GboDHCI2HfRK2YOeiVJ3XjsNsw==",
++      "version": "10.1.2",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-component-footer/-/frontend-component-footer-10.1.2.tgz",
++      "integrity": "sha512-R41uS1kqZ9ll0VCcT9a/TCGCjQ/msLyn9kiUH5LFCisfB7c1LU91XmVgpVk9P9+wTMuIhwQmgTNn0UJ64oQO9g==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "1.2.32",
+         "@fortawesome/free-brands-svg-icons": "5.8.2",
+diff --git a/package.json b/package.json
+index 6098ffa..c9e4b96 100644
+--- a/package.json
++++ b/package.json
+@@ -35,7 +35,7 @@
+   },
+   "dependencies": {
+     "@edx/brand": "npm:@edx/brand-openedx@1.1.0",
+-    "@edx/frontend-component-footer": "10.1.1",
++    "@edx/frontend-component-footer": "10.1.2",
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-platform": "1.8.1",
+     "@edx/paragon": "12.3.1",
+diff --git a/src/course-home/dates-tab/DatesTab.jsx b/src/course-home/dates-tab/DatesTab.jsx
+index 45b482a..54efc3f 100644
+--- a/src/course-home/dates-tab/DatesTab.jsx
++++ b/src/course-home/dates-tab/DatesTab.jsx
+@@ -22,7 +22,7 @@ function DatesTab({ intl }) {
+ 
+   return (
+     <>
+-      <div role="heading" aria-level="1" className="h4 my-3">
++      <div role="heading" aria-level="1" className="h2 my-3">
+         {intl.formatMessage(messages.title)}
+       </div>
+       <DatesBannerContainer
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index 63be855..2b10dfd 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -13,7 +13,7 @@ export default function DateSummary({
+   const linkedTitle = dateBlock.link && isLearnerAssignment(dateBlock);
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+   return (
+-    <li className="container p-0 mb-3">
++    <li className="container p-0 mb-3 small text-dark-500">
+       <div className="row">
+         <FontAwesomeIcon icon={faCalendarAlt} className="ml-3 mt-1 mr-1" fixedWidth />
+         <div className="ml-1 font-weight-bold">
+@@ -27,7 +27,7 @@ export default function DateSummary({
+           />
+         </div>
+       </div>
+-      <div className="row ml-4 pl-1 pr-2">
++      <div className="row ml-4 pr-2">
+         <div className="date-summary-text">
+           {linkedTitle
+           && <div className="font-weight-bold mt-2"><a href={dateBlock.link}>{dateBlock.title}</a></div>}
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 4fe9f15..a1b9d06 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -87,7 +87,7 @@ function OutlineTab({ intl }) {
+       </Toast>
+       <div className="row w-100 m-0 mb-3 justify-content-between">
+         <div className="col-12 col-sm-auto p-0">
+-          <div role="heading" aria-level="1" className="h4">{title}</div>
++          <div role="heading" aria-level="1" className="h2">{title}</div>
+         </div>
+         {resumeCourseUrl && (
+           <div className="col-12 col-sm-auto p-0">
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index e815286..cf06eec 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -53,13 +53,13 @@ function Section({
+           <FontAwesomeIcon
+             icon={farCheckCircle}
+             fixedWidth
+-            className="float-left mt-1 text-gray-200"
++            className="float-left mt-1 text-gray-400"
+             aria-hidden="true"
+             title={intl.formatMessage(messages.incompleteSection)}
+           />
+         )}
+       </div>
+-      <div className="col-10 ml-2 p-0 font-weight-bold">
++      <div className="col-10 ml-3 p-0 font-weight-bold text-dark-500">
+         {title}
+         <span className="sr-only">
+           , {intl.formatMessage(complete ? messages.completedSection : messages.incompleteSection)}
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index 5a66c02..d903699 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -56,20 +56,20 @@ function SequenceLink({
+               <FontAwesomeIcon
+                 icon={farCheckCircle}
+                 fixedWidth
+-                className="float-left text-gray-200 mt-1"
++                className="float-left text-gray-400 mt-1"
+                 aria-hidden="true"
+                 title={intl.formatMessage(messages.incompleteAssignment)}
+               />
+             )}
+           </div>
+-          <div className="col-10 p-0 ml-2 text-break">{displayTitle}</div>
++          <div className="col-10 p-0 ml-3 text-break">{displayTitle}</div>
+           <span className="sr-only">
+             , {intl.formatMessage(complete ? messages.completedAssignment : messages.incompleteAssignment)}
+           </span>
+         </div>
+         {due && (
+           <div className="row w-100 m-0 ml-3 pl-3">
+-            <small className="text-body">
++            <small className="text-body pl-2">
+               <FormattedMessage
+                 id="learning.outline.sequence-due"
+                 defaultMessage="{description} due {assignmentDue}"
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index 1ed45cc..ff89d0b 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -22,7 +22,7 @@ function CourseDates({ courseId, intl }) {
+ 
+   return (
+     <section className="mb-4">
+-      <h2 className="h6">{intl.formatMessage(messages.dates)}</h2>
++      <h2 className="h4">{intl.formatMessage(messages.dates)}</h2>
+       <ol className="list-unstyled">
+         {courseDateBlocks.map((courseDateBlock) => (
+           <DateSummary
+@@ -32,7 +32,7 @@ function CourseDates({ courseId, intl }) {
+           />
+         ))}
+       </ol>
+-      <a className="font-weight-bold ml-4 pl-1" href={datesTabLink}>
++      <a className="font-weight-bold ml-4 pl-1 small" href={datesTabLink}>
+         {intl.formatMessage(messages.allDates)}
+       </a>
+     </section>
+diff --git a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx b/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+index 8324005..6d724e3 100644
+--- a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+@@ -38,7 +38,7 @@ function CourseGoalCard({
+       <Card.Body>
+         <div className="row w-100 m-0 justify-content-between align-items-center">
+           <div className="col col-8 p-0">
+-            <Card.Title role="heading" aria-level="2" className="h6 m-0">{intl.formatMessage(messages.welcomeTo)} {title}</Card.Title>
++            <h2 className="h4 m-0">{intl.formatMessage(messages.welcomeTo)} {title}</h2>
+           </div>
+           <div className="col col-auto p-0">
+             <Button
+@@ -54,7 +54,7 @@ function CourseGoalCard({
+             </Button>
+           </div>
+         </div>
+-        <Card.Text className="my-2 mx-1">{intl.formatMessage(messages.setGoal)}</Card.Text>
++        <Card.Text className="my-2 mx-1 text-dark-500">{intl.formatMessage(messages.setGoal)}</Card.Text>
+         <div className="row w-100 m-0">
+           {goalOptions.map((goal) => {
+             const [goalKey, goalText] = goal;
+diff --git a/src/course-home/outline-tab/widgets/CourseHandouts.jsx b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+index 0530d5f..f952bc1 100644
+--- a/src/course-home/outline-tab/widgets/CourseHandouts.jsx
++++ b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+@@ -18,7 +18,7 @@ function CourseHandouts({ courseId, intl }) {
+ 
+   return (
+     <section className="mb-4">
+-      <h2 className="h6">{intl.formatMessage(messages.handouts)}</h2>
++      <h2 className="h4">{intl.formatMessage(messages.handouts)}</h2>
+       <LmsHtmlFragment
+         html={handoutsHtml}
+         title={intl.formatMessage(messages.handouts)}
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index e8c4748..4464a50 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -55,10 +55,10 @@ function CourseTools({ courseId, intl }) {
+ 
+   return (
+     <section className="mb-4">
+-      <h2 className="h6">{intl.formatMessage(messages.tools)}</h2>
++      <h2 className="h4">{intl.formatMessage(messages.tools)}</h2>
+       <ul className="list-unstyled">
+         {courseTools.map((courseTool) => (
+-          <li key={courseTool.analyticsId}>
++          <li key={courseTool.analyticsId} className="small">
+             <a href={courseTool.url} onClick={() => logClick(courseTool.analyticsId)}>
+               <FontAwesomeIcon icon={renderIcon(courseTool.analyticsId)} className="mr-2" fixedWidth />
+               {courseTool.title}
+diff --git a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+index 440ed21..b872930 100644
+--- a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
++++ b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+@@ -39,7 +39,7 @@ function UpdateGoalSelector({
+       <section className="mb-4">
+         <div className="row w-100 m-0">
+           <div className="col-12 p-0">
+-            <label className="h6 m-0" htmlFor="edit-goal-selector">
++            <label className="h4 m-0" htmlFor="edit-goal-selector">
+               {intl.formatMessage(messages.goal)}
+             </label>
+           </div>
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+index 8fa715f..21ac6f3 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+@@ -38,29 +38,39 @@ function UpgradeCard({ courseId, intl, onLearnMore }) {
+   };
+ 
+   return (
+-    <section className="mb-4 p-4 outline-sidebar-upgrade-card">
+-      <h2 className="h6" id="outline-sidebar-upgrade-header">{intl.formatMessage(messages.upgradeTitle)}</h2>
+-      <img
+-        alt={intl.formatMessage(messages.certAlt)}
+-        src={VerifiedCert}
+-        style={{ width: '124px' }}
+-      />
+-      <div className="float-right d-flex flex-column align-items-center">
+-        <UpgradeButton
+-          offer={offer}
+-          onClick={logClick}
+-          verifiedMode={verifiedMode}
+-        />
+-        {onLearnMore && (
+-          <Button
+-            variant="link"
+-            size="sm"
+-            onClick={onLearnMore}
+-            aria-labelledby="outline-sidebar-upgrade-header"
+-          >
+-            {intl.formatMessage(messages.learnMore)}
+-          </Button>
+-        )}
++    <section className="mb-4 p-3 outline-sidebar-upgrade-card">
++      <h2 className="h4" id="outline-sidebar-upgrade-header">{intl.formatMessage(messages.upgradeTitle)}</h2>
++      <div className="row w-100 m-0">
++        <div className="col-6 col-md-12 col-lg-3 col-xl-4 p-0 text-md-center text-lg-left">
++          <img
++            alt={intl.formatMessage(messages.certAlt)}
++            className="w-100"
++            src={VerifiedCert}
++            style={{ maxWidth: '10rem' }}
++          />
++        </div>
++        <div className="col-6 col-md-12 col-lg-9 col-xl-8 p-0 pl-lg-2 text-center mt-md-2 mt-lg-0">
++          <div className="row w-100 m-0 justify-content-center">
++            <UpgradeButton
++              offer={offer}
++              onClick={logClick}
++              verifiedMode={verifiedMode}
++            />
++            {onLearnMore && (
++              <div className="col-12">
++                <Button
++                  variant="link"
++                  size="sm"
++                  className="pb-0"
++                  onClick={onLearnMore}
++                  aria-labelledby="outline-sidebar-upgrade-header"
++                >
++                  {intl.formatMessage(messages.learnMore)}
++                </Button>
++              </div>
++            )}
++          </div>
++        </div>
+       </div>
+     </section>
+   );
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.scss b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+index 3d517d3..5f36951 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.scss
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+@@ -1,4 +1,4 @@
+ .outline-sidebar-upgrade-card {
+-  border: 1px solid $gray-500;
+-  border-top: 5px solid $success-500;
++  border: 1px solid $dark-500;
++  border-top: 5px solid $dark-500;
+ }
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 9e9f192..074c534 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -47,6 +47,7 @@ function CourseCelebration({ intl }) {
+     offer,
+     org,
+     relatedPrograms,
++    title,
+     verifiedMode,
+     verifyIdentityUrl,
+     verificationStatus,
+@@ -274,7 +275,7 @@ function CourseCelebration({ intl }) {
+   return (
+     <>
+       <Helmet>
+-        <title>{`${intl.formatMessage(messages.congratulationsHeader)} | ${getConfig().SITE_NAME}`}</title>
++        <title>{`${intl.formatMessage(messages.congratulationsHeader)} | ${title} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+       <div className="row w-100 mx-0 mb-4 px-5 py-4 border border-light">
+         <div className="col-12 p-0 h2 text-center">
+diff --git a/src/courseware/course/course-exit/CourseInProgress.jsx b/src/courseware/course/course-exit/CourseInProgress.jsx
+index 4106bc1..eaf1f19 100644
+--- a/src/courseware/course/course-exit/CourseInProgress.jsx
++++ b/src/courseware/course/course-exit/CourseInProgress.jsx
+@@ -16,7 +16,7 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseInProgress({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org, tabs } = useModel('courses', courseId);
++  const { org, tabs, title } = useModel('courses', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get dates tab link for 'view course schedule' button
+@@ -28,7 +28,7 @@ function CourseInProgress({ intl }) {
+   return (
+     <>
+       <Helmet>
+-        <title>{`${intl.formatMessage(messages.endOfCourseTitle)} | ${getConfig().SITE_NAME}`}</title>
++        <title>{`${intl.formatMessage(messages.endOfCourseTitle)} | ${title} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+       <div className="row w-100 mx-0 mb-4 px-5 py-4 border border-light justify-content-center">
+         <div className="col-12 p-0 h2 text-center">
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index 63b2332..028b8f1 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -16,7 +16,7 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseNonPassing({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org, tabs } = useModel('courses', courseId);
++  const { org, tabs, title } = useModel('courses', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get progress tab link for 'view grades' button
+@@ -28,7 +28,7 @@ function CourseNonPassing({ intl }) {
+   return (
+     <>
+       <Helmet>
+-        <title>{`${intl.formatMessage(messages.endOfCourseTitle)} | ${getConfig().SITE_NAME}`}</title>
++        <title>{`${intl.formatMessage(messages.endOfCourseTitle)} | ${title} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+       <div className="row w-100 mx-0 mb-4 px-5 py-4 border border-light justify-content-center">
+         <div className="col-12 p-0 h2 text-center">
+diff --git a/src/generic/course-sock/CourseSock.jsx b/src/generic/course-sock/CourseSock.jsx
+index 18a576f..55f8ccb 100644
+--- a/src/generic/course-sock/CourseSock.jsx
++++ b/src/generic/course-sock/CourseSock.jsx
+@@ -35,7 +35,7 @@ export default class CourseSock extends Component {
+       return null;
+     }
+ 
+-    const buttonClass = this.state.showUpsell ? 'btn-success' : 'btn-outline-success';
++    const buttonClass = this.state.showUpsell ? 'btn-primary' : 'btn-outline-primary';
+     return (
+       <div ref={this.sockElement} className="verification-sock container py-5">
+         <div className="d-flex justify-content-center">
+diff --git a/src/generic/upgrade-button/UpgradeButton.jsx b/src/generic/upgrade-button/UpgradeButton.jsx
+index c9d67e8..a347a6a 100644
+--- a/src/generic/upgrade-button/UpgradeButton.jsx
++++ b/src/generic/upgrade-button/UpgradeButton.jsx
+@@ -19,7 +19,7 @@ function UpgradeButton(props) {
+ 
+   return (
+     <Button
+-      variant="success"
++      variant="primary"
+       href={url}
+       onClick={onClick}
+       {...rest}
+diff --git a/src/generic/user-messages/Alert.jsx b/src/generic/user-messages/Alert.jsx
+index bade929..4030331 100644
+--- a/src/generic/user-messages/Alert.jsx
++++ b/src/generic/user-messages/Alert.jsx
+@@ -45,10 +45,10 @@ function Alert({
+   type, dismissible, children, footer, intl, onDismiss,
+ }) {
+   return (
+-    <div data-testid={`alert-container-${type}`} className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))} style={{ padding: '20px' }}>
++    <div data-testid={`alert-container-${type}`} className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))} style={{ padding: '1em' }}>
+       <div className="row w-100 m-0">
+         {type !== ALERT_TYPES.WELCOME && (
+-          <div className="col-auto p-0 mr-2">
++          <div className="col-auto p-0 mr-3">
+             <FontAwesomeIcon icon={getAlertIcon(type)} />
+           </div>
+         )}
+@@ -58,12 +58,12 @@ function Alert({
+           </div>
+         </div>
+         {dismissible && (
+-          <div className="col-auto p-0">
++          <div className="col-auto p-0" style={{ margin: '-0.2em -0.2em 0em 0em' }}>
+             <IconButton
+               icon={faTimes}
+-              className="close"
+               onClick={onDismiss}
+               alt={intl.formatMessage(messages.close)}
++              variant="primary"
+             />
+           </div>
+         )}
+-- 
+2.34.1
+

@@ -1,0 +1,98 @@
+From c7c401e385cf7b40fb46737dddf7c60064add2c6 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Thu, 6 Aug 2020 08:58:47 -0700
+Subject: [PATCH 0217/1021] AA-275: Persist if the original user was staff for
+ Instructor Toolbar (#167)
+
+We want to be able to know if both the original user is a Staff user
+as well as if the user being masqueraded as is staff. This updates
+to accept both of these fields
+---
+ .../data/__factories__/courseHomeMetadata.factory.js          | 1 +
+ src/course-home/data/__snapshots__/redux.test.js.snap         | 2 ++
+ src/courseware/data/__factories__/courseMetadata.factory.js   | 1 +
+ src/courseware/data/api.js                                    | 1 +
+ src/tab-page/LoadedTabPage.jsx                                | 4 ++--
+ 5 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 8991163..65d8215 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -9,6 +9,7 @@ Factory.define('courseHomeMetadata')
+   .option('host', 'http://localhost:18000')
+   .attrs({
+     is_staff: false,
++    original_user_is_staff: false,
+     number: 'DemoX',
+     org: 'edX',
+     title: 'Demonstration Course',
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 343133b..4d58e06 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -37,6 +37,7 @@ Object {
+         "isStaff": false,
+         "number": "DemoX",
+         "org": "edX",
++        "originalUserIsStaff": false,
+         "tabs": Array [
+           Object {
+             "slug": "courseware",
+@@ -119,6 +120,7 @@ Object {
+         "isStaff": false,
+         "number": "DemoX",
+         "org": "edX",
++        "originalUserIsStaff": false,
+         "tabs": Array [
+           Object {
+             "slug": "courseware",
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 4d7a5a9..9fe24d3 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -34,6 +34,7 @@ Factory.define('courseMetadata')
+     },
+     show_calculator: false,
+     is_staff: false,
++    original_user_is_staff: false,
+     license: 'all-rights-reserved',
+     can_load_courseware: {
+       has_access: true,
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 838a6a0..e967c6a 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -126,6 +126,7 @@ function normalizeMetadata(metadata) {
+     enrollmentMode: metadata.enrollment.mode,
+     isEnrolled: metadata.enrollment.is_active,
+     canLoadCourseware: camelCaseObject(metadata.can_load_courseware),
++    originalUserIsStaff: metadata.original_user_is_staff,
+     isStaff: metadata.is_staff,
+     license: metadata.license,
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index eba2e88..0f29828 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -12,7 +12,7 @@ function LoadedTabPage({
+   unitId,
+ }) {
+   const {
+-    isStaff,
++    originalUserIsStaff,
+     number,
+     org,
+     tabs,
+@@ -26,7 +26,7 @@ function LoadedTabPage({
+         courseNumber={number}
+         courseTitle={title}
+       />
+-      {isStaff && (
++      {originalUserIsStaff && (
+         <InstructorToolbar
+           courseId={courseId}
+           unitId={unitId}
+-- 
+2.34.1
+

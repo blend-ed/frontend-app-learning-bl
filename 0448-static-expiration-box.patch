@@ -1,0 +1,783 @@
+From 7e5dacf68d00ed74eb40ef9abfccc37f0a4c670c Mon Sep 17 00:00:00 2001
+From: Emma Green <emma.green.software@gmail.com>
+Date: Fri, 5 Mar 2021 10:41:49 -0500
+Subject: [PATCH 0448/1021] static expiration box
+
+---
+ src/course-home/data/__factories__/index.js   |   1 +
+ .../__factories__/upgradeCardData.factory.js  |  20 +
+ .../data/__snapshots__/redux.test.js.snap     |   1 +
+ src/course-home/data/api.js                   |   1 +
+ src/course-home/outline-tab/OutlineTab.jsx    |  11 +-
+ .../outline-tab/widgets/UpgradeCard.jsx       | 386 +++++++++++++++---
+ .../outline-tab/widgets/UpgradeCard.scss      |  55 ++-
+ .../outline-tab/widgets/UpgradeCard.test.jsx  | 185 +++++++++
+ 8 files changed, 608 insertions(+), 52 deletions(-)
+ create mode 100644 src/course-home/data/__factories__/upgradeCardData.factory.js
+ create mode 100644 src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+
+diff --git a/src/course-home/data/__factories__/index.js b/src/course-home/data/__factories__/index.js
+index a620ad5..e8ebf46 100644
+--- a/src/course-home/data/__factories__/index.js
++++ b/src/course-home/data/__factories__/index.js
+@@ -2,3 +2,4 @@ import './courseHomeMetadata.factory';
+ import './datesTabData.factory';
+ import './outlineTabData.factory';
+ import './progressTabData.factory';
++import './upgradeCardData.factory';
+diff --git a/src/course-home/data/__factories__/upgradeCardData.factory.js b/src/course-home/data/__factories__/upgradeCardData.factory.js
+new file mode 100644
+index 0000000..fcabc3d
+--- /dev/null
++++ b/src/course-home/data/__factories__/upgradeCardData.factory.js
+@@ -0,0 +1,20 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('upgradeCardData')
++  .option('host', 'http://localhost:18000')
++  .option('dateBlocks', [])
++  .option('offer', null)
++  .option('userTimezone', null)
++  .option('accessExpiration', null)
++  .option('contentTypeGatingEnabled', false)
++  .attr('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .attr('verifiedMode', ['host'], (host) => ({
++    access_expiration_date: '2050-01-01T12:00:00',
++    currency: 'USD',
++    currencySymbol: '$',
++    price: 149,
++    sku: 'ABCD1234',
++    upgradeUrl: `${host}/dashboard`,
++  }))
++  .attr('org', 'edX')
++  .attr('timeOffsetMillis', 0);
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 5605d04..3f60ebe 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -432,6 +432,7 @@ Object {
+           "hasVisitedCourse": false,
+           "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+Test+Block@12345abcde",
+         },
++        "timeOffsetMillis": 0,
+         "verifiedMode": Object {
+           "accessExpirationDate": "2050-01-01T12:00:00",
+           "currency": "USD",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 7730204..ad974ab 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -207,6 +207,7 @@ export async function getOutlineTabData(courseId) {
+     resumeCourse,
+     verifiedMode,
+     welcomeMessageHtml,
++    timeOffsetMillis: 0,
+   };
+ }
+ 
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 538c21d..71fdd8b 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -64,6 +64,7 @@ function OutlineTab({ intl }) {
+       url: resumeCourseUrl,
+     },
+     offer,
++    timeOffsetMillis,
+     verifiedMode,
+   } = useModel('outline', courseId);
+ 
+@@ -224,10 +225,14 @@ function OutlineTab({ intl }) {
+               ? <MMP2PFlyover isStatic options={MMP2P} />
+               : (
+                 <UpgradeCard
++                  offer={offer}
++                  verifiedMode={verifiedMode}
++                  accessExpiration={accessExpiration}
++                  contentTypeGatingEnabled={datesBannerInfo.contentTypeGatingEnabled}
++                  userTimezone={userTimezone}
++                  timeOffsetMillis={timeOffsetMillis}
+                   courseId={courseId}
+-                  onLearnMore={
+-                    canShowUpgradeSock ? () => { courseSock.current.showToUser(); } : null
+-                  }
++                  org={org}
+                 />
+               )}
+             <CourseDates
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+index fd753fd..868d559 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+@@ -1,21 +1,232 @@
+ import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
++import { faCheck } from '@fortawesome/free-solid-svg-icons';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ 
+ import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Button } from '@edx/paragon';
++import { FormattedDate, FormattedMessage, injectIntl } from '@edx/frontend-platform/i18n';
++import { getConfig } from '@edx/frontend-platform';
+ 
+-import messages from '../messages';
+-import { useModel } from '../../../generic/model-store';
+ import { UpgradeButton } from '../../../generic/upgrade-button';
+-import VerifiedCert from '../../../generic/assets/edX_certificate.png';
+ 
+-function UpgradeCard({ courseId, intl, onLearnMore }) {
+-  const { org } = useModel('courseHomeMeta', courseId);
+-  const {
+-    offer,
+-    verifiedMode,
+-  } = useModel('outline', courseId);
++function UpsellNoFBECardContent() {
++  return (
++    <ul className="fa-ul upgrade-card-ul pt-0">
++      <li>
++        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.verifiedCertLink"
++          defaultMessage="Earn a {verifiedCertLink} of completion to showcase on your resume"
++          values={{
++            verifiedCertLink: (
++              <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href={`${getConfig().MARKETING_SITE_BASE_URL}/verified-certificate`}>verified certificate</a>
++            ),
++          }}
++        />
++      </li>
++      <li>
++        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.nonProfitMission"
++          defaultMessage="Support our {nonProfitMission} at edX"
++          values={{
++            nonProfitMission: (
++              <span className="font-weight-bold">non-profit mission</span>
++            ),
++          }}
++        />
++      </li>
++    </ul>
++  );
++}
++
++function UpsellFBEFarAwayCardContent() {
++  return (
++    <ul className="fa-ul upgrade-card-ul">
++      <li>
++        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.verifiedCertLink"
++          defaultMessage="Earn a {verifiedCertLink} of completion to showcase on your resume"
++          values={{
++            verifiedCertLink: (
++              <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href={`${getConfig().MARKETING_SITE_BASE_URL}/verified-certificate`}>verified certificate</a>
++            ),
++          }}
++        />
++      </li>
++      <li>
++        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.unlock-graded"
++          defaultMessage="Unlock your access to all course activities, including {gradedAssignments}"
++          values={{
++            gradedAssignments: (
++              <span className="font-weight-bold">graded assignments</span>
++            ),
++          }}
++        />
++      </li>
++      <li>
++        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.fullAccess"
++          defaultMessage="{fullAccess} to course content and materials, even after the course ends"
++          values={{
++            fullAccess: (
++              <span className="font-weight-bold">Full access</span>
++            ),
++          }}
++        />
++      </li>
++      <li>
++        <span className="fa-li upgrade-card-li"><FontAwesomeIcon icon={faCheck} /></span>
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.nonProfitMission"
++          defaultMessage="Support our {nonProfitMission} at edX"
++          values={{
++            nonProfitMission: (
++              <span className="font-weight-bold">non-profit mission</span>
++            ),
++          }}
++        />
++      </li>
++    </ul>
++  );
++}
++
++function UpsellFBESoonCardContent({ accessExpirationDate, timezoneFormatArgs }) {
++  return (
++    <div>
++      <p>
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.expirationAccessLoss"
++          defaultMessage="You will lose all access to this course, {includingAnyProgress}, on {date}."
++          values={{
++            includingAnyProgress: (<span className="font-weight-bold">including any progress</span>),
++            date: (
++              <FormattedDate
++                key="accessDate"
++                day="numeric"
++                month="long"
++                value={new Date(accessExpirationDate)}
++                {...timezoneFormatArgs}
++              />
++            ),
++          }}
++        />
++      </p>
++      <p>
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.expirationVerifiedCert"
++          defaultMessage="Upgrading your course enables you to pursue a verified certificate and unlocks numerous features. Learn more about the {benefitsOfUpgrading}."
++          values={{
++            benefitsOfUpgrading: (<a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href="https://support.edx.org/hc/en-us/articles/360013426573-What-are-the-differences-between-audit-free-and-verified-paid-courses-">benefits of upgrading</a>),
++          }}
++        />
++      </p>
++    </div>
++  );
++}
++
++UpsellFBESoonCardContent.propTypes = {
++  accessExpirationDate: PropTypes.PropTypes.instanceOf(Date).isRequired,
++  timezoneFormatArgs: PropTypes.shape({
++    timeZone: PropTypes.string,
++  }),
++};
++
++UpsellFBESoonCardContent.defaultProps = {
++  timezoneFormatArgs: {},
++};
++
++function ExpirationCountdown({ hoursToExpiration }) {
++  let expirationText;
++
++  if (hoursToExpiration >= 24) {
++    expirationText = (
++      <FormattedMessage
++        id="learning.outline.alert.upgradecard.expiration.days"
++        defaultMessage={`{dayCount, number} {dayCount, plural, 
++          one {day}
++          other {days}} left`}
++        values={{
++          dayCount: (Math.floor(hoursToExpiration / 24)),
++        }}
++      />
++    );
++  } else if (hoursToExpiration >= 1) {
++    expirationText = (
++      <FormattedMessage
++        id="learning.outline.alert.upgradecard.expiration.hours"
++        defaultMessage={`{hourCount, number} {hourCount, plural,
++          one {hour}
++          other {hours}} left`}
++        values={{
++          hourCount: (hoursToExpiration),
++        }}
++      />
++    );
++  } else {
++    expirationText = (
++      <FormattedMessage
++        id="learning.outline.alert.upgradecard.expiration.minutes"
++        defaultMessage="Less than 1 hour left"
++      />
++    );
++  }
++  return (<div className="upsell-warning">{expirationText}</div>);
++}
++
++ExpirationCountdown.propTypes = {
++  hoursToExpiration: PropTypes.number.isRequired,
++};
++
++function AccessExpirationDateBanner({ accessExpirationDate, timezoneFormatArgs }) {
++  return (
++    <div className="upsell-warning-light">
++      <FormattedMessage
++        id="learning.outline.alert.upgradecard.expirationr"
++        defaultMessage="Course access will expire {date}"
++        values={{
++          date: (
++            <FormattedDate
++              key="accessExpireDate"
++              day="numeric"
++              month="long"
++              value={accessExpirationDate}
++              {...timezoneFormatArgs}
++            />
++          ),
++        }}
++      />
++    </div>
++  );
++}
++
++AccessExpirationDateBanner.propTypes = {
++  accessExpirationDate: PropTypes.PropTypes.instanceOf(Date).isRequired,
++  timezoneFormatArgs: PropTypes.shape({
++    timeZone: PropTypes.string,
++  }),
++};
++
++AccessExpirationDateBanner.defaultProps = {
++  timezoneFormatArgs: {},
++};
++
++function UpgradeCard({
++  accessExpiration,
++  contentTypeGatingEnabled,
++  courseId,
++  offer,
++  org,
++  timeOffsetMillis,
++  userTimezone,
++  verifiedMode,
++}) {
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++  const correctedTime = new Date(Date.now() + timeOffsetMillis);
+ 
+   if (!verifiedMode) {
+     return null;
+@@ -55,53 +266,136 @@ function UpgradeCard({ courseId, intl, onLearnMore }) {
+     });
+   };
+ 
+-  return (
+-    <section className="mb-4 p-3 outline-sidebar-upgrade-card">
+-      <h2 className="h4" id="outline-sidebar-upgrade-header">{intl.formatMessage(messages.upgradeTitle)}</h2>
+-      <div className="row w-100 m-0">
+-        <div className="col-6 col-md-12 col-lg-3 col-xl-4 p-0 text-md-center text-lg-left">
+-          <img
+-            alt={intl.formatMessage(messages.certAlt)}
+-            className="w-100"
+-            src={VerifiedCert}
+-            style={{ maxWidth: '10rem' }}
++  /*
++  There are 4 parts that change in the upgrade card:
++    upgradeCardHeaderText
++    expirationBanner
++    upsellMessage
++    offerCode
++  */
++  let upgradeCardHeaderText;
++  let expirationBanner;
++  let upsellMessage;
++  let offerCode;
++
++  if (!!accessExpiration && !!contentTypeGatingEnabled) {
++    if (offer) { // if there's a first purchase discount, show it
++      const hoursToDiscountExpiration = Math.floor((new Date(offer.expirationDate) - correctedTime) / 1000 / 60 / 60);
++
++      upgradeCardHeaderText = (
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.firstTimeLearnerDiscount"
++          defaultMessage="{percentage}% First-Time Learner Discount"
++          values={{
++            percentage: (offer.percentage),
++          }}
++        />
++      );
++      expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToDiscountExpiration} />;
++      upsellMessage = <UpsellFBEFarAwayCardContent />;
++      offerCode = (
++        <div className="text-center discount-info">
++          <FormattedMessage
++            id="learning.outline.alert.upgradecard.code"
++            defaultMessage="Use code {code} at checkout"
++            values={{
++              code: (<span className="font-weight-bold">{offer.code}</span>),
++            }}
+           />
+         </div>
+-        <div className="col-6 col-md-12 col-lg-9 col-xl-8 p-0 pl-lg-2 text-center mt-md-2 mt-lg-0">
+-          <div className="row w-100 m-0 justify-content-center">
+-            <UpgradeButton
+-              offer={offer}
+-              onClick={logClick}
+-              verifiedMode={verifiedMode}
+-            />
+-            {onLearnMore && (
+-              <div className="col-12">
+-                <Button
+-                  variant="link"
+-                  size="sm"
+-                  className="pb-0"
+-                  onClick={onLearnMore}
+-                  aria-labelledby="outline-sidebar-upgrade-header"
+-                >
+-                  {intl.formatMessage(messages.learnMore)}
+-                </Button>
+-              </div>
+-            )}
+-          </div>
+-        </div>
++      );
++    } else {
++      const accessExpirationDate = new Date(accessExpiration.expirationDate);
++      const hoursToAccessExpiration = Math.floor((accessExpirationDate - correctedTime) / 1000 / 60 / 60);
++
++      if (hoursToAccessExpiration >= (7 * 24)) {
++        upgradeCardHeaderText = (
++          <FormattedMessage
++            id="learning.outline.alert.upgradecard.accessExpiration"
++            defaultMessage="Upgrade your course today"
++          />
++        );
++        expirationBanner = (
++          <AccessExpirationDateBanner
++            accessExpirationDate={accessExpirationDate}
++            timezoneFormatArgs={timezoneFormatArgs}
++          />
++        );
++        upsellMessage = <UpsellFBEFarAwayCardContent />;
++      } else { // more urgent messaging if there's less than 7 days left
++        upgradeCardHeaderText = (
++          <FormattedMessage
++            id="learning.outline.alert.upgradecard.accessExpirationUrgent"
++            defaultMessage="Course Access Expiration"
++          />
++        );
++        expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToAccessExpiration} />;
++        upsellMessage = (
++          <UpsellFBESoonCardContent
++            accessExpirationDate={accessExpirationDate}
++            timezoneFormatArgs={timezoneFormatArgs}
++          />
++        );
++      }
++    }
++  } else { // FBE is turned off
++    upgradeCardHeaderText = (
++      <FormattedMessage
++        id="learning.outline.alert.upgradecard.pursueAverifiedCertificate"
++        defaultMessage="Pursue a verified certificate"
++      />
++    );
++    upsellMessage = (<UpsellNoFBECardContent />);
++  }
++
++  return (
++    <section className="mb-4 card upgrade-card small">
++      <h2 className="h5 upgrade-card-header" id="outline-sidebar-upgrade-header">
++        {upgradeCardHeaderText}
++      </h2>
++      {expirationBanner}
++      <div className="upgrade-card-message">
++        {upsellMessage}
+       </div>
++      <UpgradeButton
++        offer={offer}
++        onClick={logClick}
++        verifiedMode={verifiedMode}
++        className="upgrade-card-button"
++      />
++      {offerCode}
+     </section>
+   );
+ }
+ 
+ UpgradeCard.propTypes = {
+   courseId: PropTypes.string.isRequired,
+-  intl: intlShape.isRequired,
+-  onLearnMore: PropTypes.func,
++  org: PropTypes.string.isRequired,
++  accessExpiration: PropTypes.shape({
++    expirationDate: PropTypes.string,
++  }),
++  contentTypeGatingEnabled: PropTypes.bool,
++  offer: PropTypes.shape({
++    expirationDate: PropTypes.string,
++    percentage: PropTypes.number,
++    code: PropTypes.string,
++  }),
++  timeOffsetMillis: PropTypes.number,
++  userTimezone: PropTypes.string,
++  verifiedMode: PropTypes.shape({
++    currencySymbol: PropTypes.string.isRequired,
++    price: PropTypes.number.isRequired,
++    upgradeUrl: PropTypes.string.isRequired,
++  }),
+ };
+ 
+ UpgradeCard.defaultProps = {
+-  onLearnMore: null,
++  accessExpiration: null,
++  contentTypeGatingEnabled: false,
++  offer: null,
++  timeOffsetMillis: 0,
++  userTimezone: null,
++  verifiedMode: null,
+ };
+ 
+ export default injectIntl(UpgradeCard);
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.scss b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+index 5f36951..226c04d 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.scss
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+@@ -1,4 +1,53 @@
+-.outline-sidebar-upgrade-card {
+-  border: 1px solid $dark-500;
+-  border-top: 5px solid $dark-500;
++.upgrade-card {
++  border-radius: 0 !important;
+ }
++
++.upgrade-card-header{
++  margin: 1.25rem;
++
++}
++
++.upsell-warning{
++  background-color: $danger-100;
++}
++
++.upsell-warning-light{
++  background-color: $warning-100;
++}
++
++.upsell-warning, .upsell-warning-light{
++  padding-left: 1.25rem;
++  padding-right: 1.25rem;
++  padding-top: 0.5rem;
++  padding-bottom: 0.5rem;
++}
++
++.upgrade-card-ul{
++  margin-left: 3rem;
++  padding-top: 0.875rem;
++  padding-right: 1.25rem;
++}
++
++.upgrade-card-li{
++  left: -2.125rem;
++}
++
++.upgrade-card-button{
++  margin-left: 1.25rem;
++  margin-right: 1.25rem;
++  margin-bottom: 1.25rem;
++}
++
++.discount-info {
++  border-top: 1px solid rgba(0, 0, 0, 0.125);
++  padding-top: .75rem;
++  padding-bottom: .75rem;
++}
++
++.inline-link-underline {
++  text-decoration: underline;
++}
++
++.upgrade-card .upgrade-card-message a{
++  color: $primary-500;
++}
+\ No newline at end of file
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+new file mode 100644
+index 0000000..427403d
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+@@ -0,0 +1,185 @@
++import React from 'react';
++import { Factory } from 'rosie';
++
++import { initializeMockApp, render, screen } from '../../../setupTest';
++import UpgradeCard from './UpgradeCard';
++
++initializeMockApp();
++jest.mock('@edx/frontend-platform/analytics');
++const dateNow = new Date('2021-04-13T11:01:58.135Z');
++jest
++  .spyOn(global.Date, 'now')
++  .mockImplementation(() => dateNow.valueOf());
++
++describe('Upgrade Card', () => {
++  function buildAndRender(attributes) {
++    const upgradeCardData = Factory.build('upgradeCardData', { ...attributes });
++    render(<UpgradeCard {...upgradeCardData} />);
++  }
++
++  it('does not render when there is no verified mode', async () => {
++    buildAndRender({ verifiedMode: null });
++    expect(screen.queryByRole('link', { name: 'Upgrade for $149' })).not.toBeInTheDocument();
++  });
++
++  it('renders non-FBE when there is a verified mode but no FBE', async () => {
++    buildAndRender();
++    expect(screen.getByRole('heading', { name: 'Pursue a verified certificate' })).toBeInTheDocument();
++    expect(screen.getByText(/Earn a.*?of completion to showcase on your resume/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resume');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
++    expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
++  });
++
++  it('renders FBE expiration within an hour properly', async () => {
++    const expirationDate = new Date(dateNow);
++    expirationDate.setMinutes(expirationDate.getMinutes() + 45);
++    buildAndRender({
++      accessExpiration: {
++        expirationDate,
++      },
++      contentTypeGatingEnabled: true,
++    });
++    expect(screen.getByRole('heading', { name: 'Course Access Expiration' })).toBeInTheDocument();
++    expect(screen.getByText('Less than 1 hour left')).toBeInTheDocument();
++    expect(screen.getByText(/You will lose all access to this course.*?on/s).textContent).toMatch('You will lose all access to this course, including any progress, on April 13.');
++    expect(screen.getByText(/Upgrading your course enables you/s).textContent).toMatch('Upgrading your course enables you to pursue a verified certificate and unlocks numerous features. Learn more about the benefits of upgrading.');
++    expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
++  });
++
++  it('renders FBE expiration within 24 hours properly', async () => {
++    const expirationDate = new Date(dateNow);
++    expirationDate.setHours(expirationDate.getHours() + 12);
++    buildAndRender({
++      accessExpiration: {
++        expirationDate,
++      },
++      contentTypeGatingEnabled: true,
++    });
++    expect(screen.getByRole('heading', { name: 'Course Access Expiration' })).toBeInTheDocument();
++    expect(screen.getByText('12 hours left')).toBeInTheDocument();
++    expect(screen.getByText(/You will lose all access to this course.*?on/s).textContent).toMatch('You will lose all access to this course, including any progress, on April 13.');
++    expect(screen.getByText(/Upgrading your course enables you/s).textContent).toMatch('Upgrading your course enables you to pursue a verified certificate and unlocks numerous features. Learn more about the benefits of upgrading.');
++    expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
++  });
++
++  it('renders FBE expiration within 7 days properly', async () => {
++    const expirationDate = new Date(dateNow);
++    expirationDate.setDate(expirationDate.getDate() + 6);
++    buildAndRender({
++      accessExpiration: {
++        expirationDate,
++      },
++      contentTypeGatingEnabled: true,
++    });
++    expect(screen.getByRole('heading', { name: 'Course Access Expiration' })).toBeInTheDocument();
++    expect(screen.getByText('6 days left')).toBeInTheDocument(); // setting the time to 12 will mean that it's slightly less than 12
++    expect(screen.getByText(/You will lose all access to this course.*?on/s).textContent).toMatch('You will lose all access to this course, including any progress, on April 19.');
++    expect(screen.getByText(/Upgrading your course enables you/s).textContent).toMatch('Upgrading your course enables you to pursue a verified certificate and unlocks numerous features. Learn more about the benefits of upgrading.');
++    expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
++  });
++
++  it('renders FBE expiration greater than 7 days properly', async () => {
++    const expirationDate = new Date(dateNow);
++    expirationDate.setDate(expirationDate.getDate() + 14);
++    buildAndRender({
++      accessExpiration: {
++        expirationDate,
++      },
++      contentTypeGatingEnabled: true,
++    });
++    expect(screen.getByRole('heading', { name: 'Upgrade your course today' })).toBeInTheDocument();
++    expect(screen.getByText(/Course access will expire/s).textContent).toMatch('Course access will expire April 27');
++    expect(screen.getByText(/Earn a.*?of completion to showcase on your resume/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resume');
++    expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
++    expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
++    expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
++  });
++
++  it('renders discount less than an hour properly', async () => {
++    const accessExpirationDate = new Date(dateNow);
++    accessExpirationDate.setDate(accessExpirationDate.getDate() + 21);
++    const discountExpirationDate = new Date(dateNow);
++    discountExpirationDate.setMinutes(discountExpirationDate.getMinutes() + 30);
++    buildAndRender({
++      accessExpiration: {
++        accessExpirationDate,
++      },
++      contentTypeGatingEnabled: true,
++      offer: {
++        expirationDate: discountExpirationDate,
++        percentage: 15,
++        code: 'Welcome15',
++        discountedPrice: '126.65',
++        originalPrice: '149',
++        upgradeUrl: 'www.exampleUpgradeUrl.com',
++      },
++    });
++    expect(screen.getByRole('heading', { name: '15% First-Time Learner Discount' })).toBeInTheDocument();
++    expect(screen.getByText('Less than 1 hour left')).toBeInTheDocument();
++    expect(screen.getByText(/Earn a.*?of completion to showcase on your resume/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resume');
++    expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
++    expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
++    expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
++  });
++
++  it('renders discount less than a day properly', async () => {
++    const accessExpirationDate = new Date(dateNow);
++    accessExpirationDate.setDate(accessExpirationDate.getDate() + 21);
++    const discountExpirationDate = new Date(dateNow);
++    discountExpirationDate.setHours(discountExpirationDate.getHours() + 12);
++    buildAndRender({
++      accessExpiration: {
++        accessExpirationDate,
++      },
++      contentTypeGatingEnabled: true,
++      offer: {
++        expirationDate: discountExpirationDate,
++        percentage: 15,
++        code: 'Welcome15',
++        discountedPrice: '126.65',
++        originalPrice: '149',
++        upgradeUrl: 'www.exampleUpgradeUrl.com',
++      },
++    });
++    expect(screen.getByRole('heading', { name: '15% First-Time Learner Discount' })).toBeInTheDocument();
++    expect(screen.getByText(/hours left/s).textContent).toMatch('12 hours left');
++    expect(screen.getByText(/Earn a.*?of completion to showcase on your resume/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resume');
++    expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
++    expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
++    expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
++  });
++
++  it('renders discount less a week properly', async () => {
++    const accessExpirationDate = new Date(dateNow);
++    accessExpirationDate.setDate(accessExpirationDate.getDate() + 21);
++    const discountExpirationDate = new Date(dateNow);
++    discountExpirationDate.setDate(discountExpirationDate.getDate() + 6);
++    buildAndRender({
++      accessExpiration: {
++        accessExpirationDate,
++      },
++      contentTypeGatingEnabled: true,
++      offer: {
++        expirationDate: discountExpirationDate,
++        percentage: 15,
++        code: 'Welcome15',
++        discountedPrice: '126.65',
++        originalPrice: '149',
++        upgradeUrl: 'www.exampleUpgradeUrl.com',
++      },
++    });
++    expect(screen.getByRole('heading', { name: '15% First-Time Learner Discount' })).toBeInTheDocument();
++    expect(screen.getByText(/days left/s).textContent).toMatch('6 days left');
++    expect(screen.getByText(/Earn a.*?of completion to showcase on your resume/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resume');
++    expect(screen.getByText(/Unlock your access/s).textContent).toMatch('Unlock your access to all course activities, including graded assignments');
++    expect(screen.getByText(/to course content and materials/s).textContent).toMatch('Full access to course content and materials, even after the course ends');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
++    expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
++  });
++});
+-- 
+2.34.1
+

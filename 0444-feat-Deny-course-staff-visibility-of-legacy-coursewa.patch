@@ -1,0 +1,149 @@
+From 6c257271bb9ce91fe5c3cfdd6325dc794b1b12b2 Mon Sep 17 00:00:00 2001
+From: Julia Eskew <julia.eskew@edx.org>
+Date: Tue, 4 May 2021 13:57:00 -0400
+Subject: [PATCH 0444/1021] feat: Deny course staff visibility of legacy
+ courseware. (#427)
+
+Currently, course staff can always view their courses
+in the Legacy courseware experience.
+
+With this change, course staff will *not* be able
+to view their courses if the New (MFE) courseware
+experience has been enabled for them.
+
+This does not affect global staff, and it does not
+affect courses that are still running in the Legacy
+experience.
+
+Adds a new parameter returned by the course metadata API
+used by the courseware MFE to determine if the button to
+show legacy experience should be displayed or not.
+
+TNL-8203
+---
+ src/courseware/data/api.js                    |  1 +
+ src/instructor-toolbar/InstructorToolbar.jsx  |  7 +++++
+ .../InstructorToolbar.test.jsx                | 29 ++++++++++++++++++-
+ src/tab-page/LoadedTabPage.jsx                |  2 ++
+ 4 files changed, 38 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index c9fdc61..05e798a 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -133,6 +133,7 @@ function normalizeMetadata(metadata) {
+     enrollmentMode: metadata.enrollment.mode,
+     isEnrolled: metadata.enrollment.is_active,
+     canLoadCourseware: camelCaseObject(metadata.can_load_courseware),
++    canViewLegacyCourseware: metadata.can_view_legacy_courseware,
+     originalUserIsStaff: metadata.original_user_is_staff,
+     isStaff: metadata.is_staff,
+     license: metadata.license,
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index e21ea43..60a9ea5 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -53,9 +53,14 @@ export default function InstructorToolbar(props) {
+   const {
+     courseId,
+     unitId,
++    canViewLegacyCourseware,
+   } = props;
+   const urlInsights = getInsightsUrl(courseId);
+   const urlLegacy = useSelector((state) => {
++    if (!canViewLegacyCourseware) {
++      return undefined;
++    }
++
+     if (!unitId) {
+       return undefined;
+     }
+@@ -113,9 +118,11 @@ export default function InstructorToolbar(props) {
+ InstructorToolbar.propTypes = {
+   courseId: PropTypes.string,
+   unitId: PropTypes.string,
++  canViewLegacyCourseware: PropTypes.bool,
+ };
+ 
+ InstructorToolbar.defaultProps = {
+   courseId: undefined,
+   unitId: undefined,
++  canViewLegacyCourseware: undefined,
+ };
+diff --git a/src/instructor-toolbar/InstructorToolbar.test.jsx b/src/instructor-toolbar/InstructorToolbar.test.jsx
+index 515029e..ae15731 100644
+--- a/src/instructor-toolbar/InstructorToolbar.test.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.test.jsx
+@@ -25,6 +25,7 @@ describe('Instructor Toolbar', () => {
+     mockData = {
+       courseId: courseware.courseId,
+       unitId: Object.values(models.units)[0].id,
++      canViewLegacyCourseware: true,
+     };
+ 
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+@@ -53,7 +54,7 @@ describe('Instructor Toolbar', () => {
+     expect(screen.getByRole('alert')).toHaveTextContent('Unable to get masquerade options');
+   });
+ 
+-  it('displays links to view course in different services', () => {
++  it('displays links to view course in available services', () => {
+     const config = { ...originalConfig };
+     config.INSIGHTS_BASE_URL = 'http://localhost:18100';
+     getConfig.mockImplementation(() => config);
+@@ -65,6 +66,32 @@ describe('Instructor Toolbar', () => {
+     });
+   });
+ 
++  it('displays links to view course in available services - false legacy courseware flag', () => {
++    const config = { ...originalConfig };
++    config.INSIGHTS_BASE_URL = 'http://localhost:18100';
++    getConfig.mockImplementation(() => config);
++    mockData.canViewLegacyCourseware = false;
++    render(<InstructorToolbar {...mockData} />);
++
++    const linksContainer = screen.getByText('View course in:').parentElement;
++    ['Studio', 'Insights'].forEach(service => {
++      expect(getByText(linksContainer, service).getAttribute('href')).toMatch(/http.*/);
++    });
++  });
++
++  it('displays links to view course in available services - empty unit', () => {
++    const config = { ...originalConfig };
++    config.INSIGHTS_BASE_URL = 'http://localhost:18100';
++    getConfig.mockImplementation(() => config);
++    mockData.unitId = undefined;
++    render(<InstructorToolbar {...mockData} />);
++
++    const linksContainer = screen.getByText('View course in:').parentElement;
++    ['Studio', 'Insights'].forEach(service => {
++      expect(getByText(linksContainer, service).getAttribute('href')).toMatch(/http.*/);
++    });
++  });
++
+   it('does not display links if there are no services available', () => {
+     const config = { ...originalConfig };
+     config.STUDIO_BASE_URL = undefined;
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 5db01da..029c1a9 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -26,6 +26,7 @@ function LoadedTabPage({
+     tabs,
+     title,
+     celebrations,
++    canViewLegacyCourseware,
+   } = useModel(metadataModel, courseId);
+ 
+   // Logistration and enrollment alerts are only really used for the outline tab, but loaded here to put them above
+@@ -51,6 +52,7 @@ function LoadedTabPage({
+         <InstructorToolbar
+           courseId={courseId}
+           unitId={unitId}
++          canViewLegacyCourseware={canViewLegacyCourseware}
+         />
+       )}
+       {streakLengthToCelebrate && (
+-- 
+2.34.1
+

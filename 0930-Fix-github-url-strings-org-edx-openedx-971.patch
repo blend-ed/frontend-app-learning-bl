@@ -1,0 +1,97 @@
+From 381be9a26b5987ec58c2a3a94cc1289b77a0823b Mon Sep 17 00:00:00 2001
+From: Sarina Canelake <sarina@tcril.org>
+Date: Wed, 14 Sep 2022 10:01:48 -0400
+Subject: [PATCH 0930/1021] Fix github url strings (org edx -> openedx) (#971)
+
+* fix: fix github url strings (org edx -> openedx)
+
+* fix: update path to .github workflows to read from openedx org
+---
+ .github/workflows/commitlint.yml            | 2 +-
+ .github/workflows/lockfileversion-check.yml | 2 +-
+ README.rst                                  | 6 +++---
+ package.json                                | 6 +++---
+ 4 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/.github/workflows/commitlint.yml b/.github/workflows/commitlint.yml
+index e2b0661..fec11d6 100644
+--- a/.github/workflows/commitlint.yml
++++ b/.github/workflows/commitlint.yml
+@@ -7,4 +7,4 @@ on:
+ 
+ jobs:
+   commitlint:
+-    uses: edx/.github/.github/workflows/commitlint.yml@master
++    uses: openedx/.github/.github/workflows/commitlint.yml@master
+diff --git a/.github/workflows/lockfileversion-check.yml b/.github/workflows/lockfileversion-check.yml
+index 901addd..42312e8 100644
+--- a/.github/workflows/lockfileversion-check.yml
++++ b/.github/workflows/lockfileversion-check.yml
+@@ -10,4 +10,4 @@ on:
+ 
+ jobs:
+   version-check:
+-    uses: edx/.github/.github/workflows/lockfileversion-check.yml@master
++    uses: openedx/.github/.github/workflows/lockfileversion-check.yml@master
+diff --git a/README.rst b/README.rst
+index 7f869df..b1d2f39 100644
+--- a/README.rst
++++ b/README.rst
+@@ -15,7 +15,7 @@ Please tag **@edx/engage-squad** on any PRs or issues.  Thanks.
+ .. |codecov| image:: https://codecov.io/gh/edx/frontend-app-learning/branch/master/graph/badge.svg?token=3z7XvuzTq3
+    :target: https://codecov.io/gh/edx/frontend-app-learning
+ .. |license| image:: https://img.shields.io/badge/license-AGPL-informational
+-   :target: https://github.com/edx/frontend-app-account/blob/master/LICENSE
++   :target: https://github.com/openedx/frontend-app-account/blob/master/LICENSE
+ 
+ Development
+ -----------
+@@ -23,7 +23,7 @@ Development
+ Start Devstack
+ ^^^^^^^^^^^^^^
+ 
+-To use this application, `devstack <https://github.com/edx/devstack>`__ must be running and you must be logged into it.
++To use this application, `devstack <https://github.com/openedx/devstack>`__ must be running and you must be logged into it.
+ 
+ - Run ``make dev.up.lms``
+ - Visit http://localhost:2000/course/course-v1:edX+DemoX+Demo_Course to view the demo course.  You can replace ``course-v1:edX+DemoX+Demo_Course`` with a different course key.
+@@ -52,7 +52,7 @@ file (which is git-ignored) that defines where to find your local modules, for i
+      ],
+    };
+ 
+-See https://github.com/edx/frontend-build#local-module-configuration-for-webpack for more details.
++See https://github.com/openedx/frontend-build#local-module-configuration-for-webpack for more details.
+ 
+ Deployment
+ ----------
+diff --git a/package.json b/package.json
+index 178b18d..f736b71 100644
+--- a/package.json
++++ b/package.json
+@@ -4,7 +4,7 @@
+   "description": "Frontend learning application.",
+   "repository": {
+     "type": "git",
+-    "url": "git+https://github.com/edx/frontend-app-learning.git"
++    "url": "git+https://github.com/openedx/frontend-app-learning.git"
+   },
+   "browserslist": [
+     "extends @edx/browserslist-config"
+@@ -21,12 +21,12 @@
+   },
+   "author": "edX",
+   "license": "AGPL-3.0",
+-  "homepage": "https://github.com/edx/frontend-app-learning#readme",
++  "homepage": "https://github.com/openedx/frontend-app-learning#readme",
+   "publishConfig": {
+     "access": "public"
+   },
+   "bugs": {
+-    "url": "https://github.com/edx/frontend-app-learning/issues"
++    "url": "https://github.com/openedx/frontend-app-learning/issues"
+   },
+   "dependencies": {
+     "@edx/brand": "npm:@edx/brand-openedx@1.1.0",
+-- 
+2.34.1
+

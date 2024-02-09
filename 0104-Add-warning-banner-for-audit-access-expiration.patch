@@ -1,0 +1,152 @@
+From 44f535ba1e97dc8c1ff7eb05db03e380f302881c Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 7 Apr 2020 13:20:59 -0700
+Subject: [PATCH 0104/1021] Add warning banner for audit access expiration
+
+to inform users of deadline and prompt them to upgrade to the verified
+access track.
+---
+ .../AccessExpirationAlert.jsx                 | 21 ++++++++++++++
+ src/access-expiration-alert/hooks.js          | 28 +++++++++++++++++++
+ src/access-expiration-alert/index.js          |  2 ++
+ src/courseware/course/Course.jsx              |  4 +++
+ src/data/api.js                               |  2 ++
+ src/user-messages/AlertList.jsx               |  1 +
+ 6 files changed, 58 insertions(+)
+ create mode 100644 src/access-expiration-alert/AccessExpirationAlert.jsx
+ create mode 100644 src/access-expiration-alert/hooks.js
+ create mode 100644 src/access-expiration-alert/index.js
+
+diff --git a/src/access-expiration-alert/AccessExpirationAlert.jsx b/src/access-expiration-alert/AccessExpirationAlert.jsx
+new file mode 100644
+index 0000000..0c9c038
+--- /dev/null
++++ b/src/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -0,0 +1,21 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import Alert from '../user-messages/Alert';
++
++function AccessExpirationAlert(props) {
++  const {
++    rawHtml,
++  } = props;
++  return rawHtml && (
++    <Alert type="info">
++      <div dangerouslySetInnerHTML={{ __html: rawHtml }} />
++    </Alert>
++  );
++}
++
++AccessExpirationAlert.propTypes = {
++  rawHtml: PropTypes.string.isRequired,
++};
++
++export default AccessExpirationAlert;
+diff --git a/src/access-expiration-alert/hooks.js b/src/access-expiration-alert/hooks.js
+new file mode 100644
+index 0000000..7bbe325
+--- /dev/null
++++ b/src/access-expiration-alert/hooks.js
+@@ -0,0 +1,28 @@
++/* eslint-disable import/prefer-default-export */
++import { useContext, useState, useEffect } from 'react';
++import UserMessagesContext from '../user-messages/UserMessagesContext';
++import { useModel } from '../model-store';
++
++export function useAccessExpirationAlert(courseId) {
++  const course = useModel('courses', courseId);
++  const { add, remove } = useContext(UserMessagesContext);
++  const [alertId, setAlertId] = useState(null);
++  const expiredMessage = (course && course.courseExpiredMessage) || null;
++  useEffect(() => {
++    if (expiredMessage && alertId === null) {
++      setAlertId(add({
++        code: 'clientAccessExpirationAlert',
++        topic: 'course',
++        rawHtml: expiredMessage,
++      }));
++    } else if (alertId !== null) {
++      remove(alertId);
++      setAlertId(null);
++    }
++    return () => {
++      if (alertId !== null) {
++        remove(alertId);
++      }
++    };
++  }, [course, expiredMessage]);
++}
+diff --git a/src/access-expiration-alert/index.js b/src/access-expiration-alert/index.js
+new file mode 100644
+index 0000000..d8b07c2
+--- /dev/null
++++ b/src/access-expiration-alert/index.js
+@@ -0,0 +1,2 @@
++export { default as AccessExpirationAlert } from './AccessExpirationAlert';
++export { useAccessExpirationAlert } from './hooks';
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 75af027..634a2aa 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -4,6 +4,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { useSelector } from 'react-redux';
+ import AlertList from '../../user-messages/AlertList';
++import { useAccessExpirationAlert } from '../../access-expiration-alert';
+ import { useLogistrationAlert } from '../../logistration-alert';
+ import { useEnrollmentAlert } from '../../enrollment-alert';
+ import PageLoading from '../../PageLoading';
+@@ -22,6 +23,7 @@ import { useModel } from '../../model-store';
+ // This is because Reacy.lazy() requires that we import() from a file with a Component as it's
+ // default export.
+ // See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
++const AccessExpirationAlert = React.lazy(() => import('../../access-expiration-alert/AccessExpirationAlert'));
+ const EnrollmentAlert = React.lazy(() => import('../../enrollment-alert/EnrollmentAlert'));
+ const StaffEnrollmentAlert = React.lazy(() => import('../../enrollment-alert/StaffEnrollmentAlert'));
+ const LogistrationAlert = React.lazy(() => import('../../logistration-alert'));
+@@ -41,6 +43,7 @@ function Course({
+ 
+   useLogistrationAlert();
+   useEnrollmentAlert(courseId);
++  useAccessExpirationAlert(courseId);
+ 
+   const courseStatus = useSelector(state => state.courseware.courseStatus);
+ 
+@@ -77,6 +80,7 @@ function Course({
+               clientEnrollmentAlert: EnrollmentAlert,
+               clientStaffEnrollmentAlert: StaffEnrollmentAlert,
+               clientLogistrationAlert: LogistrationAlert,
++              clientAccessExpirationAlert: AccessExpirationAlert,
+             }}
+           />
+           <CourseBreadcrumbs
+diff --git a/src/data/api.js b/src/data/api.js
+index 5b3e948..e929703 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -5,6 +5,8 @@ import { logError } from '@edx/frontend-platform/logging';
+ 
+ function normalizeMetadata(metadata) {
+   return {
++    // TODO: TNL-7185: return course expired _date_, instead of _message_
++    courseExpiredMessage: metadata.course_expired_message,
+     id: metadata.id,
+     title: metadata.name,
+     number: metadata.number,
+diff --git a/src/user-messages/AlertList.jsx b/src/user-messages/AlertList.jsx
+index 4c433eb..cae5c36 100644
+--- a/src/user-messages/AlertList.jsx
++++ b/src/user-messages/AlertList.jsx
+@@ -26,6 +26,7 @@ export default function AlertList({ topic, className, customAlerts }) {
+               type={message.type}
+               dismissible={message.dismissible}
+               onDismiss={() => remove(message.id)}
++              rawHtml={message.rawHtml}
+             >
+               {message.text}
+             </AlertComponent>
+-- 
+2.34.1
+

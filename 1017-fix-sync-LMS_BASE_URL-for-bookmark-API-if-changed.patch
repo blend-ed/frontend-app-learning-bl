@@ -1,0 +1,71 @@
+From 2213d45461ba90e411ad6876a8466cb74d0076bb Mon Sep 17 00:00:00 2001
+From: Ghassan Maslamani <ghassan.maslamani@gmail.com>
+Date: Mon, 29 May 2023 19:00:43 +0300
+Subject: [PATCH 1017/1021] fix: sync LMS_BASE_URL for bookmark API if changed
+
+  This change makes it possible to use the latest  LMS_BASE_API
+  if it was changed because of dynamic config API, which is the
+  default case of tutor.
+
+  This changes closes openedx/wg-build-test-release/issues/270
+
+   Fixes that are simlar to this
+  - gradebook openedx/frontend-app-gradebook/pull/290
+  - course authoring openedx/frontend-app-course-authoring/pull/389
+---
+ src/courseware/course/bookmark/BookmarkButton.test.jsx | 5 +++--
+ src/courseware/course/bookmark/data/api.js             | 6 +++---
+ 2 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/src/courseware/course/bookmark/BookmarkButton.test.jsx b/src/courseware/course/bookmark/BookmarkButton.test.jsx
+index a38d635..7e80d52 100644
+--- a/src/courseware/course/bookmark/BookmarkButton.test.jsx
++++ b/src/courseware/course/bookmark/BookmarkButton.test.jsx
+@@ -1,12 +1,12 @@
+ import React from 'react';
+ import MockAdapter from 'axios-mock-adapter';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+-import { getConfig } from '@edx/frontend-platform';
+ import { Factory } from 'rosie';
+ import {
+   render, screen, fireEvent, initializeTestStore, waitFor, authenticatedUser, logUnhandledRequests,
+ } from '../../../setupTest';
+ import { BookmarkButton } from './index';
++import { getBookmarksBaseUrl } from './data/api';
+ 
+ describe('Bookmark Button', () => {
+   let axiosMock;
+@@ -32,7 +32,8 @@ describe('Bookmark Button', () => {
+     mockData.unitId = nonBookmarkedUnitBlock.id;
+ 
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+-    const bookmarkUrl = `${getConfig().LMS_BASE_URL}/api/bookmarks/v1/bookmarks/`;
++    const bookmarkUrl = getBookmarksBaseUrl();
++
+     axiosMock.onPost(bookmarkUrl).reply(200, { });
+ 
+     const bookmarkDeleteUrlRegExp = new RegExp(`${bookmarkUrl}*,*`);
+diff --git a/src/courseware/course/bookmark/data/api.js b/src/courseware/course/bookmark/data/api.js
+index 0969190..64aec84 100644
+--- a/src/courseware/course/bookmark/data/api.js
++++ b/src/courseware/course/bookmark/data/api.js
+@@ -1,13 +1,13 @@
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+-const bookmarksBaseUrl = `${getConfig().LMS_BASE_URL}/api/bookmarks/v1/bookmarks/`;
++export const getBookmarksBaseUrl = () => `${getConfig().LMS_BASE_URL}/api/bookmarks/v1/bookmarks/`;
+ 
+ export async function createBookmark(usageId) {
+-  return getAuthenticatedHttpClient().post(bookmarksBaseUrl, { usage_id: usageId });
++  return getAuthenticatedHttpClient().post(getBookmarksBaseUrl(), { usage_id: usageId });
+ }
+ 
+ export async function deleteBookmark(usageId) {
+   const { username } = getAuthenticatedUser();
+-  return getAuthenticatedHttpClient().delete(`${bookmarksBaseUrl}${username},${usageId}/`);
++  return getAuthenticatedHttpClient().delete(`${getBookmarksBaseUrl()}${username},${usageId}/`);
+ }
+-- 
+2.34.1
+

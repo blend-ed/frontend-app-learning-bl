@@ -1,0 +1,68 @@
+From 209a64c29b436343c23ef5ad5d1c05941e2a4b92 Mon Sep 17 00:00:00 2001
+From: Nick <ndalfonso@edx.org>
+Date: Fri, 29 May 2020 13:48:23 -0400
+Subject: [PATCH 0133/1021] AA-117 mfe dates tab waffle flag (#75)
+
+- redirect back to platform dates tab if waffle flags are not
+  enable for the mfe dates tab
+---
+ src/data/api.js | 28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
+
+diff --git a/src/data/api.js b/src/data/api.js
+index 84e77f6..c8bffa7 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -3,14 +3,11 @@ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { logError } from '@edx/frontend-platform/logging';
+ 
+-function overrideTabUrls(id, tabs) {
+-  // "LMS tab slug" to "MFE URL slug" for overridden tabs
+-  const tabOverrides = {};
++function normalizeTabUrls(id, tabs) {
++  // If api doesn't return the mfe base url, change tab url to point back to LMS
+   return tabs.map((tab) => {
+-    let url;
+-    if (tabOverrides[tab.slug]) {
+-      url = `/course/${id}/${tabOverrides[tab.slug]}`;
+-    } else {
++    let { url } = tab;
++    if (url[0] === '/') {
+       url = `${getConfig().LMS_BASE_URL}${tab.url}`;
+     }
+     return { ...tab, url };
+@@ -37,7 +34,7 @@ function normalizeMetadata(metadata) {
+     canLoadCourseware: camelCaseObject(metadata.can_load_courseware),
+     isStaff: metadata.is_staff,
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+-    tabs: overrideTabUrls(metadata.id, camelCaseObject(metadata.tabs)),
++    tabs: normalizeTabUrls(metadata.id, camelCaseObject(metadata.tabs)),
+     showCalculator: metadata.show_calculator,
+     notes: camelCaseObject(metadata.notes),
+   };
+@@ -51,8 +48,19 @@ export async function getCourseMetadata(courseId) {
+ 
+ export async function getTabData(courseId, tab, version) {
+   const url = `${getConfig().LMS_BASE_URL}/api/course_home/${version}/${tab}/${courseId}`;
+-  const { data } = await getAuthenticatedHttpClient().get(url);
+-  return camelCaseObject(data);
++  try {
++    const { data } = await getAuthenticatedHttpClient().get(url);
++    return camelCaseObject(data);
++  } catch (error) {
++    const { httpErrorStatus } = error && error.customAttributes;
++    if (httpErrorStatus === 404) {
++      return window.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/dates`);
++    }
++    // async functions expect return values. to satisfy that requirement
++    // we return true here which in turn continues with the normal flow of displaying
++    // the "unexpected error try again" screen to the user.
++    return true;
++  }
+ }
+ 
+ function normalizeBlocks(courseId, blocks) {
+-- 
+2.34.1
+

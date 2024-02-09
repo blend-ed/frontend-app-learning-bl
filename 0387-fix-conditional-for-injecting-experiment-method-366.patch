@@ -1,0 +1,26 @@
+From 4bbc29591cf6373f5a21875ea94ac26534b84046 Mon Sep 17 00:00:00 2001
+From: Ben Warzeski <bwarzeski@edx.org>
+Date: Mon, 22 Feb 2021 12:33:27 -0500
+Subject: [PATCH 0387/1021] fix conditional for injecting experiment method
+ (#366)
+
+---
+ src/course-home/outline-tab/DateSummary.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index b0a3ce0..1b57207 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -15,7 +15,7 @@ export default function DateSummary({
+ 
+   /** [MM-P2P experiment] */
+   const [showMMP2P, setShowMMP2P] = useState(window.experiment__home_dates_bShowMMP2P);
+-  if (window.experiment__home_dates_showMMP2P !== undefined) {
++  if (window.experiment__home_dates_showMMP2P === undefined) {
+     window.experiment__home_dates_showMMP2P = (value) => {
+       setShowMMP2P(!!value);
+       window.experiment__home_dates_bShowMMP2P = !!value;
+-- 
+2.34.1
+

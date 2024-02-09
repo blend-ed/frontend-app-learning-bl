@@ -1,0 +1,99 @@
+From 3e14b1727129686e454c31fd030b9d9ef618635a Mon Sep 17 00:00:00 2001
+From: Bill Currie <bill@taniwha.org>
+Date: Wed, 15 Jul 2020 04:21:33 +0900
+Subject: [PATCH 0163/1021] [BD-29] [TNL-7288] Fix front-end behavior when the
+ course has no sections or no subsections in the first section (#98)
+
+* Do not redirect when the sequenceId is not valid
+
+That is, if firstSequenceId is null or undefined. This prevents the url
+becoming bogus but does cause the course contents display to become stuck
+with the loading message.
+
+* Detect invalid sequence when loading
+
+If the course has no sections or the first section has no sub-sections,
+then sequence will be null. Before the redirection fix, this would cause an
+error, but after, the sequenceStatus never leaves the loading state. Thus,
+if still loading and the sequence is null, return the no.content message.
+
+* Check sequenceId instead of sequence
+
+From David Joy:
+
+During initial page load, I expect there's a period of time before the
+course blocks API and the sequence metadata API come back where the
+sequenceStatus is loading but the sequence is still false, meaning that
+we'll see a flash of this 'no content' messaging for a moment before the
+data comes in.
+
+If we instead check whether sequenceId is null here, that may give us a
+more accurate condition. The sequenceId in redux is only populated when we
+begin to request a sequence (fetchSequence thunk). If we have no sequence
+ID in the URL route, then fetchSequence never happens and the sequenceId in
+redux stays null.
+
+* Fix up some additional errors Piotr found
+
+This fixes errors caused by deleting units or subsections.
+
+* Move test for unit validity to SequenceContent
+---
+ src/courseware/CoursewareContainer.jsx             | 2 +-
+ src/courseware/course/sequence/Sequence.jsx        | 5 ++++-
+ src/courseware/course/sequence/SequenceContent.jsx | 3 ++-
+ 3 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 665bb60..070a79f 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -116,7 +116,7 @@ function useContentRedirect(courseStatus, sequenceStatus) {
+         // This is a replace because we don't want this change saved in the browser's history.
+         if (data.sectionId && data.unitId) {
+           history.replace(`/course/${courseId}/${data.sectionId}/${data.unitId}`);
+-        } else {
++        } else if (firstSequenceId) {
+           history.replace(`/course/${courseId}/${firstSequenceId}`);
+         }
+       });
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index fd99ea8..ccffcd1 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -100,6 +100,9 @@ function Sequence({
+   }, [unit]);
+ 
+   if (sequenceStatus === 'loading') {
++    if (!sequenceId) {
++      return (<div> {intl.formatMessage(messages['learn.sequence.no.content'])} </div>);
++    }
+     return (
+       <PageLoading
+         srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+@@ -107,7 +110,7 @@ function Sequence({
+     );
+   }
+ 
+-  const gated = sequence.gatedContent !== undefined && sequence.gatedContent.gated;
++  const gated = sequence && sequence.gatedContent !== undefined && sequence.gatedContent.gated;
+ 
+   if (sequenceStatus === 'loaded') {
+     return (
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index 523d1da..1926adf 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -38,7 +38,8 @@ function SequenceContent({
+     );
+   }
+ 
+-  if (unitId === null) {
++  const unit = useModel('units', unitId);
++  if (!unitId || !unit) {
+     return (
+       <div>
+         {intl.formatMessage(messages['learn.sequence.no.content'])}
+-- 
+2.34.1
+

@@ -1,0 +1,387 @@
+From f756299975a86be103f37d690fa301941a07d5e5 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 13 Jan 2020 16:52:19 -0500
+Subject: [PATCH 0031/1021] =?UTF-8?q?Getting=20gated=20content=20and=20?=
+ =?UTF-8?q?=E2=80=9Cgoto=20prereq=E2=80=9D=20working.?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Also allowing partially defined URLs - it will fill in the sub section or unit ID if it’s missing.
+---
+ src/index.jsx                                 |  2 +-
+ .../LearningSequencePage.jsx                  | 11 +++--
+ src/learning-sequence/data/hooks.js           | 25 ++++++++++-
+ .../sub-section/SubSection.jsx                | 35 ++++++++++++---
+ .../sub-section/SubSectionNavigation.jsx      |  8 +++-
+ .../sub-section/content-lock/ContentLock.jsx  | 44 +++++++++++++++++++
+ .../sub-section/content-lock/index.js         |  1 +
+ .../sub-section/content-lock/messages.js      | 21 +++++++++
+ .../sub-section/data/hooks.js                 | 18 +++++++-
+ src/learning-sequence/sub-section/messages.js | 11 +++++
+ 10 files changed, 159 insertions(+), 17 deletions(-)
+ create mode 100644 src/learning-sequence/sub-section/content-lock/ContentLock.jsx
+ create mode 100644 src/learning-sequence/sub-section/content-lock/index.js
+ create mode 100644 src/learning-sequence/sub-section/content-lock/messages.js
+ create mode 100644 src/learning-sequence/sub-section/messages.js
+
+diff --git a/src/index.jsx b/src/index.jsx
+index 8a872f6..c6a1114 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -29,10 +29,10 @@ subscribe(APP_READY, () => {
+         <Route
+           exact
+           path="/"
+-
+           render={() => <Link to="/course/course-v1%3AedX%2BDemoX%2BDemo_Course/block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction/block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0270f6de40fc">Visit Demo Course</Link>}
+         />
+         <Route path="/course/:courseId/:subSectionId/:unitId" component={LearningSequencePage} />
++        <Route path="/course/:courseId/:subSectionId" component={LearningSequencePage} />
+         <Route path="/course/:courseId" component={LearningSequencePage} />
+       </Switch>
+       <Footer />
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+index d4cbcaa..de5e84e 100644
+--- a/src/learning-sequence/LearningSequencePage.jsx
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+@@ -6,8 +6,9 @@ import PageLoading from './PageLoading';
+ import messages from './messages';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import CourseStructureContext from './CourseStructureContext';
+-import { useLoadCourseStructure } from './data/hooks';
++import { useLoadCourseStructure, useMissingSubSectionRedirect } from './data/hooks';
+ import SubSection from './sub-section/SubSection';
++import { history } from '@edx/frontend-platform';
+ 
+ function LearningSequencePage({ match, intl }) {
+   const {
+@@ -18,6 +19,8 @@ function LearningSequencePage({ match, intl }) {
+ 
+   const { blocks, loaded, courseBlockId } = useLoadCourseStructure(courseId);
+ 
++  useMissingSubSectionRedirect(loaded, blocks, courseId, courseBlockId, subSectionId);
++
+   return (
+     <main className="container-fluid d-flex flex-column flex-grow-1">
+       <CourseStructureContext.Provider value={{
+@@ -33,8 +36,8 @@ function LearningSequencePage({ match, intl }) {
+           srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+         />}
+ 
+-        {loaded && <CourseBreadcrumbs />}
+-        <SubSection />
++        {loaded && unitId && <CourseBreadcrumbs />}
++        {subSectionId && <SubSection />}
+       </CourseStructureContext.Provider>
+ 
+     </main>
+diff --git a/src/learning-sequence/data/hooks.js b/src/learning-sequence/data/hooks.js
+index 1cded51..fc9d2be 100644
+--- a/src/learning-sequence/data/hooks.js
++++ b/src/learning-sequence/data/hooks.js
+@@ -1,4 +1,5 @@
+ import { useContext, useMemo, useState, useEffect } from 'react';
++import { history } from '@edx/frontend-platform';
+ import { AppContext } from '@edx/frontend-platform/react';
+ 
+ import CourseStructureContext from '../CourseStructureContext';
+@@ -18,6 +19,26 @@ export function useBlockAncestry(blockId) {
+   }, [blocks, blockId, loaded]);
+ }
+ 
++export function useMissingSubSectionRedirect(
++  loaded,
++  blocks,
++  courseId,
++  courseBlockId,
++  subSectionId,
++) {
++  useEffect(() => {
++    if (loaded && !subSectionId) {
++      const course = blocks[courseBlockId];
++      const nextSectionId = course.children[0];
++      const nextSection = blocks[nextSectionId];
++      const nextSubSectionId = nextSection.children[0];
++      const nextSubSection = blocks[nextSubSectionId];
++      const nextUnitId = nextSubSection.children[0];
++      history.push(`/course/${courseId}/${nextSubSectionId}/${nextUnitId}`);
++    }
++  }, [loaded, subSectionId]);
++}
++
+ export function useLoadCourseStructure(courseId) {
+   const { authenticatedUser } = useContext(AppContext);
+ 
+@@ -48,7 +69,7 @@ export function useCurrentCourse() {
+ export function useCurrentSubSection() {
+   const { loaded, blocks, subSectionId } = useContext(CourseStructureContext);
+ 
+-  return loaded ? blocks[subSectionId] : null;
++  return loaded && subSectionId ? blocks[subSectionId] : null;
+ }
+ 
+ export function useCurrentSection() {
+@@ -60,7 +81,7 @@ export function useCurrentSection() {
+ export function useCurrentUnit() {
+   const { loaded, blocks, unitId } = useContext(CourseStructureContext);
+ 
+-  return loaded ? blocks[unitId] : null;
++  return loaded && unitId ? blocks[unitId] : null;
+ }
+ 
+ 
+diff --git a/src/learning-sequence/sub-section/SubSection.jsx b/src/learning-sequence/sub-section/SubSection.jsx
+index bfcb06b..25a2790 100644
+--- a/src/learning-sequence/sub-section/SubSection.jsx
++++ b/src/learning-sequence/sub-section/SubSection.jsx
+@@ -1,4 +1,5 @@
+-import React, { useContext } from 'react';
++import React, { useContext, Suspense } from 'react';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import SubSectionNavigation from './SubSectionNavigation';
+ import CourseStructureContext from '../CourseStructureContext';
+@@ -7,22 +8,31 @@ import {
+   useLoadSubSectionMetadata,
+   useExamRedirect,
+   usePersistentUnitPosition,
++  useMissingUnitRedirect,
+ } from './data/hooks';
+ import SubSectionMetadataContext from './SubSectionMetadataContext';
++import PageLoading from '../PageLoading';
++import messages from './messages';
++import { useCurrentUnit } from '../data/hooks';
+ 
+-export default function SubSection() {
++const ContentLock = React.lazy(() => import('./content-lock'));
++
++function SubSection({ intl }) {
+   const {
+     courseId,
+     subSectionId,
+     unitId,
+     blocks,
+   } = useContext(CourseStructureContext);
+-  const { metadata } = useLoadSubSectionMetadata(courseId, subSectionId);
++  const { metadata, loaded } = useLoadSubSectionMetadata(courseId, subSectionId);
+   usePersistentUnitPosition(courseId, subSectionId, unitId, metadata);
+ 
+   useExamRedirect(metadata, blocks);
+ 
+-  const ready = blocks !== null && metadata !== null;
++  useMissingUnitRedirect(metadata, loaded);
++  const unit = useCurrentUnit();
++
++  const ready = blocks !== null && metadata !== null && unitId && unit;
+ 
+   if (!ready) {
+     return null;
+@@ -34,9 +44,22 @@ export default function SubSection() {
+     <SubSectionMetadataContext.Provider value={metadata}>
+       <section className="d-flex flex-column flex-grow-1">
+         <SubSectionNavigation />
+-        {isGated && <div>This is gated content.</div>}
+-        {!isGated && <Unit id={unitId} unit={blocks[unitId]} />}
++        {isGated && (
++          <Suspense fallback={<PageLoading
++            srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
++          />}
++          >
++            <ContentLock />
++          </Suspense>
++        )}
++        {!isGated && <Unit id={unitId} unit={unit} />}
+       </section>
+     </SubSectionMetadataContext.Provider>
+   );
+ }
++
++SubSection.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(SubSection);
+diff --git a/src/learning-sequence/sub-section/SubSectionNavigation.jsx b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+index 677f4d5..0caa786 100644
+--- a/src/learning-sequence/sub-section/SubSectionNavigation.jsx
++++ b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+@@ -41,7 +41,7 @@ UnitIcon.propTypes = {
+ };
+ 
+ export default function SubSectionNavigation() {
+-  const { courseId } = useContext(CourseStructureContext);
++  const { courseId, unitId } = useContext(CourseStructureContext);
+   const previousUnit = usePreviousUnit();
+   const nextUnit = useNextUnit();
+ 
+@@ -60,6 +60,10 @@ export default function SubSectionNavigation() {
+     history.push(`/course/${courseId}/${unit.parentId}/${unit.id}`);
+   });
+ 
++  if (!unitId) {
++    return null;
++  }
++
+   return (
+     <nav className="flex-grow-0 d-flex w-100 mb-3">
+       <Button
+@@ -82,8 +86,8 @@ export default function SubSectionNavigation() {
+ }
+ 
+ function UnitNavigation({ clickHandler }) {
+-  const units = useCurrentSubSectionUnits();
+   const currentUnit = useCurrentUnit();
++  const units = useCurrentSubSectionUnits();
+   const metadata = useContext(SubSectionMetadataContext);
+ 
+   const isGated = metadata.gatedContent.gated;
+diff --git a/src/learning-sequence/sub-section/content-lock/ContentLock.jsx b/src/learning-sequence/sub-section/content-lock/ContentLock.jsx
+new file mode 100644
+index 0000000..622a49e
+--- /dev/null
++++ b/src/learning-sequence/sub-section/content-lock/ContentLock.jsx
+@@ -0,0 +1,44 @@
++import React, { useContext, useCallback } from 'react';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faLock } from '@fortawesome/free-solid-svg-icons';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { history } from '@edx/frontend-platform';
++import { Button } from '@edx/paragon';
++
++import SubSectionMetadataContext from '../SubSectionMetadataContext';
++import messages from './messages';
++import { useCurrentSubSection } from '../../data/hooks';
++import CourseStructureContext from '../../CourseStructureContext';
++
++function ContentLock({ intl }) {
++  const { courseId } = useContext(CourseStructureContext);
++  const metadata = useContext(SubSectionMetadataContext);
++  const subSection = useCurrentSubSection();
++
++  const handleClick = useCallback(() => {
++    history.push(`/course/${courseId}/${metadata.gatedContent.prereqId}`);
++  });
++
++  return (
++    <>
++      <h3>
++        <FontAwesomeIcon icon={faLock} />{' '}
++        {subSection.displayName}
++      </h3>
++      <h4>{intl.formatMessage(messages['learn.contentLock.content.locked'])}</h4>
++      <p>{intl.formatMessage(messages['learn.contentLock.complete.prerequisite'], {
++        prereqSectionName: metadata.gatedContent.prereqSectionName,
++      })}
++      </p>
++      <p>
++        <Button className="btn-primary" onClick={handleClick}>{intl.formatMessage(messages['learn.contentLock.goToSection'])}</Button>
++      </p>
++    </>
++  );
++}
++
++ContentLock.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(ContentLock);
+diff --git a/src/learning-sequence/sub-section/content-lock/index.js b/src/learning-sequence/sub-section/content-lock/index.js
+new file mode 100644
+index 0000000..81524e6
+--- /dev/null
++++ b/src/learning-sequence/sub-section/content-lock/index.js
+@@ -0,0 +1 @@
++export { default } from './ContentLock';
+diff --git a/src/learning-sequence/sub-section/content-lock/messages.js b/src/learning-sequence/sub-section/content-lock/messages.js
+new file mode 100644
+index 0000000..872009b
+--- /dev/null
++++ b/src/learning-sequence/sub-section/content-lock/messages.js
+@@ -0,0 +1,21 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learn.contentLock.content.locked': {
++    id: 'learn.contentLock.content.locked',
++    defaultMessage: 'Content Locked',
++    description: 'Message shown to indicate that a piece of content is unavailable and has a prerequisite.',
++  },
++  'learn.contentLock.complete.prerequisite': {
++    id: 'learn.contentLock.complete.prerequisite',
++    defaultMessage: "You must complete the prerequisite: '{prereqSectionName}' to access this content.",
++    description: 'Message shown to indicate which prerequisite the student must complete prior to accessing the locked content.  {prereqSectionName} is the name of the prerequisite.',
++  },
++  'learn.contentLock.goToSection': {
++    id: 'learn.contentLock.goToSection',
++    defaultMessage: 'Go To Prerequisite Section',
++    description: 'A button users can click that navigates their browser to the prerequisite of this section.',
++  },
++});
++
++export default messages;
+diff --git a/src/learning-sequence/sub-section/data/hooks.js b/src/learning-sequence/sub-section/data/hooks.js
+index 716d041..b1e2e2c 100644
+--- a/src/learning-sequence/sub-section/data/hooks.js
++++ b/src/learning-sequence/sub-section/data/hooks.js
+@@ -1,7 +1,8 @@
+-import { useState, useEffect } from 'react';
+-import { camelCaseObject } from '@edx/frontend-platform';
++import { useState, useEffect, useContext } from 'react';
++import { camelCaseObject, history } from '@edx/frontend-platform';
+ 
+ import { getSubSectionMetadata, saveSubSectionPosition } from './api';
++import CourseStructureContext from '../../CourseStructureContext';
+ 
+ export function useLoadSubSectionMetadata(courseId, subSectionId) {
+   const [metadata, setMetadata] = useState(null);
+@@ -9,6 +10,7 @@ export function useLoadSubSectionMetadata(courseId, subSectionId) {
+ 
+   useEffect(() => {
+     setLoaded(false);
++    setMetadata(null);
+     getSubSectionMetadata(courseId, subSectionId).then((data) => {
+       setMetadata(camelCaseObject(data));
+       setLoaded(true);
+@@ -59,3 +61,15 @@ export function usePersistentUnitPosition(courseId, subSectionId, unitId, subSec
+     saveSubSectionPosition(courseId, subSectionId, newPosition);
+   }, [courseId, subSectionId, unitId, subSectionMetadata]);
+ }
++
++export function useMissingUnitRedirect(metadata, loaded) {
++  const { courseId, subSectionId, unitId } = useContext(CourseStructureContext);
++  useEffect(() => {
++    if (loaded && metadata.itemId === subSectionId && !unitId) {
++      // Position comes from the server as a 1-indexed array index.  Convert it to 0-indexed.
++      const position = metadata.position - 1;
++      const nextUnitId = metadata.items[position].id;
++      history.push(`/course/${courseId}/${subSectionId}/${nextUnitId}`);
++    }
++  }, [loaded, metadata, unitId]);
++}
+diff --git a/src/learning-sequence/sub-section/messages.js b/src/learning-sequence/sub-section/messages.js
+new file mode 100644
+index 0000000..fc3007b
+--- /dev/null
++++ b/src/learning-sequence/sub-section/messages.js
+@@ -0,0 +1,11 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learn.loading.content.lock': {
++    id: 'learn.loading.content.lock',
++    defaultMessage: 'Loading locked content messaging...',
++    description: 'Message shown when an interface about locked content is being loaded',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

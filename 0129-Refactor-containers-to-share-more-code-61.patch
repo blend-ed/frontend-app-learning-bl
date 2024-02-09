@@ -1,0 +1,849 @@
+From 2f01e8a64639e822c35333e7d7e2e6dd9ff4dcef Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 21 May 2020 11:56:49 -0400
+Subject: [PATCH 0129/1021] Refactor containers to share more code (#61)
+
+Specifically, make sure that the header, footer, and tabs are all
+shared code so that they look the same and don't need to be
+redefined as we add more tab pages.
+---
+ LICENSE                                    |   0
+ Makefile                                   |   0
+ src/course-header/CourseTabsNavigation.jsx |   9 +-
+ src/course-header/Header.jsx               |  12 +-
+ src/course-home/CourseHome.jsx             |  97 ++++++----------
+ src/course-home/CourseHomeContainer.jsx    |  54 ---------
+ src/course-home/index.js                   |   2 +-
+ src/course-home/messages.js                |  11 --
+ src/courseware/CoursewareContainer.jsx     |  10 +-
+ src/courseware/course/Course.jsx           | 122 +++++++--------------
+ src/courseware/course/messages.js          |  16 ---
+ src/data/api.js                            |  16 ++-
+ src/index.jsx                              |   9 +-
+ src/index.scss                             |   1 -
+ src/tab-page/LoadedTabPage.jsx             |  60 ++++++++++
+ src/tab-page/TabContainer.jsx              |  42 +++++++
+ src/tab-page/TabPage.jsx                   |  52 +++++++++
+ src/tab-page/index.js                      |   2 +
+ src/tab-page/messages.js                   |  16 +++
+ 19 files changed, 290 insertions(+), 241 deletions(-)
+ mode change 100755 => 100644 LICENSE
+ mode change 100755 => 100644 Makefile
+ delete mode 100644 src/course-home/CourseHomeContainer.jsx
+ delete mode 100644 src/course-home/messages.js
+ delete mode 100644 src/courseware/course/messages.js
+ create mode 100644 src/tab-page/LoadedTabPage.jsx
+ create mode 100644 src/tab-page/TabContainer.jsx
+ create mode 100644 src/tab-page/TabPage.jsx
+ create mode 100644 src/tab-page/index.js
+ create mode 100644 src/tab-page/messages.js
+
+diff --git a/LICENSE b/LICENSE
+old mode 100755
+new mode 100644
+diff --git a/Makefile b/Makefile
+old mode 100755
+new mode 100644
+diff --git a/src/course-header/CourseTabsNavigation.jsx b/src/course-header/CourseTabsNavigation.jsx
+index 63d1bdf..a24c30e 100644
+--- a/src/course-header/CourseTabsNavigation.jsx
++++ b/src/course-header/CourseTabsNavigation.jsx
+@@ -1,17 +1,16 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { getConfig } from '@edx/frontend-platform';
+ import classNames from 'classnames';
+ 
+ import messages from './messages';
+ import Tabs from '../tabs/Tabs';
+ 
+ function CourseTabsNavigation({
+-  activeTabSlug, tabs, intl,
++  activeTabSlug, className, tabs, intl,
+ }) {
+   return (
+-    <div className="course-tabs-navigation">
++    <div className={classNames('course-tabs-navigation', className)}>
+       <div className="container-fluid">
+         <Tabs
+           className="nav-underline-tabs"
+@@ -21,7 +20,7 @@ function CourseTabsNavigation({
+             <a
+               key={slug}
+               className={classNames('nav-item flex-shrink-0 nav-link', { active: slug === activeTabSlug })}
+-              href={`${getConfig().LMS_BASE_URL}${url}`}
++              href={url}
+             >
+               {title}
+             </a>
+@@ -34,6 +33,7 @@ function CourseTabsNavigation({
+ 
+ CourseTabsNavigation.propTypes = {
+   activeTabSlug: PropTypes.string,
++  className: PropTypes.string,
+   tabs: PropTypes.arrayOf(PropTypes.shape({
+     title: PropTypes.string.isRequired,
+     priority: PropTypes.number.isRequired,
+@@ -45,6 +45,7 @@ CourseTabsNavigation.propTypes = {
+ 
+ CourseTabsNavigation.defaultProps = {
+   activeTabSlug: undefined,
++  className: null,
+ };
+ 
+ export default injectIntl(CourseTabsNavigation);
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index b213e05..ce38e11 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -68,7 +68,13 @@ export default function Header({
+ }
+ 
+ Header.propTypes = {
+-  courseOrg: PropTypes.string.isRequired,
+-  courseNumber: PropTypes.string.isRequired,
+-  courseTitle: PropTypes.string.isRequired,
++  courseOrg: PropTypes.string,
++  courseNumber: PropTypes.string,
++  courseTitle: PropTypes.string,
++};
++
++Header.defaultProps = {
++  courseOrg: null,
++  courseNumber: null,
++  courseTitle: null,
+ };
+diff --git a/src/course-home/CourseHome.jsx b/src/course-home/CourseHome.jsx
+index 577b101..877fc83 100644
+--- a/src/course-home/CourseHome.jsx
++++ b/src/course-home/CourseHome.jsx
+@@ -1,11 +1,8 @@
+ import React from 'react';
+-import PropTypes from 'prop-types';
++import { useSelector } from 'react-redux';
+ import { Button } from '@edx/paragon';
+ 
+ import { AlertList } from '../user-messages';
+-import { Header, CourseTabsNavigation } from '../course-header';
+-import { useLogistrationAlert } from '../logistration-alert';
+-import { useEnrollmentAlert } from '../enrollment-alert';
+ 
+ import CourseDates from './CourseDates';
+ import Section from './Section';
+@@ -18,15 +15,12 @@ import { useModel } from '../model-store';
+ const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../enrollment-alert'));
+ const LogistrationAlert = React.lazy(() => import('../logistration-alert'));
+ 
+-export default function CourseHome({
+-  courseId,
+-}) {
+-  useLogistrationAlert();
+-  useEnrollmentAlert(courseId);
++export default function CourseHome() {
++  const {
++    courseId,
++  } = useSelector(state => state.courseware);
+ 
+   const {
+-    org,
+-    number,
+     title,
+     start,
+     end,
+@@ -34,64 +28,45 @@ export default function CourseHome({
+     enrollmentEnd,
+     enrollmentMode,
+     isEnrolled,
+-    tabs,
+     sectionIds,
+   } = useModel('courses', courseId);
+ 
+   return (
+     <>
+-      <Header
+-        courseOrg={org}
+-        courseNumber={number}
+-        courseTitle={title}
++      <AlertList
++        topic="outline"
++        className="mb-3"
++        customAlerts={{
++          clientEnrollmentAlert: EnrollmentAlert,
++          clientStaffEnrollmentAlert: StaffEnrollmentAlert,
++          clientLogistrationAlert: LogistrationAlert,
++        }}
+       />
+-      <main className="d-flex flex-column flex-grow-1">
+-        <div className="container-fluid">
+-          <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug="courseware" />
+-          <AlertList
+-            topic="outline"
+-            className="mb-3"
+-            customAlerts={{
+-              clientEnrollmentAlert: EnrollmentAlert,
+-              clientStaffEnrollmentAlert: StaffEnrollmentAlert,
+-              clientLogistrationAlert: LogistrationAlert,
+-            }}
+-          />
++      <div className="d-flex justify-content-between mb-3">
++        <h2>{title}</h2>
++        <Button className="btn-primary" type="button">Resume Course</Button>
++      </div>
++      <div className="row">
++        <div className="col col-8">
++          {sectionIds.map((sectionId) => (
++            <Section
++              key={sectionId}
++              id={sectionId}
++              courseId={courseId}
++            />
++          ))}
+         </div>
+-        <div className="flex-grow-1">
+-          <div className="container-fluid">
+-            <div className="d-flex justify-content-between mb-3">
+-              <h2>{title}</h2>
+-              <Button className="btn-primary" type="button">Resume Course</Button>
+-            </div>
+-            <div className="row">
+-              <div className="col col-8">
+-                {sectionIds.map((sectionId) => (
+-                  <Section
+-                    key={sectionId}
+-                    id={sectionId}
+-                    courseId={courseId}
+-                  />
+-                ))}
+-              </div>
+-              <div className="col col-4">
+-                <CourseDates
+-                  start={start}
+-                  end={end}
+-                  enrollmentStart={enrollmentStart}
+-                  enrollmentEnd={enrollmentEnd}
+-                  enrollmentMode={enrollmentMode}
+-                  isEnrolled={isEnrolled}
+-                />
+-              </div>
+-            </div>
+-          </div>
++        <div className="col col-4">
++          <CourseDates
++            start={start}
++            end={end}
++            enrollmentStart={enrollmentStart}
++            enrollmentEnd={enrollmentEnd}
++            enrollmentMode={enrollmentMode}
++            isEnrolled={isEnrolled}
++          />
+         </div>
+-      </main>
++      </div>
+     </>
+   );
+ }
+-
+-CourseHome.propTypes = {
+-  courseId: PropTypes.string.isRequired,
+-};
+diff --git a/src/course-home/CourseHomeContainer.jsx b/src/course-home/CourseHomeContainer.jsx
+deleted file mode 100644
+index 92b784b..0000000
+--- a/src/course-home/CourseHomeContainer.jsx
++++ /dev/null
+@@ -1,54 +0,0 @@
+-import React, { useEffect } from 'react';
+-import PropTypes from 'prop-types';
+-import { useDispatch, useSelector } from 'react-redux';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-
+-import messages from './messages';
+-import PageLoading from '../PageLoading';
+-import CourseHome from './CourseHome';
+-import { fetchCourse } from '../data';
+-
+-function CourseHomeContainer(props) {
+-  const {
+-    intl,
+-    match,
+-  } = props;
+-
+-  const dispatch = useDispatch();
+-  useEffect(() => {
+-    // The courseId from the URL is the course we WANT to load.
+-    dispatch(fetchCourse(match.params.courseId));
+-  }, [match.params.courseId]);
+-
+-  // The courseId from the store is the course we HAVE loaded.  If the URL changes,
+-  // we don't want the application to adjust to it until it has actually loaded the new data.
+-  const {
+-    courseId,
+-    courseStatus,
+-  } = useSelector(state => state.courseware);
+-
+-  return (
+-    <>
+-      {courseStatus === 'loaded' ? (
+-        <CourseHome
+-          courseId={courseId}
+-        />
+-      ) : (
+-        <PageLoading
+-          srMessage={intl.formatMessage(messages['learn.loading.outline'])}
+-        />
+-      )}
+-    </>
+-  );
+-}
+-
+-CourseHomeContainer.propTypes = {
+-  intl: intlShape.isRequired,
+-  match: PropTypes.shape({
+-    params: PropTypes.shape({
+-      courseId: PropTypes.string.isRequired,
+-    }).isRequired,
+-  }).isRequired,
+-};
+-
+-export default injectIntl(CourseHomeContainer);
+diff --git a/src/course-home/index.js b/src/course-home/index.js
+index 5a034d1..a5b1f5a 100644
+--- a/src/course-home/index.js
++++ b/src/course-home/index.js
+@@ -1 +1 @@
+-export { default } from './CourseHomeContainer';
++export { default } from './CourseHome';
+diff --git a/src/course-home/messages.js b/src/course-home/messages.js
+deleted file mode 100644
+index a5d2a02..0000000
+--- a/src/course-home/messages.js
++++ /dev/null
+@@ -1,11 +0,0 @@
+-import { defineMessages } from '@edx/frontend-platform/i18n';
+-
+-const messages = defineMessages({
+-  'learn.loading.outline': {
+-    id: 'learn.loading.learning.sequence',
+-    defaultMessage: 'Loading learning sequence...',
+-    description: 'Message when learning sequence is being loaded',
+-  },
+-});
+-
+-export default messages;
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 3ed72d8..c418241 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
+ import { history } from '@edx/frontend-platform';
+ import { getLocale } from '@edx/frontend-platform/i18n';
+ import { useRouteMatch, Redirect } from 'react-router';
++
+ import {
+   fetchCourse,
+   fetchSequence,
+@@ -14,9 +15,9 @@ import {
+   saveSequencePosition,
+ } from './data/thunks';
+ import { useModel } from '../model-store';
++import { TabPage } from '../tab-page';
+ 
+ import Course from './course';
+-
+ import { sequenceIdsSelector, firstSequenceIdSelector } from './data/selectors';
+ 
+ function useUnitNavigationHandler(courseId, sequenceId, unitId) {
+@@ -200,7 +201,10 @@ export default function CoursewareContainer() {
+   }
+ 
+   return (
+-    <main className="flex-grow-1 d-flex flex-column">
++    <TabPage
++      activeTabSlug="courseware"
++      courseId={courseId}
++    >
+       <Course
+         courseId={courseId}
+         sequenceId={sequenceId}
+@@ -209,7 +213,7 @@ export default function CoursewareContainer() {
+         previousSequenceHandler={previousSequenceHandler}
+         unitNavigationHandler={unitNavigationHandler}
+       />
+-    </main>
++    </TabPage>
+   );
+ }
+ 
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index a02bba8..fd4bbd8 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -1,23 +1,15 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+-import { useSelector } from 'react-redux';
+ import { AlertList } from '../../user-messages';
+ import { useAccessExpirationAlert } from '../../access-expiration-alert';
+-import { useLogistrationAlert } from '../../logistration-alert';
+-import { useEnrollmentAlert } from '../../enrollment-alert';
+ import { useOfferAlert } from '../../offer-alert';
+-import PageLoading from '../../PageLoading';
+ 
+-import InstructorToolbar from './InstructorToolbar';
+ import Sequence from './sequence';
+ 
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+-import { Header, CourseTabsNavigation } from '../../course-header';
+ import CourseSock from './course-sock';
+ import ContentTools from './tools/ContentTools';
+-import messages from './messages';
+ import { useModel } from '../../model-store';
+ 
+ // Note that we import from the component files themselves in the enrollment-alert package.
+@@ -37,90 +29,53 @@ function Course({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   unitNavigationHandler,
+-  intl,
+ }) {
+   const course = useModel('courses', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const section = useModel('sections', sequence ? sequence.sectionId : null);
+ 
+   useOfferAlert(courseId);
+-  useLogistrationAlert();
+-  useEnrollmentAlert(courseId);
+   useAccessExpirationAlert(courseId);
+ 
+-  const courseStatus = useSelector(state => state.courseware.courseStatus);
++  const {
++    canShowUpgradeSock,
++    verifiedMode,
++  } = course;
+ 
+-  if (courseStatus === 'loading') {
+-    return (
+-      <PageLoading
+-        srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-      />
+-    );
+-  }
+-
+-  if (courseStatus === 'loaded') {
+-    const {
+-      canShowUpgradeSock,
+-      org, number, title, isStaff, tabs, verifiedMode,
+-    } = course;
+-    return (
+-      <>
+-        <Header
+-          courseOrg={org}
+-          courseNumber={number}
+-          courseTitle={title}
+-        />
+-        {isStaff && (
+-          <InstructorToolbar
+-            courseId={courseId}
+-            unitId={unitId}
+-          />
+-        )}
+-        <CourseTabsNavigation tabs={tabs} activeTabSlug="courseware" />
+-        <div className="container-fluid">
+-          <AlertList
+-            className="my-3"
+-            topic="course"
+-            customAlerts={{
+-              clientEnrollmentAlert: EnrollmentAlert,
+-              clientStaffEnrollmentAlert: StaffEnrollmentAlert,
+-              clientLogistrationAlert: LogistrationAlert,
+-              clientAccessExpirationAlert: AccessExpirationAlert,
+-              clientOfferAlert: OfferAlert,
+-            }}
+-            // courseId is provided because EnrollmentAlert and StaffEnrollmentAlert require it.
+-            customProps={{
+-              courseId,
+-            }}
+-          />
+-          <CourseBreadcrumbs
+-            courseId={courseId}
+-            sectionId={section ? section.id : null}
+-            sequenceId={sequenceId}
+-          />
+-          <AlertList topic="sequence" />
+-        </div>
+-        <div className="flex-grow-1 d-flex flex-column">
+-          <Sequence
+-            unitId={unitId}
+-            sequenceId={sequenceId}
+-            courseId={courseId}
+-            unitNavigationHandler={unitNavigationHandler}
+-            nextSequenceHandler={nextSequenceHandler}
+-            previousSequenceHandler={previousSequenceHandler}
+-          />
+-          {canShowUpgradeSock && verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
+-          <ContentTools course={course} />
+-        </div>
+-      </>
+-    );
+-  }
+-
+-  // courseStatus 'failed' and any other unexpected course status.
+   return (
+-    <p className="text-center py-5 mx-auto" style={{ maxWidth: '30em' }}>
+-      {intl.formatMessage(messages['learn.course.load.failure'])}
+-    </p>
++    <>
++      <AlertList
++        className="my-3"
++        topic="course"
++        customAlerts={{
++          clientEnrollmentAlert: EnrollmentAlert,
++          clientStaffEnrollmentAlert: StaffEnrollmentAlert,
++          clientLogistrationAlert: LogistrationAlert,
++          clientAccessExpirationAlert: AccessExpirationAlert,
++          clientOfferAlert: OfferAlert,
++        }}
++        // courseId is provided because EnrollmentAlert and StaffEnrollmentAlert require it.
++        customProps={{
++          courseId,
++        }}
++      />
++      <CourseBreadcrumbs
++        courseId={courseId}
++        sectionId={section ? section.id : null}
++        sequenceId={sequenceId}
++      />
++      <AlertList topic="sequence" />
++      <Sequence
++        unitId={unitId}
++        sequenceId={sequenceId}
++        courseId={courseId}
++        unitNavigationHandler={unitNavigationHandler}
++        nextSequenceHandler={nextSequenceHandler}
++        previousSequenceHandler={previousSequenceHandler}
++      />
++      {canShowUpgradeSock && verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
++      <ContentTools course={course} />
++    </>
+   );
+ }
+ 
+@@ -131,7 +86,6 @@ Course.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   unitNavigationHandler: PropTypes.func.isRequired,
+-  intl: intlShape.isRequired,
+ };
+ 
+ Course.defaultProps = {
+@@ -140,4 +94,4 @@ Course.defaultProps = {
+   unitId: null,
+ };
+ 
+-export default injectIntl(Course);
++export default Course;
+diff --git a/src/courseware/course/messages.js b/src/courseware/course/messages.js
+deleted file mode 100644
+index d7f7dfc..0000000
+--- a/src/courseware/course/messages.js
++++ /dev/null
+@@ -1,16 +0,0 @@
+-import { defineMessages } from '@edx/frontend-platform/i18n';
+-
+-const messages = defineMessages({
+-  'learn.loading.learning.sequence': {
+-    id: 'learn.loading.learning.sequence',
+-    defaultMessage: 'Loading learning sequence...',
+-    description: 'Message when learning sequence is being loaded',
+-  },
+-  'learn.course.load.failure': {
+-    id: 'learn.course.load.failure',
+-    defaultMessage: 'There was an error loading this course.',
+-    description: 'Message when a course fails to load',
+-  },
+-});
+-
+-export default messages;
+diff --git a/src/data/api.js b/src/data/api.js
+index 2b6f8fe..159e8bc 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -3,6 +3,20 @@ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { logError } from '@edx/frontend-platform/logging';
+ 
++function overrideTabUrls(id, tabs) {
++  // "LMS tab slug" to "MFE URL slug" for overridden tabs
++  const tabOverrides = {};
++  return tabs.map((tab) => {
++    let url;
++    if (tabOverrides[tab.slug]) {
++      url = `/course/${id}/${tabOverrides[tab.slug]}`;
++    } else {
++      url = `${getConfig().LMS_BASE_URL}${tab.url}`;
++    }
++    return { ...tab, url };
++  });
++}
++
+ function normalizeMetadata(metadata) {
+   return {
+     canShowUpgradeSock: metadata.can_show_upgrade_sock,
+@@ -23,7 +37,7 @@ function normalizeMetadata(metadata) {
+     canLoadCourseware: camelCaseObject(metadata.can_load_courseware),
+     isStaff: metadata.is_staff,
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+-    tabs: camelCaseObject(metadata.tabs),
++    tabs: overrideTabUrls(metadata.id, camelCaseObject(metadata.tabs)),
+     showCalculator: metadata.show_calculator,
+     notes: camelCaseObject(metadata.notes),
+   };
+diff --git a/src/index.jsx b/src/index.jsx
+index d849116..bc0f301 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -18,9 +18,10 @@ import { UserMessagesProvider } from './user-messages';
+ 
+ import './index.scss';
+ import './assets/favicon.ico';
++import CourseHome from './course-home';
+ import CoursewareContainer from './courseware';
+-import CourseHomeContainer from './course-home';
+ import CoursewareRedirect from './CoursewareRedirect';
++import { TabContainer } from './tab-page';
+ 
+ import store from './store';
+ 
+@@ -30,7 +31,11 @@ subscribe(APP_READY, () => {
+       <UserMessagesProvider>
+         <Switch>
+           <Route path="/redirect" component={CoursewareRedirect} />
+-          <Route path="/course/:courseId/home" component={CourseHomeContainer} />
++          <Route path="/course/:courseId/home">
++            <TabContainer tab="courseware">
++              <CourseHome />
++            </TabContainer>
++          </Route>
+           <Route
+             path={[
+               '/course/:courseId/:sequenceId/:unitId',
+diff --git a/src/index.scss b/src/index.scss
+index 36f7467..2faf598 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -108,7 +108,6 @@ $primary: #1176B2;
+   @media (min-width: map-get($grid-breakpoints, 'sm')) {
+     max-width: 1440px;
+     width: 100%;
+-    padding: 0 $grid-gutter-width;
+     margin-right: auto;
+     margin-left: auto;
+   }
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+new file mode 100644
+index 0000000..c72baa6
+--- /dev/null
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -0,0 +1,60 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { Header, CourseTabsNavigation } from '../course-header';
++import { useModel } from '../model-store';
++import { useEnrollmentAlert } from '../enrollment-alert';
++import InstructorToolbar from '../courseware/course/InstructorToolbar';
++
++function LoadedTabPage({
++  activeTabSlug,
++  children,
++  courseId,
++  unitId,
++}) {
++  useEnrollmentAlert(courseId);
++
++  const {
++    isStaff,
++    number,
++    org,
++    tabs,
++    title,
++  } = useModel('courses', courseId);
++
++  return (
++    <>
++      <Header
++        courseOrg={org}
++        courseNumber={number}
++        courseTitle={title}
++      />
++      {isStaff && (
++        <InstructorToolbar
++          courseId={courseId}
++          unitId={unitId}
++        />
++      )}
++      <main className="d-flex flex-column flex-grow-1">
++        <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug={activeTabSlug} />
++        <div className="container-fluid">
++          {children}
++        </div>
++      </main>
++    </>
++  );
++}
++
++LoadedTabPage.propTypes = {
++  activeTabSlug: PropTypes.string.isRequired,
++  children: PropTypes.node,
++  courseId: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
++};
++
++LoadedTabPage.defaultProps = {
++  children: null,
++  unitId: null,
++};
++
++export default LoadedTabPage;
+diff --git a/src/tab-page/TabContainer.jsx b/src/tab-page/TabContainer.jsx
+new file mode 100644
+index 0000000..da72686
+--- /dev/null
++++ b/src/tab-page/TabContainer.jsx
+@@ -0,0 +1,42 @@
++import React, { useEffect } from 'react';
++import PropTypes from 'prop-types';
++import { useDispatch, useSelector } from 'react-redux';
++import { useParams } from 'react-router-dom';
++
++import { fetchCourse } from '../data';
++
++import TabPage from './TabPage';
++
++export default function TabContainer(props) {
++  const {
++    children,
++    tab,
++  } = props;
++
++  const { courseId: courseIdFromUrl } = useParams();
++  const dispatch = useDispatch();
++  useEffect(() => {
++    // The courseId from the URL is the course we WANT to load.
++    dispatch(fetchCourse(courseIdFromUrl));
++  }, [courseIdFromUrl]);
++
++  // The courseId from the store is the course we HAVE loaded.  If the URL changes,
++  // we don't want the application to adjust to it until it has actually loaded the new data.
++  const {
++    courseId,
++  } = useSelector(state => state.courseware);
++
++  return (
++    <TabPage
++      activeTabSlug={tab}
++      courseId={courseId}
++    >
++      {children}
++    </TabPage>
++  );
++}
++
++TabContainer.propTypes = {
++  children: PropTypes.node.isRequired,
++  tab: PropTypes.string.isRequired,
++};
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+new file mode 100644
+index 0000000..bec6a14
+--- /dev/null
++++ b/src/tab-page/TabPage.jsx
+@@ -0,0 +1,52 @@
++import React from 'react';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { useSelector } from 'react-redux';
++
++import { Header } from '../course-header';
++import { useLogistrationAlert } from '../logistration-alert';
++import PageLoading from '../PageLoading';
++
++import messages from './messages';
++import LoadedTabPage from './LoadedTabPage';
++
++function TabPage({
++  intl,
++  ...passthroughProps
++}) {
++  useLogistrationAlert();
++
++  const courseStatus = useSelector(state => state.courseware.courseStatus);
++
++  if (courseStatus === 'loading') {
++    return (
++      <>
++        <Header />
++        <PageLoading
++          srMessage={intl.formatMessage(messages['learn.loading'])}
++        />
++      </>
++    );
++  }
++
++  if (courseStatus === 'loaded') {
++    return (
++      <LoadedTabPage {...passthroughProps} />
++    );
++  }
++
++  // courseStatus 'failed' and any other unexpected course status.
++  return (
++    <>
++      <Header />
++      <p className="text-center py-5 mx-auto" style={{ maxWidth: '30em' }}>
++        {intl.formatMessage(messages['learn.loading.failure'])}
++      </p>
++    </>
++  );
++}
++
++TabPage.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(TabPage);
+diff --git a/src/tab-page/index.js b/src/tab-page/index.js
+new file mode 100644
+index 0000000..6388f74
+--- /dev/null
++++ b/src/tab-page/index.js
+@@ -0,0 +1,2 @@
++export { default as TabContainer } from './TabContainer';
++export { default as TabPage } from './TabPage';
+diff --git a/src/tab-page/messages.js b/src/tab-page/messages.js
+new file mode 100644
+index 0000000..03cbd8d
+--- /dev/null
++++ b/src/tab-page/messages.js
+@@ -0,0 +1,16 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learn.loading': {
++    id: 'learn.loading',
++    defaultMessage: 'Loading course page...',
++    description: 'Message when course page is being loaded',
++  },
++  'learn.loading.failure': {
++    id: 'learn.loading.failure',
++    defaultMessage: 'There was an error loading this course.',
++    description: 'Message when a course page fails to load',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

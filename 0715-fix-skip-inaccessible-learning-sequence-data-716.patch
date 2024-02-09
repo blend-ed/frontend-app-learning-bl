@@ -1,0 +1,381 @@
+From d1f19a9dc415e860e677edb9b0d40140a8b27fd9 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 29 Oct 2021 10:53:50 -0400
+Subject: [PATCH 0715/1021] fix: skip inaccessible learning sequence data
+ (#716)
+
+When normalizing learning sequences, skip inaccessible sequences
+and also skip sections with only inaccessible sequences.
+
+This both imitates the legacy course block behavior and also
+avoids a failure when merging course block data with LS data
+when they disagree about which sequences exist.
+---
+ src/courseware/data/api.js                    |  47 ++++---
+ .../data/pact-tests/lmsPact.test.jsx          | 125 +++++++++++++++++
+ src/pacts/frontend-app-learning-lms.json      | 131 +++++++++++++++++-
+ 3 files changed, 284 insertions(+), 19 deletions(-)
+
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index e05b07a..717be9e 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -98,12 +98,40 @@ export function normalizeLearningSequencesData(learningSequencesData) {
+     sequences: {},
+   };
+ 
++  // Sequences
++  Object.entries(learningSequencesData.outline.sequences).forEach(([seqId, sequence]) => {
++    if (!sequence.accessible) {
++      // Skipping inaccessible sequences replicates the behavior of the legacy course blocks API
++      return;
++    }
++
++    models.sequences[seqId] = {
++      id: seqId,
++      title: sequence.title,
++    };
++  });
++
++  // Sections
++  learningSequencesData.outline.sections.forEach(section => {
++    // Skipping sections with only inaccessible sequences replicates the behavior of the legacy course blocks API
++    const accessibleSequenceIds = section.sequence_ids.filter(seqId => seqId in models.sequences);
++    if (accessibleSequenceIds.length === 0) {
++      return;
++    }
++
++    models.sections[section.id] = {
++      id: section.id,
++      title: section.title,
++      sequenceIds: accessibleSequenceIds,
++    };
++  });
++
+   // Course
+   const now = new Date();
+   models.courses[learningSequencesData.course_key] = {
+     id: learningSequencesData.course_key,
+     title: learningSequencesData.title,
+-    sectionIds: learningSequencesData.outline.sections.map(section => section.id),
++    sectionIds: Object.entries(models.sections).map(([sectionId]) => sectionId),
+ 
+     // Scan through all the sequences and look for ones that aren't accessible
+     // to us yet because the start date has not yet passed. (Some may be
+@@ -113,23 +141,6 @@ export function normalizeLearningSequencesData(learningSequencesData) {
+     ),
+   };
+ 
+-  // Sections
+-  learningSequencesData.outline.sections.forEach(section => {
+-    models.sections[section.id] = {
+-      id: section.id,
+-      title: section.title,
+-      sequenceIds: section.sequence_ids,
+-    };
+-  });
+-
+-  // Sequences
+-  Object.entries(learningSequencesData.outline.sequences).forEach(([seqId, sequence]) => {
+-    models.sequences[seqId] = {
+-      id: seqId,
+-      title: sequence.title,
+-    };
+-  });
+-
+   return models;
+ }
+ 
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index ce768fd..09f437c 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -6,6 +6,7 @@ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import {
+   getCourseBlocks,
+   getCourseMetadata,
++  getLearningSequencesOutline,
+   getSequenceMetadata,
+   postSequencePosition,
+   getBlockCompletion,
+@@ -96,6 +97,130 @@ describe('Courseware Service', () => {
+     });
+   });
+ 
++  describe('When a request to get a learning sequence outline is made', () => {
++    it('returns a normalized outline', async () => {
++      await provider.addInteraction({
++        state: `Outline exists for course_id ${courseId}`,
++        uponReceiving: 'a request to get an outline',
++        withRequest: {
++          method: 'GET',
++          path: `/api/learning_sequences/v1/course_outline/${courseId}`,
++        },
++        willRespondWith: {
++          status: 200,
++          body: {
++            course_key: string('block-v1:edX+DemoX+Demo_Course'),
++            title: string('Demo Course'),
++            outline: {
++              sections: [],
++              sequences: {},
++            },
++          },
++        },
++      });
++      const normalizedOutline = {
++        courses: {
++          'block-v1:edX+DemoX+Demo_Course': {
++            id: 'block-v1:edX+DemoX+Demo_Course',
++            title: 'Demo Course',
++            sectionIds: [],
++            hasScheduledContent: false,
++          },
++        },
++        sections: {},
++        sequences: {},
++      };
++      const response = await getLearningSequencesOutline(courseId);
++      expect(response).toEqual(normalizedOutline);
++    });
++
++    it('skips inaccessible sequences', async () => {
++      await provider.addInteraction({
++        state: `Outline exists with inaccessible sequences for course_id ${courseId}`,
++        uponReceiving: 'a request to get an outline',
++        withRequest: {
++          method: 'GET',
++          path: `/api/learning_sequences/v1/course_outline/${courseId}`,
++        },
++        willRespondWith: {
++          status: 200,
++          body: {
++            course_key: string('block-v1:edX+DemoX+Demo_Course'),
++            title: string('Demo Course'),
++            outline: like({
++              sections: [
++                {
++                  id: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial',
++                  title: 'Partially accessible',
++                  sequence_ids: [
++                    'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible',
++                    'block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope1',
++                  ],
++                },
++                {
++                  id: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@nope',
++                  title: 'Wholly inaccessible',
++                  sequence_ids: [
++                    'block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope2',
++                  ],
++                },
++              ],
++              sequences: {
++                'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible': {
++                  id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible',
++                  title: 'Can access',
++                  accessible: true,
++                  effective_start: '2019-07-01T17:00:00Z',
++                },
++                'block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope1': {
++                  id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope1',
++                  title: 'Cannot access',
++                  accessible: false,
++                  effective_start: '9999-07-01T17:00:00Z',
++                },
++                'block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope2': {
++                  id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope2',
++                  title: 'Still cannot access',
++                  accessible: false,
++                  effective_start: '9999-07-01T17:00:00Z',
++                },
++              },
++            }),
++          },
++        },
++      });
++      const normalizedOutline = {
++        courses: {
++          'block-v1:edX+DemoX+Demo_Course': {
++            id: 'block-v1:edX+DemoX+Demo_Course',
++            title: 'Demo Course',
++            sectionIds: [
++              'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial',
++            ],
++            hasScheduledContent: true,
++          },
++        },
++        sections: {
++          'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial': {
++            id: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial',
++            title: 'Partially accessible',
++            sequenceIds: [
++              'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible',
++            ],
++          },
++        },
++        sequences: {
++          'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible': {
++            id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible',
++            title: 'Can access',
++          },
++        },
++      };
++      const response = await getLearningSequencesOutline(courseId);
++      expect(response).toEqual(normalizedOutline);
++    });
++  });
++
+   describe('When a request to get course metadata is made', () => {
+     it('returns normalized course metadata', async () => {
+       await provider.addInteraction({
+diff --git a/src/pacts/frontend-app-learning-lms.json b/src/pacts/frontend-app-learning-lms.json
+index c329f52..c1f4af7 100644
+--- a/src/pacts/frontend-app-learning-lms.json
++++ b/src/pacts/frontend-app-learning-lms.json
+@@ -623,6 +623,135 @@
+         "headers": {
+         }
+       }
++    },
++    {
++      "description": "a request to get a learning sequence outline",
++      "providerState": "Learning sequence outline exists for course_id course-v1:edX+DemoX+Demo_Course",
++      "request": {
++        "method": "GET",
++        "path": "/api/learning_sequences/v1/course_outline/course-v1:edX+DemoX+Demo_Course"
++      },
++      "response": {
++        "status": 200,
++        "headers": {
++        },
++        "body": {
++          "course_key": "block-v1:edX+DemoX+Demo_Course",
++          "title": "Demo Course",
++          "outline": {
++            "sections": [
++
++            ],
++            "sequences": [
++
++            ]
++          }
++        },
++        "matchingRules": {
++          "$.body.course_key": {
++            "match": "type"
++          },
++          "$.body.title": {
++            "match": "type"
++          }
++        }
++      }
++    },
++    {
++      "description": "a request to get an outline",
++      "providerState": "Outline exists for course_id course-v1:edX+DemoX+Demo_Course",
++      "request": {
++        "method": "GET",
++        "path": "/api/learning_sequences/v1/course_outline/course-v1:edX+DemoX+Demo_Course"
++      },
++      "response": {
++        "status": 200,
++        "headers": {
++        },
++        "body": {
++          "course_key": "block-v1:edX+DemoX+Demo_Course",
++          "title": "Demo Course",
++          "outline": {
++            "sections": [
++
++            ],
++            "sequences": {
++            }
++          }
++        },
++        "matchingRules": {
++          "$.body.course_key": {
++            "match": "type"
++          },
++          "$.body.title": {
++            "match": "type"
++          }
++        }
++      }
++    },
++    {
++      "description": "a request to get an outline",
++      "providerState": "Outline exists with inaccessible sequences for course_id course-v1:edX+DemoX+Demo_Course",
++      "request": {
++        "method": "GET",
++        "path": "/api/learning_sequences/v1/course_outline/course-v1:edX+DemoX+Demo_Course"
++      },
++      "response": {
++        "status": 200,
++        "headers": {
++        },
++        "body": {
++          "course_key": "block-v1:edX+DemoX+Demo_Course",
++          "title": "Demo Course",
++          "outline": {
++            "sections": [
++              {
++                "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial",
++                "title": "Partially accessible",
++                "sequence_ids": [
++                  "block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible",
++                  "block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope1"
++                ]
++              },
++              {
++                "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@nope",
++                "title": "Wholly inaccessible",
++                "sequence_ids": [
++                  "block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope2"
++                ]
++              }
++            ],
++            "sequences": {
++              "block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible": {
++                "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible",
++                "title": "Can access",
++                "accessible": true
++              },
++              "block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope1": {
++                "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope1",
++                "title": "Cannot access",
++                "accessible": false
++              },
++              "block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope2": {
++                "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@nope2",
++                "title": "Still cannot access",
++                "accessible": false
++              }
++            }
++          }
++        },
++        "matchingRules": {
++          "$.body.course_key": {
++            "match": "type"
++          },
++          "$.body.title": {
++            "match": "type"
++          },
++          "$.body.outline": {
++            "match": "type"
++          }
++        }
++      }
+     }
+   ],
+   "metadata": {
+@@ -630,4 +759,4 @@
+       "version": "2.0.0"
+     }
+   }
+-}
++}
+\ No newline at end of file
+-- 
+2.34.1
+

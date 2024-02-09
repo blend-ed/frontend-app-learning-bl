@@ -1,0 +1,69 @@
+From e04f588d1f3219d1566ca4e440d1653b9c414587 Mon Sep 17 00:00:00 2001
+From: Kyle McCormick <kmccormick@edx.org>
+Date: Thu, 9 Jul 2020 10:22:30 -0400
+Subject: [PATCH 0158/1021] Treat html-type XBlocks as units (#104)
+
+Fixes bug where courses with html-type XBlocks as children
+of sequences would ignore those children instead of treating them
+as units. This caused the app to later just give up and redirect
+to the course home in the old experience.
+
+Also, handle that scenario where we have sections/sequences
+with children of unexpected block types more gracefully by
+logging an error instead of crashing.
+
+TNL-7305
+---
+ src/courseware/data/api.js | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 60b97af..22155bf 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -34,6 +34,7 @@ export function normalizeBlocks(courseId, blocks) {
+           unitIds: block.children || [],
+         };
+         break;
++      case 'html':
+       case 'vertical':
+         models.units[block.id] = {
+           graded: block.graded,
+@@ -43,7 +44,7 @@ export function normalizeBlocks(courseId, blocks) {
+         };
+         break;
+       default:
+-        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, and vertical.`);
++        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, vertical, and html.`);
+     }
+   });
+ 
+@@ -61,7 +62,11 @@ export function normalizeBlocks(courseId, blocks) {
+   Object.values(models.sections).forEach(section => {
+     if (Array.isArray(section.sequenceIds)) {
+       section.sequenceIds.forEach(sequenceId => {
+-        models.sequences[sequenceId].sectionId = section.id;
++        if (sequenceId in models.sequences) {
++          models.sequences[sequenceId].sectionId = section.id;
++        } else {
++          logError(`Section ${section.id} has child block ${sequenceId}, but that block is not in the list of sequences.`);
++        }
+       });
+     }
+   });
+@@ -69,7 +74,11 @@ export function normalizeBlocks(courseId, blocks) {
+   Object.values(models.sequences).forEach(sequence => {
+     if (Array.isArray(sequence.unitIds)) {
+       sequence.unitIds.forEach(unitId => {
+-        models.units[unitId].sequenceId = sequence.id;
++        if (unitId in models.units) {
++          models.units[unitId].sequenceId = sequence.id;
++        } else {
++          logError(`Sequence ${sequence.id} has child block ${unitId}, but that block is not in the list of units.`);
++        }
+       });
+     }
+   });
+-- 
+2.34.1
+

@@ -1,0 +1,88 @@
+From c48d2ab9a2a95f603b396e61b20f05a014af0676 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Wed, 15 Jan 2020 12:29:07 -0500
+Subject: [PATCH 0037/1021] Getting ready to deploy to staging.
+
+Adding a staging course link.
+Fixing some errors that occurred when using the demo/staging course links.
+---
+ src/index.jsx                                  | 18 ++++++++++++------
+ src/learning-sequence/CourseContainer.jsx      |  8 +++++---
+ .../course/SequenceContainer.jsx               |  5 ++++-
+ 3 files changed, 21 insertions(+), 10 deletions(-)
+
+diff --git a/src/index.jsx b/src/index.jsx
+index dbff9c9..a62e3b6 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -17,6 +17,17 @@ import LearningSequencePage from './learning-sequence/LearningSequencePage';
+ import './index.scss';
+ import './assets/favicon.ico';
+ 
++function courseLinks() {
++  return (
++    <main className="m-3">
++      <ul>
++        <li><Link to="/course/course-v1:edX+DemoX+Demo_Course">Visit Demo Course</Link></li>
++        <li><Link to="/course/course-v1:UBCx+Water201x_2+2T2015">Visit Staging Course</Link></li>
++      </ul>
++    </main>
++  );
++}
++
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+     <AppProvider>
+@@ -25,12 +36,7 @@ subscribe(APP_READY, () => {
+         <CourseTabsNavigation activeTabSlug="course" />
+       </div>
+       <Switch>
+-        {/* Staging: course-v1:UBCx+Water201x_2+2T2015 */}
+-        <Route
+-          exact
+-          path="/"
+-          render={() => <Link to="/course/course-v1%3AedX%2BDemoX%2BDemo_Course/block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction/block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0270f6de40fc">Visit Demo Course</Link>}
+-        />
++        <Route exact path="/" render={courseLinks} />
+         <Route path="/course" component={LearningSequencePage} />
+       </Switch>
+       <Footer />
+diff --git a/src/learning-sequence/CourseContainer.jsx b/src/learning-sequence/CourseContainer.jsx
+index de66f81..ba798f5 100644
+--- a/src/learning-sequence/CourseContainer.jsx
++++ b/src/learning-sequence/CourseContainer.jsx
+@@ -58,9 +58,11 @@ function CourseContainer(props) {
+   const { models, courseId } = useLoadCourse(courseUsageKey);
+ 
+   useEffect(() => {
+-    if (!sequenceId) {
+-      // TODO: This will not work right now.
+-      const { activeSequenceId } = models[courseId];
++    if (courseId && !sequenceId) {
++      // TODO: This is temporary until we get an actual activeSequenceId into the course model data.
++      const course = models[courseId];
++      const chapter = models[course.children[0]];
++      const activeSequenceId = chapter.children[0];
+       history.push(`/course/${courseUsageKey}/${activeSequenceId}`);
+     }
+   }, [courseUsageKey, courseId, sequenceId]);
+diff --git a/src/learning-sequence/course/SequenceContainer.jsx b/src/learning-sequence/course/SequenceContainer.jsx
+index 88f28e9..1a4e0ea 100644
+--- a/src/learning-sequence/course/SequenceContainer.jsx
++++ b/src/learning-sequence/course/SequenceContainer.jsx
+@@ -119,8 +119,11 @@ SequenceContainer.propTypes = {
+   })).isRequired,
+   courseId: PropTypes.string.isRequired,
+   sequenceId: PropTypes.string.isRequired,
+-  unitId: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
+   intl: intlShape.isRequired,
+ };
+ 
++SequenceContainer.defaultProps = {
++  unitId: null,
++};
+ export default injectIntl(SequenceContainer);
+-- 
+2.34.1
+

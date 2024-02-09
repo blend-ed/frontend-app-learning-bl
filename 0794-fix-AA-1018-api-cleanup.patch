@@ -1,0 +1,111 @@
+From ec1c3da725b6499c42d6a64a518dc3162730d27d Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Fri, 4 Feb 2022 11:48:58 -0500
+Subject: [PATCH 0794/1021] fix: [AA-1018] api cleanup
+
+Fix error when moving from courseHome to courseware.
+---
+ .../sequence-navigation/UnitNavigationEffortEstimate.jsx   | 2 +-
+ src/generic/model-store/hooks.js                           | 7 +++++--
+ src/tab-page/TabContainer.jsx                              | 6 ++++--
+ src/tab-page/TabContainer.test.jsx                         | 2 ++
+ 4 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+index 7f79722..2a9c551 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+@@ -24,7 +24,7 @@ function UnitNavigationEffortEstimate({
+   const sequence = useModel('sequences', sequenceId);
+   const nextSequence = useModel('sequences', nextSequenceId);
+ 
+-  if (!sequence || !nextSequence) {
++  if (!sequence || Object.keys(sequence).length === 0 || !nextSequence || Object.keys(nextSequence).length === 0) {
+     return children;
+   }
+ 
+diff --git a/src/generic/model-store/hooks.js b/src/generic/model-store/hooks.js
+index 1529469..8802849 100644
+--- a/src/generic/model-store/hooks.js
++++ b/src/generic/model-store/hooks.js
+@@ -1,8 +1,11 @@
+ import { useSelector, shallowEqual } from 'react-redux';
+ 
++/*
++  Return the selected model with the given id, or an empty object if the model does not exist "{}".
++ */
+ export function useModel(type, id) {
+   return useSelector(
+-    state => (state.models[type] !== undefined ? state.models[type][id] : {}),
++    state => ((state.models[type] !== undefined && state.models[type][id] !== undefined) ? state.models[type][id] : {}),
+     shallowEqual,
+   );
+ }
+@@ -10,7 +13,7 @@ export function useModel(type, id) {
+ export function useModels(type, ids) {
+   return useSelector(
+     state => ids.map(
+-      id => (state.models[type] !== undefined ? state.models[type][id] : {}),
++      id => ((state.models[type] !== undefined && state.models[type][id] !== undefined) ? state.models[type][id] : {}),
+     ),
+     shallowEqual,
+   );
+diff --git a/src/tab-page/TabContainer.jsx b/src/tab-page/TabContainer.jsx
+index 51a349a..4961d37 100644
+--- a/src/tab-page/TabContainer.jsx
++++ b/src/tab-page/TabContainer.jsx
+@@ -10,6 +10,7 @@ export default function TabContainer(props) {
+   const {
+     children,
+     fetch,
++    slice,
+     tab,
+   } = props;
+ 
+@@ -25,14 +26,14 @@ export default function TabContainer(props) {
+   const {
+     courseId,
+     courseStatus,
+-  } = useSelector(state => state.courseHome);
++  } = useSelector(state => state[slice]);
+ 
+   return (
+     <TabPage
+       activeTabSlug={tab}
+       courseId={courseId}
+       courseStatus={courseStatus}
+-      metadataModel="courseHomeMeta"
++      metadataModel={`${slice}Meta`}
+     >
+       {courseId && <OuterExamTimer courseId={courseId} />}
+       {children}
+@@ -43,5 +44,6 @@ export default function TabContainer(props) {
+ TabContainer.propTypes = {
+   children: PropTypes.node.isRequired,
+   fetch: PropTypes.func.isRequired,
++  slice: PropTypes.string.isRequired,
+   tab: PropTypes.string.isRequired,
+ };
+diff --git a/src/tab-page/TabContainer.test.jsx b/src/tab-page/TabContainer.test.jsx
+index 099d92f..2f2bfd0 100644
+--- a/src/tab-page/TabContainer.test.jsx
++++ b/src/tab-page/TabContainer.test.jsx
+@@ -22,6 +22,7 @@ describe('Tab Container', () => {
+     mockData = {
+       fetch: mockFetch,
+       tab: 'dummy',
++      slice: 'courseware',
+     };
+     const store = await initializeTestStore({ excludeFetchSequence: true });
+     courseId = store.getState().courseware.courseId;
+@@ -57,6 +58,7 @@ describe('Tab Container', () => {
+           <TabContainer
+             fetch={() => mockFetch(match.params.courseId, match.params.targetUserId)}
+             tab="dummy"
++            slice="courseHome"
+           >
+             children={[]}
+           </TabContainer>
+-- 
+2.34.1
+

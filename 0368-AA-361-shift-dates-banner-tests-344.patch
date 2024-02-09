@@ -1,0 +1,251 @@
+From 96ef87886fdb8b00a0144f97b58567cea7bb1fae Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Tue, 19 Jan 2021 17:09:29 -0500
+Subject: [PATCH 0368/1021] AA-361: shift dates banner tests (#344)
+
+---
+ docs/decisions/0007-testing.md                |  25 ++++
+ .../__factories__/datesTabData.factory.js     |   5 +-
+ .../data/__snapshots__/redux.test.js.snap     |   5 +-
+ src/course-home/dates-tab/DatesTab.test.jsx   | 126 ++++++++++++++++--
+ 4 files changed, 146 insertions(+), 15 deletions(-)
+
+diff --git a/docs/decisions/0007-testing.md b/docs/decisions/0007-testing.md
+index ffdb1fd..b39b92a 100644
+--- a/docs/decisions/0007-testing.md
++++ b/docs/decisions/0007-testing.md
+@@ -21,6 +21,31 @@ For example, they discourage using class or element name selectors to find compo
+ during a test. Instead, you should find them by user-oriented attributes like labels,
+ text, or roles. As a last resort, by a `data-testid` tag.
+ 
++## Mocking data
++We'll use [Rosie](https://github.com/rosiejs/rosie) as a tool for building JavaScript objects.
++Our main use case for Rosie is to use factories in order to mock the data we'd like to fetch when rendering components.
++[axios-mock-adapter](https://www.npmjs.com/package/axios-mock-adapter) allows us to mock the response of an HTTP request.
++
++For example, we may use a factory to build a course metadata object:
++
++`const courseMetadata = Factory.build('courseMetadata');`
++
++Then we'd pass that `courseMetadata` object into an axios mock call:
++
++`axiosMock.onGet('example.com').reply(200, courseMetadata);`
++
++This way, when a component sends a GET request to `example.com` within the test's lifecycle, the request will be intercepted
++by the axios-mock-adapter, and the courseMetadata object will be returned.
++
++These factories should live within the data directories they intend to mock
++```
++courseware
++  | data
++      | __factories__
++          | courseMetadata.factory.js /* used to define the Rosie factory */
++      | api.js /* getCourseMetadata() lives here */
++```
++
+ ## What to Test
+ We have not found exhaustive unit testing of frontend code to be worth the trouble.
+ Rather, let's focus on testing non-obvious behavior.
+diff --git a/src/course-home/data/__factories__/datesTabData.factory.js b/src/course-home/data/__factories__/datesTabData.factory.js
+index 4a70a7d..fe35a51 100644
+--- a/src/course-home/data/__factories__/datesTabData.factory.js
++++ b/src/course-home/data/__factories__/datesTabData.factory.js
+@@ -9,6 +9,7 @@ Factory.define('datesTabData')
+       content_type_gating_enabled: false,
+       missed_gated_content: false,
+       missed_deadlines: false,
++      verified_upgrade_link: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+     },
+     course_date_blocks: [
+       {
+@@ -216,9 +217,7 @@ Factory.define('datesTabData')
+         extra_info: null,
+       },
+     ],
+-    missed_deadlines: false,
+-    missed_gated_content: false,
++    has_ended: false,
+     learner_is_full_access: true,
+     user_timezone: 'America/New_York',
+-    verified_upgrade_link: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+   });
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 403b2a3..1ba0c36 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -273,13 +273,12 @@ Object {
+           "contentTypeGatingEnabled": false,
+           "missedDeadlines": false,
+           "missedGatedContent": false,
++          "verifiedUpgradeLink": "http://localhost:18130/basket/add/?sku=8CF08E5",
+         },
++        "hasEnded": false,
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "learnerIsFullAccess": true,
+-        "missedDeadlines": false,
+-        "missedGatedContent": false,
+         "userTimezone": "America/New_York",
+-        "verifiedUpgradeLink": "http://localhost:18130/basket/add/?sku=8CF08E5",
+       },
+     },
+   },
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index ff6d733..1c5fb25 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -11,7 +11,7 @@ import userEvent from '@testing-library/user-event';
+ 
+ import DatesTab from './DatesTab';
+ import { fetchDatesTab } from '../data';
+-import { initializeMockApp } from '../../setupTest';
++import { fireEvent, initializeMockApp, waitFor } from '../../setupTest';
+ import initializeStore from '../../store';
+ import { TabContainer } from '../../tab-page';
+ import { UserMessagesProvider } from '../../generic/user-messages';
+@@ -33,14 +33,6 @@ describe('DatesTab', () => {
+       </UserMessagesProvider>
+     </AppProvider>
+   );
+-  const courseMetadata = Factory.build('courseHomeMetadata');
+-  const { courseId } = courseMetadata;
+-
+-  beforeEach(() => {
+-    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+-    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`).reply(200, courseMetadata);
+-    history.push(`/course/${courseId}/dates`); // so tab can pull course id from url
+-  });
+ 
+   // The dates tab is largely repetitive non-interactive static data. Thus it's a little tough to follow
+   // testing-library's advice around testing the way your user uses the site (i.e. can't find form elements by label or
+@@ -67,7 +59,14 @@ describe('DatesTab', () => {
+   describe('when receiving a full set of dates data', () => {
+     beforeEach(() => {
+       const datesTabData = Factory.build('datesTabData');
++      const courseMetadata = Factory.build('courseHomeMetadata');
++      const { courseId } = courseMetadata;
++
++      axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`).reply(200, courseMetadata);
+       axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      history.push(`/course/${courseId}/dates`); // so tab can pull course id from url
++
+       render(component);
+     });
+ 
+@@ -128,4 +127,113 @@ describe('DatesTab', () => {
+       waitForElementToBeRemoved(tooltip); // and it's gone again
+     });
+   });
++
++  describe('Dates banner container ', () => {
++    const courseMetadata = Factory.build('courseHomeMetadata', { is_self_paced: true, is_enrolled: true });
++    const { courseId } = courseMetadata;
++    const datesTabData = Factory.build('datesTabData');
++
++    beforeEach(() => {
++      axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`).reply(200, courseMetadata);
++      history.push(`/course/${courseId}/dates`);
++    });
++
++    it('renders datesTabInfoBanner', async () => {
++      datesTabData.datesBannerInfo = {
++        contentTypeGatingEnabled: false,
++        missedDeadlines: false,
++        missedGatedContent: false,
++      };
++
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      render(component);
++
++      await waitFor(() => expect(screen.getByText("We've built a suggested schedule to help you stay on track.")).toBeInTheDocument());
++    });
++
++    it('renders upgradeToCompleteGradedBanner', async () => {
++      datesTabData.datesBannerInfo = {
++        contentTypeGatingEnabled: true,
++        missedDeadlines: false,
++        missedGatedContent: false,
++        verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++      };
++
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      render(component);
++
++      await waitFor(() => expect(screen.getByText('You are auditing this course,')).toBeInTheDocument());
++      expect(screen.getByText('which means that you are unable to participate in graded assignments. To complete graded assignments as part of this course, you can upgrade today.')).toBeInTheDocument();
++      expect(screen.getByRole('button', { name: 'Upgrade now' })).toBeInTheDocument();
++    });
++
++    it('renders upgradeToResetBanner', async () => {
++      datesTabData.datesBannerInfo = {
++        contentTypeGatingEnabled: true,
++        missedDeadlines: true,
++        missedGatedContent: true,
++        verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++      };
++
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      render(component);
++
++      await waitFor(() => expect(screen.getByText('You are auditing this course,')).toBeInTheDocument());
++      expect(screen.getByText('which means that you are unable to participate in graded assignments. It looks like you missed some important deadlines based on our suggested schedule. To complete graded assignments as part of this course and shift the past due assignments into the future, you can upgrade today.')).toBeInTheDocument();
++      expect(screen.getByRole('button', { name: 'Upgrade to shift due dates' })).toBeInTheDocument();
++    });
++
++    it('renders resetDatesBanner', async () => {
++      datesTabData.datesBannerInfo = {
++        contentTypeGatingEnabled: true,
++        missedDeadlines: true,
++        missedGatedContent: false,
++        verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++      };
++
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      render(component);
++
++      await waitFor(() => expect(screen.getByText('It looks like you missed some important deadlines based on our suggested schedule.')).toBeInTheDocument());
++      expect(screen.getByText('To keep yourself on track, you can update this schedule and shift the past due assignments into the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.')).toBeInTheDocument();
++      expect(screen.getByRole('button', { name: 'Shift due dates' })).toBeInTheDocument();
++    });
++
++    it('handles shift due dates click', async () => {
++      datesTabData.datesBannerInfo = {
++        contentTypeGatingEnabled: true,
++        missedDeadlines: true,
++        missedGatedContent: false,
++        verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++      };
++
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      render(component);
++
++      // confirm "Shift due dates" button has rendered
++      await waitFor(() => expect(screen.getByRole('button', { name: 'Shift due dates' })).toBeInTheDocument());
++
++      // update response to reflect shifted dates
++      datesTabData.datesBannerInfo = {
++        contentTypeGatingEnabled: true,
++        missedDeadlines: false,
++        missedGatedContent: false,
++        verifiedUpgradeLink: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++      };
++
++      const resetDeadlinesData = {
++        header: "You've successfully shifted your dates!",
++      };
++      axiosMock.onPost(`${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`).reply(200, resetDeadlinesData);
++
++      // click "Shift due dates"
++      fireEvent.click(screen.getByRole('button', { name: 'Shift due dates' }));
++
++      // wait for page to reload & Toast to render
++      await waitFor(() => expect(screen.getByText("You've successfully shifted your dates!")).toBeInTheDocument());
++      // confirm "Shift due dates" button has not rendered
++      expect(screen.queryByRole('button', { name: 'Shift due dates' })).not.toBeInTheDocument();
++    });
++  });
+ });
+-- 
+2.34.1
+

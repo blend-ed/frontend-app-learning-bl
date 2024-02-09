@@ -1,0 +1,124 @@
+From 5a964476d3b988ac44c8e8e9c96d51a02745a7c6 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Fri, 10 Jan 2020 15:28:36 -0500
+Subject: [PATCH 0026/1021] feat: save unit position in sequence on navigate
+ (#7)
+
+---
+ .../sub-section/SubSection.jsx                |  9 ++++--
+ src/learning-sequence/sub-section/data/api.js | 24 +++++++++++++-
+ .../sub-section/data/hooks.js                 | 31 ++++++++++++++++++-
+ 3 files changed, 59 insertions(+), 5 deletions(-)
+
+diff --git a/src/learning-sequence/sub-section/SubSection.jsx b/src/learning-sequence/sub-section/SubSection.jsx
+index aa92656..7abe20a 100644
+--- a/src/learning-sequence/sub-section/SubSection.jsx
++++ b/src/learning-sequence/sub-section/SubSection.jsx
+@@ -3,8 +3,11 @@ import React, { useContext } from 'react';
+ import SubSectionNavigation from './SubSectionNavigation';
+ import CourseStructureContext from '../CourseStructureContext';
+ import Unit from './Unit';
+-import { useSubSectionMetadata, useExamRedirect } from './data/hooks';
+-
++import {
++  useSubSectionMetadata,
++  useExamRedirect,
++  usePersistentUnitPosition
++} from './data/hooks';
+ 
+ export default function SubSection() {
+   const {
+@@ -14,7 +17,7 @@ export default function SubSection() {
+     blocks,
+   } = useContext(CourseStructureContext);
+   const { metadata } = useSubSectionMetadata(courseId, subSectionId);
+-
++  usePersistentUnitPosition(courseId, subSectionId, unitId, metadata);
+   useExamRedirect(metadata, blocks);
+ 
+   const ready = blocks !== null && metadata !== null;
+diff --git a/src/learning-sequence/sub-section/data/api.js b/src/learning-sequence/sub-section/data/api.js
+index 5cf2f69..5ca1cbe 100644
+--- a/src/learning-sequence/sub-section/data/api.js
++++ b/src/learning-sequence/sub-section/data/api.js
+@@ -3,9 +3,31 @@ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ 
+ /* eslint-disable import/prefer-default-export */
+ 
++const getSubSectionXModuleHandlerUrl = (courseId, subSectionId) =>
++  `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${subSectionId}/handler/xmodule_handler`;
++
+ export async function getSubSectionMetadata(courseId, subSectionId) {
+   const { data } = await getAuthenticatedHttpClient()
+-    .get(`${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${subSectionId}/handler/xmodule_handler/metadata`, {});
++    .get(`${getSubSectionXModuleHandlerUrl(courseId, subSectionId)}/metadata`, {});
++
++  return data;
++}
++
++export async function saveSubSectionPosition(courseId, subSectionId, position) {
++  // Post data sent to this endpoint must be url encoded
++  // TODO: Remove the need for this to be the case.
++  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
++  const urlEncoded = new URLSearchParams();
++  urlEncoded.append('position', position);
++  const requestConfig = {
++    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
++  };
++
++  const { data } = await getAuthenticatedHttpClient().post(
++    `${getSubSectionXModuleHandlerUrl(courseId, subSectionId)}/goto_position`,
++    urlEncoded.toString(),
++    requestConfig,
++  );
+ 
+   return data;
+ }
+diff --git a/src/learning-sequence/sub-section/data/hooks.js b/src/learning-sequence/sub-section/data/hooks.js
+index 7bb7aed..87920b3 100644
+--- a/src/learning-sequence/sub-section/data/hooks.js
++++ b/src/learning-sequence/sub-section/data/hooks.js
+@@ -1,6 +1,6 @@
+ import { useState, useEffect } from 'react';
+ 
+-import { getSubSectionMetadata } from './api';
++import { getSubSectionMetadata, saveSubSectionPosition } from './api';
+ 
+ export function useSubSectionMetadata(courseId, subSectionId) {
+   const [metadata, setMetadata] = useState(null);
+@@ -29,3 +29,32 @@ export function useExamRedirect(metadata, blocks) {
+     }
+   }, [metadata, blocks]);
+ }
++
++/**
++ * Save the position of current unit the subsection
++ */
++export function usePersistentUnitPosition(courseId, subSectionId, unitId, subSectionMetadata) {
++  useEffect(() => {
++    // All values must be defined to function
++    const hasNeededData = courseId && subSectionId && unitId && subSectionMetadata;
++    if (!hasNeededData) {
++      return;
++    }
++
++    const { items, save_position: savePosition } = subSectionMetadata;
++
++    // A sub-section can individually specify whether positions should be saved
++    if (!savePosition) {
++      return;
++    }
++
++    const unitIndex = items.findIndex(({ id }) => unitId === id);
++    // "position" is a 1-indexed value due to legacy compatibility concerns.
++    // TODO: Make this value 0-indexed
++    const newPosition = unitIndex + 1;
++
++    // TODO: update the local understanding of the position and
++    // don't make requests to update the position if they still match?
++    saveSubSectionPosition(courseId, subSectionId, newPosition);
++  }, [courseId, subSectionId, unitId, subSectionMetadata]);
++}
+-- 
+2.34.1
+

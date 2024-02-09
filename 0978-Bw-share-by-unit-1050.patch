@@ -1,0 +1,32 @@
+From 3bb7aa06bc5607ebcee05cdbd055323bf2718e5b Mon Sep 17 00:00:00 2001
+From: Ben Warzeski <bwarzeski@edx.org>
+Date: Fri, 20 Jan 2023 11:33:38 -0500
+Subject: [PATCH 0978/1021] Bw/share by unit (#1050)
+
+* fix: disable share feature on component unmount
+
+* fix: share only on set units
+
+* fix: share only on set units
+
+* fix: typo
+---
+ src/courseware/course/sequence/Unit.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 4e927cc..41fe9d8 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -150,7 +150,7 @@ function Unit({
+         isProcessing={unit.bookmarkedUpdateState === 'loading'}
+       />
+       {/* TODO: social share exp. Need to remove later */}
+-      {(window.expSocialShareAboutUrls && window.expSocialShareUrls[unit.id] !== undefined) && (
++      {(window.expSocialShareAboutUrls && window.expSocialShareAboutUrls[unit.id] !== undefined) && (
+         <ShareButton url={window.expSocialShareAboutUrls[unit.id]} />
+       )}
+       {contentTypeGatingEnabled && unit.containsContentTypeGatedContent && (
+-- 
+2.34.1
+

@@ -1,0 +1,314 @@
+From 37ce01c00a6d90c7a5c77564a34c78844ea8779d Mon Sep 17 00:00:00 2001
+From: Thomas Tracy <contact@tjtracy.com>
+Date: Mon, 28 Jun 2021 12:20:06 -0400
+Subject: [PATCH 0514/1021] Ttracy/microba 1192 early with info display
+ behavior (#497)
+
+* [feat] Add ID verification Alert to course home
+
+if a user has a verified seat, but is in the unverified certificate
+status state, the certificateStatusAlert will now show a message letting
+the learner know they need to verify in order to earn a certificate.
+
+This does not remove the message about the verification deadline in the
+right sidebar of the course home.
+---
+ .../outline-tab/OutlineTab.test.jsx           |  34 ++++
+ .../CertificateStatusAlert.jsx                | 154 ++++++++++++------
+ .../alerts/certificate-status-alert/hooks.js  |   5 +-
+ .../certificate-status/messages.js            |  12 ++
+ src/setupTest.js                              |   2 +-
+ 5 files changed, 150 insertions(+), 57 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 460cfe4..28f7f45 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -659,6 +659,40 @@ describe('Outline Tab', () => {
+         await fetchAndRender();
+         expect(screen.queryByText('Your grade and certificate will be ready soon!')).toBeInTheDocument();
+       });
++      it('renders verification alert', async () => {
++        const now = new Date();
++        const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
++        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
++        setMetadata({ is_enrolled: true });
++        setTabData({
++          cert_data: {
++            cert_status: CERT_STATUS_TYPE.UNVERIFIED,
++            cert_web_view_url: null,
++            download_url: null,
++          },
++        }, {
++          date_blocks: [
++            {
++              date_type: 'course-end-date',
++              date: yesterday.toISOString(),
++              title: 'End',
++            },
++            {
++              date_type: 'certificate-available-date',
++              date: tomorrow.toISOString(),
++              title: 'Cert Available',
++            },
++            {
++              date_type: 'verification-deadline-date',
++              date: tomorrow.toISOString(),
++              link_text: 'Verify',
++              title: 'Verification Upgrade Deadline',
++            },
++          ],
++        });
++        await fetchAndRender();
++        expect(screen.queryByText('Verify your identity to earn a certificate!')).toBeInTheDocument();
++      });
+     });
+   });
+ 
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+index ea993e1..47a1be1 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+@@ -8,13 +8,15 @@ import {
+ } from '@edx/frontend-platform/i18n';
+ import { Alert, Button } from '@edx/paragon';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
++import { faCheckCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
++import { getConfig } from '@edx/frontend-platform';
+ import certMessages from './messages';
+ import certStatusMessages from '../../../progress-tab/certificate-status/messages';
+ 
+ export const CERT_STATUS_TYPE = {
+   EARNED_NOT_AVAILABLE: 'earned_but_not_available',
+   DOWNLOADABLE: 'downloadable',
++  UNVERIFIED: 'unverified',
+ };
+ 
+ function CertificateStatusAlert({ intl, payload }) {
+@@ -27,65 +29,109 @@ function CertificateStatusAlert({ intl, payload }) {
+     userTimezone,
+   } = payload;
+ 
+-  let variant = '';
+-  if (certStatusType === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE || certStatusType === CERT_STATUS_TYPE.DOWNLOADABLE) {
+-    variant = 'success';
+-  }
++  // eslint-disable-next-line react/prop-types
++  const AlertWrapper = (props) => props.children(props);
+ 
+-  let header = '';
+-  let body = '';
+-  let buttonVisible = false;
+-  let buttonMessage = '';
++  const renderCertAwardedStatus = () => {
++    const alertProps = {
++      variant: 'success',
++      icon: faCheckCircle,
++      iconClassName: 'alert-icon text-success-500',
++    };
++    if (certStatusType === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
++      const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++      const certificateAvailableDateFormatted = <FormattedDate value={certificateAvailableDate} day="numeric" month="long" year="numeric" />;
++      const courseEndDateFormatted = <FormattedDate value={courseEndDate} day="numeric" month="long" year="numeric" />;
++      alertProps.header = intl.formatMessage(certMessages.certStatusEarnedNotAvailableHeader);
++      alertProps.body = (
++        <p>
++          <FormattedMessage
++            id="learning.outline.alert.cert.when"
++            defaultMessage="This course ended on {courseEndDateFormatted}. Final grades and certificates are
++            scheduled to be available after {certificateAvailableDate}."
++            values={{
++              courseEndDateFormatted,
++              certificateAvailableDate: certificateAvailableDateFormatted,
++            }}
++            {...timezoneFormatArgs}
++          />
++        </p>
++      );
++    } else if (certStatusType === CERT_STATUS_TYPE.DOWNLOADABLE) {
++      alertProps.header = intl.formatMessage(certMessages.certStatusDownloadableHeader);
++      if (isWebCert) {
++        alertProps.buttonMessage = intl.formatMessage(certStatusMessages.viewableButton);
++      } else {
++        alertProps.buttonMessage = intl.formatMessage(certStatusMessages.downloadableButton);
++      }
++      alertProps.buttonVisible = true;
++      alertProps.buttonLink = certURL;
++    }
++    return alertProps;
++  };
+ 
+-  if (certStatusType === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
+-    const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+-    const certificateAvailableDateFormatted = <FormattedDate value={certificateAvailableDate} day="numeric" month="long" year="numeric" />;
+-    const courseEndDateFormatted = <FormattedDate value={courseEndDate} day="numeric" month="long" year="numeric" />;
++  const renderNotIDVerifiedStatus = () => {
++    const alertProps = {
++      variant: 'warning',
++      icon: faExclamationTriangle,
++      iconClassName: 'alert-icon text-warning-500',
++      header: intl.formatMessage(certStatusMessages.unverifiedHomeHeader),
++      buttonMessage: intl.formatMessage(certStatusMessages.unverifiedHomeButton),
++      body: intl.formatMessage(certStatusMessages.unverifiedHomeBody),
++      buttonVisible: true,
++      buttonLink: getConfig().SUPPORT_URL_ID_VERIFICATION,
++    };
+ 
+-    header = intl.formatMessage(certMessages.certStatusEarnedNotAvailableHeader);
+-    body = (
+-      <p>
+-        <FormattedMessage
+-          id="learning.outline.alert.cert.when"
+-          defaultMessage="This course ended on {courseEndDateFormatted}. Final grades and certificates are
+-          scheduled to be available after {certificateAvailableDate}."
+-          values={{
+-            courseEndDateFormatted,
+-            certificateAvailableDate: certificateAvailableDateFormatted,
+-          }}
+-          {...timezoneFormatArgs}
+-        />
+-      </p>
+-    );
+-  } else if (certStatusType === CERT_STATUS_TYPE.DOWNLOADABLE) {
+-    header = intl.formatMessage(certMessages.certStatusDownloadableHeader);
+-    if (isWebCert) {
+-      buttonMessage = intl.formatMessage(certStatusMessages.viewableButton);
+-    } else {
+-      buttonMessage = intl.formatMessage(certStatusMessages.downloadableButton);
+-    }
+-    buttonVisible = true;
++    return alertProps;
++  };
++
++  let alertProps = {};
++  switch (certStatusType) {
++    case CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE:
++    case CERT_STATUS_TYPE.DOWNLOADABLE:
++      alertProps = renderCertAwardedStatus();
++      break;
++    case CERT_STATUS_TYPE.UNVERIFIED:
++      alertProps = renderNotIDVerifiedStatus();
++      break;
++    default:
++      break;
+   }
++
+   return (
+-    <Alert variant={variant}>
+-      <div className="row justify-content-between align-items-center">
+-        <div className={buttonVisible ? '' : 'col-auto'}>
+-          <FontAwesomeIcon icon={faCheckCircle} className="alert-icon text-success-500" />
+-          <Alert.Heading>{header}</Alert.Heading>
+-          {body}
+-        </div>
+-        {buttonVisible && (
+-          <div className="m-auto m-lg-0 pr-lg-3">
+-            <Button
+-              variant="primary"
+-              href={certURL}
+-            >
+-              {buttonMessage}
+-            </Button>
++    <AlertWrapper {...alertProps}>
++      {({
++        variant,
++        buttonVisible,
++        iconClassName,
++        icon,
++        header,
++        buttonLink,
++        body,
++        buttonMessage,
++      }) => (
++        <Alert variant={variant}>
++          <div className="row justify-content-between align-items-center">
++            <div className={buttonVisible ? 'col-lg-8' : 'col-auto'}>
++              <FontAwesomeIcon icon={icon} className={iconClassName} />
++              <Alert.Heading>{header}</Alert.Heading>
++              {body}
++            </div>
++            {buttonVisible && (
++              <div className="m-auto m-lg-0 pr-lg-3">
++                <Button
++                  variant="primary"
++                  href={buttonLink}
++                >
++                  {buttonMessage}
++                </Button>
++              </div>
++            )}
+           </div>
+-        )}
+-      </div>
+-    </Alert>
++        </Alert>
++
++      )}
++    </AlertWrapper>
+   );
+ }
+ 
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+index 99c6b24..2f2f130 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+@@ -16,6 +16,9 @@ function verifyCertStatusType(status) {
+   if (status === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
+     return CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE;
+   }
++  if (status === CERT_STATUS_TYPE.UNVERIFIED) {
++    return CERT_STATUS_TYPE.UNVERIFIED;
++  }
+   return '';
+ }
+ 
+@@ -37,9 +40,7 @@ function useCertificateStatusAlert(courseId) {
+     certificateAvailableDate,
+     downloadUrl,
+   } = certData || {};
+-
+   const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+-
+   const certStatusType = verifyCertStatusType(certStatus);
+   const isWebCert = downloadUrl === null;
+ 
+diff --git a/src/course-home/progress-tab/certificate-status/messages.js b/src/course-home/progress-tab/certificate-status/messages.js
+index f8253eb..13dde25 100644
+--- a/src/course-home/progress-tab/certificate-status/messages.js
++++ b/src/course-home/progress-tab/certificate-status/messages.js
+@@ -77,6 +77,18 @@ const messages = defineMessages({
+     id: 'progress.certificateStatus.upgradeButton',
+     defaultMessage: 'Upgrade now',
+   },
++  unverifiedHomeHeader: {
++    id: 'progress.certificateStatus.unverifiedHomeHeader',
++    defaultMessage: 'Verify your identity to earn a certificate!',
++  },
++  unverifiedHomeButton: {
++    id: 'progress.certificateStatus.unverifiedHomeButton',
++    defaultMessage: 'Verify my ID',
++  },
++  unverifiedHomeBody: {
++    id: 'progress.certificateStatus.unverifiedHomeBody',
++    defaultMessage: 'In order to generate a certificate for this course, you must complete the ID verification process.',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/setupTest.js b/src/setupTest.js
+index fdfcf91..4fb05c6 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -82,7 +82,7 @@ export function initializeMockApp() {
+       roles: [],
+       administrator: false,
+     },
+-    SUPPORT_URL_ID_VERIFICATION: true,
++    SUPPORT_URL_ID_VERIFICATION: 'http://example.com',
+   });
+ 
+   const loggingService = configureLogging(MockLoggingService, {
+-- 
+2.34.1
+

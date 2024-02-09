@@ -1,0 +1,41 @@
+From c0d089563054a3277a33c4ef918c650893ee5618 Mon Sep 17 00:00:00 2001
+From: Kyle McCormick <kmccormick@edx.org>
+Date: Fri, 10 Jul 2020 09:05:04 -0400
+Subject: [PATCH 0162/1021] Do not assume HTML blocks are units (#105)
+
+After further conversation, we decide that
+we shouldn't just treat HTML blocks as units.
+We've been making the assumption that Verticals
+occupy the Unit-level, and we shouldn't break that
+assumption for this specific case.
+
+Reverts part of e04f588d1f3219d1566ca4e440d1653b9c414587.
+However, the error handling changes remain.
+---
+ src/courseware/data/api.js | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index fa4a5c6..0ce1303 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -34,7 +34,6 @@ export function normalizeBlocks(courseId, blocks) {
+           unitIds: block.children || [],
+         };
+         break;
+-      case 'html':
+       case 'vertical':
+         models.units[block.id] = {
+           graded: block.graded,
+@@ -44,7 +43,7 @@ export function normalizeBlocks(courseId, blocks) {
+         };
+         break;
+       default:
+-        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, vertical, and html.`);
++        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, and vertical.`);
+     }
+   });
+ 
+-- 
+2.34.1
+

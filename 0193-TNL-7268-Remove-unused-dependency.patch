@@ -1,0 +1,69 @@
+From 6a44d018d84ccf09f34f21d12f18cbe99e59648c Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Thu, 9 Jul 2020 04:02:25 +0200
+Subject: [PATCH 0193/1021] [TNL-7268] Remove unused dependency
+
+---
+ src/courseware/course/sequence/Unit.test.jsx |  2 --
+ src/setupTest.js                             | 25 ++++++++++----------
+ 2 files changed, 12 insertions(+), 15 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 4d25189..a730e0c 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -72,8 +72,6 @@ describe('Unit', () => {
+     window.postMessage(testMessageWithUnhandledType, '*');
+ 
+     // HACK: We don't have a function we could reliably await here, so this test relies on the timeout of `waitFor`.
+-    // FIXME: After the last updates `toThrowErrorMatchingSnapshot` (due to a bug) started returning DOM
+-    //  after the error, so we had to fall back to `toThrowError` assertion for better readability.
+     await expect(waitFor(
+       () => expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(testMessageWithUnhandledType.payload.height)),
+       { timeout: 100 },
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 120652b..d35a4ad 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -5,6 +5,18 @@ import { getConfig, mergeConfig } from '@edx/frontend-platform';
+ import { configure as configureI18n } from '@edx/frontend-platform/i18n';
+ import { configure as configureLogging } from '@edx/frontend-platform/logging';
+ import { configure as configureAuth, MockAuthService } from '@edx/frontend-platform/auth';
++import React from 'react';
++import PropTypes from 'prop-types';
++// eslint-disable-next-line import/no-extraneous-dependencies
++import { render as rtlRender, screen } from '@testing-library/react';
++import { Provider } from 'react-redux';
++import { configureStore } from '@reduxjs/toolkit';
++// eslint-disable-next-line import/no-extraneous-dependencies
++import { IntlProvider } from 'react-intl';
++import { reducer as courseHomeReducer } from './course-home/data';
++import { reducer as coursewareReducer } from './courseware/data/slice';
++import { reducer as modelsReducer } from './generic/model-store';
++import { UserMessagesProvider } from './generic/user-messages';
+ 
+ import appMessages from './i18n';
+ 
+@@ -44,19 +56,6 @@ export default function initializeMockApp() {
+   return { loggingService, authService };
+ }
+ 
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-// eslint-disable-next-line import/no-extraneous-dependencies
+-import { render as rtlRender, screen } from '@testing-library/react';
+-import { Provider } from 'react-redux';
+-import { configureStore } from '@reduxjs/toolkit';
+-// eslint-disable-next-line import/no-extraneous-dependencies
+-import { IntlProvider } from 'react-intl';
+-import { reducer as courseHomeReducer } from './course-home/data';
+-import { reducer as coursewareReducer } from './courseware/data/slice';
+-import { reducer as modelsReducer } from './generic/model-store';
+-import { UserMessagesProvider } from './generic/user-messages';
+-
+ /**
+  * HACK: Mock the MutationObserver as it's breaking async testing.
+  *  According to StackOverflow it should be fixed in `jest-environment-jsdom` v16,
+-- 
+2.34.1
+

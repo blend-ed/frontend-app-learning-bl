@@ -1,0 +1,134 @@
+From 8b34f8c792d21bbc027bb67b8a480a22e8f59a03 Mon Sep 17 00:00:00 2001
+From: Patrick Cockwell <pcockwell@gmail.com>
+Date: Wed, 24 Jun 2020 03:09:12 +0700
+Subject: [PATCH 0153/1021] TNL-7126 BD-29 Visual Updates to Learning Sequence
+ (#88)
+
+* BB-2569: Use faVideo instead of faFilm for video units; Set page title based on section, sequence, and course titles
+
+* Add CourseLicense component with styling
+
+* Reorder the pageTitleBreadCrumbs that are used for setting the page title
+
+* Revert "Add CourseLicense component with styling"
+
+This reverts commit 8d154998decdd2d61dcc7a3f063e08bffddab148.
+
+* Fix package-lock.json so that only new changes for react-helmet are included
+---
+ package-lock.json                             | 21 +++++++++++++++++++
+ package.json                                  |  1 +
+ src/courseware/course/Course.jsx              | 11 ++++++++++
+ .../sequence/sequence-navigation/UnitIcon.jsx |  4 ++--
+ 4 files changed, 35 insertions(+), 2 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 8a6308c..bf5cd89 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -15762,6 +15762,22 @@
+       "integrity": "sha512-+DMR2k5c6BqMDSMF8hLH0vYKtKTeikiFW+fj0LClN+XZg4N9b8QUAdHC62CGWNLTi/gnuuemNcNcTFrCvK1f+A==",
+       "dev": true
+     },
++    "react-fast-compare": {
++      "version": "2.0.4",
++      "resolved": "https://registry.npmjs.org/react-fast-compare/-/react-fast-compare-2.0.4.tgz",
++      "integrity": "sha512-suNP+J1VU1MWFKcyt7RtjiSWUjvidmQSlqu+eHslq+342xCbGTYmC0mEhPCOHxlW0CywylOC1u2DFAT+bv4dBw=="
++    },
++    "react-helmet": {
++      "version": "6.0.0",
++      "resolved": "https://registry.npmjs.org/react-helmet/-/react-helmet-6.0.0.tgz",
++      "integrity": "sha512-My6S4sa0uHN/IuVUn0HFmasW5xj9clTkB9qmMngscVycQ5vVG51Qp44BEvLJ4lixupTwDlU9qX1/sCrMN4AEPg==",
++      "requires": {
++        "object-assign": "^4.1.1",
++        "prop-types": "^15.7.2",
++        "react-fast-compare": "^2.0.4",
++        "react-side-effect": "^2.1.0"
++      }
++    },
+     "react-intl": {
+       "version": "2.9.0",
+       "resolved": "https://registry.npmjs.org/react-intl/-/react-intl-2.9.0.tgz",
+@@ -15848,6 +15864,11 @@
+         "jsonp": "^0.2.1"
+       }
+     },
++    "react-side-effect": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/react-side-effect/-/react-side-effect-2.1.0.tgz",
++      "integrity": "sha512-IgmcegOSi5SNX+2Snh1vqmF0Vg/CbkycU9XZbOHJlZ6kMzTmi3yc254oB1WCkgA7OQtIAoLmcSFuHTc/tlcqXg=="
++    },
+     "react-transition-group": {
+       "version": "4.3.0",
+       "resolved": "https://registry.npmjs.org/react-transition-group/-/react-transition-group-4.3.0.tgz",
+diff --git a/package.json b/package.json
+index 73773f7..cd56a31 100644
+--- a/package.json
++++ b/package.json
+@@ -50,6 +50,7 @@
+     "react": "^16.12.0",
+     "react-break": "^1.3.2",
+     "react-dom": "^16.12.0",
++    "react-helmet": "6.0.0",
+     "react-redux": "^7.1.3",
+     "react-router": "^5.1.2",
+     "react-router-dom": "^5.1.2",
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 37499c0..6fbc250 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -1,5 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import { Helmet } from 'react-helmet';
++import { getConfig } from '@edx/frontend-platform';
+ 
+ import { AlertList } from '../../user-messages';
+ import { useAccessExpirationAlert } from '../../alerts/access-expiration-alert';
+@@ -35,6 +37,12 @@ function Course({
+   const sequence = useModel('sequences', sequenceId);
+   const section = useModel('sections', sequence ? sequence.sectionId : null);
+ 
++  const pageTitleBreadCrumbs = [
++    sequence,
++    section,
++    course,
++  ].filter(element => element != null).map(element => element.title);
++
+   useOfferAlert(courseId);
+   useAccessExpirationAlert(courseId);
+ 
+@@ -49,6 +57,9 @@ function Course({
+ 
+   return (
+     <>
++      <Helmet>
++        <title>{`${pageTitleBreadCrumbs.join(' | ')} | ${getConfig().SITE_NAME}`}</title>
++      </Helmet>
+       <AlertList
+         className="my-3"
+         topic="course"
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx b/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
+index dec610f..4a48c53 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
+@@ -2,14 +2,14 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import {
+-  faFilm, faBook, faEdit, faTasks, faLock,
++  faVideo, faBook, faEdit, faTasks, faLock,
+ } from '@fortawesome/free-solid-svg-icons';
+ 
+ export default function UnitIcon({ type }) {
+   let icon = null;
+   switch (type) {
+     case 'video':
+-      icon = faFilm;
++      icon = faVideo;
+       break;
+     case 'other':
+       icon = faBook;
+-- 
+2.34.1
+

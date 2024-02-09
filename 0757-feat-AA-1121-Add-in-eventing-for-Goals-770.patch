@@ -1,0 +1,88 @@
+From 32e299e13be9f9b3c4821c5b7cd6a888c0de6049 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Thu, 9 Dec 2021 09:11:21 -0800
+Subject: [PATCH 0757/1021] feat: AA-1121: Add in eventing for Goals (#770)
+
+---
+ .../goal-unsubscribe/GoalUnsubscribe.jsx      |  5 +++++
+ .../widgets/WeeklyLearningGoalCard.jsx        | 19 +++++++++++++++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx b/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+index f4b21e9..895e410 100644
+--- a/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
++++ b/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+@@ -1,5 +1,6 @@
+ import { useEffect, useState } from 'react';
+ import { useParams } from 'react-router-dom';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { Header } from '../../course-header';
+@@ -28,6 +29,10 @@ function GoalUnsubscribe({ intl }) {
+           setError(true);
+         },
+       );
++    // We unfortunately have no information about the user, course, org, or really anything
++    // as visiting this page is allowed to be done anonymously and without the context of the course.
++    // The token can be used to connect a user and course, it will just require some post-processing
++    sendTrackEvent('edx.ui.lms.goal.unsubscribe', { token });
+   }, []); // deps=[] to only run once
+ 
+   return (
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index 2ebfd82..0b5e19b 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -2,6 +2,8 @@ import React, { useState } from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import { Form, Card, Icon } from '@edx/paragon';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Email } from '@edx/paragon/icons';
+ import { useSelector } from 'react-redux';
+@@ -22,8 +24,11 @@ function WeeklyLearningGoalCard({
+ 
+   const {
+     isMasquerading,
++    org,
+   } = useModel('courseHomeMeta', courseId);
+ 
++  const { administrator } = getAuthenticatedUser();
++
+   const [daysPerWeekGoal, setDaysPerWeekGoal] = useState(daysPerWeek);
+   // eslint-disable-next-line react/prop-types
+   const [isGetReminderSelected, setGetReminderSelected] = useState(subscribedToReminders);
+@@ -35,6 +40,13 @@ function WeeklyLearningGoalCard({
+     setDaysPerWeekGoal(days);
+     if (!isMasquerading) { // don't save goal updates while masquerading
+       saveWeeklyLearningGoal(courseId, days, selectReminders);
++      sendTrackEvent('edx.ui.lms.goal.days-per-week.changed', {
++        org_key: org,
++        courserun_key: courseId,
++        is_staff: administrator,
++        num_days: days,
++        reminder_selected: selectReminders,
++      });
+     }
+   }
+ 
+@@ -43,6 +55,13 @@ function WeeklyLearningGoalCard({
+     setGetReminderSelected(isGetReminderChecked);
+     if (!isMasquerading) { // don't save goal updates while masquerading
+       saveWeeklyLearningGoal(courseId, daysPerWeekGoal, isGetReminderChecked);
++      sendTrackEvent('edx.ui.lms.goal.reminder-selected.changed', {
++        org_key: org,
++        courserun_key: courseId,
++        is_staff: administrator,
++        num_days: daysPerWeekGoal,
++        reminder_selected: isGetReminderChecked,
++      });
+     }
+   }
+ 
+-- 
+2.34.1
+

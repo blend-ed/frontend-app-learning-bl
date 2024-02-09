@@ -1,0 +1,176 @@
+From 1da461e2ded3f357b7cb940b58c591f25f60aeb1 Mon Sep 17 00:00:00 2001
+From: Julia Eskew <julia.eskew@edx.org>
+Date: Mon, 17 May 2021 13:43:01 -0400
+Subject: [PATCH 0466/1021] feat: Support classifying certain errors as ignored
+ errors in an MFE. (#447)
+
+Ignored errors are sent to New Relic as page actions instead of JS errors,
+allowing those errors to still be tracked as occurring but without causing
+unnecessary alerts.
+
+Ignored errors are configured per-MFE, *not* globally.
+
+Bump the frontend-platform version to 1.10.2.
+
+Add IGNORED_ERROR_REGEX variable for use in development. The actual
+production value will be read from the YAML in edx-internal.
+
+TNL-7924
+---
+ .env              |  1 +
+ .env.development  |  1 +
+ .env.test         |  1 +
+ package-lock.json | 46 +++++++++++++++++++++++++++++++---------------
+ package.json      |  2 +-
+ 5 files changed, 35 insertions(+), 16 deletions(-)
+
+diff --git a/.env b/.env
+index 4384aab..61d7547 100644
+--- a/.env
++++ b/.env
+@@ -6,6 +6,7 @@ CSRF_TOKEN_API_PATH=null
+ DISCOVERY_API_BASE_URL=null
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME=null
+ ECOMMERCE_BASE_URL=null
++IGNORED_ERROR_REGEX=''
+ INSIGHTS_BASE_URL=null
+ LANGUAGE_PREFERENCE_COOKIE_NAME=null
+ LMS_BASE_URL=null
+diff --git a/.env.development b/.env.development
+index 9bbe198..c04bdef 100644
+--- a/.env.development
++++ b/.env.development
+@@ -6,6 +6,7 @@ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ DISCOVERY_API_BASE_URL='http://localhost:18381'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME='localhost:8734'
++IGNORED_ERROR_REGEX=''
+ LANGUAGE_PREFERENCE_COOKIE_NAME='openedx-language-preference'
+ LMS_BASE_URL='http://localhost:18000'
+ LOGIN_URL='http://localhost:18000/login'
+diff --git a/.env.test b/.env.test
+index acdb816..8ee1cf1 100644
+--- a/.env.test
++++ b/.env.test
+@@ -6,6 +6,7 @@ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ DISCOVERY_API_BASE_URL='http://localhost:18381'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME='localhost:8734'
++IGNORED_ERROR_REGEX=''
+ LANGUAGE_PREFERENCE_COOKIE_NAME='openedx-language-preference'
+ LMS_BASE_URL='http://localhost:18000'
+ LOGIN_URL='http://localhost:18000/login'
+diff --git a/package-lock.json b/package-lock.json
+index 7652869..7cd9250 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1164,9 +1164,9 @@
+       }
+     },
+     "@cospired/i18n-iso-languages": {
+-      "version": "2.1.2",
+-      "resolved": "https://registry.npmjs.org/@cospired/i18n-iso-languages/-/i18n-iso-languages-2.1.2.tgz",
+-      "integrity": "sha512-XylKOsWRyQm9sNanZnppRORXTLaL34uThyBQpTFwOGAYvNg9PeYsyTTfLA1FTCh02RV+kiwt/O/y14DR/OqpWg=="
++      "version": "2.2.0",
++      "resolved": "https://registry.npmjs.org/@cospired/i18n-iso-languages/-/i18n-iso-languages-2.2.0.tgz",
++      "integrity": "sha512-hywY9u9apWGeLxQuRcXw7IW0XkMdXum/hr3TpmHY2fAbXMTFlhhkPCdsQeHzjxMQwTnMgXaZ4j4WOCwKtlDRCQ=="
+     },
+     "@edx/brand": {
+       "version": "npm:@edx/brand-openedx@1.1.0",
+@@ -1389,15 +1389,15 @@
+       }
+     },
+     "@edx/frontend-platform": {
+-      "version": "1.8.4",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-platform/-/frontend-platform-1.8.4.tgz",
+-      "integrity": "sha512-Xjl5VYFK+OrOY8TaMMGfDK45+dkxr0ai/6SsNDt3KCLTqIqsNLY19mPGsHHpZD8B3H5unQuWTn6VoRZ7q+Ovxg==",
++      "version": "1.10.2",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-platform/-/frontend-platform-1.10.2.tgz",
++      "integrity": "sha512-y24X4JJIhDkgg900t46bUDLLXPbzaI717WzXKhbw1zLNER1HIUoCaqWpG9c2QuyG62zhauEz4wJ0f6COd+N4rQ==",
+       "requires": {
+-        "@cospired/i18n-iso-languages": "2.1.2",
++        "@cospired/i18n-iso-languages": "2.2.0",
+         "axios": "0.21.1",
+         "axios-cache-adapter": "^2.5.0",
+         "form-urlencoded": "4.1.4",
+-        "glob": "7.1.6",
++        "glob": "7.1.7",
+         "history": "4.10.1",
+         "i18n-iso-countries": "4.3.1",
+         "jwt-decode": "2.2.0",
+@@ -1407,9 +1407,24 @@
+         "lodash.memoize": "4.1.2",
+         "lodash.merge": "4.6.2",
+         "lodash.snakecase": "4.1.1",
+-        "pubsub-js": "1.7.0",
++        "pubsub-js": "1.9.3",
+         "react-intl": "2.9.0",
+         "universal-cookie": "4.0.4"
++      },
++      "dependencies": {
++        "glob": {
++          "version": "7.1.7",
++          "resolved": "https://registry.npmjs.org/glob/-/glob-7.1.7.tgz",
++          "integrity": "sha512-OvD9ENzPLbegENnYP5UUfJIirTg4+XwMWGaQfQTY0JenxNvvIKP3U3/tAQSPIu/lHxXYSZmpXlUHeqAIdKzBLQ==",
++          "requires": {
++            "fs.realpath": "^1.0.0",
++            "inflight": "^1.0.4",
++            "inherits": "2",
++            "minimatch": "^3.0.4",
++            "once": "^1.3.0",
++            "path-is-absolute": "^1.0.0"
++          }
++        }
+       }
+     },
+     "@edx/paragon": {
+@@ -3984,9 +3999,9 @@
+       }
+     },
+     "axios-cache-adapter": {
+-      "version": "2.7.0",
+-      "resolved": "https://registry.npmjs.org/axios-cache-adapter/-/axios-cache-adapter-2.7.0.tgz",
+-      "integrity": "sha512-itggIo9i8tnsBFnniNh8+7RxXfdCKZT+cEvyjzBdU8IIyudpj4WyrY7288KE8MICs6+u7YFRVlLZi3vvXufz8w==",
++      "version": "2.7.3",
++      "resolved": "https://registry.npmjs.org/axios-cache-adapter/-/axios-cache-adapter-2.7.3.tgz",
++      "integrity": "sha512-A+ZKJ9lhpjthOEp4Z3QR/a9xC4du1ALaAsejgRGrH9ef6kSDxdFrhRpulqsh9khsEnwXxGfgpUuDp1YXMNMEiQ==",
+       "requires": {
+         "cache-control-esm": "1.0.0",
+         "md5": "^2.2.1"
+@@ -9250,6 +9265,7 @@
+       "version": "7.1.6",
+       "resolved": "https://registry.npmjs.org/glob/-/glob-7.1.6.tgz",
+       "integrity": "sha512-LwaxwyZ72Lk7vZINtNNrywX0ZuLyStrdDtabefZKAY5ZGJhVtgdznluResxNmPitE0SAO+O26sWTHeKSI2wMBA==",
++      "dev": true,
+       "requires": {
+         "fs.realpath": "^1.0.0",
+         "inflight": "^1.0.4",
+@@ -17235,9 +17251,9 @@
+       }
+     },
+     "pubsub-js": {
+-      "version": "1.7.0",
+-      "resolved": "https://registry.npmjs.org/pubsub-js/-/pubsub-js-1.7.0.tgz",
+-      "integrity": "sha512-Pb68P9qFZxnvDipHMuj9oT1FoIgBcXJ9C9eWdHCLZAnulaUoJ3+Y87RhGMYilWpun6DMWVmvK70T4RP4drZMSA=="
++      "version": "1.9.3",
++      "resolved": "https://registry.npmjs.org/pubsub-js/-/pubsub-js-1.9.3.tgz",
++      "integrity": "sha512-FhYYlPNOywTh7zN38u5AlG67emA47w6JZd7YgdQU1w8gQbZhhIGxVM0AQosdaINHb2ALb+fhfnVyBJAt4D4IzA=="
+     },
+     "pump": {
+       "version": "3.0.0",
+diff --git a/package.json b/package.json
+index ad5f090..6d07466 100644
+--- a/package.json
++++ b/package.json
+@@ -38,7 +38,7 @@
+     "@edx/brand": "npm:@edx/brand-openedx@1.1.0",
+     "@edx/frontend-component-footer": "10.1.4",
+     "@edx/frontend-enterprise": "4.2.3",
+-    "@edx/frontend-platform": "1.8.4",
++    "@edx/frontend-platform": "1.10.2",
+     "@edx/paragon": "14.8.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+-- 
+2.34.1
+

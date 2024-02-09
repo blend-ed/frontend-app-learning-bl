@@ -1,0 +1,1684 @@
+From 927d424d339a8ecde9c542b446770a82bc7dc3cd Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Fri, 18 Sep 2020 09:27:41 -0400
+Subject: [PATCH 0255/1021] Agrendalath/bb 2599 low priority tests (#214)
+
+* [TNL-7269] WIP low priority tests
+
+* [TNL-7269] Add low priority tests
+
+* [TNL-7269] Fix failing EnrollmentAlert tests
+
+* [TNL-7269] Address review comments
+
+* Fixing test errors on rebase with master.
+
+Co-authored-by: Agrendalath <piotr@surowiec.it>
+---
+ package-lock.json                             |  24 ++-
+ package.json                                  |   1 +
+ .../CourseTabsNavigation.test.jsx             |  34 ++++
+ src/course-header/Header.test.jsx             |  29 +++
+ .../courseHomeMetadata.factory.js             |   1 +
+ .../__factories__/outlineTabData.factory.js   |   8 +-
+ .../data/__snapshots__/redux.test.js.snap     |  17 +-
+ src/course-home/data/redux.test.js            |   2 +-
+ src/course-home/dates-tab/DatesTab.test.jsx   |   2 +-
+ .../outline-tab/OutlineTab.test.jsx           | 178 ++++++++++++++++++
+ src/courseware/CoursewareContainer.test.jsx   |   2 +-
+ src/courseware/course/Course.test.jsx         | 157 +++++++++++++++
+ .../course/bookmark/BookmarkButton.test.jsx   |  94 +++++++++
+ .../course/bookmark/data/redux.test.js        |   2 +-
+ .../content-tools/ContentTools.test.jsx       |  42 +++++
+ .../calculator/Calculator.test.jsx            |  79 ++++++++
+ .../notes-visibility/NotesVisibility.jsx      |   5 +-
+ .../notes-visibility/NotesVisibility.test.jsx |  97 ++++++++++
+ .../course/course-sock/CourseSock.jsx         |   6 +-
+ .../course/course-sock/CourseSock.test.jsx    |  41 ++++
+ .../content-lock/ContentLock.test.jsx         |  43 +++++
+ .../lock-paywall/LockPaywall.test.jsx         |  39 ++++
+ .../__factories__/courseMetadata.factory.js   |   2 +
+ src/courseware/data/redux.test.js             |   2 +-
+ src/generic/tabs/Tabs.test.jsx                |  37 ++++
+ src/generic/user-messages/Alert.jsx           |   2 +-
+ src/generic/user-messages/Alert.test.jsx      |  55 ++++++
+ src/generic/user-messages/AlertList.test.jsx  |  18 ++
+ src/instructor-toolbar/InstructorToolbar.jsx  |   2 +-
+ .../InstructorToolbar.test.jsx                |  76 ++++++++
+ src/setupTest.js                              |  26 ++-
+ src/tab-page/LoadedTabPage.test.jsx           |  31 +++
+ src/tab-page/TabContainer.test.jsx            |  44 +++++
+ src/tab-page/TabPage.test.jsx                 |  61 ++++++
+ 34 files changed, 1222 insertions(+), 37 deletions(-)
+ create mode 100644 src/course-header/CourseTabsNavigation.test.jsx
+ create mode 100644 src/course-header/Header.test.jsx
+ create mode 100644 src/course-home/outline-tab/OutlineTab.test.jsx
+ create mode 100644 src/courseware/course/Course.test.jsx
+ create mode 100644 src/courseware/course/bookmark/BookmarkButton.test.jsx
+ create mode 100644 src/courseware/course/content-tools/ContentTools.test.jsx
+ create mode 100644 src/courseware/course/content-tools/calculator/Calculator.test.jsx
+ create mode 100644 src/courseware/course/content-tools/notes-visibility/NotesVisibility.test.jsx
+ create mode 100644 src/courseware/course/course-sock/CourseSock.test.jsx
+ create mode 100644 src/courseware/course/sequence/content-lock/ContentLock.test.jsx
+ create mode 100644 src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+ create mode 100644 src/generic/tabs/Tabs.test.jsx
+ create mode 100644 src/generic/user-messages/Alert.test.jsx
+ create mode 100644 src/generic/user-messages/AlertList.test.jsx
+ create mode 100644 src/instructor-toolbar/InstructorToolbar.test.jsx
+ create mode 100644 src/tab-page/LoadedTabPage.test.jsx
+ create mode 100644 src/tab-page/TabContainer.test.jsx
+ create mode 100644 src/tab-page/TabPage.test.jsx
+
+diff --git a/package-lock.json b/package-lock.json
+index fd98ca9..3f7eb48 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2893,9 +2893,9 @@
+           }
+         },
+         "supports-color": {
+-          "version": "7.1.0",
+-          "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-7.1.0.tgz",
+-          "integrity": "sha512-oRSIpR8pxT1Wr2FquTNnGet79b3BWljqOuoW/h4oBhxJ/HUbX5nX6JSruTkvXDCFMwDPvsaTTbvMLKZWSy0R5g==",
++          "version": "7.2.0",
++          "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-7.2.0.tgz",
++          "integrity": "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==",
+           "dev": true,
+           "requires": {
+             "has-flag": "^4.0.0"
+@@ -3055,9 +3055,9 @@
+       }
+     },
+     "@types/jest": {
+-      "version": "26.0.10",
+-      "resolved": "https://registry.npmjs.org/@types/jest/-/jest-26.0.10.tgz",
+-      "integrity": "sha512-i2m0oyh8w/Lum7wWK/YOZJakYF8Mx08UaKA1CtbmFeDquVhAEdA7znacsVSf2hJ1OQ/OfVMGN90pw/AtzF8s/Q==",
++      "version": "26.0.12",
++      "resolved": "https://registry.npmjs.org/@types/jest/-/jest-26.0.12.tgz",
++      "integrity": "sha512-vZOFjm562IPb1EmaKxMjdcouxVb1l3NqoUH4XC4tDQ2R/AWde+0HXBUhyfc6L+7vc3mJ393U+5vr3nH2CLSVVg==",
+       "dev": true,
+       "requires": {
+         "jest-diff": "^25.2.1",
+@@ -3164,9 +3164,9 @@
+           }
+         },
+         "supports-color": {
+-          "version": "7.1.0",
+-          "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-7.1.0.tgz",
+-          "integrity": "sha512-oRSIpR8pxT1Wr2FquTNnGet79b3BWljqOuoW/h4oBhxJ/HUbX5nX6JSruTkvXDCFMwDPvsaTTbvMLKZWSy0R5g==",
++          "version": "7.2.0",
++          "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-7.2.0.tgz",
++          "integrity": "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==",
+           "dev": true,
+           "requires": {
+             "has-flag": "^4.0.0"
+@@ -12177,6 +12177,12 @@
+         }
+       }
+     },
++    "jest-chain": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/jest-chain/-/jest-chain-1.1.5.tgz",
++      "integrity": "sha512-bTx51vQP/6/XVDrMtz0WmT3wZoXvj5QAAnw1to+o6pvtjcwTIVuB6uR5URRXH/9rHf1WuM1UgsfVTWhTC/QAzw==",
++      "dev": true
++    },
+     "jest-changed-files": {
+       "version": "26.3.0",
+       "resolved": "https://registry.npmjs.org/jest-changed-files/-/jest-changed-files-26.3.0.tgz",
+diff --git a/package.json b/package.json
+index c16356c..6011668 100644
+--- a/package.json
++++ b/package.json
+@@ -72,6 +72,7 @@
+     "glob": "7.1.6",
+     "husky": "3.1.0",
+     "jest": "24.9.0",
++    "jest-chain": "^1.1.5",
+     "reactifex": "1.1.1",
+     "rosie": "2.0.1"
+   }
+diff --git a/src/course-header/CourseTabsNavigation.test.jsx b/src/course-header/CourseTabsNavigation.test.jsx
+new file mode 100644
+index 0000000..cd6d24a
+--- /dev/null
++++ b/src/course-header/CourseTabsNavigation.test.jsx
+@@ -0,0 +1,34 @@
++import React from 'react';
++import { initializeMockApp, render, screen } from '../setupTest';
++import { CourseTabsNavigation } from './index';
++
++describe('Course Tabs Navigation', () => {
++  beforeAll(async () => {
++    initializeMockApp();
++  });
++
++  it('renders without tabs', () => {
++    render(<CourseTabsNavigation tabs={[]} />);
++    expect(screen.getByRole('button', { name: 'More...' })).toBeInTheDocument();
++  });
++
++  it('renders with tabs', () => {
++    const tabs = [
++      { url: 'http://test-url1', title: 'Item 1', slug: 'test1' },
++      { url: 'http://test-url2', title: 'Item 2', slug: 'test2' },
++    ];
++    const mockData = {
++      tabs,
++      activeTabSlug: tabs[0].slug,
++    };
++    render(<CourseTabsNavigation {...mockData} />);
++
++    expect(screen.getByRole('link', { name: tabs[0].title }))
++      .toHaveAttribute('href', tabs[0].url)
++      .toHaveClass('active');
++
++    expect(screen.getByRole('link', { name: tabs[1].title }))
++      .toHaveAttribute('href', tabs[1].url)
++      .not.toHaveClass('active');
++  });
++});
+diff --git a/src/course-header/Header.test.jsx b/src/course-header/Header.test.jsx
+new file mode 100644
+index 0000000..2889aa7
+--- /dev/null
++++ b/src/course-header/Header.test.jsx
+@@ -0,0 +1,29 @@
++import React from 'react';
++import {
++  authenticatedUser, initializeMockApp, render, screen,
++} from '../setupTest';
++import { Header } from './index';
++
++describe('Header', () => {
++  beforeAll(async () => {
++    // We need to mock AuthService to implicitly use `getAuthenticatedUser` within `AppContext.Provider`.
++    await initializeMockApp();
++  });
++
++  it('displays user button', () => {
++    render(<Header />);
++    expect(screen.getByRole('button')).toHaveTextContent(authenticatedUser.username);
++  });
++
++  it('displays course data', () => {
++    const courseData = {
++      courseOrg: 'course-org',
++      courseNumber: 'course-number',
++      courseTitle: 'course-title',
++    };
++    render(<Header {...courseData} />);
++
++    expect(screen.getByText(`${courseData.courseOrg} ${courseData.courseNumber}`)).toBeInTheDocument();
++    expect(screen.getByText(courseData.courseTitle)).toBeInTheDocument();
++  });
++});
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 5acedcf..67d2ab1 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -12,6 +12,7 @@ Factory.define('courseHomeMetadata')
+     org: 'edX',
+     title: 'Demonstration Course',
+     is_self_paced: false,
++    is_enrolled: false,
+   })
+   .attr(
+     'tabs', ['courseId', 'host'], (courseId, host) => {
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 771a62f..da62220 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -6,11 +6,11 @@ Factory.define('outlineTabData')
+   .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+   .option('host', 'http://localhost:18000')
+   .attr('course_expired_html', [], () => '<div>Course expired</div>')
+-  .attr('course_tools', ['host', 'courseId'], (host, courseId) => ({
++  .attr('course_tools', ['host', 'courseId'], (host, courseId) => ([{
+     analytics_id: 'edx.bookmarks',
+     title: 'Bookmarks',
+     url: `${host}/courses/${courseId}/bookmarks/`,
+-  }))
++  }]))
+   .attr('course_blocks', ['courseId'], courseId => {
+     const { courseBlocks } = buildSimpleCourseBlocks(courseId);
+     return {
+@@ -25,6 +25,10 @@ Factory.define('outlineTabData')
+     can_enroll: true,
+     extra_text: 'Contact the administrator.',
+   })
++  .attr('dates_widget', {
++    courseDateBlocks: [],
++    userTimezone: 'UTC',
++  })
+   .attr('handouts_html', [], () => '<ul><li>Handout 1</li></ul>')
+   .attr('offer_html', [], () => '<div>Great offer here</div>')
+   .attr('resume_course', ['host', 'courseId'], (host, courseId) => ({
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 78bcb64..b88bb17 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -20,6 +20,7 @@ Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "isEnrolled": false,
+         "isSelfPaced": false,
+         "isStaff": false,
+         "number": "DemoX",
+@@ -300,6 +301,7 @@ Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "isEnrolled": false,
+         "isSelfPaced": false,
+         "isStaff": false,
+         "number": "DemoX",
+@@ -377,12 +379,17 @@ Object {
+           "goalOptions": Array [],
+           "selectedGoal": Object {},
+         },
+-        "courseTools": Object {
+-          "analyticsId": "edx.bookmarks",
+-          "title": "Bookmarks",
+-          "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/bookmarks/",
++        "courseTools": Array [
++          Object {
++            "analyticsId": "edx.bookmarks",
++            "title": "Bookmarks",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/bookmarks/",
++          },
++        ],
++        "datesWidget": Object {
++          "courseDateBlocks": Array [],
++          "userTimezone": "UTC",
+         },
+-        "datesWidget": undefined,
+         "enrollAlert": Object {
+           "canEnroll": true,
+           "extraText": "Contact the administrator.",
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index 460ff53..28e8247 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -8,7 +8,7 @@ import * as thunks from './thunks';
+ 
+ import executeThunk from '../../utils';
+ 
+-import initializeMockApp from '../../setupTest';
++import { initializeMockApp } from '../../setupTest';
+ import initializeStore from '../../store';
+ 
+ const { loggingService } = initializeMockApp();
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index 6f8e124..5d1fb0e 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -11,7 +11,7 @@ import userEvent from '@testing-library/user-event';
+ 
+ import DatesTab from './DatesTab';
+ import { fetchDatesTab } from '../data';
+-import initializeMockApp from '../../setupTest';
++import { initializeMockApp } from '../../setupTest';
+ import initializeStore from '../../store';
+ import { TabContainer } from '../../tab-page';
+ import { UserMessagesProvider } from '../../generic/user-messages';
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+new file mode 100644
+index 0000000..9a1b063
+--- /dev/null
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -0,0 +1,178 @@
++import React from 'react';
++import { Factory } from 'rosie';
++import { getConfig } from '@edx/frontend-platform';
++import MockAdapter from 'axios-mock-adapter';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import OutlineTab from './OutlineTab';
++import {
++  fireEvent, initializeTestStore, logUnhandledRequests, render, screen, waitFor,
++} from '../../setupTest';
++import executeThunk from '../../utils';
++import * as thunks from '../data/thunks';
++import { ALERT_TYPES } from '../../generic/user-messages';
++
++jest.mock('@edx/frontend-platform/analytics');
++
++describe('Outline Tab', () => {
++  let store;
++  let axiosMock;
++  const courseMetadata = Factory.build('courseMetadata');
++  const courseHomeMetadata = Factory.build(
++    'courseHomeMetadata', {
++      course_id: courseMetadata.id,
++    },
++    { courseTabs: courseMetadata.tabs },
++  );
++  const outlineTabData = Factory.build('outlineTabData', {
++    courseId: courseMetadata.id,
++    resume_course: {
++      has_visited_course: false,
++      url: `${getConfig().LMS_BASE_URL}/courses/${courseMetadata.id}/jump_to/block-v1:edX+Test+Block@12345abcde`,
++    },
++  });
++
++  const outlineUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/course_home/v1/outline/*`);
++  const courseMetadataUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/*`);
++
++  beforeEach(async () => {
++    store = await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true, courseMetadata });
++
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    axiosMock.onGet(outlineUrl).reply(200, outlineTabData);
++    axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadata);
++    logUnhandledRequests(axiosMock);
++    await executeThunk(thunks.fetchOutlineTab(courseMetadata.id), store.dispatch);
++  });
++
++  it('displays link to start course', () => {
++    render(<OutlineTab />);
++    expect(screen.getByRole('link', { name: 'Start Course' })).toBeInTheDocument();
++  });
++
++  it('displays link to resume course', async () => {
++    const outlineTabDataHasVisited = Factory.build('outlineTabData', {
++      courseId: courseMetadata.id,
++      resume_course: {
++        has_visited_course: true,
++        url: `${getConfig().LMS_BASE_URL}/courses/${courseMetadata.id}/jump_to/block-v1:edX+Test+Block@12345abcde`,
++      },
++    });
++    axiosMock.onGet(outlineUrl).reply(200, outlineTabDataHasVisited);
++    await executeThunk(thunks.fetchOutlineTab(courseMetadata.id), store.dispatch);
++
++    render(<OutlineTab />);
++
++    expect(screen.getByRole('link', { name: 'Resume Course' })).toBeInTheDocument();
++  });
++
++  describe('Alert List', () => {
++    describe('Enrollment Alert', () => {
++      const extraText = outlineTabData.enroll_alert.extra_text;
++      const alertMessage = `You must be enrolled in the course to see course content. ${extraText}`;
++      const staffMessage = 'You are viewing this course as staff, and are not enrolled.';
++
++      it('does not display enrollment alert for enrolled user', async () => {
++        const courseHomeMetadataForEnrolledUser = Factory.build(
++          'courseHomeMetadata', { course_id: courseMetadata.id, is_enrolled: true },
++          { courseTabs: courseMetadata.tabs },
++        );
++        axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadataForEnrolledUser);
++        await executeThunk(thunks.fetchOutlineTab(courseMetadata.id), store.dispatch);
++
++        render(<OutlineTab />);
++
++        expect(screen.queryByText(alertMessage)).not.toBeInTheDocument();
++      });
++
++      it('does not display enrollment button if enrollment is not available', async () => {
++        const outlineTabDataCannotEnroll = Factory.build('outlineTabData', {
++          courseId: courseMetadata.id,
++          enroll_alert: {
++            can_enroll: false,
++            extra_text: extraText,
++          },
++        });
++        axiosMock.onGet(outlineUrl).reply(200, outlineTabDataCannotEnroll);
++        await executeThunk(thunks.fetchOutlineTab(courseMetadata.id), store.dispatch);
++
++        render(<OutlineTab />);
++
++        expect(screen.queryByRole('button', { name: 'Enroll Now' })).not.toBeInTheDocument();
++      });
++
++      it('displays enrollment alert for unenrolled user', async () => {
++        render(<OutlineTab />);
++
++        const alert = await screen.findByText(alertMessage);
++        expect(alert).toHaveAttribute('role', 'alert');
++        const alertContainer = await screen.findByTestId(`alert-container-${ALERT_TYPES.ERROR}`);
++        expect(screen.queryByText(staffMessage)).not.toBeInTheDocument();
++
++        expect(alertContainer.querySelector('svg')).toHaveClass('fa-exclamation-triangle');
++      });
++
++      it('displays different message for unenrolled staff user', async () => {
++        const courseHomeMetadataForUnenrolledStaff = Factory.build(
++          'courseHomeMetadata', { course_id: courseMetadata.id, is_staff: true },
++          { courseTabs: courseMetadata.tabs },
++        );
++        axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadataForUnenrolledStaff);
++        // We need to remove offer_html and course_expired_html to limit the number of alerts we
++        // show, which makes this test easier to write.  If there's only one, it's easy to query
++        // for below.
++        const outlineTabDataCannotEnroll = Factory.build('outlineTabData', {
++          courseId: courseMetadata.id,
++          offer_html: null,
++          course_expired_html: null,
++        });
++        axiosMock.onGet(outlineUrl).reply(200, outlineTabDataCannotEnroll);
++        await executeThunk(thunks.fetchOutlineTab(courseMetadata.id), store.dispatch);
++
++        render(<OutlineTab />);
++
++        const alert = await screen.findByText(staffMessage);
++        expect(alert).toHaveAttribute('role', 'alert');
++        expect(screen.queryByText(alertMessage)).not.toBeInTheDocument();
++        const alertContainer = await screen.findByTestId(`alert-container-${ALERT_TYPES.INFO}`);
++        expect(alertContainer.querySelector('svg')).toHaveClass('fa-info-circle');
++      });
++
++      it('handles button click', async () => {
++        const enrollmentUrl = `${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`;
++        axiosMock.reset();
++        axiosMock.onPost(enrollmentUrl).reply(200, { });
++        const { location } = window;
++        delete window.location;
++        window.location = {
++          reload: jest.fn(),
++        };
++        render(<OutlineTab />);
++
++        const button = await screen.findByRole('button', { name: 'Enroll Now' });
++        fireEvent.click(button);
++        await waitFor(() => expect(axiosMock.history.post).toHaveLength(1));
++        expect(axiosMock.history.post[0].data)
++          .toEqual(JSON.stringify({ course_details: { course_id: courseMetadata.id } }));
++        expect(window.location.reload).toHaveBeenCalledTimes(1);
++
++        window.location = location;
++      });
++    });
++
++    describe('Access Expiration Alert', () => {
++      // TODO: Test this alert.
++    });
++
++    describe('Course Start Alert', () => {
++      // TODO: Test this alert.
++    });
++
++    describe('Course End Alert', () => {
++      // TODO: Test this alert.
++    });
++
++    describe('Certificate Available Alert', () => {
++      // TODO: Test this alert.
++    });
++  });
++});
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index b78e94e..b140804 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -11,7 +11,7 @@ import MockAdapter from 'axios-mock-adapter';
+ 
+ import { UserMessagesProvider } from '../generic/user-messages';
+ import tabMessages from '../tab-page/messages';
+-import initializeMockApp from '../setupTest';
++import { initializeMockApp } from '../setupTest';
+ 
+ import CoursewareContainer from './CoursewareContainer';
+ import buildSimpleCourseBlocks from './data/__factories__/courseBlocks.factory';
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+new file mode 100644
+index 0000000..ea11ef2
+--- /dev/null
++++ b/src/courseware/course/Course.test.jsx
+@@ -0,0 +1,157 @@
++import React from 'react';
++import { Factory } from 'rosie';
++import {
++  loadUnit, render, screen, waitFor, getByRole, initializeTestStore, fireEvent,
++} from '../../setupTest';
++import Course from './Course';
++import { handleNextSectionCelebration } from './celebration';
++import * as celebrationUtils from './celebration/utils';
++
++jest.mock('@edx/frontend-platform/analytics');
++
++const recordFirstSectionCelebration = jest.fn();
++celebrationUtils.recordFirstSectionCelebration = recordFirstSectionCelebration;
++
++describe('Course', () => {
++  let store;
++  const mockData = {
++    nextSequenceHandler: () => {},
++    previousSequenceHandler: () => {},
++    unitNavigationHandler: () => {},
++  };
++
++  beforeAll(async () => {
++    store = await initializeTestStore();
++    const { courseware, models } = store.getState();
++    const { courseId, sequenceId } = courseware;
++    Object.assign(mockData, {
++      courseId,
++      sequenceId,
++      unitId: Object.values(models.units)[0].id,
++    });
++  });
++
++  it('loads learning sequence', async () => {
++    render(<Course {...mockData} />);
++    expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toBeInTheDocument();
++    expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
++
++    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
++    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
++    expect(screen.queryByRole('button', { name: 'Learn About Verified Certificates' })).not.toBeInTheDocument();
++
++    loadUnit();
++    await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
++
++    const { models } = store.getState();
++    const sequence = models.sequences[mockData.sequenceId];
++    const section = models.sections[sequence.sectionId];
++    const course = models.courses[mockData.courseId];
++    expect(document.title).toMatch(
++      `${sequence.title} | ${section.title} | ${course.title} | edX`,
++    );
++  });
++
++  it('displays celebration modal', async () => {
++    // TODO: Remove these console mocks after merging https://github.com/edx/paragon/pull/526.
++    jest.spyOn(console, 'warn').mockImplementation(() => {});
++    jest.spyOn(console, 'error').mockImplementation(() => {});
++
++    // Mock media queries, because `Celebration` modal uses `react-break` for responsive breakpoints.
++    Object.defineProperty(window, 'matchMedia', {
++      writable: true,
++      value: jest.fn().mockImplementation(query => ({
++        matches: false,
++        media: query,
++        onchange: null,
++        addListener: jest.fn(), // deprecated
++        removeListener: jest.fn(), // deprecated
++        addEventListener: jest.fn(),
++        removeEventListener: jest.fn(),
++        dispatchEvent: jest.fn(),
++      })),
++    });
++
++    const courseMetadata = Factory.build('courseMetadata', { celebrations: { firstSection: true } });
++    const testStore = await initializeTestStore({ courseMetadata }, false);
++    const { courseware, models } = testStore.getState();
++    const { courseId, sequenceId } = courseware;
++    const testData = {
++      ...mockData,
++      courseId,
++      sequenceId,
++      unitId: Object.values(models.units)[0].id,
++    };
++    // Set up LocalStorage for testing.
++    handleNextSectionCelebration(sequenceId, sequenceId, testData.unitId);
++    render(<Course {...testData} />, { store: testStore });
++
++    const celebrationModal = screen.getByRole('dialog');
++    expect(celebrationModal).toBeInTheDocument();
++    expect(getByRole(celebrationModal, 'heading', { name: 'Congratulations!' })).toBeInTheDocument();
++  });
++
++  it('displays upgrade sock', async () => {
++    const courseMetadata = Factory.build('courseMetadata', { can_show_upgrade_sock: true });
++    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
++
++    render(<Course {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++    expect(screen.getByRole('button', { name: 'Learn About Verified Certificates' })).toBeInTheDocument();
++  });
++
++  it('displays offer and expiration alert', async () => {
++    const offerText = 'test-offer';
++    const offerId = `${offerText}-id`;
++    const offerHtml = `<div data-testid="${offerId}">${offerText}</div>`;
++
++    const expirationText = 'test-expiration';
++    const expirationId = `${expirationText}-id`;
++    const expirationHtml = `<div data-testid="${expirationId}">${expirationText}</div>`;
++
++    const courseMetadata = Factory.build('courseMetadata', {
++      offer_html: offerHtml,
++      course_expired_message: expirationHtml,
++    });
++    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
++    render(<Course {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++
++    expect(await screen.findByTestId(offerId)).toHaveTextContent(offerText);
++    expect(screen.getByTestId(expirationId)).toHaveTextContent(expirationText);
++  });
++
++  it('passes handlers to the sequence', async () => {
++    const nextSequenceHandler = jest.fn();
++    const previousSequenceHandler = jest.fn();
++    const unitNavigationHandler = jest.fn();
++
++    const courseMetadata = Factory.build('courseMetadata');
++    const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
++      'block',
++      { type: 'vertical' },
++      { courseId: courseMetadata.id },
++    ));
++    const testStore = await initializeTestStore({ courseMetadata, unitBlocks }, false);
++    const { courseware, models } = testStore.getState();
++    const { courseId, sequenceId } = courseware;
++    const testData = {
++      ...mockData,
++      courseId,
++      sequenceId,
++      unitId: Object.values(models.units)[1].id, // Corner cases are already covered in `Sequence` tests.
++      nextSequenceHandler,
++      previousSequenceHandler,
++      unitNavigationHandler,
++    };
++    render(<Course {...testData} />, { store: testStore });
++
++    loadUnit();
++    await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
++    screen.getAllByRole('button', { name: /previous/i }).forEach(button => fireEvent.click(button));
++    screen.getAllByRole('button', { name: /next/i }).forEach(button => fireEvent.click(button));
++
++    // We are in the middle of the sequence, so no
++    expect(previousSequenceHandler).not.toHaveBeenCalled();
++    expect(nextSequenceHandler).not.toHaveBeenCalled();
++    expect(unitNavigationHandler).toHaveBeenCalledTimes(4);
++  });
++});
+diff --git a/src/courseware/course/bookmark/BookmarkButton.test.jsx b/src/courseware/course/bookmark/BookmarkButton.test.jsx
+new file mode 100644
+index 0000000..a38d635
+--- /dev/null
++++ b/src/courseware/course/bookmark/BookmarkButton.test.jsx
+@@ -0,0 +1,94 @@
++import React from 'react';
++import MockAdapter from 'axios-mock-adapter';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { getConfig } from '@edx/frontend-platform';
++import { Factory } from 'rosie';
++import {
++  render, screen, fireEvent, initializeTestStore, waitFor, authenticatedUser, logUnhandledRequests,
++} from '../../../setupTest';
++import { BookmarkButton } from './index';
++
++describe('Bookmark Button', () => {
++  let axiosMock;
++  let store;
++  const courseMetadata = Factory.build('courseMetadata');
++  const mockData = {
++    isProcessing: false,
++  };
++  const nonBookmarkedUnitBlock = Factory.build(
++    'block',
++    { type: 'vertical' },
++    { courseId: courseMetadata.id },
++  );
++  const bookmarkedUnitBlock = Factory.build(
++    'block',
++    { type: 'vertical', bookmarked: true },
++    { courseId: courseMetadata.id },
++  );
++  const unitBlocks = [nonBookmarkedUnitBlock, bookmarkedUnitBlock];
++
++  beforeEach(async () => {
++    store = await initializeTestStore({ courseMetadata, unitBlocks });
++    mockData.unitId = nonBookmarkedUnitBlock.id;
++
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    const bookmarkUrl = `${getConfig().LMS_BASE_URL}/api/bookmarks/v1/bookmarks/`;
++    axiosMock.onPost(bookmarkUrl).reply(200, { });
++
++    const bookmarkDeleteUrlRegExp = new RegExp(`${bookmarkUrl}*,*`);
++    axiosMock.onDelete(bookmarkDeleteUrlRegExp).reply(200, { });
++    logUnhandledRequests(axiosMock);
++  });
++
++  it('handles adding bookmark', async () => {
++    render(<BookmarkButton {...mockData} />);
++
++    const button = screen.getByRole('button', { name: 'Bookmark this page' });
++    expect(button).not.toHaveClass('disabled');
++
++    fireEvent.click(button);
++    await waitFor(() => expect(axiosMock.history.post).toHaveLength(1));
++    expect(axiosMock.history.post[0].data).toEqual(JSON.stringify({ usage_id: nonBookmarkedUnitBlock.id }));
++    expect(store.getState().models.units[nonBookmarkedUnitBlock.id].bookmarked).toBeTruthy();
++  });
++
++  it('does not handle adding bookmark when processing', async () => {
++    render(<BookmarkButton {...mockData} isProcessing />);
++
++    const button = screen.getByRole('button', { name: 'Bookmark this page' });
++    expect(button).toHaveClass('disabled');
++
++    fireEvent.click(button);
++    // HACK: We don't have a function we could reliably await here, so this test relies on the timeout of `waitFor`.
++    await expect(waitFor(
++      () => expect(axiosMock.history.post).toHaveLength(1),
++      { timeout: 100 },
++    )).rejects.toThrowError(/expect.*toHaveLength.*/);
++    expect(store.getState().models.units[nonBookmarkedUnitBlock.id].bookmarked).toBeFalsy();
++  });
++
++  it('handles removing bookmark', async () => {
++    render(<BookmarkButton {...mockData} unitId={bookmarkedUnitBlock.id} isBookmarked />);
++    const button = screen.getByRole('button', { name: 'Bookmarked' });
++
++    fireEvent.click(button);
++    await waitFor(() => expect(axiosMock.history.delete).toHaveLength(1));
++    expect(axiosMock.history.delete[0].url).toContain(`${authenticatedUser.username},${bookmarkedUnitBlock.id}`);
++    expect(store.getState().models.units[bookmarkedUnitBlock.id].bookmarked).toBeFalsy();
++  });
++
++  it('does not handle removing bookmark when processing', async () => {
++    render(<BookmarkButton {...mockData} unitId={bookmarkedUnitBlock.id} isBookmarked isProcessing />);
++
++    const button = screen.getByRole('button', { name: 'Bookmarked' });
++    expect(button).toHaveClass('disabled');
++
++    fireEvent.click(button);
++    // HACK: We don't have a function we could reliably await here, so this test relies on the timeout of `waitFor`.
++    await expect(waitFor(
++      () => expect(axiosMock.history.delete).toHaveLength(1),
++      { timeout: 100 },
++    )).rejects.toThrowError(/expect.*toHaveLength.*/);
++    expect(store.getState().models.units[bookmarkedUnitBlock.id].bookmarked).toBeTruthy();
++  });
++});
+diff --git a/src/courseware/course/bookmark/data/redux.test.js b/src/courseware/course/bookmark/data/redux.test.js
+index f068361..fd633c1 100644
+--- a/src/courseware/course/bookmark/data/redux.test.js
++++ b/src/courseware/course/bookmark/data/redux.test.js
+@@ -7,7 +7,7 @@ import * as thunks from './thunks';
+ 
+ import executeThunk from '../../../../utils';
+ 
+-import initializeMockApp from '../../../../setupTest';
++import { initializeMockApp } from '../../../../setupTest';
+ import initializeStore from '../../../../store';
+ 
+ const { loggingService } = initializeMockApp();
+diff --git a/src/courseware/course/content-tools/ContentTools.test.jsx b/src/courseware/course/content-tools/ContentTools.test.jsx
+new file mode 100644
+index 0000000..08cadff
+--- /dev/null
++++ b/src/courseware/course/content-tools/ContentTools.test.jsx
+@@ -0,0 +1,42 @@
++import React from 'react';
++import { initializeTestStore, render, screen } from '../../../setupTest';
++import ContentTools from './ContentTools';
++
++jest.mock('./calculator/Calculator', () => () => <div data-testid="Calculator" />);
++jest.mock('./notes-visibility/NotesVisibility', () => () => <div data-testid="NotesVisibility" />);
++
++describe('Content Tools', () => {
++  const mockData = {
++    course: {
++      notes: { enabled: false },
++      showCalculator: false,
++    },
++  };
++
++  beforeAll(async () => {
++    await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true });
++  });
++
++  it('hides content tools', () => {
++    const { container } = render(<ContentTools {...mockData} />);
++    expect(container.getElementsByClassName('d-flex')[0]).toBeEmptyDOMElement();
++  });
++
++  it('displays Calculator', () => {
++    const testData = JSON.parse(JSON.stringify(mockData));
++    testData.course.showCalculator = true;
++    render(<ContentTools {...testData} />);
++
++    expect(screen.getByTestId('Calculator')).toBeInTheDocument();
++    expect(screen.queryByTestId('NotesVisibility')).not.toBeInTheDocument();
++  });
++
++  it('displays Notes Visibility', () => {
++    const testData = JSON.parse(JSON.stringify(mockData));
++    testData.course.notes.enabled = true;
++    render(<ContentTools {...testData} />);
++
++    expect(screen.getByTestId('NotesVisibility')).toBeInTheDocument();
++    expect(screen.queryByTestId('Calculator')).not.toBeInTheDocument();
++  });
++});
+diff --git a/src/courseware/course/content-tools/calculator/Calculator.test.jsx b/src/courseware/course/content-tools/calculator/Calculator.test.jsx
+new file mode 100644
+index 0000000..35eae9d
+--- /dev/null
++++ b/src/courseware/course/content-tools/calculator/Calculator.test.jsx
+@@ -0,0 +1,79 @@
++import React from 'react';
++import MockAdapter from 'axios-mock-adapter';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { getConfig } from '@edx/frontend-platform';
++import Calculator from './Calculator';
++import {
++  initializeTestStore, render, screen, fireEvent, waitFor, logUnhandledRequests,
++} from '../../../../setupTest';
++
++describe('Calculator', () => {
++  let axiosMock;
++  let equationUrl;
++
++  beforeAll(async () => {
++    await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true });
++
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    equationUrl = new RegExp(`${getConfig().LMS_BASE_URL}/calculate*`);
++  });
++
++  it('expands on click', () => {
++    render(<Calculator />);
++
++    expect(screen.queryByRole('button', { name: 'Calculate' })).not.toBeInTheDocument();
++    expect(screen.queryByRole('button', { name: 'Calculator Instructions' })).not.toBeInTheDocument();
++
++    const button = screen.getByRole('button', { name: 'Calculator' });
++    expect(button.querySelector('svg')).toHaveClass('fa-calculator');
++
++    fireEvent.click(button);
++    expect(button.querySelector('svg')).toHaveClass('fa-times-circle');
++    expect(screen.getByRole('button', { name: 'Calculate' })).toBeInTheDocument();
++    expect(screen.getByRole('button', { name: 'Calculator Instructions' })).toBeInTheDocument();
++
++    fireEvent.click(button);
++    expect(button.querySelector('svg')).toHaveClass('fa-calculator');
++  });
++
++  it('displays instructions on click', () => {
++    render(<Calculator />);
++
++    const button = screen.getByRole('button', { name: 'Calculator' });
++    fireEvent.click(button);
++
++    const instructionsButton = screen.getByRole('button', { name: 'Calculator Instructions' });
++    expect(instructionsButton.querySelector('svg')).toHaveClass('fa-question-circle');
++    expect(screen.queryByText(/For detailed information, see/)).not.toBeInTheDocument();
++
++    fireEvent.click(instructionsButton);
++    expect(instructionsButton.querySelector('svg')).toHaveClass('fa-times-circle');
++    expect(screen.getByText(/For detailed information, see/)).toBeInTheDocument();
++
++    fireEvent.click(instructionsButton);
++    expect(instructionsButton.querySelector('svg')).toHaveClass('fa-question-circle');
++  });
++
++  it('handles submitting equation', async () => {
++    const equation = 'log2(2^10)';
++    const result = '10';
++
++    axiosMock.reset();
++    axiosMock.onGet(equationUrl).reply(200, { result });
++    logUnhandledRequests(axiosMock);
++
++    render(<Calculator />);
++    fireEvent.click(screen.getByRole('button', { name: 'Calculator' }));
++    const input = screen.getByRole('textbox', { name: 'Calculator Input' });
++    const output = screen.getByRole('textbox', { name: 'Calculator Result' });
++    const submitButton = screen.getByRole('button', { name: 'Calculate' });
++
++    fireEvent.change(input, { target: { value: equation } });
++    fireEvent.click(submitButton);
++
++    await waitFor(() => expect(axiosMock.history.get).toHaveLength(1));
++    expect(axiosMock.history.get[0].url).toContain(escape(equation));
++
++    expect(output).toHaveValue(result);
++  });
++});
+diff --git a/src/courseware/course/content-tools/notes-visibility/NotesVisibility.jsx b/src/courseware/course/content-tools/notes-visibility/NotesVisibility.jsx
+index a241ef2..73152c9 100644
+--- a/src/courseware/course/content-tools/notes-visibility/NotesVisibility.jsx
++++ b/src/courseware/course/content-tools/notes-visibility/NotesVisibility.jsx
+@@ -57,11 +57,10 @@ class NotesVisibility extends Component {
+ NotesVisibility.propTypes = {
+   intl: intlShape.isRequired,
+   course: PropTypes.shape({
+-    id: PropTypes.string,
++    id: PropTypes.string.isRequired,
+     notes: PropTypes.shape({
+-      enabled: PropTypes.bool,
+       visible: PropTypes.bool,
+-    }),
++    }).isRequired,
+   }).isRequired,
+ };
+ 
+diff --git a/src/courseware/course/content-tools/notes-visibility/NotesVisibility.test.jsx b/src/courseware/course/content-tools/notes-visibility/NotesVisibility.test.jsx
+new file mode 100644
+index 0000000..762ad3e
+--- /dev/null
++++ b/src/courseware/course/content-tools/notes-visibility/NotesVisibility.test.jsx
+@@ -0,0 +1,97 @@
++import React from 'react';
++import { waitFor } from '@testing-library/dom';
++import { getConfig } from '@edx/frontend-platform';
++import MockAdapter from 'axios-mock-adapter';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import {
++  fireEvent, initializeTestStore, logUnhandledRequests, render, screen,
++} from '../../../../setupTest';
++import NotesVisibility from './NotesVisibility';
++
++const originalConfig = jest.requireActual('@edx/frontend-platform').getConfig();
++jest.mock('@edx/frontend-platform', () => ({
++  ...jest.requireActual('@edx/frontend-platform'),
++  getConfig: jest.fn(),
++}));
++
++describe('Notes Visibility', () => {
++  let axiosMock;
++  let visibilityUrl;
++  const mockData = {
++    course: {
++      id: 'test-course',
++      notes: {
++        visible: false,
++      },
++    },
++  };
++
++  beforeAll(async () => {
++    await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true });
++
++    // Mock `targetOrigin` of the `postMessage`.
++    getConfig.mockImplementation(() => originalConfig);
++    const config = { ...originalConfig };
++    config.LMS_BASE_URL = `${window.location.protocol}//${window.location.host}`;
++    getConfig.mockImplementation(() => config);
++
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    visibilityUrl = `${config.LMS_BASE_URL}/courses/${mockData.course.id}/edxnotes/visibility/`;
++  });
++
++  beforeEach(() => {
++    axiosMock.reset();
++    axiosMock.onPut(visibilityUrl).reply(200);
++    logUnhandledRequests(axiosMock);
++  });
++
++  it('hides notes', () => {
++    render(<NotesVisibility {...mockData} />);
++
++    const button = screen.getByRole('switch', { name: 'Show Notes' });
++    expect(button)
++      .not.toBeChecked()
++      .toHaveClass('text-success');
++    expect(button.querySelector('svg'))
++      .toHaveClass('fa-pencil-alt')
++      .toHaveAttribute('aria-hidden', 'true');
++  });
++
++  it('shows notes', () => {
++    const testData = JSON.parse(JSON.stringify(mockData));
++    testData.course.notes.visible = true;
++    render(<NotesVisibility {...testData} />);
++
++    const button = screen.getByRole('switch', { name: 'Hide Notes' });
++    expect(button)
++      .toBeChecked()
++      .toHaveClass('text-secondary');
++    expect(button.querySelector('svg'))
++      .toHaveClass('fa-pencil-alt')
++      .toHaveAttribute('aria-hidden', 'true');
++  });
++
++  it('handles click', async () => {
++    const mockFn = jest.fn();
++    const frame = document.createElement('iframe');
++    frame.id = 'unit-iframe';
++    const { container } = render(<NotesVisibility {...mockData} />);
++
++    container.appendChild(frame);
++    frame.contentWindow.addEventListener('message', e => {
++      mockFn(e.data);
++    });
++
++    fireEvent.click(screen.getByRole('switch', { name: 'Show Notes' }));
++    await waitFor(() => expect(mockFn).toHaveBeenCalled());
++    expect(mockFn)
++      .toHaveBeenCalledTimes(1)
++      .toHaveBeenCalledWith('tools.toggleNotes');
++
++    expect(axiosMock.history.put).toHaveLength(1);
++    expect(axiosMock.history.put[0].url).toEqual(visibilityUrl);
++    expect(axiosMock.history.put[0].data).toEqual(`{"visibility":${mockData.course.notes.visible}}`);
++
++    expect(screen.getByRole('switch', { name: 'Hide Notes' })).toBeInTheDocument();
++  });
++});
+diff --git a/src/courseware/course/course-sock/CourseSock.jsx b/src/courseware/course/course-sock/CourseSock.jsx
+index d2c7aad..3a637cf 100644
+--- a/src/courseware/course/course-sock/CourseSock.jsx
++++ b/src/courseware/course/course-sock/CourseSock.jsx
+@@ -191,9 +191,5 @@ CourseSock.propTypes = {
+     currencySymbol: PropTypes.string,
+     sku: PropTypes.string,
+     upgradeUrl: PropTypes.string,
+-  }),
+-};
+-
+-CourseSock.defaultProps = {
+-  verifiedMode: null,
++  }).isRequired,
+ };
+diff --git a/src/courseware/course/course-sock/CourseSock.test.jsx b/src/courseware/course/course-sock/CourseSock.test.jsx
+new file mode 100644
+index 0000000..e3083cc
+--- /dev/null
++++ b/src/courseware/course/course-sock/CourseSock.test.jsx
+@@ -0,0 +1,41 @@
++import React from 'react';
++import {
++  render, screen, fireEvent, initializeMockApp,
++} from '../../../setupTest';
++import CourseSock from './CourseSock';
++
++describe('Course Sock', () => {
++  const mockData = {
++    verifiedMode: {
++      upgradeUrl: 'test-url',
++      price: 1234,
++      currency: 'dollars',
++      currencySymbol: '$',
++    },
++  };
++
++  beforeAll(async () => {
++    // We need to mock AuthService to implicitly use `getAuthenticatedUser` within `AppContext.Provider`.
++    await initializeMockApp();
++  });
++
++  it('hides upsell information on load', () => {
++    render(<CourseSock {...mockData} />);
++
++    expect(screen.getByRole('button', { name: 'Learn About Verified Certificates' })).toBeInTheDocument();
++    expect(screen.queryByText('edX Verified Certificate')).not.toBeInTheDocument();
++  });
++
++  it('handles click', () => {
++    render(<CourseSock {...mockData} />);
++    const upsellButton = screen.getByRole('button', { name: 'Learn About Verified Certificates' });
++    fireEvent.click(upsellButton);
++
++    expect(screen.getByText('edX Verified Certificate')).toBeInTheDocument();
++    const { currencySymbol, price, currency } = mockData.verifiedMode;
++    expect(screen.getByText(`Upgrade (${currencySymbol}${price} ${currency})`)).toBeInTheDocument();
++
++    fireEvent.click(upsellButton);
++    expect(screen.queryByText('edX Verified Certificate')).not.toBeInTheDocument();
++  });
++});
+diff --git a/src/courseware/course/sequence/content-lock/ContentLock.test.jsx b/src/courseware/course/sequence/content-lock/ContentLock.test.jsx
+new file mode 100644
+index 0000000..500b507
+--- /dev/null
++++ b/src/courseware/course/sequence/content-lock/ContentLock.test.jsx
+@@ -0,0 +1,43 @@
++import React from 'react';
++import { history } from '@edx/frontend-platform';
++import {
++  render, screen, fireEvent, initializeMockApp,
++} from '../../../../setupTest';
++import ContentLock from './ContentLock';
++
++describe('Content Lock', () => {
++  const mockData = {
++    courseId: 'test-course-id',
++    prereqSectionName: 'test-prerequisite-section-name',
++    prereqId: 'test-prerequisite-id',
++    sequenceTitle: 'test-sequence-title',
++  };
++
++  beforeAll(async () => {
++    // We need to mock AuthService to implicitly use `getAuthenticatedUser` within `AppContext.Provider`.
++    await initializeMockApp();
++  });
++
++  it('displays sequence title along with lock icon', () => {
++    const { container } = render(<ContentLock {...mockData} />);
++
++    const lockIcon = container.querySelector('svg');
++    expect(lockIcon).toHaveClass('fa-lock');
++    expect(lockIcon.parentElement).toHaveTextContent(mockData.sequenceTitle);
++  });
++
++  it('displays prerequisite name', () => {
++    const prereqText = `You must complete the prerequisite: '${mockData.prereqSectionName}' to access this content.`;
++    render(<ContentLock {...mockData} />);
++
++    expect(screen.getByText(prereqText)).toBeInTheDocument();
++  });
++
++  it('handles click', () => {
++    history.push = jest.fn();
++    render(<ContentLock {...mockData} />);
++    fireEvent.click(screen.getByRole('button'));
++
++    expect(history.push).toHaveBeenCalledWith(`/course/${mockData.courseId}/${mockData.prereqId}`);
++  });
++});
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+new file mode 100644
+index 0000000..3e97812
+--- /dev/null
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+@@ -0,0 +1,39 @@
++import React from 'react';
++import { Factory } from 'rosie';
++import { initializeTestStore, render, screen } from '../../../../setupTest';
++import LockPaywall from './LockPaywall';
++
++describe('Lock Paywall', () => {
++  let store;
++  const mockData = {};
++
++  beforeAll(async () => {
++    store = await initializeTestStore();
++    const { courseware } = store.getState();
++    mockData.courseId = courseware.courseId;
++  });
++
++  it('displays message along with lock icon', () => {
++    const { container } = render(<LockPaywall {...mockData} />);
++
++    const lockIcon = container.querySelector('svg');
++    expect(lockIcon).toHaveClass('fa-lock');
++    expect(lockIcon.parentElement).toHaveTextContent('Verified Track Access');
++  });
++
++  it('displays unlock link with price', () => {
++    const { currencySymbol, price, upgradeUrl } = store.getState().models.courses[mockData.courseId].verifiedMode;
++    render(<LockPaywall {...mockData} />);
++
++    const upgradeLink = screen.getByRole('link', { name: `Upgrade to unlock (${currencySymbol}${price})` });
++    expect(upgradeLink).toHaveAttribute('href', `${upgradeUrl}`);
++  });
++
++  it('does not display anything if course does not have verified mode', async () => {
++    const courseMetadata = Factory.build('courseMetadata', { verified_mode: null });
++    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
++    const { container } = render(<LockPaywall {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++
++    expect(container).toBeEmptyDOMElement();
++  });
++});
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 9fe24d3..2faf6ea 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -49,6 +49,8 @@ Factory.define('courseMetadata')
+       enabled: false,
+     },
+     marketing_url: null,
++    celebrations: null,
++    enroll_alert: null,
+   }).attr(
+     'tabs', ['tabs', 'id'], (passedTabs, id) => {
+       if (passedTabs) {
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index 10ec8e5..d3837e5 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -9,7 +9,7 @@ import * as thunks from './thunks';
+ import executeThunk from '../../utils';
+ 
+ import buildSimpleCourseBlocks from './__factories__/courseBlocks.factory';
+-import initializeMockApp from '../../setupTest';
++import { initializeMockApp } from '../../setupTest';
+ import initializeStore from '../../store';
+ 
+ const { loggingService } = initializeMockApp();
+diff --git a/src/generic/tabs/Tabs.test.jsx b/src/generic/tabs/Tabs.test.jsx
+new file mode 100644
+index 0000000..46bebfb
+--- /dev/null
++++ b/src/generic/tabs/Tabs.test.jsx
+@@ -0,0 +1,37 @@
++import React from 'react';
++import { initializeMockApp, render, screen } from '../../setupTest';
++import Tabs from './Tabs';
++import useIndexOfLastVisibleChild from './useIndexOfLastVisibleChild';
++
++jest.mock('./useIndexOfLastVisibleChild');
++
++describe('Tabs', () => {
++  const mockChildren = [...Array(4).keys()].map(i => (<button key={i} type="button">{`Item ${i}`}</button>));
++  // Only half of the children will be visible. The rest of them will be in the dropdown.
++  const indexOfLastVisibleChild = mockChildren.length / 2 - 1;
++  const invisibleStyle = { visibility: 'hidden' };
++  useIndexOfLastVisibleChild.mockReturnValue([indexOfLastVisibleChild, null, invisibleStyle, null]);
++
++  beforeAll(async () => {
++    initializeMockApp();
++  });
++
++  it('renders without children', () => {
++    render(<Tabs />);
++    expect(screen.getByRole('button', { name: 'More...' })).toBeInTheDocument();
++  });
++
++  it('hides invisible children', async () => {
++    render(<Tabs>{mockChildren}</Tabs>);
++
++    [...Array(mockChildren.length).keys()].forEach(i => {
++      const button = screen.getByRole('button', { name: `Item ${i}` });
++      if (i <= indexOfLastVisibleChild) {
++        expect(button).not.toHaveAttribute('style');
++      } else {
++        // FIXME: this should use `toHaveStyle`, but it does not detect any style.
++        expect(button).toHaveAttribute('style', 'visibility: hidden;');
++      }
++    });
++  });
++});
+diff --git a/src/generic/user-messages/Alert.jsx b/src/generic/user-messages/Alert.jsx
+index 832fc12..bade929 100644
+--- a/src/generic/user-messages/Alert.jsx
++++ b/src/generic/user-messages/Alert.jsx
+@@ -45,7 +45,7 @@ function Alert({
+   type, dismissible, children, footer, intl, onDismiss,
+ }) {
+   return (
+-    <div className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))} style={{ padding: '20px' }}>
++    <div data-testid={`alert-container-${type}`} className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))} style={{ padding: '20px' }}>
+       <div className="row w-100 m-0">
+         {type !== ALERT_TYPES.WELCOME && (
+           <div className="col-auto p-0 mr-2">
+diff --git a/src/generic/user-messages/Alert.test.jsx b/src/generic/user-messages/Alert.test.jsx
+new file mode 100644
+index 0000000..0e08ffd
+--- /dev/null
++++ b/src/generic/user-messages/Alert.test.jsx
+@@ -0,0 +1,55 @@
++import React from 'react';
++import {
++  render, screen, fireEvent, initializeMockApp,
++} from '../../setupTest';
++import { Alert, ALERT_TYPES } from './index';
++
++describe('Alert', () => {
++  const types = {
++    [ALERT_TYPES.ERROR]: {
++      alert_class: 'alert-warning',
++      icon: 'fa-exclamation-triangle',
++    },
++    [ALERT_TYPES.DANGER]: {
++      alert_class: 'alert-danger',
++      icon: 'fa-minus-circle',
++    },
++    [ALERT_TYPES.SUCCESS]: {
++      alert_class: 'alert-success',
++      icon: 'fa-check-circle',
++    },
++    [ALERT_TYPES.INFO]: {
++      alert_class: 'alert-info',
++      icon: 'fa-info-circle',
++    },
++  };
++
++  beforeAll(async () => {
++    // We need to mock AuthService to implicitly use `getAuthenticatedUser` within `AppContext.Provider`.
++    await initializeMockApp();
++  });
++
++  Object.entries(types).forEach(([alert, properties]) => {
++    it(`renders ${alert} alert`, () => {
++      const alertContent = 'Test alert.';
++      const { container } = render(<Alert type={alert}>{alertContent}</Alert>);
++
++      expect(container.firstChild).toHaveClass(properties.alert_class);
++      expect(container.querySelector('svg')).toHaveClass(properties.icon);
++      expect(screen.getByText(alertContent)).toBeInTheDocument();
++    });
++  });
++
++  it('is dismissible', () => {
++    const onDismiss = jest.fn();
++    const { container } = render(<Alert type={ALERT_TYPES.ERROR} dismissible {...{ onDismiss }} />);
++
++    expect(container.firstChild).toHaveClass('alert-dismissible');
++
++    const dismissButton = screen.getByRole('button');
++    expect(container.querySelector('svg')).toHaveClass('fa-exclamation-triangle');
++
++    fireEvent.click(dismissButton);
++    expect(onDismiss).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/src/generic/user-messages/AlertList.test.jsx b/src/generic/user-messages/AlertList.test.jsx
+new file mode 100644
+index 0000000..8090ee5
+--- /dev/null
++++ b/src/generic/user-messages/AlertList.test.jsx
+@@ -0,0 +1,18 @@
++import React from 'react';
++import { initializeMockApp, render } from '../../setupTest';
++import { AlertList } from './index';
++
++describe('Alert List', () => {
++  beforeAll(async () => {
++    // We need to mock AuthService to implicitly use `getAuthenticatedUser` within `AppContext.Provider`.
++    await initializeMockApp();
++  });
++
++  it('renders empty div by default', () => {
++    const { container } = render(<AlertList />);
++    expect(container).toBeEmptyDOMElement();
++  });
++
++  // FIXME: Currently these alerts are tested in `OutlineTab.test` and `Course.test`, because creating
++  //  `UserMessagesProvider` for testing would introduce a lot of boilerplate code that could get outdated quickly.
++});
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 14b8f5f..99dc0f9 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -43,7 +43,7 @@ export default function InstructorToolbar(props) {
+   const urlInsights = getInsightsUrl(courseId);
+   const urlLms = useSelector((state) => {
+     if (!unitId) {
+-      return {};
++      return undefined;
+     }
+ 
+     const activeUnit = state.models.units[props.unitId];
+diff --git a/src/instructor-toolbar/InstructorToolbar.test.jsx b/src/instructor-toolbar/InstructorToolbar.test.jsx
+new file mode 100644
+index 0000000..515029e
+--- /dev/null
++++ b/src/instructor-toolbar/InstructorToolbar.test.jsx
+@@ -0,0 +1,76 @@
++import React from 'react';
++import { getConfig } from '@edx/frontend-platform';
++import MockAdapter from 'axios-mock-adapter';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import {
++  initializeTestStore, render, screen, waitFor, getByText, logUnhandledRequests,
++} from '../setupTest';
++import InstructorToolbar from './index';
++
++const originalConfig = jest.requireActual('@edx/frontend-platform').getConfig();
++jest.mock('@edx/frontend-platform', () => ({
++  ...jest.requireActual('@edx/frontend-platform'),
++  getConfig: jest.fn(),
++}));
++getConfig.mockImplementation(() => originalConfig);
++
++describe('Instructor Toolbar', () => {
++  let mockData;
++  let axiosMock;
++  let masqueradeUrl;
++
++  beforeAll(async () => {
++    const store = await initializeTestStore({ excludeFetchSequence: true });
++    const { courseware, models } = store.getState();
++    mockData = {
++      courseId: courseware.courseId,
++      unitId: Object.values(models.units)[0].id,
++    };
++
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    masqueradeUrl = `${getConfig().LMS_BASE_URL}/courses/${courseware.courseId}/masquerade`;
++  });
++
++  beforeEach(() => {
++    axiosMock.reset();
++    axiosMock.onGet(masqueradeUrl).reply(200, { success: true });
++    logUnhandledRequests(axiosMock);
++  });
++
++  it('sends query to masquerade and does not display alerts by default', async () => {
++    render(<InstructorToolbar {...mockData} />);
++
++    await waitFor(() => expect(axiosMock.history.get).toHaveLength(1));
++    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
++  });
++
++  it('displays masquerade error', async () => {
++    axiosMock.reset();
++    axiosMock.onGet(masqueradeUrl).reply(200, { success: false });
++    render(<InstructorToolbar {...mockData} />);
++
++    await waitFor(() => expect(axiosMock.history.get).toHaveLength(1));
++    expect(screen.getByRole('alert')).toHaveTextContent('Unable to get masquerade options');
++  });
++
++  it('displays links to view course in different services', () => {
++    const config = { ...originalConfig };
++    config.INSIGHTS_BASE_URL = 'http://localhost:18100';
++    getConfig.mockImplementation(() => config);
++    render(<InstructorToolbar {...mockData} />);
++
++    const linksContainer = screen.getByText('View course in:').parentElement;
++    ['Legacy experience', 'Studio', 'Insights'].forEach(service => {
++      expect(getByText(linksContainer, service).getAttribute('href')).toMatch(/http.*/);
++    });
++  });
++
++  it('does not display links if there are no services available', () => {
++    const config = { ...originalConfig };
++    config.STUDIO_BASE_URL = undefined;
++    getConfig.mockImplementation(() => config);
++    render(<InstructorToolbar {...mockData} unitId={null} />);
++
++    expect(screen.queryByText('View course in:')).not.toBeInTheDocument();
++  });
++});
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 3406084..349ed6d 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -1,6 +1,8 @@
+ import 'core-js/stable';
+ import 'regenerator-runtime/runtime';
+ import '@testing-library/jest-dom';
++import '@testing-library/jest-dom/extend-expect';
++import 'jest-chain';
+ import './courseware/data/__factories__';
+ import './course-home/data/__factories__';
+ import { getConfig, mergeConfig } from '@edx/frontend-platform';
+@@ -34,7 +36,14 @@ window.getComputedStyle = jest.fn(() => ({
+   getPropertyValue: jest.fn(),
+ }));
+ 
+-export default function initializeMockApp() {
++export const authenticatedUser = {
++  userId: 'abc123',
++  username: 'Mock User',
++  roles: [],
++  administrator: false,
++};
++
++export function initializeMockApp() {
+   mergeConfig({
+     INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
+     STUDIO_BASE_URL: process.env.STUDIO_BASE_URL || null,
+@@ -79,6 +88,15 @@ export function loadUnit(message = messageEvent) {
+   window.postMessage(message, '*');
+ }
+ 
++// Helper function to log unhandled API requests to the console while running tests.
++export function logUnhandledRequests(axiosMock) {
++  axiosMock.onAny().reply((config) => {
++    // eslint-disable-next-line no-console
++    console.log(config.method, config.url);
++    return [200, {}];
++  });
++}
++
+ let globalStore;
+ 
+ export async function initializeTestStore(options = {}, overrideStore = true) {
+@@ -110,11 +128,7 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
+     axiosMock.onGet(sequenceMetadataUrl).reply(200, metadata);
+   });
+ 
+-  axiosMock.onAny().reply((config) => {
+-    // eslint-disable-next-line no-console
+-    console.log(config.url);
+-    return [200, {}];
+-  });
++  logUnhandledRequests(axiosMock);
+ 
+   // eslint-disable-next-line no-unused-expressions
+   !options.excludeFetchCourse && await executeThunk(fetchCourse(courseMetadata.id), store.dispatch);
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+new file mode 100644
+index 0000000..b098f68
+--- /dev/null
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -0,0 +1,31 @@
++import React from 'react';
++import { Factory } from 'rosie';
++import { initializeTestStore, render, screen } from '../setupTest';
++import LoadedTabPage from './LoadedTabPage';
++
++jest.mock('../course-header/CourseTabsNavigation', () => () => <div data-testid="CourseTabsNavigation" />);
++jest.mock('../instructor-toolbar/InstructorToolbar', () => () => <div data-testid="InstructorToolbar" />);
++
++describe('Loaded Tab Page', () => {
++  const mockData = { activeTabSlug: 'dummy' };
++
++  beforeAll(async () => {
++    const store = await initializeTestStore({ excludeFetchSequence: true });
++    mockData.courseId = store.getState().courseware.courseId;
++  });
++
++  it('renders correctly', () => {
++    render(<LoadedTabPage {...mockData} />);
++
++    expect(screen.queryByTestId('CourseTabsNavigation')).toBeInTheDocument();
++    expect(screen.queryByTestId('InstructorToolbar')).not.toBeInTheDocument();
++  });
++
++  it('shows Instructor Toolbar if original user is staff', async () => {
++    const courseMetadata = Factory.build('courseMetadata', { original_user_is_staff: true });
++    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
++    render(<LoadedTabPage {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++
++    expect(screen.getByTestId('InstructorToolbar')).toBeInTheDocument();
++  });
++});
+diff --git a/src/tab-page/TabContainer.test.jsx b/src/tab-page/TabContainer.test.jsx
+new file mode 100644
+index 0000000..ef973e5
+--- /dev/null
++++ b/src/tab-page/TabContainer.test.jsx
+@@ -0,0 +1,44 @@
++import React from 'react';
++import { history } from '@edx/frontend-platform';
++import { Route } from 'react-router';
++import { initializeTestStore, render, screen } from '../setupTest';
++import { TabContainer } from './index';
++
++const mockDispatch = jest.fn();
++const mockFetch = jest.fn().mockImplementation((x) => x);
++jest.mock('react-redux', () => ({
++  ...jest.requireActual('react-redux'),
++  useDispatch: () => mockDispatch,
++}));
++jest.mock('./TabPage', () => () => <div data-testid="TabPage" />);
++
++describe('Tab Container', () => {
++  const mockData = {
++    children: [],
++    fetch: mockFetch,
++    tab: 'dummy',
++  };
++  let courseId;
++
++  beforeAll(async () => {
++    const store = await initializeTestStore({ excludeFetchSequence: true });
++    courseId = store.getState().courseware.courseId;
++  });
++
++  it('renders correctly', () => {
++    history.push(`/course/${courseId}`);
++    render(
++      <Route path="/course/:courseId">
++        <TabContainer {...mockData} />
++      </Route>,
++    );
++
++    expect(mockFetch)
++      .toHaveBeenCalledTimes(1)
++      .toHaveBeenCalledWith(courseId);
++    expect(mockDispatch)
++      .toHaveBeenCalledTimes(1)
++      .toHaveBeenCalledWith(courseId);
++    expect(screen.getByTestId('TabPage')).toBeInTheDocument();
++  });
++});
+diff --git a/src/tab-page/TabPage.test.jsx b/src/tab-page/TabPage.test.jsx
+new file mode 100644
+index 0000000..bc5793d
+--- /dev/null
++++ b/src/tab-page/TabPage.test.jsx
+@@ -0,0 +1,61 @@
++import React from 'react';
++import { getConfig } from '@edx/frontend-platform';
++import MockAdapter from 'axios-mock-adapter';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import {
++  initializeTestStore, logUnhandledRequests, render, screen,
++} from '../setupTest';
++import { TabPage } from './index';
++import executeThunk from '../utils';
++import * as thunks from '../course-home/data/thunks';
++
++// We should not test `LoadedTabPage` page here, as `TabPage` is used only for passing `passthroughProps`.
++jest.mock('./LoadedTabPage', () => () => <div data-testid="LoadedTabPage" />);
++
++describe('Tab Page', () => {
++  const mockData = {
++    courseStatus: 'loaded',
++  };
++
++  beforeAll(async () => {
++    await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true });
++  });
++
++  it('displays loading message', () => {
++    render(<TabPage {...mockData} courseStatus="loading" />);
++    expect(screen.getByText('Loading course page…')).toBeInTheDocument();
++  });
++
++  it('displays loading failure message', () => {
++    render(<TabPage {...mockData} courseStatus="other" />);
++    expect(screen.getByText('There was an error loading this course.')).toBeInTheDocument();
++  });
++
++  it('displays Learning Toast', async () => {
++    const testStore = await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true }, false);
++    render(<TabPage {...mockData} />, { store: testStore });
++
++    const resetUrl = `${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`;
++    const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    axiosMock.onPost(resetUrl).reply(201, {
++      link: 'test-toast-link',
++      link_text: 'test-toast-body',
++      header: 'test-toast-header',
++    });
++    logUnhandledRequests(axiosMock);
++
++    const getTabDataMock = jest.fn(() => ({
++      type: 'MOCK_ACTION',
++    }));
++
++    await executeThunk(thunks.resetDeadlines('courseId', getTabDataMock), testStore.dispatch);
++
++    expect(screen.getByText('test-toast-header')).toBeInTheDocument();
++    expect(screen.getByText('test-toast-body')).toBeInTheDocument();
++  });
++
++  it('displays Loaded Tab Page', () => {
++    render(<TabPage {...mockData} />);
++    expect(screen.getByTestId('LoadedTabPage')).toBeInTheDocument();
++  });
++});
+-- 
+2.34.1
+

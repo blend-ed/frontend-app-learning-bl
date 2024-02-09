@@ -1,0 +1,608 @@
+From 7b0429f4729a225e38930b459d64bfba99f74541 Mon Sep 17 00:00:00 2001
+From: Rebecca Graber <rgraber@edx.org>
+Date: Mon, 21 Jun 2021 13:18:35 -0400
+Subject: [PATCH 0503/1021] feat: make course recommendations a part of the
+ course celebration (#486)
+
+---
+ .../course/course-exit/CatalogSuggestion.jsx  |   2 +-
+ .../course/course-exit/CourseCelebration.jsx  |  13 +-
+ .../course/course-exit/CourseExit.test.jsx    |  65 +++++++++-
+ ...ions.exp.jsx => CourseRecommendations.jsx} |  67 ++++++-----
+ .../course-exit/CourseRecommendations.scss    |  30 +++++
+ .../course_recommendations.exp.scss           | 111 ------------------
+ .../data/api.exp.js => data/api.js}           |   0
+ .../data/slice.exp.js => data/slice.js}       |   0
+ .../data/thunks.exp.js => data/thunks.js}     |   6 +-
+ .../__factories__/courseMetadata.factory.js   |   1 +
+ .../courseRecommendations.factory.js          |  38 ++++++
+ src/courseware/data/__factories__/index.js    |   1 +
+ src/index.scss                                |   2 +-
+ src/setupTest.js                              |   2 +-
+ src/store.js                                  |   2 +-
+ 15 files changed, 175 insertions(+), 165 deletions(-)
+ rename src/courseware/course/course-exit/{CourseRecommendationsExp/CourseRecommendations.exp.jsx => CourseRecommendations.jsx} (80%)
+ create mode 100644 src/courseware/course/course-exit/CourseRecommendations.scss
+ delete mode 100644 src/courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp.scss
+ rename src/courseware/course/course-exit/{CourseRecommendationsExp/data/api.exp.js => data/api.js} (100%)
+ rename src/courseware/course/course-exit/{CourseRecommendationsExp/data/slice.exp.js => data/slice.js} (100%)
+ rename src/courseware/course/course-exit/{CourseRecommendationsExp/data/thunks.exp.js => data/thunks.js} (84%)
+ create mode 100644 src/courseware/data/__factories__/courseRecommendations.factory.js
+
+diff --git a/src/courseware/course/course-exit/CatalogSuggestion.jsx b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+index a1fb5c3..2f91868 100644
+--- a/src/courseware/course/course-exit/CatalogSuggestion.jsx
++++ b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+@@ -33,7 +33,7 @@ function CatalogSuggestion({ intl, variant }) {
+   );
+ 
+   return (
+-    <div className="row w-100 mx-0 my-2 justify-content-center">
++    <div className="row w-100 mx-0 my-2 justify-content-center" data-testid="catalog-suggestion">
+       <div className="col col-md-8 p-4 bg-info-100 text-center">
+         <FontAwesomeIcon icon={faSearch} style={{ width: '20px' }} />&nbsp;
+         <FormattedMessage
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 0fdd5d8..72fae79 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -1,4 +1,4 @@
+-import React, { useEffect, useState } from 'react';
++import React, { useEffect } from 'react';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faLinkedinIn } from '@fortawesome/free-brands-svg-icons';
+ 
+@@ -12,7 +12,6 @@ import { Alert, Button, Hyperlink } from '@edx/paragon';
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+-import CatalogSuggestion from './CatalogSuggestion';
+ import CelebrationMobile from './assets/celebration_456x328.gif';
+ import CelebrationDesktop from './assets/celebration_750x540.gif';
+ import certificate from '../../../generic/assets/edX_certificate.png';
+@@ -27,7 +26,7 @@ import UpgradeFootnote from './UpgradeFootnote';
+ import SocialIcons from '../../social-share/SocialIcons';
+ import { logClick, logVisit } from './utils';
+ import { DashboardLink, IdVerificationSupportLink, ProfileLink } from '../../../shared/links';
+-import CourseRecommendations from './CourseRecommendationsExp/CourseRecommendations.exp';
++import CourseRecommendations from './CourseRecommendations';
+ 
+ const LINKEDIN_BLUE = '#2867B2';
+ 
+@@ -63,10 +62,6 @@ function CourseCelebration({ intl }) {
+     certificateAvailableDate,
+   } = certificateData || {};
+ 
+-  /** [WS-1681 experiment] */
+-  const [showWS1681, setShowWS1681] = useState(window.experiment__courseware_celebration_bShowWS1681);
+-  useEffect(() => { setShowWS1681(window.experiment__courseware_celebration_bShowWS1681); });
+-
+   const { administrator } = getAuthenticatedUser();
+ 
+   const dashboardLink = <DashboardLink />;
+@@ -330,9 +325,7 @@ function CourseCelebration({ intl }) {
+             />
+           ))}
+           {footnote}
+-          { showWS1681 && <CourseRecommendations variant={visitEvent} />}
+-          { !showWS1681 && <CatalogSuggestion variant={visitEvent} /> }
+-
++          <CourseRecommendations variant={visitEvent} />
+         </div>
+       </div>
+     </>
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 342fca8..4e992ef 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -21,7 +21,7 @@ jest.mock('@edx/frontend-platform/analytics');
+ 
+ describe('Course Exit Pages', () => {
+   let axiosMock;
+-  const store = initializeStore();
++  let store;
+   const defaultMetadata = Factory.build('courseMetadata', {
+     user_has_passing_grade: true,
+     end: '2014-02-05T05:00:00Z',
+@@ -31,7 +31,8 @@ describe('Course Exit Pages', () => {
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${defaultMetadata.id}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+   const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+-
++  const discoveryRecommendationsUrl = new RegExp(`${getConfig().DISCOVERY_API_BASE_URL}/api/v1/course_recommendations/*`);
++  const enrollmentsUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment*`);
+   function setMetadata(attributes) {
+     const courseMetadata = { ...defaultMetadata, ...attributes };
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+@@ -43,10 +44,13 @@ describe('Course Exit Pages', () => {
+   }
+ 
+   beforeEach(() => {
++    store = initializeStore();
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
+     axiosMock.onGet(courseBlocksUrlRegExp).reply(200, defaultCourseBlocks);
+-
++    axiosMock.onGet(discoveryRecommendationsUrl).reply(200,
++      Factory.build('courseRecommendations', {}, { numRecs: 2 }));
++    axiosMock.onGet(enrollmentsUrl).reply(200, []);
+     logUnhandledRequests(axiosMock);
+   });
+ 
+@@ -290,6 +294,61 @@ describe('Course Exit Pages', () => {
+         expect(screen.queryByTestId('excluded-program-type')).not.toBeInTheDocument();
+       });
+     });
++
++    describe('Course recommendations', () => {
++      it('Displays recommendations if at least two are available', async () => {
++        await fetchAndRender(<CourseCelebration />);
++        const recommendationsTable = await screen.findByTestId('course-recommendations');
++        expect(recommendationsTable).toBeInTheDocument();
++        expect(screen.queryByTestId('catalog-suggestion')).not.toBeInTheDocument();
++      });
++
++      it('Displays the generic catalog suggestion if fewer than two recommendations are available', async () => {
++        axiosMock.onGet(discoveryRecommendationsUrl).reply(200,
++          Factory.build('courseRecommendations', {}, { numRecs: 1 }));
++        await fetchAndRender(<CourseCelebration />);
++        const catalogSuggestion = await screen.findByTestId('catalog-suggestion');
++        expect(catalogSuggestion).toBeInTheDocument();
++        expect(screen.queryByTestId('course-recommendations')).not.toBeInTheDocument();
++      });
++
++      it('Will not recommend a course in which the user is already enrolled', async () => {
++        const initialRecommendations = Factory.build('courseRecommendations', {}, { numRecs: 2 });
++        initialRecommendations.recommendations.push(
++          Factory.build('courseRecommendation', { key: 'edX+EnrolledX', title: 'Already Enrolled' }),
++        );
++        initialRecommendations.recommendations.push(
++          Factory.build('courseRecommendation', { key: 'edX+NotEnrolledX', title: 'Not Already Enrolled' }),
++        );
++        axiosMock.onGet(discoveryRecommendationsUrl).reply(200, initialRecommendations);
++        axiosMock.onGet(enrollmentsUrl).reply(200, [
++          Factory.build('userEnrollment', '',
++            {
++              runKey: 'edX+EnrolledX+1T2021',
++            }),
++        ]);
++        await fetchAndRender(<CourseCelebration />);
++        const recommendationsTable = await screen.findByTestId('course-recommendations');
++        expect(recommendationsTable).toBeInTheDocument();
++        expect(screen.queryByText('Already Enrolled')).not.toBeInTheDocument();
++        expect(screen.queryByText('Not Already Enrolled')).toBeInTheDocument();
++      });
++
++      it('Will not recommend the same course that the user just finished', async () => {
++        // the uuid returned from the call to discovery is the uuid of the current course
++        const initialRecommendations = Factory.build('courseRecommendations',
++          { uuid: 'my_uuid' },
++          { numRecs: 2 });
++        initialRecommendations.recommendations.push(
++          Factory.build('courseRecommendation', { uuid: 'my_uuid', title: 'Same Course' }),
++        );
++        axiosMock.onGet(discoveryRecommendationsUrl).reply(200, initialRecommendations);
++        await fetchAndRender(<CourseCelebration />);
++        const recommendationsTable = await screen.findByTestId('course-recommendations');
++        expect(recommendationsTable).toBeInTheDocument();
++        expect(screen.queryByText('Same Course')).not.toBeInTheDocument();
++      });
++    });
+   });
+ 
+   describe('Course Non-passing Experience', () => {
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/CourseRecommendations.exp.jsx b/src/courseware/course/course-exit/CourseRecommendations.jsx
+similarity index 80%
+rename from src/courseware/course/course-exit/CourseRecommendationsExp/CourseRecommendations.exp.jsx
+rename to src/courseware/course/course-exit/CourseRecommendations.jsx
+index ab637a7..7eb5ca0 100644
+--- a/src/courseware/course/course-exit/CourseRecommendationsExp/CourseRecommendations.exp.jsx
++++ b/src/courseware/course/course-exit/CourseRecommendations.jsx
+@@ -6,15 +6,17 @@ import {
+   FormattedMessage, injectIntl, intlShape, defineMessages,
+ } from '@edx/frontend-platform/i18n';
+ import { useSelector, useDispatch } from 'react-redux';
+-import { Hyperlink, DataTable, CardView } from '@edx/paragon';
++import {
++  Hyperlink, DataTable, CardView, Card,
++} from '@edx/paragon';
+ import PropTypes from 'prop-types';
+ import truncate from 'truncate-html';
+-import { useModel } from '../../../../generic/model-store';
+-import fetchCourseRecommendations from './data/thunks.exp';
+-import { FAILED, LOADED, LOADING } from './data/slice.exp';
+-import CatalogSuggestion from '../CatalogSuggestion';
+-import PageLoading from '../../../../generic/PageLoading';
+-import { logClick } from '../utils';
++import { useModel } from '../../../generic/model-store/hooks';
++import fetchCourseRecommendations from './data/thunks';
++import { FAILED, LOADED, LOADING } from './data/slice';
++import CatalogSuggestion from './CatalogSuggestion';
++import PageLoading from '../../../generic/PageLoading';
++import { logClick } from './utils';
+ 
+ const messages = defineMessages({
+   recommendationsHeading: {
+@@ -48,8 +50,7 @@ const ListStyles = {
+   conjunction: 'conjunction',
+ };
+ 
+-// TODO: replace custom card (copied from Prospectus) with Paragon Card component
+-function Card({
++function CourseCard({
+   original: {
+     title,
+     image,
+@@ -74,24 +75,23 @@ function Card({
+ 
+   return (
+     <div
+-      className="discovery-card"
+       role="group"
+       aria-label={title}
+     >
+       <Hyperlink
+         destination={marketingUrl}
+-        className="discovery-card-link"
++        className="text-decoration-none"
+         onClick={onClick}
+       >
+-        <div className="d-flex flex-column d-card-wrapper">
+-          <div className="d-card-hero">
+-            <img src={image.src} alt="" />
+-          </div>
+-          <div className="d-card-body">
+-            <h3 className="name-heading">
+-              {truncate(title, 70, { reserveLastWord: -1 })}
+-            </h3>
+-            <div className="provider">
++        <Card style={{ width: '270px', height: '270px' }} className="discovery-card">
++          <Card.Img variant="top" src={image.src} bsPrefix="d-card-hero" />
++          <Card.Body>
++            <Card.Title>
++              <h3 className="h4 text-gray-700 font-weight-normal">
++                {truncate(title, 70, { reserveLastWord: -1 })}
++              </h3>
++            </Card.Title>
++            <div className="text-gray-500 small">
+               <FormattedMessage
+                 id="courseCelebration.recommendations.card.schools.label"
+                 description="Screenreader label for the Schools and Partners running the course."
+@@ -104,23 +104,22 @@ function Card({
+               )}
+               </FormattedMessage>
+             </div>
+-          </div>
+-          <div className="d-card-footer">
+-            <div className="card-type">
+-              <FormattedMessage
+-                id="courseCelebration.recommendations.label"
+-                description="Label on a discovery-card that lets a user know that it is a course card"
+-                defaultMessage="Course"
+-              />
+-            </div>
+-          </div>
+-        </div>
++          </Card.Body>
++          <footer className="pl-4 pb-2 x-small text-gray-500">
++            <FormattedMessage
++              id="courseCelebration.recommendations.label"
++              description="Label on a discovery-card that lets a user know that it is a course card"
++              defaultMessage="Course"
++            />
++          </footer>
++
++        </Card>
+       </Hyperlink>
+     </div>
+   );
+ }
+ 
+-Card.propTypes = {
++CourseCard.propTypes = {
+   original: PropTypes.shape({
+     marketingUrl: PropTypes.string,
+     title: PropTypes.string,
+@@ -135,7 +134,7 @@ Card.propTypes = {
+   intl: intlShape.isRequired,
+ };
+ 
+-const IntlCard = injectIntl(Card);
++const IntlCard = injectIntl(CourseCard);
+ 
+ function CourseRecommendations({ intl, variant }) {
+   const { courseId, recommendationsStatus } = useSelector(state => ({ ...state.recommendations, ...state.courseware }));
+@@ -178,7 +177,7 @@ function CourseRecommendations({ intl, variant }) {
+   ));
+ 
+   return (
+-    <div className="course-recommendations d-flex flex-column align-items-center">
++    <div className="course-recommendations d-flex flex-column align-items-center" data-testid="course-recommendations">
+       <h2 className="text-center mb-3">{intl.formatMessage(messages.recommendationsHeading)}</h2>
+       <div className="mb-2 mt-3">
+         <DataTable
+diff --git a/src/courseware/course/course-exit/CourseRecommendations.scss b/src/courseware/course/course-exit/CourseRecommendations.scss
+new file mode 100644
+index 0000000..9c68020
+--- /dev/null
++++ b/src/courseware/course/course-exit/CourseRecommendations.scss
+@@ -0,0 +1,30 @@
++.course-recommendations {
++  .pgn__data-table-wrapper {
++    border: 0;
++    box-shadow: none;
++    .pgn__card-grid {
++      .row > div[class*="col-"] {
++        justify-content: center;
++      }
++    }
++  }
++
++  .discovery-card {
++    &:hover,
++    &:focus {
++      box-shadow: 0 2px 4px 2px $gray-500
++    }
++  }
++
++    .d-card-hero-top {
++      height: 102px;
++      min-height: 102px;
++      background-color: $gray-200;
++      overflow: hidden;
++      border: {
++        radius: 3px 3px 0 0;
++        bottom: 1px solid $success-100;
++      }
++    }
++
++}
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp.scss b/src/courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp.scss
+deleted file mode 100644
+index d696879..0000000
+--- a/src/courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp.scss
++++ /dev/null
+@@ -1,111 +0,0 @@
+-$default-border-color: $info-300;
+-.course-recommendations {
+-  .pgn__data-table-wrapper {
+-    border: 0;
+-    .pgn__card-grid {
+-      .row > div[class*="col-"] {
+-        justify-content: center;
+-      }
+-    }
+-  }
+-
+-  .discovery-card {
+-    min-width: 270px;
+-    max-width: 270px;
+-    width: 270px;
+-    height: 270px;
+-    position: relative;
+-    border-bottom: 3px solid $default-border-color;
+-    background-color: $white;
+-    box-shadow: none;
+-    padding: 0;
+-    border: none;
+-
+-    &.custom-link {
+-      background: none;
+-    }
+-
+-    .d-card-wrapper {
+-      height: 270px;
+-      box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.3);
+-      border: {
+-        color: $primary-200;
+-        width: 1px;
+-        radius: 3px;
+-      }
+-    }
+-
+-    .discovery-card-link {
+-      text-decoration: none;
+-      position: absolute;
+-      top: 0;
+-      right: 0;
+-      bottom: 0;
+-      left: 0;
+-
+-      &:focus,
+-      &:hover {
+-        border: 0;
+-        outline: none;
+-
+-        .d-card-wrapper {
+-          box-shadow: 0 2px 4px 2px $gray-500;
+-        }
+-      }
+-    }
+-
+-    .d-card-hero {
+-      height: 102px;
+-      background-color: $gray-200;
+-      overflow: hidden;
+-      border: {
+-        radius: 3px 3px 0 0;
+-        bottom: 1px solid $success-100;
+-      }
+-    }
+-
+-    .d-card-body {
+-      padding: 28px 20px 33px;
+-    }
+-
+-    .d-card-footer {
+-      padding: 0 20px;
+-    }
+-
+-    .name-heading {
+-      height: auto;
+-      line-height: 1.15;
+-      color: $gray-700;
+-      font: {
+-        family: $font-family-sans-serif;
+-        size: 1.25rem;
+-        weight: 500;
+-      }
+-    }
+-
+-    .provider {
+-      line-height: 0.86;
+-      color: $gray-500;
+-      margin-bottom: 20px;
+-      font: {
+-        family: $font-family-sans-serif;
+-        size: 0.875rem;
+-        weight: $font-weight-normal;
+-      }
+-    }
+-
+-    .card-type {
+-      height: 20px;
+-      line-height: 1.67;
+-      letter-spacing: 0.2px;
+-      color: $gray-500;
+-      position: absolute;
+-      bottom: 10px;
+-      font: {
+-        family: $font-family-sans-serif;
+-        size: 0.75rem;
+-        weight: $font-weight-normal;
+-      }
+-    }
+-  }
+-}
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/data/api.exp.js b/src/courseware/course/course-exit/data/api.js
+similarity index 100%
+rename from src/courseware/course/course-exit/CourseRecommendationsExp/data/api.exp.js
+rename to src/courseware/course/course-exit/data/api.js
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/data/slice.exp.js b/src/courseware/course/course-exit/data/slice.js
+similarity index 100%
+rename from src/courseware/course/course-exit/CourseRecommendationsExp/data/slice.exp.js
+rename to src/courseware/course/course-exit/data/slice.js
+diff --git a/src/courseware/course/course-exit/CourseRecommendationsExp/data/thunks.exp.js b/src/courseware/course/course-exit/data/thunks.js
+similarity index 84%
+rename from src/courseware/course/course-exit/CourseRecommendationsExp/data/thunks.exp.js
+rename to src/courseware/course/course-exit/data/thunks.js
+index 6d1e7e0..f355afb 100644
+--- a/src/courseware/course/course-exit/CourseRecommendationsExp/data/thunks.exp.js
++++ b/src/courseware/course/course-exit/data/thunks.js
+@@ -4,9 +4,9 @@ import {
+   fetchCourseRecommendationsFailure,
+   fetchCourseRecommendationsRequest,
+   fetchCourseRecommendationsSuccess,
+-} from './slice.exp';
+-import getCourseRecommendations from './api.exp';
+-import { updateModel } from '../../../../../generic/model-store';
++} from './slice';
++import getCourseRecommendations from './api';
++import { updateModel } from '../../../../generic/model-store';
+ 
+ export default function fetchCourseRecommendations(courseKey, courseId) {
+   return async (dispatch) => {
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 2c97f45..2f13687 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -59,4 +59,5 @@ Factory.define('courseMetadata')
+     user_needs_integrity_signature: false,
+     is_mfe_special_exams_enabled: false,
+     is_mfe_proctored_exams_enabled: false,
++    recommendations: null,
+   });
+diff --git a/src/courseware/data/__factories__/courseRecommendations.factory.js b/src/courseware/data/__factories__/courseRecommendations.factory.js
+new file mode 100644
+index 0000000..e252b96
+--- /dev/null
++++ b/src/courseware/data/__factories__/courseRecommendations.factory.js
+@@ -0,0 +1,38 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('courseRecommendations')
++  .option('host', '')
++  .option('numRecs', '', 4)
++  .sequence('uuid', (i) => `a-uuid-${i}`)
++  .attr('recommendations', ['numRecs'], (numRecs) => {
++    const recs = [];
++    for (let i = 0; i < numRecs; i++) {
++      recs.push(Factory.build('courseRecommendation'));
++    }
++    return recs;
++  });
++
++Factory.define('courseRecommendation')
++  .sequence('key', (i) => `edX+DemoX${i}`)
++  .sequence('uuid', (i) => `abcd-${i}`)
++  .attrs({
++    title: 'DemoX',
++    owners: [
++      {
++        uuid: '',
++        key: 'edX',
++      },
++    ],
++    image: {
++      src: '',
++    },
++  })
++  .attr('course_run_keys', ['key'], (key) => (
++    [`${key}+1T2021`]
++  ))
++  .attr('url_slug', ['key'], (key) => key)
++  .attr('marketing_url', ['url_slug'], (urlSlug) => `https://www.edx.org/course/${urlSlug}`);
++
++Factory.define('userEnrollment')
++  .option('runKey')
++  .attr('course_details', ['runKey'], (runKey) => (runKey ? { course_id: runKey } : { course_id: 'edX+EnrolledX' }));
+diff --git a/src/courseware/data/__factories__/index.js b/src/courseware/data/__factories__/index.js
+index e8f3e04..d3bb1b2 100644
+--- a/src/courseware/data/__factories__/index.js
++++ b/src/courseware/data/__factories__/index.js
+@@ -1,2 +1,3 @@
+ import './courseMetadata.factory';
+ import './sequenceMetadata.factory';
++import './courseRecommendations.factory';
+diff --git a/src/index.scss b/src/index.scss
+index e0c8dbe..c2cfb04 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -384,7 +384,7 @@
+ @import 'course-home/outline-tab/widgets/ProctoringInfoPanel.scss';
+ @import 'course-home/progress-tab/course-completion/CompletionDonutChart.scss';
+ @import 'course-home/progress-tab/grades/course-grade/GradeBar.scss';
+-@import 'courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp';
++@import 'courseware/course/course-exit/CourseRecommendations';
+ 
+ /** [MM-P2P] Experiment */
+ @import 'experiments/mm-p2p/index.scss';
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 2d29312..2868ea6 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -122,7 +122,7 @@ export function loadUnit(message = messageEvent) {
+ export function logUnhandledRequests(axiosMock) {
+   axiosMock.onAny().reply((config) => {
+     // eslint-disable-next-line no-console
+-    console.log(config.method, config.url);
++    console.log(config.method, config.url.href);
+     return [200, {}];
+   });
+ }
+diff --git a/src/store.js b/src/store.js
+index a7d500e..c7ede6e 100644
+--- a/src/store.js
++++ b/src/store.js
+@@ -1,7 +1,7 @@
+ import { configureStore } from '@reduxjs/toolkit';
+ import { reducer as courseHomeReducer } from './course-home/data';
+ import { reducer as coursewareReducer } from './courseware/data/slice';
+-import { reducer as recommendationsReducer } from './courseware/course/course-exit/CourseRecommendationsExp/data/slice.exp';
++import { reducer as recommendationsReducer } from './courseware/course/course-exit/data/slice';
+ import { reducer as modelsReducer } from './generic/model-store';
+ 
+ export default function initializeStore() {
+-- 
+2.34.1
+

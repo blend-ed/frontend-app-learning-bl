@@ -1,0 +1,334 @@
+From 3e9065e963fbf31941b6bbfb37e3546f99f795fb Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Thu, 12 Dec 2019 16:04:41 -0500
+Subject: [PATCH 0004/1021] Absorbing work from douglashall/learning_sequence
+
+---
+ .env.development                              |   4 +-
+ src/example/ExamplePage.jsx                   |  12 --
+ src/example/ExamplePage.test.jsx              |   5 -
+ src/example/data/.gitkeep                     |   0
+ src/example/data/README.rst                   |   4 -
+ src/example/index.scss                        |   0
+ src/index.jsx                                 |   7 +-
+ src/index.scss                                |   2 +-
+ .../LearningSequencePage.jsx                  | 119 ++++++++++++++++++
+ src/learning-sequence/PageLoading.jsx         |  37 ++++++
+ src/learning-sequence/index.scss              |   4 +
+ src/learning-sequence/messages.js             |  16 +++
+ 12 files changed, 184 insertions(+), 26 deletions(-)
+ delete mode 100644 src/example/ExamplePage.jsx
+ delete mode 100644 src/example/ExamplePage.test.jsx
+ delete mode 100644 src/example/data/.gitkeep
+ delete mode 100644 src/example/data/README.rst
+ delete mode 100644 src/example/index.scss
+ create mode 100644 src/learning-sequence/LearningSequencePage.jsx
+ create mode 100644 src/learning-sequence/PageLoading.jsx
+ create mode 100644 src/learning-sequence/index.scss
+ create mode 100644 src/learning-sequence/messages.js
+
+diff --git a/.env.development b/.env.development
+index df083d4..db5888f 100644
+--- a/.env.development
++++ b/.env.development
+@@ -1,7 +1,7 @@
+ NODE_ENV='development'
+-PORT=8080
++PORT=2000
+ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+-BASE_URL='localhost:8080'
++BASE_URL='localhost:2000'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+diff --git a/src/example/ExamplePage.jsx b/src/example/ExamplePage.jsx
+deleted file mode 100644
+index ec21e1b..0000000
+--- a/src/example/ExamplePage.jsx
++++ /dev/null
+@@ -1,12 +0,0 @@
+-import React from 'react';
+-
+-export default function ExamplePage() {
+-  return (
+-    <main>
+-      <div className="container-fluid">
+-        <h1>Example Page</h1>
+-        <p>Hello world!</p>
+-      </div>
+-    </main>
+-  );
+-}
+diff --git a/src/example/ExamplePage.test.jsx b/src/example/ExamplePage.test.jsx
+deleted file mode 100644
+index 3bad6f3..0000000
+--- a/src/example/ExamplePage.test.jsx
++++ /dev/null
+@@ -1,5 +0,0 @@
+-describe('example', () => {
+-  it('will pass because it is an example', () => {
+-
+-  });
+-});
+diff --git a/src/example/data/.gitkeep b/src/example/data/.gitkeep
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/src/example/data/README.rst b/src/example/data/README.rst
+deleted file mode 100644
+index c4db0b6..0000000
+--- a/src/example/data/README.rst
++++ /dev/null
+@@ -1,4 +0,0 @@
+-data folder
+-===========
+-
+-This folder is the home for non-component files, such as redux reducers, actions, selectors, API client services, etc.  See `Feature-based Application Organization <https://github.com/edx/frontend-template-application/blob/master/docs/decisions/0002-feature-based-application-organization.rst>`_. for more detail.
+\ No newline at end of file
+diff --git a/src/example/index.scss b/src/example/index.scss
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/src/index.jsx b/src/index.jsx
+index e3ade7c..18b05f2 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -4,12 +4,13 @@ import { APP_INIT_ERROR, APP_READY, subscribe, initialize } from '@edx/frontend-
+ import { AppProvider, ErrorPage } from '@edx/frontend-platform/react';
+ import React from 'react';
+ import ReactDOM from 'react-dom';
++import { Route, Switch } from 'react-router-dom';
+ 
+ import Header, { messages as headerMessages } from '@edx/frontend-component-header';
+ import Footer, { messages as footerMessages } from '@edx/frontend-component-footer';
+ 
+ import appMessages from './i18n';
+-import ExamplePage from './example/ExamplePage';
++import LearningSequencePage from './learning-sequence/LearningSequencePage';
+ 
+ import './index.scss';
+ import './assets/favicon.ico';
+@@ -18,7 +19,9 @@ subscribe(APP_READY, () => {
+   ReactDOM.render(
+     <AppProvider>
+       <Header />
+-      <ExamplePage />
++      <Switch>
++        <Route path="/course/:courseRunId/:sequenceBlockId" component={LearningSequencePage} />
++      </Switch>
+       <Footer />
+     </AppProvider>,
+     document.getElementById('root'),
+diff --git a/src/index.scss b/src/index.scss
+index 4baa5c4..ab4e5a3 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -1,6 +1,6 @@
+ @import '~@edx/paragon/scss/edx/theme.scss';
+ 
+-@import './example/index.scss';
++@import './learning-sequence/index';
+ 
+ @import "~@edx/frontend-component-header/dist/index";
+ @import "~@edx/frontend-component-footer/dist/footer";
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+new file mode 100644
+index 0000000..a4655f5
+--- /dev/null
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -0,0 +1,119 @@
++import React, { useState, useEffect, useCallback, useRef } from 'react';
++import PropTypes from 'prop-types';
++import { camelCaseObject, getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import PageLoading from './PageLoading';
++
++import messages from './messages';
++
++function useApi(apiFunction, {
++  format = true, keepDataIfFailed = false, loadedIfFailed = false, refreshParams = [],
++}) {
++  const [data, setData] = useState(null);
++  const [loading, setLoading] = useState(false);
++  const [loaded, setLoaded] = useState(false);
++  const [failed, setFailed] = useState(false);
++  const [error, setError] = useState(null);
++
++  useEffect(() => {
++    setLoading(true);
++    apiFunction().then((response) => {
++      const result = format ? camelCaseObject(response.data) : response.data;
++      setData(result);
++      setLoaded(true);
++      setLoading(false);
++      setError(null);
++      setFailed(false);
++    })
++      .catch((e) => {
++        if (keepDataIfFailed) {
++          setData(null);
++        }
++        setFailed(true);
++        setLoading(false);
++        if (loadedIfFailed) {
++          setLoaded(true);
++        }
++        setError(e);
++      });
++  }, refreshParams);
++
++  return {
++    data,
++    loading,
++    loaded,
++    failed,
++    error,
++  };
++}
++
++function LearningSequencePage(props) {
++  const iframeRef = useRef(null);
++
++  const handleResizeIframe = useCallback(() => {
++    // TODO: This won't work because of crossdomain issues.  Leaving here for reference once we're
++    // able to have the iFrame content publish resize events through postMessage
++    console.log('**** Resizing iframe...');
++    const iframe = iframeRef.current;
++    const contentHeight = iframe.contentWindow.document.body.scrollHeight;
++    console.log(`**** Height is: ${contentHeight}`);
++    iframe.height = contentHeight + 20;
++  });
++
++  const {
++    data,
++    loading,
++    loaded,
++  } = useApi(
++    async () => getAuthenticatedHttpClient().get(`${getConfig().LMS_BASE_URL}/api/courses/v1/blocks/?course_id=course-v1%3AedX%2BDemoX%2BDemo_Course&username=staff&depth=all&block_types_filter=sequential&requested_fields=children`, {}),
++    {
++      keepDataIfFailed: false,
++      refreshParams: [
++        props.match.params.courseRunId,
++        props.match.params.sequenceBlockId,
++      ],
++    },
++  );
++
++  console.log(data);
++
++  if (loading) {
++    return (
++      <PageLoading srMessage={props.intl.formatMessage(messages['learn.loading.learning.sequence'])} />
++    );
++  }
++
++  return (
++    <main>
++      <div className="container-fluid">
++        <h1>Learning Sequence Page</h1>
++        <p>Hello world!</p>
++        Params: {props.match.params.courseRunId}/{props.match.params.sequenceBlockId}
++        State:
++        {loaded && data.blocks ? (
++          <iframe
++            title="yus"
++            ref={iframeRef}
++            src={Object.values(data.blocks)[0].studentViewUrl}
++            onLoad={handleResizeIframe}
++            height={500}
++          />
++        ) : null}
++      </div>
++    </main>
++  );
++}
++
++LearningSequencePage.propTypes = {
++  match: PropTypes.shape({
++    params: PropTypes.shape({
++      courseRunId: PropTypes.string.isRequired,
++      sequenceBlockId: PropTypes.string.isRequired,
++    }).isRequired,
++  }).isRequired,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(LearningSequencePage);
+diff --git a/src/learning-sequence/PageLoading.jsx b/src/learning-sequence/PageLoading.jsx
+new file mode 100644
+index 0000000..1b1135d
+--- /dev/null
++++ b/src/learning-sequence/PageLoading.jsx
+@@ -0,0 +1,37 @@
++import React, { Component } from 'react';
++import PropTypes from 'prop-types';
++
++export default class PageLoading extends Component {
++  renderSrMessage() {
++    if (!this.props.srMessage) {
++      return null;
++    }
++
++    return (
++      <span className="sr-only">
++        {this.props.srMessage}
++      </span>
++    );
++  }
++
++  render() {
++    return (
++      <div>
++        <div
++          className="d-flex justify-content-center align-items-center flex-column"
++          style={{
++            height: '50vh',
++          }}
++        >
++          <div className="spinner-border text-primary" role="status">
++            {this.renderSrMessage()}
++          </div>
++        </div>
++      </div>
++    );
++  }
++}
++
++PageLoading.propTypes = {
++  srMessage: PropTypes.string.isRequired,
++};
+diff --git a/src/learning-sequence/index.scss b/src/learning-sequence/index.scss
+new file mode 100644
+index 0000000..97c9813
+--- /dev/null
++++ b/src/learning-sequence/index.scss
+@@ -0,0 +1,4 @@
++iframe {
++  border: 0;
++  width: 100%;
++}
+diff --git a/src/learning-sequence/messages.js b/src/learning-sequence/messages.js
+new file mode 100644
+index 0000000..65564d1
+--- /dev/null
++++ b/src/learning-sequence/messages.js
+@@ -0,0 +1,16 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learn.loading.learning.sequence': {
++    id: 'learn.loading.learning.sequence',
++    defaultMessage: 'Loading learning sequence...',
++    description: 'Message when learning sequence is being loaded',
++  },
++  'learn.loading.error': {
++    id: 'learn.loading.error',
++    defaultMessage: 'Error: {error}',
++    description: 'Message when learning sequence fails to load',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

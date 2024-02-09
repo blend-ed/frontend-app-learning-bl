@@ -1,0 +1,267 @@
+From c5e480456ab9d4b39560be25c63ca796299077f4 Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Wed, 21 Jul 2021 10:22:05 -0400
+Subject: [PATCH 0547/1021] fix: LockPaywall content gating layout issue (#549)
+
+REV-2307
+---
+ src/courseware/course/NotificationIcon.jsx    |  1 -
+ src/courseware/course/sequence/Sequence.jsx   |  1 +
+ .../course/sequence/SequenceContent.jsx       |  3 ++
+ src/courseware/course/sequence/Unit.jsx       |  4 +-
+ .../sequence/lock-paywall/LockPaywall.jsx     | 45 ++++++++++---------
+ .../sequence/lock-paywall/LockPaywall.scss    |  4 +-
+ src/generic/upgrade-button/UpgradeButton.jsx  |  2 -
+ .../UpgradeNotification.jsx                   |  1 +
+ src/index.scss                                |  1 +
+ 9 files changed, 37 insertions(+), 25 deletions(-)
+
+diff --git a/src/courseware/course/NotificationIcon.jsx b/src/courseware/course/NotificationIcon.jsx
+index da8f011..ae8c08c 100644
+--- a/src/courseware/course/NotificationIcon.jsx
++++ b/src/courseware/course/NotificationIcon.jsx
+@@ -5,7 +5,6 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Icon } from '@edx/paragon';
+ import { WatchOutline } from '@edx/paragon/icons';
+ 
+-import './NotificationIcon.scss';
+ import messages from './messages';
+ 
+ function NotificationIcon({ intl, status, notificationColor }) {
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index c56e457..c274a65 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -204,6 +204,7 @@ function Sequence({
+             sequenceId={sequenceId}
+             unitId={unitId}
+             unitLoadedHandler={handleUnitLoaded}
++            notificationTrayVisible={notificationTrayVisible}
+             /** [MM-P2P] Experiment */
+             mmp2p={mmp2p}
+           />
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index d6eff20..110dd0c 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -16,6 +16,7 @@ function SequenceContent({
+   sequenceId,
+   unitId,
+   unitLoadedHandler,
++  notificationTrayVisible,
+   /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
+@@ -61,6 +62,7 @@ function SequenceContent({
+       key={unitId}
+       id={unitId}
+       onLoaded={unitLoadedHandler}
++      notificationTrayVisible={notificationTrayVisible}
+       /** [MM-P2P] Experiment */
+       mmp2p={mmp2p}
+     />
+@@ -73,6 +75,7 @@ SequenceContent.propTypes = {
+   sequenceId: PropTypes.string.isRequired,
+   unitId: PropTypes.string,
+   unitLoadedHandler: PropTypes.func.isRequired,
++  notificationTrayVisible: PropTypes.bool.isRequired,
+   intl: intlShape.isRequired,
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 6c08d7c..3da681b 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -85,6 +85,7 @@ function Unit({
+   onLoaded,
+   id,
+   intl,
++  notificationTrayVisible,
+   /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
+@@ -171,7 +172,7 @@ function Unit({
+             />
+           )}
+         >
+-          <LockPaywall courseId={courseId} />
++          <LockPaywall courseId={courseId} notificationTrayVisible={notificationTrayVisible} />
+         </Suspense>
+       )}
+       { /** [MM-P2P] Experiment */ }
+@@ -252,6 +253,7 @@ Unit.propTypes = {
+   id: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
+   onLoaded: PropTypes.func,
++  notificationTrayVisible: PropTypes.bool.isRequired,
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+     state: PropTypes.shape({
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index c8b6293..97ebab2 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -1,22 +1,22 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import classNames from 'classnames';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faCheck } from '@fortawesome/free-solid-svg-icons';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import {
+-  Alert, Icon,
+-} from '@edx/paragon';
++import { Alert } from '@edx/paragon';
+ import { Locked } from '@edx/paragon/icons';
+ import messages from './messages';
+ import certificateLocked from '../../../../generic/assets/edX_locked_certificate.png';
+ import { useModel } from '../../../../generic/model-store';
++import useWindowSize, { responsiveBreakpoints } from '../../../../generic/tabs/useWindowSize';
+ import { UpgradeButton } from '../../../../generic/upgrade-button';
+-import './LockPaywall.scss';
+ 
+ function LockPaywall({
+   intl,
+   courseId,
++  notificationTrayVisible,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+   const {
+@@ -25,6 +25,18 @@ function LockPaywall({
+     verifiedMode,
+   } = course;
+ 
++  // the following variables are set and used for resposive layout to work with
++  // whether the NotificationTray is open or not and if there's an offer with longer text
++  const shouldDisplayBulletPointsBelowCertificate = useWindowSize().width
++    <= responsiveBreakpoints.large.minWidth;
++  const shouldDisplayGatedContentOneColumn = useWindowSize().width <= responsiveBreakpoints.extraLarge.minWidth
++    && notificationTrayVisible;
++  const shouldDisplayGatedContentTwoColumns = useWindowSize().width < responsiveBreakpoints.large.minWidth
++    && notificationTrayVisible;
++  const shouldDisplayGatedContentTwoColumnsHalf = useWindowSize().width <= responsiveBreakpoints.large.minWidth
++    && !notificationTrayVisible;
++  const shouldWrapTextOnButton = useWindowSize().width > responsiveBreakpoints.extraSmall.minWidth;
++
+   if (!verifiedMode) {
+     return null;
+   }
+@@ -44,14 +56,6 @@ function LockPaywall({
+     });
+   };
+ 
+-  const lockIcon = (
+-    <Icon
+-      className="float-left"
+-      src={Locked}
+-      aria-hidden="true"
+-    />
+-  );
+-
+   const verifiedCertLink = (
+     <Alert.Link
+       href="https://www.edx.org/verified-certificate"
+@@ -79,12 +83,8 @@ function LockPaywall({
+   );
+ 
+   return (
+-    <Alert variant="light" aria-live="off">
++    <Alert variant="light" aria-live="off" icon={Locked} className="lock-paywall-container">
+       <div className="row">
+-        <div className="col-auto px-0">
+-          {lockIcon}
+-        </div>
+-
+         <div className="col">
+           <h4 aria-level="3">
+             <span>{intl.formatMessage(messages['learn.lockPaywall.title'])}</span>
+@@ -94,7 +94,7 @@ function LockPaywall({
+             {intl.formatMessage(messages['learn.lockPaywall.content'])}
+           </div>
+ 
+-          <div className="d-flex flex-row flex-wrap">
++          <div className={classNames('d-flex flex-row', { 'flex-wrap': notificationTrayVisible || shouldDisplayBulletPointsBelowCertificate })}>
+             <div style={{ float: 'left' }} className="mr-3 mb-2">
+               <img
+                 alt={intl.formatMessage(messages['learn.lockPaywall.example.alt'])}
+@@ -148,13 +148,17 @@ function LockPaywall({
+         </div>
+ 
+         <div
+-          className="col-md-auto p-md-0 d-md-flex align-items-md-center mr-md-3"
+-          style={{ textAlign: 'right' }}
++          className={
++            classNames('p-md-0 d-md-flex align-items-md-center text-right', {
++              'col-md-5 mx-md-0': notificationTrayVisible, 'col-md-4 mx-md-3 justify-content-center': !notificationTrayVisible && !shouldDisplayGatedContentTwoColumnsHalf, 'col-md-11 justify-content-end': shouldDisplayGatedContentOneColumn && !shouldDisplayGatedContentTwoColumns, 'col-md-6 justify-content-center': shouldDisplayGatedContentTwoColumnsHalf,
++            })
++          }
+         >
+           <UpgradeButton
+             offer={offer}
+             onClick={logClick}
+             verifiedMode={verifiedMode}
++            style={{ whiteSpace: shouldWrapTextOnButton ? 'nowrap' : null }}
+           />
+         </div>
+       </div>
+@@ -164,5 +168,6 @@ function LockPaywall({
+ LockPaywall.propTypes = {
+   intl: intlShape.isRequired,
+   courseId: PropTypes.string.isRequired,
++  notificationTrayVisible: PropTypes.bool.isRequired,
+ };
+ export default injectIntl(LockPaywall);
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.scss b/src/courseware/course/sequence/lock-paywall/LockPaywall.scss
+index 20b2b3a..e0c35b9 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.scss
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.scss
+@@ -1,5 +1,7 @@
++.lock-paywall-container svg {
++    color: $primary-700;
++}
+ 
+-// Temporary CSS intervention until paragon list items will support icons (PAR-429)
+ .fa-li {
+     left: -31px !important;
+     padding-right: 22px;
+diff --git a/src/generic/upgrade-button/UpgradeButton.jsx b/src/generic/upgrade-button/UpgradeButton.jsx
+index 8e9bd31..6be38d5 100644
+--- a/src/generic/upgrade-button/UpgradeButton.jsx
++++ b/src/generic/upgrade-button/UpgradeButton.jsx
+@@ -24,8 +24,6 @@ function UpgradeButton(props) {
+       href={url}
+       onClick={onClick}
+       {...rest}
+-      size="lg"
+-      block
+     >
+       <FormattedMessage
+         id="learning.upgradeButton.buttonText"
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+index f7ded3e..c929c90 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -408,6 +408,7 @@ function UpgradeNotification({
+         onClick={logClick}
+         verifiedMode={verifiedMode}
+         className="upgrade-notification-button"
++        block
+       />
+       {offerCode}
+     </section>
+diff --git a/src/index.scss b/src/index.scss
+index 9426fc6..c905358 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -375,6 +375,7 @@
+ @import 'courseware/course/NotificationTray.scss';
+ @import 'courseware/course/NotificationTrigger.scss';
+ @import 'courseware/course/NotificationIcon.scss';
++@import 'courseware/course/sequence/lock-paywall/LockPaywall.scss';
+ @import 'shared/streak-celebration/StreakCelebrationModal.scss';
+ @import 'courseware/course/content-tools/calculator/calculator.scss';
+ @import 'courseware/course/content-tools/contentTools.scss';
+-- 
+2.34.1
+

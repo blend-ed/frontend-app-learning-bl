@@ -1,0 +1,229 @@
+From a2ccedcecdb216a2bc0e91dec375ddf6cd53c7cb Mon Sep 17 00:00:00 2001
+From: Ben Warzeski <bwarzeski@edx.org>
+Date: Tue, 16 Feb 2021 12:01:04 -0500
+Subject: [PATCH 0384/1021] [MM-P2P] optimizely experiment overrides for
+ course_home (#364)
+
+* alert override
+
+* course home date overrides
+
+* add undefined check for experiment hook
+
+* inject intl rather than passing
+---
+ .../AccessExpirationAlert.jsx                 | 19 ++++-
+ .../AccessExpirationAlertMMP2P.jsx            | 80 +++++++++++++++++++
+ src/course-home/outline-tab/DateSummary.jsx   | 51 +++++++++---
+ 3 files changed, 137 insertions(+), 13 deletions(-)
+ create mode 100644 src/alerts/access-expiration-alert/AccessExpirationAlertMMP2P.jsx
+
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index f5d0307..b51b3a9 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import PropTypes from 'prop-types';
+ import {
+   FormattedMessage, FormattedDate, injectIntl, intlShape,
+@@ -7,8 +7,18 @@ import { Hyperlink } from '@edx/paragon';
+ 
+ import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ import messages from './messages';
++import AccessExpirationAlertMMP2P from './AccessExpirationAlertMMP2P';
+ 
+ function AccessExpirationAlert({ intl, payload }) {
++  /** [MM-P2P] Experiment */
++  const [showMMP2P, setShowMMP2P] = useState(!!window.experiment__home_alert_bShowMMP2P);
++  if (window.experiment__home_alert_showMMP2P === undefined) {
++    window.experiment__home_alert_showMMP2P = (val) => {
++      window.experiment__home_alert_bShowMMP2P = !!val;
++      setShowMMP2P(!!val);
++    };
++  }
++
+   const {
+     accessExpiration,
+     userTimezone,
+@@ -49,6 +59,13 @@ function AccessExpirationAlert({ intl, payload }) {
+     );
+   }
+ 
++  /** [MM-P2P] Experiment */
++  if (showMMP2P) {
++    return (
++      <AccessExpirationAlertMMP2P payload={payload} />
++    );
++  }
++
+   let deadlineMessage = null;
+   if (upgradeDeadline && upgradeUrl) {
+     deadlineMessage = (
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlertMMP2P.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlertMMP2P.jsx
+new file mode 100644
+index 0000000..15e703d
+--- /dev/null
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlertMMP2P.jsx
+@@ -0,0 +1,80 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FormattedDate, injectIntl } from '@edx/frontend-platform/i18n';
++import { Hyperlink } from '@edx/paragon';
++
++import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++import messages from './messages';
++
++function AccessExpirationAlertMMP2P({ payload }) {
++  const {
++    accessExpiration,
++    userTimezone,
++  } = payload;
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  if (!accessExpiration) {
++    return null;
++  }
++
++  const {
++    expirationDate,
++    upgradeDeadline,
++    upgradeUrl,
++  } = accessExpiration;
++
++  let deadlineMessage = null;
++  const formatDate = (val, key) => (
++    <FormattedDate
++      key={`accessExpiration.${key}`}
++      day="numeric"
++      month="short"
++      year="numeric"
++      value={val}
++      {...timezoneFormatArgs}
++    />
++  );
++
++  if (upgradeDeadline && upgradeUrl) {
++    deadlineMessage = (
++      <>
++        Upgrade by {formatDate(upgradeDeadline, 'upgradeDesc')} to unlock unlimited access to all course activities, including graded assignments.
++        &nbsp;
++        <Hyperlink
++          className="font-weight-bold"
++          style={{ textDecoration: 'underline' }}
++          destination={upgradeUrl}
++        >
++          {messages.upgradeNow.defaultMessage}
++        </Hyperlink>
++      </>
++    );
++  }
++
++  return (
++    <Alert type={ALERT_TYPES.INFO}>
++      <span className="font-weight-bold">
++        Unlock full course content by {formatDate(upgradeDeadline, 'upgradeTitle')}
++      </span>
++      <br />
++      {deadlineMessage}
++      <br />
++      You lose all access to the first two weeks of scheduled content
++      on {formatDate(expirationDate, 'expirationBody')}.
++    </Alert>
++  );
++}
++
++AccessExpirationAlertMMP2P.propTypes = {
++  payload: PropTypes.shape({
++    accessExpiration: PropTypes.shape({
++      expirationDate: PropTypes.string.isRequired,
++      masqueradingExpiredCourse: PropTypes.bool.isRequired,
++      upgradeDeadline: PropTypes.string,
++      upgradeUrl: PropTypes.string,
++    }).isRequired,
++    userTimezone: PropTypes.string.isRequired,
++  }).isRequired,
++};
++
++export default injectIntl(AccessExpirationAlertMMP2P);
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index 2b10dfd..b0a3ce0 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -1,7 +1,7 @@
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faCalendarAlt } from '@fortawesome/free-regular-svg-icons';
+ import { FormattedDate } from '@edx/frontend-platform/i18n';
+-import React from 'react';
++import React, { useState } from 'react';
+ import PropTypes from 'prop-types';
+ import { isLearnerAssignment } from '../dates-tab/utils';
+ import './DateSummary.scss';
+@@ -12,6 +12,17 @@ export default function DateSummary({
+ }) {
+   const linkedTitle = dateBlock.link && isLearnerAssignment(dateBlock);
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  /** [MM-P2P experiment] */
++  const [showMMP2P, setShowMMP2P] = useState(window.experiment__home_dates_bShowMMP2P);
++  if (window.experiment__home_dates_showMMP2P !== undefined) {
++    window.experiment__home_dates_showMMP2P = (value) => {
++      setShowMMP2P(!!value);
++      window.experiment__home_dates_bShowMMP2P = !!value;
++    };
++  }
++  const activateMMP2P = (showMMP2P && dateBlock.dateType === 'verified-upgrade-deadline');
++
+   return (
+     <li className="container p-0 mb-3 small text-dark-500">
+       <div className="row">
+@@ -27,18 +38,34 @@ export default function DateSummary({
+           />
+         </div>
+       </div>
+-      <div className="row ml-4 pr-2">
+-        <div className="date-summary-text">
+-          {linkedTitle
+-          && <div className="font-weight-bold mt-2"><a href={dateBlock.link}>{dateBlock.title}</a></div>}
+-          {!linkedTitle
+-          && <div className="font-weight-bold mt-2">{dateBlock.title}</div>}
++      {activateMMP2P ? (
++        <div className="row ml-4 pr-2">
++          <div className="date-summary-text">
++            <div className="font-weight-bold mt-2">
++              Last chance to upgrade
++            </div>
++          </div>
++          <div className="date-summary-text mt-1">
++            Don&apos;t miss the opportunity to highlight your knowledge and skills by earning a verified certificate.
++          </div>
++          <a href={dateBlock.link} className="description-link">
++            {dateBlock.linkText}
++          </a>
+         </div>
+-        {dateBlock.description
+-          && <div className="date-summary-text mt-1">{dateBlock.description}</div>}
+-        {!linkedTitle && dateBlock.link
+-          && <a href={dateBlock.link} className="description-link">{dateBlock.linkText}</a>}
+-      </div>
++      ) : (
++        <div className="row ml-4 pr-2">
++          <div className="date-summary-text">
++            {linkedTitle
++            && <div className="font-weight-bold mt-2"><a href={dateBlock.link}>{dateBlock.title}</a></div>}
++            {!linkedTitle
++            && <div className="font-weight-bold mt-2">{dateBlock.title}</div>}
++          </div>
++          {dateBlock.description
++            && <div className="date-summary-text mt-1">{dateBlock.description}</div>}
++          {!linkedTitle && dateBlock.link
++            && <a href={dateBlock.link} className="description-link">{dateBlock.linkText}</a>}
++        </div>
++      )}
+     </li>
+   );
+ }
+-- 
+2.34.1
+

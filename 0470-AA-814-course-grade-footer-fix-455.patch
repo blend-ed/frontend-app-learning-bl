@@ -1,0 +1,103 @@
+From 663bf7562bbb17af6efd7f5b9b2eeb745d23838f Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 19 May 2021 13:44:28 -0400
+Subject: [PATCH 0470/1021] AA-814: course grade footer fix (#455)
+
+---
+ src/course-home/outline-tab/OutlineTab.test.jsx    |  4 ++--
+ src/course-home/outline-tab/messages.js            |  2 +-
+ .../grades/course-grade/CourseGradeFooter.jsx      | 14 ++++++++------
+ .../grades/course-grade/CurrentGradeTooltip.jsx    |  2 +-
+ .../progress-tab/grades/course-grade/GradeBar.jsx  |  2 +-
+ 5 files changed, 13 insertions(+), 11 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index a625078..43f5534 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -281,13 +281,13 @@ describe('Outline Tab', () => {
+         ],
+       });
+       await fetchAndRender();
+-      expect(screen.getByRole('heading', { name: 'Upcoming Dates' })).toBeInTheDocument();
++      expect(screen.getByRole('heading', { name: 'Important dates' })).toBeInTheDocument();
+     });
+ 
+     it('does not render when course date blocks are not populated', async () => {
+       setMetadata({ is_enrolled: true });
+       await fetchAndRender();
+-      expect(screen.queryByRole('heading', { name: 'Upcoming Dates' })).not.toBeInTheDocument();
++      expect(screen.queryByRole('heading', { name: 'Important dates' })).not.toBeInTheDocument();
+     });
+ 
+     it('sends analytics event onClick of upgrade link', async () => {
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index b43701a..1e6a107 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -22,7 +22,7 @@ const messages = defineMessages({
+   },
+   dates: {
+     id: 'learning.outline.dates',
+-    defaultMessage: 'Upcoming Dates',
++    defaultMessage: 'Important dates',
+   },
+   editGoal: {
+     id: 'learning.outline.editGoal',
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+index 3cadd5f..701896c 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+@@ -40,15 +40,17 @@ function CourseGradeFooter({ intl, passingGrade }) {
+ 
+   if (isPassing) {
+     if (hasLetterGrades) {
+-      const letterGrades = Object.keys(gradeRange);
+-      const gradeIndex = letterGrades.indexOf(letterGrade);
+-      const minGrade = gradeRange[letterGrade] * 100;
+-      const maxGrade = gradeIndex > 0 ? gradeRange[letterGrades[gradeIndex - 1]] * 100 : 100;
++      const minGradeRangeCutoff = gradeRange[letterGrade] * 100;
++      const possibleMaxGradeRangeValues = [...Object.values(gradeRange).filter(
++        (grade) => (grade * 100 > minGradeRangeCutoff),
++      )];
++      const maxGradeRangeCutoff = possibleMaxGradeRangeValues.length ? Math.min(...possibleMaxGradeRangeValues) * 100
++        : 100;
+ 
+       footerText = intl.formatMessage(messages.courseGradeFooterPassingWithGrade, {
+         letterGrade,
+-        minGrade: minGrade.toFixed(0),
+-        maxGrade: maxGrade.toFixed(0),
++        minGrade: minGradeRangeCutoff.toFixed(0),
++        maxGrade: maxGradeRangeCutoff.toFixed(0),
+       });
+     } else {
+       footerText = intl.formatMessage(messages.courseGradeFooterGenericPassing);
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index 9f0e4f8..ce65126 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -21,7 +21,7 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+     },
+   } = useModel('progress', courseId);
+ 
+-  const currentGrade = percent * 100;
++  const currentGrade = Number((percent * 100).toFixed(0));
+ 
+   return (
+     <>
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index ac1ebec..a16e212 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -24,7 +24,7 @@ function GradeBar({ intl, passingGrade }) {
+     },
+   } = useModel('progress', courseId);
+ 
+-  const currentGrade = percent * 100;
++  const currentGrade = Number((percent * 100).toFixed(0));
+ 
+   const isLocked = lockedCount > 0;
+   const lockedTooltipClassName = isLocked ? 'locked-overlay' : '';
+-- 
+2.34.1
+

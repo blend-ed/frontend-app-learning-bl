@@ -1,0 +1,128 @@
+From 09436dd175b65ad4950d40bc95d9f8d4116af88a Mon Sep 17 00:00:00 2001
+From: Jansen Kantor <jkantor@edx.org>
+Date: Thu, 12 Jan 2023 16:00:06 -0500
+Subject: [PATCH 0972/1021] test: each.it indentation (#1043)
+
+---
+ .../outline-tab/OutlineTab.test.jsx           | 12 ++--
+ src/product-tours/ProductTours.test.jsx       | 68 +++++++++----------
+ 2 files changed, 38 insertions(+), 42 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 5a82461..66f0827 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -383,12 +383,11 @@ describe('Outline Tab', () => {
+         expect(screen.getByLabelText(messages.setGoalReminder.defaultMessage)).toBeDisabled();
+       });
+ 
+-      it.each`
+-      level     | days 
+-      ${'Casual'}  | ${1}
+-      ${'Regular'} | ${3}
+-      ${'Intense'} | ${5}
+-        `('calls the API with a goal of $days when $level goal is clicked', async ({ level, days }) => {
++      it.each([
++        { level: 'Casual', days: 1 },
++        { level: 'Regular', days: 3 },
++        { level: 'Intense', days: 5 },
++      ])('calls the API with a goal of $days when $level goal is clicked', async ({ level, days }) => {
+         // click on Casual goal
+         const button = await screen.queryByTestId(`weekly-learning-goal-input-${level}`);
+         fireEvent.click(button);
+@@ -402,6 +401,7 @@ describe('Outline Tab', () => {
+         });
+         expect(screen.getByLabelText(messages.setGoalReminder.defaultMessage)).toBeEnabled();
+       });
++
+       it('shows and hides subscribe to reminders additional text', async () => {
+         const button = await screen.getByTestId('weekly-learning-goal-input-Regular');
+         fireEvent.click(button);
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+index bcf697e..ea24023 100644
+--- a/src/product-tours/ProductTours.test.jsx
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -144,20 +144,18 @@ describe('Course Home Tours', () => {
+     });
+   });
+ 
+-  it.each`
+-  errorStatus
+-  ${401}
+-  ${403}
+-  ${404}
+-  `('does not render tour components for $errorStatus response', async (errorStatus) => {
+-    setTourData({}, errorStatus, false);
+-
+-    // Verify no launch tour button
+-    expect(await screen.queryByRole('button', { name: 'Launch tour' })).not.toBeInTheDocument();
+-
+-    // Verify no Checkpoint or MarketingModal has rendered
+-    expect(await screen.queryByRole('dialog')).not.toBeInTheDocument();
+-  });
++  it.each([401, 403, 404])(
++    'does not render tour components for $errorStatus response',
++    async (errorStatus) => {
++      setTourData({}, errorStatus, false);
++
++      // Verify no launch tour button
++      expect(await screen.queryByRole('button', { name: 'Launch tour' })).not.toBeInTheDocument();
++
++      // Verify no Checkpoint or MarketingModal has rendered
++      expect(await screen.queryByRole('dialog')).not.toBeInTheDocument();
++    },
++  );
+ });
+ 
+ function MockUnit({ courseId, id }) { // eslint-disable-line react/prop-types
+@@ -289,27 +287,25 @@ describe('Courseware Tour', () => {
+       history.push(`/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[0].id}`);
+     });
+ 
+-    it.each`
+-  showCoursewareTour
+-  ${true}
+-  ${false}
+-`('should load courseware checkpoint correctly if tour enabled is $showCoursewareTour', async (showCoursewareTour) => {
+-      axiosMock.onGet(tourDataUrl).reply(200, {
+-        course_home_tour_status: 'no-tour',
+-        show_courseware_tour: showCoursewareTour,
+-      });
+-
+-      const container = await loadContainer();
+-
+-      const sequenceNavButtons = container.querySelectorAll('nav.sequence-navigation button');
+-      const sequenceNextButton = sequenceNavButtons[4];
+-      expect(sequenceNextButton).toHaveTextContent('Next');
+-      fireEvent.click(sequenceNextButton);
+-
+-      expect(global.location.href).toEqual(`http://localhost/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[1].id}`);
+-
+-      const checkpoint = container.querySelectorAll('#pgn__checkpoint');
+-      expect(checkpoint).toHaveLength(showCoursewareTour ? 1 : 0);
+-    });
++    it.each([true, false])(
++      'should load courseware checkpoint correctly if tour enabled is $showCoursewareTour',
++      async (showCoursewareTour) => {
++        axiosMock.onGet(tourDataUrl).reply(200, {
++          course_home_tour_status: 'no-tour',
++          show_courseware_tour: showCoursewareTour,
++        });
++
++        const container = await loadContainer();
++        const sequenceNavButtons = container.querySelectorAll('nav.sequence-navigation button');
++        const sequenceNextButton = sequenceNavButtons[4];
++        expect(sequenceNextButton).toHaveTextContent('Next');
++        fireEvent.click(sequenceNextButton);
++
++        expect(global.location.href).toEqual(`http://localhost/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[1].id}`);
++
++        const checkpoint = container.querySelectorAll('#pgn__checkpoint');
++        expect(checkpoint).toHaveLength(showCoursewareTour ? 1 : 0);
++      },
++    );
+   });
+ });
+-- 
+2.34.1
+

@@ -1,0 +1,118 @@
+From ebff3e142cfe6b8b263fb3f572e5c21efae20660 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 10 Jan 2020 14:27:15 -0500
+Subject: [PATCH 0025/1021] Using core-js and regenerator-runtime instead of
+ babel-polyfill.
+
+---
+ package-lock.json | 29 +++++++++++++++++++++++------
+ package.json      |  5 +++--
+ src/index.jsx     |  3 ++-
+ src/setupTest.js  |  3 ++-
+ 4 files changed, 30 insertions(+), 10 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index cdb5287..1f3ee4f 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2891,6 +2891,18 @@
+         "babel-runtime": "^6.26.0",
+         "core-js": "^2.5.0",
+         "regenerator-runtime": "^0.10.5"
++      },
++      "dependencies": {
++        "core-js": {
++          "version": "2.6.11",
++          "resolved": "https://registry.npmjs.org/core-js/-/core-js-2.6.11.tgz",
++          "integrity": "sha512-5wjnpaT/3dV+XB4borEsnAYQchn00XSgTAWKDkEqv+K8KevjbzmofK6hfJ9TZIlpj2N0xQpazy7PiRQiWHqzWg=="
++        },
++        "regenerator-runtime": {
++          "version": "0.10.5",
++          "resolved": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.10.5.tgz",
++          "integrity": "sha1-M2w+/BIgrc7dosn6tntaeVWjNlg="
++        }
+       }
+     },
+     "babel-preset-jest": {
+@@ -2912,6 +2924,11 @@
+         "regenerator-runtime": "^0.11.0"
+       },
+       "dependencies": {
++        "core-js": {
++          "version": "2.6.11",
++          "resolved": "https://registry.npmjs.org/core-js/-/core-js-2.6.11.tgz",
++          "integrity": "sha512-5wjnpaT/3dV+XB4borEsnAYQchn00XSgTAWKDkEqv+K8KevjbzmofK6hfJ9TZIlpj2N0xQpazy7PiRQiWHqzWg=="
++        },
+         "regenerator-runtime": {
+           "version": "0.11.1",
+           "resolved": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.11.1.tgz",
+@@ -4582,9 +4599,9 @@
+       }
+     },
+     "core-js": {
+-      "version": "2.6.11",
+-      "resolved": "https://registry.npmjs.org/core-js/-/core-js-2.6.11.tgz",
+-      "integrity": "sha512-5wjnpaT/3dV+XB4borEsnAYQchn00XSgTAWKDkEqv+K8KevjbzmofK6hfJ9TZIlpj2N0xQpazy7PiRQiWHqzWg=="
++      "version": "3.6.2",
++      "resolved": "https://registry.npmjs.org/core-js/-/core-js-3.6.2.tgz",
++      "integrity": "sha512-hIE5dXkRzRvnZ5vhkRfQxUvDxQZmD9oueA08jDYRBKJHx+VIl/Pne/e0A4x9LObEEthC/TqiZybUoNM4tRgnKg=="
+     },
+     "core-js-compat": {
+       "version": "3.5.0",
+@@ -14203,9 +14220,9 @@
+       }
+     },
+     "regenerator-runtime": {
+-      "version": "0.10.5",
+-      "resolved": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.10.5.tgz",
+-      "integrity": "sha1-M2w+/BIgrc7dosn6tntaeVWjNlg="
++      "version": "0.13.3",
++      "resolved": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.3.tgz",
++      "integrity": "sha512-naKIZz2GQ8JWh///G7L3X6LaQUAMp2lvb1rvwwsURe/VXwD6VMfr+/1NuNw3ag8v2kY1aQ/go5SNn79O9JU7yw=="
+     },
+     "regenerator-transform": {
+       "version": "0.14.1",
+diff --git a/package.json b/package.json
+index 994c593..71c4b6d 100644
+--- a/package.json
++++ b/package.json
+@@ -43,14 +43,15 @@
+     "@fortawesome/free-regular-svg-icons": "^5.12.0",
+     "@fortawesome/free-solid-svg-icons": "^5.12.0",
+     "@fortawesome/react-fontawesome": "^0.1.8",
+-    "babel-polyfill": "^6.26.0",
++    "core-js": "^3.6.2",
+     "prop-types": "^15.7.2",
+     "react": "^16.12.0",
+     "react-dom": "^16.12.0",
+     "react-redux": "^7.1.3",
+     "react-router": "^5.1.2",
+     "react-router-dom": "^5.1.2",
+-    "redux": "^4.0.4"
++    "redux": "^4.0.4",
++    "regenerator-runtime": "^0.13.3"
+   },
+   "devDependencies": {
+     "@edx/frontend-build": "^2.0.5",
+diff --git a/src/index.jsx b/src/index.jsx
+index 85a5a1f..8a872f6 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -1,4 +1,5 @@
+-import 'babel-polyfill';
++import 'core-js/stable';
++import 'regenerator-runtime/runtime';
+ 
+ import { APP_INIT_ERROR, APP_READY, subscribe, initialize } from '@edx/frontend-platform';
+ import { AppProvider, ErrorPage } from '@edx/frontend-platform/react';
+diff --git a/src/setupTest.js b/src/setupTest.js
+index b012711..34bd72c 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -1 +1,2 @@
+-import 'babel-polyfill';
++import 'core-js/stable';
++import 'regenerator-runtime/runtime';
+-- 
+2.34.1
+

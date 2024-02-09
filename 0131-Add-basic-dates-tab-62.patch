@@ -1,0 +1,471 @@
+From 7487d8d32ffda98f90f7b5b5fac73e09c2f3a197 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 26 May 2020 13:07:24 -0400
+Subject: [PATCH 0131/1021] Add basic dates tab (#62)
+
+This is not the final visuals for the dates tab, but an in-progress
+page to base further work on.
+
+AA-116
+---
+ src/data/api.js                |  13 +++++
+ src/data/dates.js              | 101 +++++++++++++++++++++++++++++++++
+ src/data/index.js              |   1 +
+ src/data/slice.js              |  15 +++++
+ src/data/thunks.js             |  49 ++++++++++++++++
+ src/dates-tab/DatesTab.jsx     |  12 ++++
+ src/dates-tab/Day.jsx          |  34 +++++++++++
+ src/dates-tab/Timeline.jsx     |  24 ++++++++
+ src/dates-tab/index.jsx        |   1 +
+ src/index.jsx                  |   9 ++-
+ src/tab-page/LoadedTabPage.jsx |   2 +-
+ src/tab-page/TabContainer.jsx  |   6 +-
+ 12 files changed, 262 insertions(+), 5 deletions(-)
+ create mode 100644 src/data/dates.js
+ create mode 100644 src/dates-tab/DatesTab.jsx
+ create mode 100644 src/dates-tab/Day.jsx
+ create mode 100644 src/dates-tab/Timeline.jsx
+ create mode 100644 src/dates-tab/index.jsx
+
+diff --git a/src/data/api.js b/src/data/api.js
+index 159e8bc..9998bf4 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -3,6 +3,9 @@ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { logError } from '@edx/frontend-platform/logging';
+ 
++// FIXME: remove this WIP hack once we're done developing the tab
++import datesTabData from './dates';
++
+ function overrideTabUrls(id, tabs) {
+   // "LMS tab slug" to "MFE URL slug" for overridden tabs
+   const tabOverrides = {};
+@@ -49,6 +52,16 @@ export async function getCourseMetadata(courseId) {
+   return normalizeMetadata(data);
+ }
+ 
++export async function getTabData(courseId, tab, version) {
++  if (tab === 'dates') {
++    return camelCaseObject(datesTabData());
++  }
++
++  const url = `${getConfig().LMS_BASE_URL}/course/${courseId}/api/course_home/${version}/${tab}`;
++  const { data } = await getAuthenticatedHttpClient().get(url);
++  return camelCaseObject(data);
++}
++
+ function normalizeBlocks(courseId, blocks) {
+   const models = {
+     courses: {},
+diff --git a/src/data/dates.js b/src/data/dates.js
+new file mode 100644
+index 0000000..618d57b
+--- /dev/null
++++ b/src/data/dates.js
+@@ -0,0 +1,101 @@
++// Sample WIP data while we develop the dates tab
++export default function datesData() {
++  return JSON.parse(`
++  {
++          "id": "course-v1:edX+DemoX+Demo_Course",
++          "isStaff": true,
++          "number": "DemoX",
++          "org": "edX",
++          "title": "Demonstration Course",
++    "tabs": [
++        {
++            "url": "/courses/course-v1:edX+DemoX+Demo_Course/course/",
++            "title": "Course",
++            "slug": "courseware",
++            "type": "courseware",
++            "priority": 0
++        },
++        {
++            "url": "/courses/course-v1:edX+DemoX+Demo_Course/discussion/forum/",
++            "title": "Discussion",
++            "slug": "discussion",
++            "type": "discussion",
++            "priority": 1
++        },
++        {
++            "url": "/courses/course-v1:edX+DemoX+Demo_Course/course_wiki",
++            "title": "Wiki",
++            "slug": "wiki",
++            "type": "wiki",
++            "priority": 2
++        },
++        {
++            "url": "/courses/course-v1:edX+DemoX+Demo_Course/progress",
++            "title": "Progress",
++            "slug": "progress",
++            "type": "progress",
++            "priority": 3
++        },
++        {
++            "url": "/courses/course-v1:edX+DemoX+Demo_Course/dates",
++            "title": "Dates",
++            "slug": "dates",
++            "type": "dates",
++            "priority": 4
++        },
++        {
++            "url": "/courses/course-v1:edX+DemoX+Demo_Course/instructor",
++            "title": "Instructor",
++            "slug": "instructor",
++            "type": "instructor",
++            "priority": 5
++        }
++    ],
++"dates": [
++    {
++        "title": "Course Starts",
++        "link": "/testing",
++        "date": "2015-02-05T05:00:00Z"
++    },
++    {
++        "contains_gated_content": true,
++        "link": "/testing",
++        "title": "Homework - Question Styles force publish",
++        "date": "2020-01-14T13:00:00Z"
++    },
++    {
++        "title": "New Subsection",
++        "date": "2020-04-20T08:30:00Z"
++    },
++    {
++        "title": "current_datetime",
++        "date": "2020-05-05T17:47:55.957725Z"
++    },
++    {
++        "title": "Verification Upgrade Deadline",
++        "date": "2020-09-16T19:05:00Z"
++    },
++    {
++        "title": "edX Exams",
++        "date": "2022-01-02T00:00:00Z"
++    },
++    {
++        "title": "Homework - Labs and Demos",
++        "date": "2022-01-14T13:00:00Z"
++    },
++    {
++        "title": "Homework - Essays",
++        "date": "2022-04-30T12:00:00Z"
++    },
++    {
++        "title": "Course End",
++        "date": "2025-02-09T00:30:00Z"
++    },
++    {
++        "title": "Verification Deadline",
++        "date": "2025-02-09T00:30:00Z"
++    }
++]
++}
++`);
++}
+diff --git a/src/data/index.js b/src/data/index.js
+index 94799e4..9317a00 100644
+--- a/src/data/index.js
++++ b/src/data/index.js
+@@ -1,5 +1,6 @@
+ export {
+   fetchCourse,
++  fetchDatesTab,
+   fetchSequence,
+ } from './thunks';
+ 
+diff --git a/src/data/slice.js b/src/data/slice.js
+index 088e951..0a40228 100644
+--- a/src/data/slice.js
++++ b/src/data/slice.js
+@@ -43,6 +43,18 @@ const slice = createSlice({
+       state.sequenceId = payload.sequenceId;
+       state.sequenceStatus = FAILED;
+     },
++    fetchTabRequest: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.courseStatus = LOADING;
++    },
++    fetchTabSuccess: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.courseStatus = LOADED;
++    },
++    fetchTabFailure: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.courseStatus = FAILED;
++    },
+   },
+ });
+ 
+@@ -54,6 +66,9 @@ export const {
+   fetchSequenceRequest,
+   fetchSequenceSuccess,
+   fetchSequenceFailure,
++  fetchTabRequest,
++  fetchTabSuccess,
++  fetchTabFailure,
+ } = slice.actions;
+ 
+ export const {
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index 134ebc5..e14b2ae 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -3,6 +3,7 @@ import {
+   getCourseMetadata,
+   getCourseBlocks,
+   getSequenceMetadata,
++  getTabData,
+ } from './api';
+ import {
+   addModelsMap, updateModel, updateModels, updateModelsMap, addModel,
+@@ -15,6 +16,9 @@ import {
+   fetchSequenceRequest,
+   fetchSequenceSuccess,
+   fetchSequenceFailure,
++  fetchTabRequest,
++  fetchTabSuccess,
++  fetchTabFailure,
+ } from './slice';
+ 
+ export function fetchCourse(courseId) {
+@@ -29,6 +33,17 @@ export function fetchCourse(courseId) {
+           modelType: 'courses',
+           model: courseMetadataResult.value,
+         }));
++        dispatch(addModel({
++          modelType: 'pageInfo',
++          model: {
++            id: courseMetadataResult.value.id,
++            isStaff: courseMetadataResult.value.isStaff,
++            number: courseMetadataResult.value.number,
++            org: courseMetadataResult.value.org,
++            tabs: courseMetadataResult.value.tabs,
++            title: courseMetadataResult.value.title,
++          },
++        }));
+       }
+ 
+       if (courseBlocksResult.status === 'fulfilled') {
+@@ -85,6 +100,40 @@ export function fetchCourse(courseId) {
+   };
+ }
+ 
++export function fetchTab(courseId, tab, version) {
++  return async (dispatch) => {
++    dispatch(fetchTabRequest({ courseId }));
++    getTabData(courseId, tab, version).then((result) => {
++      dispatch(addModel({
++        modelType: 'pageInfo',
++        model: {
++          id: result.id,
++          isStaff: result.isStaff,
++          number: result.number,
++          org: result.org,
++          tabs: result.tabs,
++          title: result.title,
++        },
++      }));
++
++      dispatch(addModel({
++        modelType: tab,
++        model: result,
++      }));
++
++      // TODO: do we need access restrictions for tabs, like we have for courseware?
++      dispatch(fetchTabSuccess({ courseId }));
++    }, (reason) => {
++      logError(reason);
++      dispatch(fetchTabFailure({ courseId }));
++    });
++  };
++}
++
++export function fetchDatesTab(courseId) {
++  return fetchTab(courseId, 'dates', 'v1');
++}
++
+ export function fetchSequence(sequenceId) {
+   return async (dispatch) => {
+     dispatch(fetchSequenceRequest({ sequenceId }));
+diff --git a/src/dates-tab/DatesTab.jsx b/src/dates-tab/DatesTab.jsx
+new file mode 100644
+index 0000000..6866659
+--- /dev/null
++++ b/src/dates-tab/DatesTab.jsx
+@@ -0,0 +1,12 @@
++import React from 'react';
++
++import Timeline from './Timeline';
++
++export default function DatesTab() {
++  return (
++    <>
++      <h2 className="mb-4">Important Dates</h2>
++      <Timeline />
++    </>
++  );
++}
+diff --git a/src/dates-tab/Day.jsx b/src/dates-tab/Day.jsx
+new file mode 100644
+index 0000000..c927178
+--- /dev/null
++++ b/src/dates-tab/Day.jsx
+@@ -0,0 +1,34 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++export default function Day({ dateInfo }) {
++  const parsedDate = new Date(dateInfo.date);
++  const formattedDate = parsedDate.toLocaleString('default', {
++    day: 'numeric',
++    month: 'short',
++    weekday: 'short',
++    year: 'numeric',
++  });
++
++  const hasLink = dateInfo.link && !dateInfo.containsGatedContent;
++  const title = hasLink ? (<u><a href={dateInfo.link} className="text-reset">{dateInfo.title}</a></u>) : dateInfo.title;
++  const textColor = dateInfo.containsGatedContent ? 'text-dark-200' : 'text-dark-500';
++
++  return (
++    <div className="mb-4">
++      <h5>{formattedDate}</h5>
++      <div className={textColor}>
++        <div className="font-weight-bold">{title}</div>
++      </div>
++    </div>
++  );
++}
++
++Day.propTypes = {
++  dateInfo: PropTypes.shape({
++    containsGatedContent: PropTypes.bool,
++    date: PropTypes.string,
++    link: PropTypes.string,
++    title: PropTypes.string,
++  }).isRequired,
++};
+diff --git a/src/dates-tab/Timeline.jsx b/src/dates-tab/Timeline.jsx
+new file mode 100644
+index 0000000..64b19f2
+--- /dev/null
++++ b/src/dates-tab/Timeline.jsx
+@@ -0,0 +1,24 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++
++import { useModel } from '../model-store';
++
++import Day from './Day';
++
++export default function Timeline() {
++  const {
++    courseId,
++  } = useSelector(state => state.courseware);
++
++  const {
++    dates,
++  } = useModel('dates', courseId);
++
++  return (
++    <div className="border-left border-gray-900 ml-2 pl-4">
++      {dates.map((date) => (
++        <Day dateInfo={date} />
++      ))}
++    </div>
++  );
++}
+diff --git a/src/dates-tab/index.jsx b/src/dates-tab/index.jsx
+new file mode 100644
+index 0000000..5f007a2
+--- /dev/null
++++ b/src/dates-tab/index.jsx
+@@ -0,0 +1 @@
++export { default } from './DatesTab';
+diff --git a/src/index.jsx b/src/index.jsx
+index bc0f301..3e73874 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -21,9 +21,11 @@ import './assets/favicon.ico';
+ import CourseHome from './course-home';
+ import CoursewareContainer from './courseware';
+ import CoursewareRedirect from './CoursewareRedirect';
++import DatesTab from './dates-tab';
+ import { TabContainer } from './tab-page';
+ 
+ import store from './store';
++import { fetchCourse, fetchDatesTab } from './data';
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+@@ -32,10 +34,15 @@ subscribe(APP_READY, () => {
+         <Switch>
+           <Route path="/redirect" component={CoursewareRedirect} />
+           <Route path="/course/:courseId/home">
+-            <TabContainer tab="courseware">
++            <TabContainer tab="courseware" fetch={fetchCourse}>
+               <CourseHome />
+             </TabContainer>
+           </Route>
++          <Route path="/course/:courseId/dates">
++            <TabContainer tab="dates" fetch={fetchDatesTab}>
++              <DatesTab />
++            </TabContainer>
++          </Route>
+           <Route
+             path={[
+               '/course/:courseId/:sequenceId/:unitId',
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index c72baa6..6818fbd 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -20,7 +20,7 @@ function LoadedTabPage({
+     org,
+     tabs,
+     title,
+-  } = useModel('courses', courseId);
++  } = useModel('pageInfo', courseId);
+ 
+   return (
+     <>
+diff --git a/src/tab-page/TabContainer.jsx b/src/tab-page/TabContainer.jsx
+index da72686..dd8e784 100644
+--- a/src/tab-page/TabContainer.jsx
++++ b/src/tab-page/TabContainer.jsx
+@@ -3,13 +3,12 @@ import PropTypes from 'prop-types';
+ import { useDispatch, useSelector } from 'react-redux';
+ import { useParams } from 'react-router-dom';
+ 
+-import { fetchCourse } from '../data';
+-
+ import TabPage from './TabPage';
+ 
+ export default function TabContainer(props) {
+   const {
+     children,
++    fetch,
+     tab,
+   } = props;
+ 
+@@ -17,7 +16,7 @@ export default function TabContainer(props) {
+   const dispatch = useDispatch();
+   useEffect(() => {
+     // The courseId from the URL is the course we WANT to load.
+-    dispatch(fetchCourse(courseIdFromUrl));
++    dispatch(fetch(courseIdFromUrl));
+   }, [courseIdFromUrl]);
+ 
+   // The courseId from the store is the course we HAVE loaded.  If the URL changes,
+@@ -38,5 +37,6 @@ export default function TabContainer(props) {
+ 
+ TabContainer.propTypes = {
+   children: PropTypes.node.isRequired,
++  fetch: PropTypes.func.isRequired,
+   tab: PropTypes.string.isRequired,
+ };
+-- 
+2.34.1
+

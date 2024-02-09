@@ -1,0 +1,40 @@
+From 7c067299fb2016f923e1efb4dfdf2d4a1991cfd3 Mon Sep 17 00:00:00 2001
+From: Awais Ansari <79941147+awais-ansari@users.noreply.github.com>
+Date: Fri, 30 Dec 2022 17:04:33 +0500
+Subject: [PATCH 0969/1021] refactor: rename inContext param to
+ inContextSidebar (#1022)
+
+---
+ .../course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx  | 2 +-
+ .../sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+index 459622c..b52d810 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -29,7 +29,7 @@ function DiscussionsSidebar({ intl }) {
+       showTitleBar={false}
+     >
+       <iframe
+-        src={`${discussionsUrl}?inContext`}
++        src={`${discussionsUrl}?inContextSidebar`}
+         className="d-flex w-100 h-100 border-0"
+         title={intl.formatMessage(messages.discussionsTitle)}
+       />
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+index 133c9e2..40c7032 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+@@ -59,7 +59,7 @@ describe('Discussions Trigger', () => {
+     renderWithProvider();
+     expect(screen.queryByTitle('Discussions')).toBeInTheDocument();
+     expect(screen.queryByTitle('Discussions'))
+-      .toHaveAttribute('src', `http://localhost:2002/${courseId}/category/${unitId}?inContext`);
++      .toHaveAttribute('src', `http://localhost:2002/${courseId}/category/${unitId}?inContextSidebar`);
+   });
+ 
+   it('should show nothing if unit has no discussions associated with it', async () => {
+-- 
+2.34.1
+

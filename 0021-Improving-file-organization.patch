@@ -1,0 +1,695 @@
+From 990cef31a336f5d323e0a4c638661033b0b2a6cd Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 10 Jan 2020 11:52:37 -0500
+Subject: [PATCH 0021/1021] Improving file organization.
+
+---
+ src/learning-sequence/CourseBreadcrumbs.jsx   |   2 +-
+ .../LearningSequencePage.jsx                  |   6 +-
+ src/learning-sequence/SubSection.jsx          | 239 ------------------
+ src/learning-sequence/api.js                  | 150 -----------
+ src/learning-sequence/data/api.js             |  16 ++
+ src/learning-sequence/{ => data}/hooks.js     |   5 +-
+ src/learning-sequence/data/utils.js           |  67 +++++
+ .../sub-section/SubSection.jsx                |  28 ++
+ .../SubSectionNavigation.jsx                  |   7 +-
+ .../{ => sub-section}/Unit.jsx                |   0
+ src/learning-sequence/sub-section/data/api.js |  11 +
+ .../sub-section/data/hooks.js                 |  31 +++
+ 12 files changed, 162 insertions(+), 400 deletions(-)
+ delete mode 100644 src/learning-sequence/SubSection.jsx
+ delete mode 100644 src/learning-sequence/api.js
+ create mode 100644 src/learning-sequence/data/api.js
+ rename src/learning-sequence/{ => data}/hooks.js (93%)
+ create mode 100644 src/learning-sequence/data/utils.js
+ create mode 100644 src/learning-sequence/sub-section/SubSection.jsx
+ rename src/learning-sequence/{ => sub-section}/SubSectionNavigation.jsx (89%)
+ rename src/learning-sequence/{ => sub-section}/Unit.jsx (100%)
+ create mode 100644 src/learning-sequence/sub-section/data/api.js
+ create mode 100644 src/learning-sequence/sub-section/data/hooks.js
+
+diff --git a/src/learning-sequence/CourseBreadcrumbs.jsx b/src/learning-sequence/CourseBreadcrumbs.jsx
+index 68acd1d..7a0115e 100644
+--- a/src/learning-sequence/CourseBreadcrumbs.jsx
++++ b/src/learning-sequence/CourseBreadcrumbs.jsx
+@@ -6,7 +6,7 @@ import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+ import CourseStructureContext from './CourseStructureContext';
+-import { useBlockAncestry } from './hooks';
++import { useBlockAncestry } from './data/hooks';
+ 
+ const CourseBreadcrumbs = () => {
+   const { courseId, unitId } = useContext(CourseStructureContext);
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+index fdd5f57..d89135b 100644
+--- a/src/learning-sequence/LearningSequencePage.jsx
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -4,12 +4,10 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import PageLoading from './PageLoading';
+ import messages from './messages';
+-
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+-import SubSection from './SubSection';
+-
+-import { useCourseStructure } from './hooks';
+ import CourseStructureContext from './CourseStructureContext';
++import { useCourseStructure } from './data/hooks';
++import SubSection from './sub-section/SubSection';
+ 
+ function LearningSequencePage({ match, intl }) {
+   const {
+diff --git a/src/learning-sequence/SubSection.jsx b/src/learning-sequence/SubSection.jsx
+deleted file mode 100644
+index abe455e..0000000
+--- a/src/learning-sequence/SubSection.jsx
++++ /dev/null
+@@ -1,239 +0,0 @@
+-import React, { Component, useContext, useEffect, useState } from 'react';
+-import PropTypes from 'prop-types';
+-import { getConfig } from '@edx/frontend-platform';
+-
+-import SubSectionNavigation from './SubSectionNavigation';
+-import { getSubSectionMetadata } from './api';
+-import CourseStructureContext from './CourseStructureContext';
+-import Unit from './Unit';
+-
+-function useSubSectionMetadata(courseId, subSectionId) {
+-  const [metadata, setMetadata] = useState(null);
+-  const [loaded, setLoaded] = useState(false);
+-
+-  useEffect(() => {
+-    setLoaded(false);
+-    getSubSectionMetadata(courseId, subSectionId).then((data) => {
+-      setMetadata(data);
+-      setLoaded(true);
+-    });
+-  }, [courseId, subSectionId]);
+-
+-  return {
+-    metadata,
+-    loaded,
+-  };
+-}
+-
+-function useExamRedirect(metadata, blocks) {
+-  useEffect(() => {
+-    if (metadata !== null && blocks !== null) {
+-      if (metadata.isTimeLimited) {
+-        global.location.href = blocks[metadata.itemId].lmsWebUrl;
+-      }
+-    }
+-  }, [metadata, blocks]);
+-}
+-
+-/*
+-
+-
+-  const calculateUnitId = (metadata, options) => {
+-    const { first, last, preferredUnitId } = options;
+-    let position = metadata.position - 1; // metadata's position is 1's indexed
+-    position = first ? 0 : position;
+-    position = last ? metadata.unitIds.length - 1 : position;
+-    position = preferredUnitId ? metadata.unitIds.indexOf(preferredUnitId) : position;
+-    const unitId = metadata.items[position].id;
+-
+-    return unitId;
+-  }
+-
+-  handleUnitChange = (unitId) => {
+-    this.setState({
+-      unitId,
+-    });
+-  }
+-
+-  */
+-
+-export default function SubSection() {
+-  const {
+-    courseId,
+-    subSectionId,
+-    unitId,
+-    blocks,
+-  } = useContext(CourseStructureContext);
+-  const { metadata } = useSubSectionMetadata(courseId, subSectionId);
+-
+-  useExamRedirect(metadata, blocks);
+-
+-  if (blocks === null || metadata === null) {
+-    return null;
+-  }
+-
+-  const unit = blocks[unitId];
+-
+-  // units={this.state.units}
+-  // unitIds={this.state.subSectionMetadata.unitIds}
+-  // activeUnitId={this.state.unitId}
+-  // unitClickHandler={this.handleUnitChange}
+-  // nextClickHandler={this.handleNextClick}
+-  // previousClickHandler={this.handlePreviousClick}
+-  return (
+-    <section>
+-
+-      <SubSectionNavigation />
+-      <Unit id={unitId} unit={unit} />
+-    </section>
+-  );
+-}
+-
+-
+-/*
+-
+- <h1>{course.displayName}</h1>
+-  <Breadcrumbs
+-    links={[
+-      { label: course.displayName, url: global.location.href },
+-      { label: chapter.displayName, url: global.location.href },
+-      { label: subSection.displayName, url: global.location.href },
+-    ]}
+-    activeLabel={currentUnit.pageTitle}
+-  />
+-
+-  <SubSectionNavigation
+-    units={this.state.units}
+-    unitIds={this.state.subSectionMetadata.unitIds}
+-    activeUnitId={this.state.unitId}
+-    unitClickHandler={this.handleUnitChange}
+-    nextClickHandler={this.handleNextClick}
+-    previousClickHandler={this.handlePreviousClick}
+-  />
+-
+-  <iframe
+-    title="yus"
+-    ref={this.iframeRef}
+-    src={iframeUrl}
+-  />
+-*/
+-
+-// constructor(props, context) {
+-//   super(props, context);
+-
+-//   // this.state = {
+-//   //   loading: true,
+-//   //   blocks: {},
+-//   //   units: {},
+-//   //   subSectionMetadata: null,
+-//   //   subSectionId: null,
+-//   //   subSectionIds: [],
+-//   //   unitId: null,
+-//   //   courseBlockId: null,
+-//   // };
+-
+-//   // this.iframeRef = React.createRef();
+-// }
+-
+-// componentDidMount() {
+-//   loadCourseSequence(this.props.match.params.courseId, this.props.match.params.subSectionId, this.props.match.params.unitId, this.context.authenticatedUser.username)
+-//     .then(({
+-//       blocks, courseBlockId, subSectionIds, subSectionMetadata, units, unitId,
+-//     }) => {
+-//       console.log(subSectionMetadata);
+-//       console.log(blocks[subSectionMetadata.itemId].lmsWebUrl);
+-//       // If the sub section is time limited, that means it is some sort of special exam.
+-//       const specialExam = subSectionMetadata.isTimeLimited;
+-//       if (specialExam) {
+-//         global.location.href = blocks[subSectionMetadata.itemId].lmsWebUrl;
+-//         return; // We get out of here to abort loading.
+-//       }
+-
+-//       this.setState({
+-//         loading: false,
+-//         blocks,
+-//         units,
+-//         subSectionMetadata,
+-//         subSectionId: subSectionMetadata.itemId,
+-//         subSectionIds,
+-//         unitId,
+-//         // eslint-disable-next-line react/no-unused-state
+-//         courseBlockId, // TODO: Currently unused, but may be necessary.
+-//       });
+-//     });
+-// }
+-
+-// componentDidUpdate(prevProps, prevState) {
+-//   if (
+-//     this.props.match.params.courseId !== prevProps.match.params.courseId ||
+-//     this.state.subSectionId !== prevState.subSectionId ||
+-//     this.state.unitId !== prevState.unitId
+-//   ) {
+-//     history.push(`/course/${this.props.match.params.courseId}/${this.state.subSectionId}/${this.state.unitId}`);
+-//   }
+-// }
+-
+-
+-// handlePreviousClick = () => {
+-//   const index = this.state.subSectionMetadata.unitIds.indexOf(this.state.unitId);
+-//   if (index > 0) {
+-//     this.setState({
+-//       unitId: this.state.subSectionMetadata.unitIds[index - 1],
+-//     });
+-//   } else {
+-//     const subSectionIndex = this.state.subSectionIds.indexOf(this.state.subSectionId);
+-//     if (subSectionIndex > 0) {
+-//       const previousSubSectionId = this.state.subSectionIds[subSectionIndex - 1];
+-
+-//       loadSubSectionMetadata(this.props.match.params.courseId, previousSubSectionId, { last: true }).then(({ subSectionMetadata, units, unitId }) => {
+-//         const specialExam = subSectionMetadata.isTimeLimited;
+-//         if (specialExam) {
+-//           global.location.href = this.state.blocks[subSectionMetadata.itemId].lmsWebUrl;
+-//           return; // We get out of here to abort loading.
+-//         }
+-//         this.setState({
+-//           subSectionId: subSectionMetadata.itemId,
+-//           subSectionMetadata,
+-//           units,
+-//           unitId,
+-//         });
+-//       });
+-//     } else {
+-//       console.log('we are at the beginning!');
+-//       // TODO: We need to calculate whether we're on the first/last subSection in render so we can
+-//       // disable the Next/Previous buttons.  That'll involve extracting a bit of logic from this
+-//       // function and handleNextClick below and reusing it - memoized, probably - in render().
+-//     }
+-//   }
+-// }
+-
+-// handleNextClick = () => {
+-//   const index = this.state.subSectionMetadata.unitIds.indexOf(this.state.unitId);
+-//   if (index < this.state.subSectionMetadata.unitIds.length - 1) {
+-//     this.setState({
+-//       unitId: this.state.subSectionMetadata.unitIds[index + 1],
+-//     });
+-//   } else {
+-//     const subSectionIndex = this.state.subSectionIds.indexOf(this.state.subSectionId);
+-//     if (subSectionIndex < this.state.subSectionIds.length - 1) {
+-//       const nextSubSectionId = this.state.subSectionIds[subSectionIndex + 1];
+-
+-//       loadSubSectionMetadata(this.props.match.params.courseId, nextSubSectionId, { first: true })
+-//         .then(({ subSectionMetadata, units, unitId }) => {
+-//           const specialExam = subSectionMetadata.isTimeLimited;
+-//           if (specialExam) {
+-//             global.location.href = this.state.blocks[subSectionMetadata.itemId].lmsWebUrl;
+-//             return; // We get out of here to abort loading.
+-//           }
+-//           this.setState({
+-//             subSectionId: subSectionMetadata.itemId,
+-//             subSectionMetadata,
+-//             units,
+-//             unitId,
+-//           });
+-//         });
+-//     } else {
+-//       console.log('we are at the end!');
+-//     }
+-//   }
+-// }
+diff --git a/src/learning-sequence/api.js b/src/learning-sequence/api.js
+deleted file mode 100644
+index 5b40c2b..0000000
+--- a/src/learning-sequence/api.js
++++ /dev/null
+@@ -1,150 +0,0 @@
+-/* eslint-disable no-use-before-define */
+-/* eslint-disable no-plusplus */
+-import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+-import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+-
+-export async function loadCourseSequence(courseId, subSectionId, urlUnitId, username) {
+-  const blocksData = await getCourseBlocks(courseId, username);
+-  const courseBlockId = blocksData.root;
+-  const blocks = createBlocksMap(blocksData.blocks);
+-  const defaultedSubSectionId = subSectionId || findFirstLeafChild(blocks, courseBlockId).id;
+-  const subSectionIds = createSubSectionIdList(blocks, courseBlockId);
+-  const { subSectionMetadata, units, unitId } = await loadSubSectionMetadata(
+-    courseId,
+-    defaultedSubSectionId,
+-    { unitId: urlUnitId },
+-  );
+-
+-  return {
+-    blocks,
+-    subSectionIds,
+-    courseBlockId,
+-    subSectionMetadata,
+-    units,
+-    unitId,
+-  };
+-}
+-
+-export async function getCourseBlocks(courseId, username) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+-  url.searchParams.append('course_id', decodeURIComponent(courseId));
+-  url.searchParams.append('username', username);
+-  url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children');
+-
+-  const { data } = await getAuthenticatedHttpClient()
+-    .get(url.href, {});
+-
+-  return data;
+-}
+-
+-export async function loadSubSectionMetadata(courseId, subSectionId, {
+-  first,
+-  last,
+-  unitId: urlUnitId,
+-}) {
+-  let subSectionMetadata = await getSubSectionMetadata(courseId, subSectionId);
+-  subSectionMetadata = camelCaseObject(subSectionMetadata);
+-  subSectionMetadata.unitIds = subSectionMetadata.items.map(item => item.id);
+-  let position = subSectionMetadata.position - 1; // metadata's position is 1's indexed
+-  position = first ? 0 : position;
+-  position = last ? subSectionMetadata.unitIds.length - 1 : position;
+-  position = urlUnitId ? subSectionMetadata.unitIds.indexOf(urlUnitId) : position;
+-  const unitId = subSectionMetadata.items[position].id;
+-  const units = createUnitsMap(subSectionMetadata.items);
+-
+-  return {
+-    subSectionMetadata,
+-    units,
+-    unitId,
+-  };
+-}
+-
+-export async function getSubSectionMetadata(courseId, subSectionId) {
+-  const { data } = await getAuthenticatedHttpClient()
+-    .get(`${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${subSectionId}/handler/xmodule_handler/metadata`, {});
+-
+-  return data;
+-}
+-
+-export function createBlocksMap(blocksData) {
+-  const blocks = {};
+-  const blocksList = Object.values(blocksData);
+-
+-  // First go through the list and flesh out our blocks map, camelCasing the objects as we go.
+-  for (let i = 0; i < blocksList.length; i++) {
+-    const block = blocksList[i];
+-    blocks[block.id] = camelCaseObject(block);
+-  }
+-
+-  // Next go through the blocksList again - now that we've added them all to the blocks map - and
+-  // append a parent ID to every child found in every `children` list, using the blocks map to find
+-  // them.
+-  for (let i = 0; i < blocksList.length; i++) {
+-    const block = blocksList[i];
+-
+-    if (Array.isArray(block.children)) {
+-      for (let j = 0; j < block.children.length; j++) {
+-        const childId = block.children[j];
+-        const child = blocks[childId];
+-        child.parentId = block.id;
+-      }
+-    }
+-  }
+-
+-  return blocks;
+-}
+-
+-function createUnitsMap(unitsList) {
+-  const units = {};
+-  for (let i = 0; i < unitsList.length; i++) {
+-    const unit = unitsList[i];
+-    units[unit.id] = camelCaseObject(unit);
+-  }
+-  return units;
+-}
+-
+-function findFirstLeafChild(blocks, entryPointId) {
+-  const block = blocks[entryPointId];
+-  if (Array.isArray(block.children) && block.children.length > 0) {
+-    return findFirstLeafChild(blocks, block.children[0]);
+-  }
+-  return block;
+-}
+-
+-export function createSubSectionIdList(blocks, entryPointId, subSections = []) {
+-  const block = blocks[entryPointId];
+-  if (block.type === 'sequential') {
+-    subSections.push(block.id);
+-  }
+-  if (Array.isArray(block.children)) {
+-    for (let i = 0; i < block.children.length; i++) {
+-      const childId = block.children[i];
+-      createSubSectionIdList(blocks, childId, subSections);
+-    }
+-  }
+-  return subSections;
+-}
+-
+-export function createUnitIdList(blocks, entryPointId, units = []) {
+-  const block = blocks[entryPointId];
+-  if (block.type === 'vertical') {
+-    units.push(block.id);
+-  }
+-  if (Array.isArray(block.children)) {
+-    for (let i = 0; i < block.children.length; i++) {
+-      const childId = block.children[i];
+-      createUnitIdList(blocks, childId, units);
+-    }
+-  }
+-  return units;
+-}
+-
+-export function findBlockAncestry(blocks, blockId, descendents = []) {
+-  const block = blocks[blockId];
+-  descendents.unshift(block);
+-  if (block.parentId === undefined) {
+-    return descendents;
+-  }
+-  return findBlockAncestry(blocks, block.parentId, descendents);
+-}
+diff --git a/src/learning-sequence/data/api.js b/src/learning-sequence/data/api.js
+new file mode 100644
+index 0000000..5fd49fb
+--- /dev/null
++++ b/src/learning-sequence/data/api.js
+@@ -0,0 +1,16 @@
++/* eslint-disable import/prefer-default-export */
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { getConfig } from '@edx/frontend-platform';
++
++export async function getCourseBlocks(courseId, username) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
++  url.searchParams.append('course_id', decodeURIComponent(courseId));
++  url.searchParams.append('username', username);
++  url.searchParams.append('depth', 3);
++  url.searchParams.append('requested_fields', 'children');
++
++  const { data } = await getAuthenticatedHttpClient()
++    .get(url.href, {});
++
++  return data;
++}
+diff --git a/src/learning-sequence/hooks.js b/src/learning-sequence/data/hooks.js
+similarity index 93%
+rename from src/learning-sequence/hooks.js
+rename to src/learning-sequence/data/hooks.js
+index 57ac371..233d249 100644
+--- a/src/learning-sequence/hooks.js
++++ b/src/learning-sequence/data/hooks.js
+@@ -1,8 +1,9 @@
+ import { useContext, useMemo, useState, useEffect } from 'react';
+ import { AppContext } from '@edx/frontend-platform/react';
+ 
+-import CourseStructureContext from './CourseStructureContext';
+-import { findBlockAncestry, getCourseBlocks, createBlocksMap, createSubSectionIdList, createUnitIdList } from './api';
++import CourseStructureContext from '../CourseStructureContext';
++import { getCourseBlocks } from './api';
++import { findBlockAncestry, createBlocksMap, createSubSectionIdList, createUnitIdList } from './utils';
+ 
+ export function useBlockAncestry(blockId) {
+   const { blocks, loaded } = useContext(CourseStructureContext);
+diff --git a/src/learning-sequence/data/utils.js b/src/learning-sequence/data/utils.js
+new file mode 100644
+index 0000000..83eacf2
+--- /dev/null
++++ b/src/learning-sequence/data/utils.js
+@@ -0,0 +1,67 @@
++/* eslint-disable no-plusplus */
++import { camelCaseObject } from '@edx/frontend-platform';
++
++export function createBlocksMap(blocksData) {
++  const blocks = {};
++  const blocksList = Object.values(blocksData);
++
++  // First go through the list and flesh out our blocks map, camelCasing the objects as we go.
++  for (let i = 0; i < blocksList.length; i++) {
++    const block = blocksList[i];
++    blocks[block.id] = camelCaseObject(block);
++  }
++
++  // Next go through the blocksList again - now that we've added them all to the blocks map - and
++  // append a parent ID to every child found in every `children` list, using the blocks map to find
++  // them.
++  for (let i = 0; i < blocksList.length; i++) {
++    const block = blocksList[i];
++
++    if (Array.isArray(block.children)) {
++      for (let j = 0; j < block.children.length; j++) {
++        const childId = block.children[j];
++        const child = blocks[childId];
++        child.parentId = block.id;
++      }
++    }
++  }
++
++  return blocks;
++}
++
++export function createSubSectionIdList(blocks, entryPointId, subSections = []) {
++  const block = blocks[entryPointId];
++  if (block.type === 'sequential') {
++    subSections.push(block.id);
++  }
++  if (Array.isArray(block.children)) {
++    for (let i = 0; i < block.children.length; i++) {
++      const childId = block.children[i];
++      createSubSectionIdList(blocks, childId, subSections);
++    }
++  }
++  return subSections;
++}
++
++export function createUnitIdList(blocks, entryPointId, units = []) {
++  const block = blocks[entryPointId];
++  if (block.type === 'vertical') {
++    units.push(block.id);
++  }
++  if (Array.isArray(block.children)) {
++    for (let i = 0; i < block.children.length; i++) {
++      const childId = block.children[i];
++      createUnitIdList(blocks, childId, units);
++    }
++  }
++  return units;
++}
++
++export function findBlockAncestry(blocks, blockId, descendents = []) {
++  const block = blocks[blockId];
++  descendents.unshift(block);
++  if (block.parentId === undefined) {
++    return descendents;
++  }
++  return findBlockAncestry(blocks, block.parentId, descendents);
++}
+diff --git a/src/learning-sequence/sub-section/SubSection.jsx b/src/learning-sequence/sub-section/SubSection.jsx
+new file mode 100644
+index 0000000..daff86c
+--- /dev/null
++++ b/src/learning-sequence/sub-section/SubSection.jsx
+@@ -0,0 +1,28 @@
++import React, { useContext } from 'react';
++
++import SubSectionNavigation from './SubSectionNavigation';
++import CourseStructureContext from '../CourseStructureContext';
++import Unit from './Unit';
++import { useSubSectionMetadata, useExamRedirect } from './data/hooks';
++
++
++export default function SubSection() {
++  const {
++    courseId,
++    subSectionId,
++    unitId,
++    blocks,
++  } = useContext(CourseStructureContext);
++  const { metadata } = useSubSectionMetadata(courseId, subSectionId);
++
++  useExamRedirect(metadata, blocks);
++
++  const ready = blocks !== null && metadata !== null;
++
++  return ready && (
++    <section>
++      <SubSectionNavigation />
++      <Unit id={unitId} unit={blocks[unitId]} />
++    </section>
++  );
++}
+diff --git a/src/learning-sequence/SubSectionNavigation.jsx b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+similarity index 89%
+rename from src/learning-sequence/SubSectionNavigation.jsx
+rename to src/learning-sequence/sub-section/SubSectionNavigation.jsx
+index 59d2bbb..bed8024 100644
+--- a/src/learning-sequence/SubSectionNavigation.jsx
++++ b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+@@ -1,12 +1,11 @@
+-import React, { Component, useCallback, useContext } from 'react';
+-import PropTypes from 'prop-types';
++import React, { useCallback, useContext } from 'react';
+ import { history } from '@edx/frontend-platform';
+ import { Button } from '@edx/paragon';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faFilm, faBook, faPencilAlt, faTasks } from '@fortawesome/free-solid-svg-icons';
+ 
+-import { useCurrentSubSection, useCurrentUnit, usePreviousUnit, useNextUnit, useCurrentCourse, useCurrentSubSectionUnits } from './hooks';
+-import CourseStructureContext from './CourseStructureContext';
++import { useCurrentSubSection, usePreviousUnit, useNextUnit, useCurrentSubSectionUnits } from '../data/hooks';
++import CourseStructureContext from '../CourseStructureContext';
+ 
+ function UnitIcon({ type }) {
+   let icon = null;
+diff --git a/src/learning-sequence/Unit.jsx b/src/learning-sequence/sub-section/Unit.jsx
+similarity index 100%
+rename from src/learning-sequence/Unit.jsx
+rename to src/learning-sequence/sub-section/Unit.jsx
+diff --git a/src/learning-sequence/sub-section/data/api.js b/src/learning-sequence/sub-section/data/api.js
+new file mode 100644
+index 0000000..5cf2f69
+--- /dev/null
++++ b/src/learning-sequence/sub-section/data/api.js
+@@ -0,0 +1,11 @@
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++
++/* eslint-disable import/prefer-default-export */
++
++export async function getSubSectionMetadata(courseId, subSectionId) {
++  const { data } = await getAuthenticatedHttpClient()
++    .get(`${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${subSectionId}/handler/xmodule_handler/metadata`, {});
++
++  return data;
++}
+diff --git a/src/learning-sequence/sub-section/data/hooks.js b/src/learning-sequence/sub-section/data/hooks.js
+new file mode 100644
+index 0000000..7bb7aed
+--- /dev/null
++++ b/src/learning-sequence/sub-section/data/hooks.js
+@@ -0,0 +1,31 @@
++import { useState, useEffect } from 'react';
++
++import { getSubSectionMetadata } from './api';
++
++export function useSubSectionMetadata(courseId, subSectionId) {
++  const [metadata, setMetadata] = useState(null);
++  const [loaded, setLoaded] = useState(false);
++
++  useEffect(() => {
++    setLoaded(false);
++    getSubSectionMetadata(courseId, subSectionId).then((data) => {
++      setMetadata(data);
++      setLoaded(true);
++    });
++  }, [courseId, subSectionId]);
++
++  return {
++    metadata,
++    loaded,
++  };
++}
++
++export function useExamRedirect(metadata, blocks) {
++  useEffect(() => {
++    if (metadata !== null && blocks !== null) {
++      if (metadata.isTimeLimited) {
++        global.location.href = blocks[metadata.itemId].lmsWebUrl;
++      }
++    }
++  }, [metadata, blocks]);
++}
+-- 
+2.34.1
+

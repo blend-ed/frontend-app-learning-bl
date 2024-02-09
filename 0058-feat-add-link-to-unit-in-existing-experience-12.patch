@@ -1,0 +1,148 @@
+From ba6764de43260f5d1ef7b06678e89be9b52ad6f6 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Fri, 14 Feb 2020 13:05:25 -0500
+Subject: [PATCH 0058/1021] feat: add link to unit in existing experience (#12)
+
+* feat: add instructor toolbar with link to lms
+
+* fix: right align user account menu dropdown
+---
+ src/courseware/InstructorToolbar.jsx   | 39 +++++++++++++++++++++
+ src/courseware/course/Course.jsx       |  7 ++++
+ src/courseware/course/CourseHeader.jsx | 48 ++++++++++++++------------
+ 3 files changed, 71 insertions(+), 23 deletions(-)
+ create mode 100644 src/courseware/InstructorToolbar.jsx
+
+diff --git a/src/courseware/InstructorToolbar.jsx b/src/courseware/InstructorToolbar.jsx
+new file mode 100644
+index 0000000..01124fe
+--- /dev/null
++++ b/src/courseware/InstructorToolbar.jsx
+@@ -0,0 +1,39 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { connect } from 'react-redux';
++
++function InstructorToolbar(props) {
++  // TODO: Only render this toolbar if the user is course staff
++  if (!props.activeUnitLmsWebUrl) {
++    return null;
++  }
++
++  return (
++    <div className="bg-primary text-light">
++      <div className="container-fluid py-2 d-flex justify-content-end">
++        <a className="text-light" href={props.activeUnitLmsWebUrl}>View unit in the existing experience</a>
++      </div>
++    </div>
++  );
++}
++
++InstructorToolbar.propTypes = {
++  activeUnitLmsWebUrl: PropTypes.string,
++};
++
++InstructorToolbar.defaultProps = {
++  activeUnitLmsWebUrl: undefined,
++};
++
++const mapStateToProps = (state, props) => {
++  if (!props.unitId) {
++    return {};
++  }
++
++  const activeUnit = state.courseBlocks.blocks[props.unitId];
++  return {
++    activeUnitLmsWebUrl: activeUnit.lmsWebUrl,
++  };
++};
++
++export default connect(mapStateToProps)(InstructorToolbar);
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 57fc0db..5fd4f8b 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -8,6 +8,7 @@ import { createSequenceIdList } from '../utils';
+ import AlertList from '../../user-messages/AlertList';
+ import CourseHeader from './CourseHeader';
+ import CourseTabsNavigation from './CourseTabsNavigation';
++import InstructorToolbar from '../InstructorToolbar';
+ 
+ export default function Course({
+   courseOrg, courseNumber, courseName, courseUsageKey, courseId, sequenceId, unitId, models, tabs,
+@@ -41,6 +42,12 @@ export default function Course({
+         courseNumber={courseNumber}
+         courseName={courseName}
+       />
++      <InstructorToolbar
++        courseUsageKey={courseUsageKey}
++        courseId={courseId}
++        sequenceId={sequenceId}
++        unitId={unitId}
++      />
+       <main className="d-flex flex-column flex-grow-1">
+         <div className="container-fluid">
+           <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug="courseware" />
+diff --git a/src/courseware/course/CourseHeader.jsx b/src/courseware/course/CourseHeader.jsx
+index aca21bb..9009395 100644
+--- a/src/courseware/course/CourseHeader.jsx
++++ b/src/courseware/course/CourseHeader.jsx
+@@ -31,30 +31,32 @@ export default function CourseHeader({
+   const { authenticatedUser } = useContext(AppContext);
+ 
+   return (
+-    <header className="container-fluid py-2 d-flex align-items-center border-bottom border-primary">
+-      <LinkedLogo
+-        className="logo"
+-        href={`${getConfig().LMS_BASE_URL}/dashboard`}
+-        src={logo}
+-        alt={getConfig().SITE_NAME}
+-      />
+-      <div className="flex-grow-1" style={{ lineHeight: 1 }}>
+-        <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
+-        <span className="d-block m-0 font-weight-bold">{courseName}</span>
+-      </div>
++    <header className="border-bottom border-primary">
++      <div className="container-fluid py-2 d-flex align-items-center ">
++        <LinkedLogo
++          className="logo"
++          href={`${getConfig().LMS_BASE_URL}/dashboard`}
++          src={logo}
++          alt={getConfig().SITE_NAME}
++        />
++        <div className="flex-grow-1" style={{ lineHeight: 1 }}>
++          <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
++          <span className="d-block m-0 font-weight-bold">{courseName}</span>
++        </div>
+ 
+-      <Dropdown>
+-        <Dropdown.Button>
+-          {authenticatedUser.username}
+-        </Dropdown.Button>
+-        <Dropdown.Menu>
+-          <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/dashboard`}>Dashboard</Dropdown.Item>
+-          <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/u/${authenticatedUser.username}`}>Profile</Dropdown.Item>
+-          <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/account/settings`}>Account</Dropdown.Item>
+-          <Dropdown.Item href={getConfig().ORDER_HISTORY_URL}>Order History</Dropdown.Item>
+-          <Dropdown.Item href={getConfig().LOGOUT_URL}>Sign Out</Dropdown.Item>
+-        </Dropdown.Menu>
+-      </Dropdown>
++        <Dropdown>
++          <Dropdown.Button>
++            {authenticatedUser.username}
++          </Dropdown.Button>
++          <Dropdown.Menu className="dropdown-menu-right">
++            <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/dashboard`}>Dashboard</Dropdown.Item>
++            <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/u/${authenticatedUser.username}`}>Profile</Dropdown.Item>
++            <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/account/settings`}>Account</Dropdown.Item>
++            <Dropdown.Item href={getConfig().ORDER_HISTORY_URL}>Order History</Dropdown.Item>
++            <Dropdown.Item href={getConfig().LOGOUT_URL}>Sign Out</Dropdown.Item>
++          </Dropdown.Menu>
++        </Dropdown>
++      </div>
+     </header>
+   );
+ }
+-- 
+2.34.1
+

@@ -1,0 +1,352 @@
+From a003059c8f70fc8371d0ef22a83b0bad2ca23f4f Mon Sep 17 00:00:00 2001
+From: Adeel Ehsan <adeel.ehsan@arbisoft.com>
+Date: Mon, 7 Jun 2021 10:33:59 +0500
+Subject: [PATCH 0487/1021] Account activation pop up added: (#474)
+
+VAN-435
+---
+ .env                                          |   1 +
+ .env.development                              |   1 +
+ package-lock.json                             |  22 +--
+ package.json                                  |   2 +-
+ .../AccountActivationAlert.jsx                | 135 ++++++++++++++++++
+ src/course-home/outline-tab/OutlineTab.jsx    |   2 +
+ .../outline-tab/OutlineTab.test.jsx           |  48 +++++++
+ src/courseware/data/api.js                    |   5 +
+ src/courseware/data/index.js                  |   1 +
+ 9 files changed, 197 insertions(+), 20 deletions(-)
+ create mode 100644 src/alerts/logistration-alert/AccountActivationAlert.jsx
+
+diff --git a/.env b/.env
+index 2b2bf47..7619bc6 100644
+--- a/.env
++++ b/.env
+@@ -32,3 +32,4 @@ TERMS_OF_SERVICE_URL=''
+ TWITTER_HASHTAG=''
+ TWITTER_URL=''
+ USER_INFO_COOKIE_NAME=''
++SESSION_COOKIE_DOMAIN=''
+\ No newline at end of file
+diff --git a/.env.development b/.env.development
+index f0b2b65..cf76371 100644
+--- a/.env.development
++++ b/.env.development
+@@ -32,3 +32,4 @@ TERMS_OF_SERVICE_URL='https://www.edx.org/edx-terms-service'
+ TWITTER_HASHTAG='myedxjourney'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
++SESSION_COOKIE_DOMAIN='localhost'
+\ No newline at end of file
+diff --git a/package-lock.json b/package-lock.json
+index 6e2ed57..13369c3 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1415,9 +1415,9 @@
+       }
+     },
+     "@edx/frontend-platform": {
+-      "version": "1.10.2",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-platform/-/frontend-platform-1.10.2.tgz",
+-      "integrity": "sha512-y24X4JJIhDkgg900t46bUDLLXPbzaI717WzXKhbw1zLNER1HIUoCaqWpG9c2QuyG62zhauEz4wJ0f6COd+N4rQ==",
++      "version": "1.11.0",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-platform/-/frontend-platform-1.11.0.tgz",
++      "integrity": "sha512-XtqKPWUvXzPJLlIEsoLMuac3TvTtAe1GY9MKu1QQsZDget1plDZqaf3ByRbuxOW8b2g2JVPvFx+Jm3FxTcrmIQ==",
+       "requires": {
+         "@cospired/i18n-iso-languages": "2.2.0",
+         "axios": "0.21.1",
+@@ -1436,21 +1436,6 @@
+         "pubsub-js": "1.9.3",
+         "react-intl": "2.9.0",
+         "universal-cookie": "4.0.4"
+-      },
+-      "dependencies": {
+-        "glob": {
+-          "version": "7.1.7",
+-          "resolved": "https://registry.npmjs.org/glob/-/glob-7.1.7.tgz",
+-          "integrity": "sha512-OvD9ENzPLbegENnYP5UUfJIirTg4+XwMWGaQfQTY0JenxNvvIKP3U3/tAQSPIu/lHxXYSZmpXlUHeqAIdKzBLQ==",
+-          "requires": {
+-            "fs.realpath": "^1.0.0",
+-            "inflight": "^1.0.4",
+-            "inherits": "2",
+-            "minimatch": "^3.0.4",
+-            "once": "^1.3.0",
+-            "path-is-absolute": "^1.0.0"
+-          }
+-        }
+       }
+     },
+     "@edx/paragon": {
+@@ -9222,7 +9207,6 @@
+       "version": "7.1.7",
+       "resolved": "https://registry.npmjs.org/glob/-/glob-7.1.7.tgz",
+       "integrity": "sha512-OvD9ENzPLbegENnYP5UUfJIirTg4+XwMWGaQfQTY0JenxNvvIKP3U3/tAQSPIu/lHxXYSZmpXlUHeqAIdKzBLQ==",
+-      "dev": true,
+       "requires": {
+         "fs.realpath": "^1.0.0",
+         "inflight": "^1.0.4",
+diff --git a/package.json b/package.json
+index 26268f5..b8cb474 100644
+--- a/package.json
++++ b/package.json
+@@ -39,7 +39,7 @@
+     "@edx/frontend-component-footer": "10.1.4",
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-lib-special-exams": "^1.0.0",
+-    "@edx/frontend-platform": "1.10.2",
++    "@edx/frontend-platform": "1.11.0",
+     "@edx/paragon": "14.8.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+diff --git a/src/alerts/logistration-alert/AccountActivationAlert.jsx b/src/alerts/logistration-alert/AccountActivationAlert.jsx
+new file mode 100644
+index 0000000..bbb9f56
+--- /dev/null
++++ b/src/alerts/logistration-alert/AccountActivationAlert.jsx
+@@ -0,0 +1,135 @@
++import React, { useState } from 'react';
++import Cookies from 'js-cookie';
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import {
++  AlertModal,
++  Button,
++  Spinner,
++  Icon,
++} from '@edx/paragon';
++import { Check, ArrowForward } from '@edx/paragon/icons';
++import { FormattedMessage, injectIntl } from '@edx/frontend-platform/i18n';
++import { sendActivationEmail } from '../../courseware/data';
++
++function AccountActivationAlert() {
++  const [showModal, setShowModal] = useState(false);
++  const [showSpinner, setShowSpinner] = useState(false);
++  const [showCheck, setShowCheck] = useState(false);
++  const handleOnClick = () => {
++    setShowSpinner(true);
++    setShowCheck(false);
++    sendActivationEmail().then(() => {
++      setShowSpinner(false);
++      setShowCheck(true);
++    });
++  };
++
++  const showAccountActivationAlert = Cookies.get('show-account-activation-popup');
++  if (showAccountActivationAlert !== undefined) {
++    Cookies.remove('show-account-activation-popup', { path: '/', domain: process.env.SESSION_COOKIE_DOMAIN });
++    // extra check to make sure cookie was removed before updating the state. Updating the state without removal
++    // of cookie would make it infinit rendering
++    if (Cookies.get('show-account-activation-popup') === undefined) {
++      setShowModal(true);
++    }
++  }
++
++  const title = (
++    <h3>
++      <FormattedMessage
++        id="account-activation.alert.title"
++        defaultMessage="Activate your account so you can log back in"
++        description="Title for account activation alert which is shown after the registration"
++      />
++    </h3>
++  );
++
++  const button = (
++    <Button
++      variant="primary"
++      className=""
++      onClick={() => setShowModal(false)}
++    >
++      <FormattedMessage
++        id="account-activation.alert.button"
++        defaultMessage="Continue to {siteName}"
++        description="account activation alert continue button"
++        values={{
++          siteName: getConfig().SITE_NAME,
++        }}
++      />
++      <Icon src={ArrowForward} className="ml-1 d-inline-block align-bottom" />
++    </Button>
++  );
++
++  const children = () => {
++    let bodyContent = null;
++    const message = (
++      <FormattedMessage
++        id="account-activation.alert.message"
++        defaultMessage="We sent an email to {boldEmail} with a link to activate your account. Can’t find it? Check your spam folder or
++        {sendEmailTag}."
++        description="Message for account activation alert which is shown after the registration"
++        values={{
++          boldEmail: <b>{getAuthenticatedUser() && getAuthenticatedUser().email}</b>,
++          sendEmailTag: (
++          // eslint-disable-next-line jsx-a11y/anchor-is-valid
++            <a href="#" role="button" onClick={handleOnClick}>
++              <FormattedMessage
++                id="account-activation.resend.link"
++                defaultMessage="resend the email"
++                description="Message for resend link in account activation alert which is shown after the registration"
++              />
++            </a>
++          ),
++        }}
++      />
++    );
++    bodyContent = (
++      <div>
++        {message}
++      </div>
++    );
++
++    if (!showCheck && showSpinner) {
++      bodyContent = (
++        <div>
++          {message}
++          <Spinner
++            animation="border"
++            variant="secondary"
++            style={{ height: '1.5rem', width: '1.5rem' }}
++          />
++        </div>
++      );
++    }
++
++    if (showCheck && !showSpinner) {
++      bodyContent = (
++        <div>
++          {message}
++          <Icon
++            src={Check}
++            style={{ height: '1.7rem', width: '1.25rem' }}
++            className="text-success-500 d-inline-block position-fixed"
++          />
++        </div>
++      );
++    }
++    return bodyContent;
++  };
++
++  return (
++    <AlertModal
++      isOpen={showModal}
++      title={title}
++      footerNode={button}
++      onClose={() => ({})}
++    >
++      {children()}
++    </AlertModal>
++  );
++}
++
++export default injectIntl(AccountActivationAlert);
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index ac6eaa7..15da293 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -26,6 +26,7 @@ import usePrivateCourseAlert from './alerts/private-course-alert';
+ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+ import ProctoringInfoPanel from './widgets/ProctoringInfoPanel';
++import AccountActivationAlert from '../../alerts/logistration-alert/AccountActivationAlert';
+ 
+ /** [MM-P2P] Experiment */
+ import { initHomeMMP2P, MMP2PFlyover } from '../../experiments/mm-p2p';
+@@ -131,6 +132,7 @@ function OutlineTab({ intl }) {
+       </div>
+       {/** [MM-P2P] Experiment (className for optimizely trigger) */}
+       <div className="row course-outline-tab">
++        <AccountActivationAlert />
+         <div className="col-12">
+           <AlertList
+             topic="outline-private-alerts"
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index b967e4d..89a2b43 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -4,6 +4,7 @@ import { getConfig } from '@edx/frontend-platform';
+ import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import MockAdapter from 'axios-mock-adapter';
++import Cookies from 'js-cookie';
+ import userEvent from '@testing-library/user-event';
+ 
+ import { buildMinimalCourseBlocks } from '../../shared/data/__factories__/courseBlocks.factory';
+@@ -917,4 +918,51 @@ describe('Outline Tab', () => {
+       });
+     });
+   });
++
++  describe('Accont Activation Alert', () => {
++    beforeEach(() => {
++      const intersectionObserverMock = () => ({
++        observe: () => null,
++        disconnect: () => null,
++      });
++      window.IntersectionObserver = jest.fn().mockImplementation(intersectionObserverMock);
++    });
++    it('displays account activation alert if cookie is set true', async () => {
++      Cookies.set = jest.fn();
++      Cookies.get = jest.fn().mockImplementation(() => 'true');
++      Cookies.remove = jest.fn().mockImplementation(() => { Cookies.get = jest.fn(); });
++
++      await fetchAndRender();
++      expect(screen.queryByText('Activate your account so you can log back in')).toBeInTheDocument();
++      expect(screen.queryByRole('button', { name: 'resend the email' })).toBeInTheDocument();
++    });
++
++    it('do not displays account activation alert if cookie is not set true', async () => {
++      Cookies.set = jest.fn();
++      Cookies.get = jest.fn();
++      Cookies.remove = jest.fn().mockImplementation(() => { Cookies.get = jest.fn(); });
++
++      await fetchAndRender();
++      expect(screen.queryByText('Activate your account so you can log back in')).not.toBeInTheDocument();
++      expect(screen.queryByRole('button', { name: 'resend the email' })).not.toBeInTheDocument();
++    });
++
++    it('sends account activation email on clicking the resened email in account activation alert', async () => {
++      Cookies.set = jest.fn();
++      Cookies.get = jest.fn().mockImplementation(() => 'true');
++      Cookies.remove = jest.fn().mockImplementation(() => { Cookies.get = jest.fn(); });
++
++      await fetchAndRender();
++
++      axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++      const resendEmailUrl = `${getConfig().LMS_BASE_URL}/api/send_account_activation_email`;
++      axiosMock.onPost(resendEmailUrl).reply(200, {});
++
++      const resendLink = screen.getByRole('button', { name: 'resend the email' });
++      fireEvent.click(resendLink);
++
++      await waitFor(() => expect(axiosMock.history.post).toHaveLength(1));
++      expect(axiosMock.history.post[0].url).toEqual(resendEmailUrl);
++    });
++  });
+ });
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index c067062..c66b0ec 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -239,3 +239,8 @@ export async function postIntegritySignature(courseId) {
+   );
+   return camelCaseObject(data);
+ }
++export async function sendActivationEmail() {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/send_account_activation_email`);
++  const { data } = await getAuthenticatedHttpClient().post(url.href, {});
++  return data;
++}
+diff --git a/src/courseware/data/index.js b/src/courseware/data/index.js
+index 5961756..72fe2bc 100644
+--- a/src/courseware/data/index.js
++++ b/src/courseware/data/index.js
+@@ -7,6 +7,7 @@ export {
+ } from './thunks';
+ export {
+   getResumeBlock,
++  sendActivationEmail,
+ } from './api';
+ export {
+   sequenceIdsSelector,
+-- 
+2.34.1
+

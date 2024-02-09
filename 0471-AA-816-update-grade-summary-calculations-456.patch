@@ -1,0 +1,386 @@
+From 05b2439ff642601d618726a7f861e5704ab8ba73 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 19 May 2021 15:44:49 -0400
+Subject: [PATCH 0471/1021] AA-816: update grade summary calculations (#456)
+
+---
+ .../__factories__/progressTabData.factory.js  |   7 +-
+ .../data/__snapshots__/redux.test.js.snap     |   7 +-
+ .../progress-tab/ProgressTab.test.jsx         | 139 +++++++++++++++++-
+ .../DroppableAssignmentFootnote.jsx           |   2 +-
+ .../grades/grade-summary/GradeSummary.jsx     |  34 ++++-
+ .../grade-summary/GradeSummaryTable.jsx       |  35 +++--
+ .../progress-tab/grades/messages.js           |   6 +-
+ 7 files changed, 201 insertions(+), 29 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+index e8321d1..1ca91f0 100644
+--- a/src/course-home/data/__factories__/progressTabData.factory.js
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -12,9 +12,9 @@ Factory.define('progressTabData')
+       locked_count: 0,
+     },
+     course_grade: {
+-      letter_grade: null,
+-      percent: 0,
+-      is_passing: false,
++      letter_grade: 'pass',
++      percent: 1,
++      is_passing: true,
+     },
+     section_scores: [
+       {
+@@ -55,6 +55,7 @@ Factory.define('progressTabData')
+       assignment_policies: [
+         {
+           num_droppable: 1,
++          num_total: 2,
+           short_label: 'HW',
+           type: 'Homework',
+           weight: 1,
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index eb3ff44..e342bb7 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -536,9 +536,9 @@ Object {
+           "lockedCount": 0,
+         },
+         "courseGrade": Object {
+-          "isPassing": false,
+-          "letterGrade": null,
+-          "percent": 0,
++          "isPassing": true,
++          "letterGrade": "pass",
++          "percent": 1,
+         },
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "end": "3027-03-31T00:00:00Z",
+@@ -547,6 +547,7 @@ Object {
+           "assignmentPolicies": Array [
+             Object {
+               "numDroppable": 1,
++              "numTotal": 2,
+               "shortLabel": "HW",
+               "type": "Homework",
+               "weight": 1,
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index d2a46e4..4284f25 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -60,19 +60,19 @@ describe('Progress Tab', () => {
+     });
+ 
+     it('renders correct copy for non-passing', async () => {
++      setTabData({
++        course_grade: {
++          is_passing: false,
++          letter_grade: null,
++          percent: 0.5,
++        },
++      });
+       await fetchAndRender();
+       expect(screen.queryByRole('button', { name: 'Grade range tooltip' })).not.toBeInTheDocument();
+       expect(screen.getByText('A weighted grade of 75% is required to pass in this course')).toBeInTheDocument();
+     });
+ 
+     it('renders correct copy for passing with pass/fail grade range', async () => {
+-      setTabData({
+-        course_grade: {
+-          is_passing: true,
+-          letter_grade: 'Pass',
+-          percent: 0.9,
+-        },
+-      });
+       await fetchAndRender();
+       expect(screen.queryByRole('button', { name: 'Grade range tooltip' })).not.toBeInTheDocument();
+       expect(screen.getByText('You’re currently passing this course')).toBeInTheDocument();
+@@ -194,6 +194,131 @@ describe('Progress Tab', () => {
+       await fetchAndRender();
+       expect(screen.queryByText('Grade summary')).not.toBeInTheDocument();
+     });
++
++    it('calculates grades correctly when number of droppable assignments equals total number of assignments', async () => {
++      setTabData({
++        grading_policy: {
++          assignment_policies: [
++            {
++              num_droppable: 2,
++              num_total: 2,
++              short_label: 'HW',
++              type: 'Homework',
++              weight: 1,
++            },
++          ],
++          grade_range: {
++            pass: 0.75,
++          },
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('Grade summary')).toBeInTheDocument();
++      // The row is comprised of "{Assignment type} {footnote - optional} {weight} {grade} {weighted grade}"
++      expect(screen.getByRole('row', { name: 'Homework 1 100% 0% 0%' })).toBeInTheDocument();
++    });
++    it('calculates grades correctly when number of droppable assignments is less than total number of assignments', async () => {
++      await fetchAndRender();
++      expect(screen.getByText('Grade summary')).toBeInTheDocument();
++      // The row is comprised of "{Assignment type} {footnote - optional} {weight} {grade} {weighted grade}"
++      expect(screen.getByRole('row', { name: 'Homework 1 100% 100% 100%' })).toBeInTheDocument();
++    });
++    it('calculates grades correctly when number of droppable assignments is zero', async () => {
++      setTabData({
++        grading_policy: {
++          assignment_policies: [
++            {
++              num_droppable: 0,
++              num_total: 2,
++              short_label: 'HW',
++              type: 'Homework',
++              weight: 1,
++            },
++          ],
++          grade_range: {
++            pass: 0.75,
++          },
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('Grade summary')).toBeInTheDocument();
++      // The row is comprised of "{Assignment type} {weight} {grade} {weighted grade}"
++      expect(screen.getByRole('row', { name: 'Homework 100% 50% 50%' })).toBeInTheDocument();
++    });
++    it('calculates grades correctly when number of total assignments is less than the number of assignments created', async () => {
++      setTabData({
++        grading_policy: {
++          assignment_policies: [
++            {
++              num_droppable: 1,
++              num_total: 1, // two assignments created in the factory, but 1 is expected per Studio settings
++              short_label: 'HW',
++              type: 'Homework',
++              weight: 1,
++            },
++          ],
++          grade_range: {
++            pass: 0.75,
++          },
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('Grade summary')).toBeInTheDocument();
++      // The row is comprised of "{Assignment type} {footnote - optional} {weight} {grade} {weighted grade}"
++      expect(screen.getByRole('row', { name: 'Homework 1 100% 100% 100%' })).toBeInTheDocument();
++    });
++    it('calculates grades correctly when number of total assignments is greater than the number of assignments created', async () => {
++      setTabData({
++        grading_policy: {
++          assignment_policies: [
++            {
++              num_droppable: 0,
++              num_total: 5, // two assignments created in the factory, but 5 are expected per Studio settings
++              short_label: 'HW',
++              type: 'Homework',
++              weight: 1,
++            },
++          ],
++          grade_range: {
++            pass: 0.75,
++          },
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('Grade summary')).toBeInTheDocument();
++      // The row is comprised of "{Assignment type} {weight} {grade} {weighted grade}"
++      expect(screen.getByRole('row', { name: 'Homework 100% 20% 20%' })).toBeInTheDocument();
++    });
++    it('calculates weighted grades correctly', async () => {
++      setTabData({
++        grading_policy: {
++          assignment_policies: [
++            {
++              num_droppable: 1,
++              num_total: 2,
++              short_label: 'HW',
++              type: 'Homework',
++              weight: 0.5,
++            },
++            {
++              num_droppable: 0,
++              num_total: 1,
++              short_label: 'Ex',
++              type: 'Exam',
++              weight: 0.5,
++            },
++          ],
++          grade_range: {
++            pass: 0.75,
++          },
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('Grade summary')).toBeInTheDocument();
++      // The row is comprised of "{Assignment type} {footnote - optional} {weight} {grade} {weighted grade}"
++      expect(screen.getByRole('row', { name: 'Homework 1 50% 100% 50%' })).toBeInTheDocument();
++      expect(screen.getByRole('row', { name: 'Exam 50% 0% 0%' })).toBeInTheDocument();
++    });
+   });
+ 
+   describe('Detailed Grades', () => {
+diff --git a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+index 7a608ac..f897b89 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+@@ -15,7 +15,7 @@ function DroppableAssignmentFootnote({ footnotes, intl }) {
+             <sup>{index + 1}</sup>
+             <FormattedMessage
+               id="progress.footnotes.droppableAssignments"
+-              defaultMessage="The lowest {numDroppable, plural, one{# {assignmentType} score} other{# {assignmentType} scores}} will be dropped."
++              defaultMessage="The lowest {numDroppable, plural, one{# {assignmentType} score is} other{# {assignmentType} scores are}} dropped."
+               values={{
+                 numDroppable: footnote.numDroppable,
+                 assignmentType: footnote.assignmentType,
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+index 0ca88f6..d4dcae8 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+@@ -21,18 +21,42 @@ function GradeSummary() {
+     return null;
+   }
+ 
+-  // accumulate grades for individual assignment types
++  // Accumulate grades for each assignment type
+   const gradeByAssignmentType = {};
+   assignmentPolicies.forEach(assignment => {
+-    gradeByAssignmentType[assignment.type] = { numPointsEarned: 0, numPointsPossible: 0 };
++    // Create an array with the number of total assignments and set the scores to 0
++    // as placeholders for assignments that have not yet been released
++    gradeByAssignmentType[assignment.type] = {
++      grades: Array(assignment.numTotal).fill(0),
++      numAssignmentsCreated: 0,
++      numTotalExpectedAssignments: assignment.numTotal,
++    };
+   });
+ 
+   sectionScores.forEach((chapter) => {
+     chapter.subsections.forEach((subsection) => {
+-      if (subsection.hasGradedAssignment) {
+-        gradeByAssignmentType[subsection.assignmentType].numPointsEarned += subsection.numPointsEarned;
+-        gradeByAssignmentType[subsection.assignmentType].numPointsPossible += subsection.numPointsPossible;
++      if (!subsection.hasGradedAssignment) {
++        return;
+       }
++      const {
++        assignmentType,
++        numPointsEarned,
++        numPointsPossible,
++      } = subsection;
++      let {
++        numAssignmentsCreated,
++      } = gradeByAssignmentType[assignmentType];
++
++      numAssignmentsCreated++;
++      if (numAssignmentsCreated <= gradeByAssignmentType[assignmentType].numTotalExpectedAssignments) {
++        // Remove a placeholder grade so long as the number of recorded created assignments is less than the number
++        // of expected assignments
++        gradeByAssignmentType[assignmentType].grades.shift();
++      }
++      // Add the graded assignment to the list
++      gradeByAssignmentType[assignmentType].grades.push(numPointsEarned ? numPointsEarned / numPointsPossible : 0);
++      // Record the created assignment
++      gradeByAssignmentType[assignmentType].numAssignmentsCreated = numAssignmentsCreated;
+     });
+   });
+ 
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index 6f81f0d..3e1e802 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -27,9 +27,23 @@ function GradeSummaryTable({
+ 
+   const footnotes = [];
+ 
+-  const calculateWeightedGrade = (numPointsEarned, numPointsPossible, assignmentWeight) => (
+-    numPointsPossible > 0 ? ((numPointsEarned * assignmentWeight * 100) / numPointsPossible).toFixed(0) : 0
+-  );
++  const calculateAssignmentTypeGrades = (points, assignmentWeight, numDroppable) => {
++    let dropCount = numDroppable;
++    // Drop the lowest grades
++    while (dropCount && points.length >= dropCount) {
++      const lowestScore = Math.min(...points);
++      const lowestScoreIndex = points.indexOf(lowestScore);
++      points.splice(lowestScoreIndex, 1);
++      dropCount--;
++    }
++    let averageGrade = 0;
++    let weightedGrade = 0;
++    if (points.length) {
++      averageGrade = Number(((points.reduce((a, b) => a + b, 0) / points.length) * 100).toFixed(0));
++      weightedGrade = (averageGrade * assignmentWeight).toFixed(0);
++    }
++    return { averageGrade, weightedGrade };
++  };
+ 
+   const getFootnoteId = (assignment) => {
+     const footnoteId = assignment.shortLabel ? assignment.shortLabel : assignment.type;
+@@ -51,16 +65,19 @@ function GradeSummaryTable({
+       footnoteMarker = footnotes.length;
+     }
+ 
+-    const weightedGrade = calculateWeightedGrade(
+-      gradeByAssignmentType[assignment.type].numPointsEarned,
+-      gradeByAssignmentType[assignment.type].numPointsPossible,
++    const {
++      averageGrade,
++      weightedGrade,
++    } = calculateAssignmentTypeGrades(
++      gradeByAssignmentType[assignment.type].grades,
+       assignment.weight,
++      assignment.numDroppable,
+     );
+ 
+     return {
+       type: { footnoteId, footnoteMarker, type: assignment.type },
+       weight: `${assignment.weight * 100}%`,
+-      score: `${gradeByAssignmentType[assignment.type].numPointsEarned}/${gradeByAssignmentType[assignment.type].numPointsPossible}`,
++      grade: `${averageGrade}%`,
+       weightedGrade: `${weightedGrade}%`,
+     };
+   });
+@@ -91,8 +108,8 @@ function GradeSummaryTable({
+             cellClassName: 'float-right small',
+           },
+           {
+-            Header: `${intl.formatMessage(messages.score)}`,
+-            accessor: 'score',
++            Header: `${intl.formatMessage(messages.grade)}`,
++            accessor: 'grade',
+             headerClassName: 'justify-content-end h5 mb-0',
+             cellClassName: 'float-right small',
+           },
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 1fada58..867efb6 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -69,6 +69,10 @@ const messages = defineMessages({
+     id: 'progress.footnotes.title',
+     defaultMessage: 'Grade summary footnotes',
+   },
++  grade: {
++    id: 'progress.gradeSummary.grade',
++    defaultMessage: 'Grade',
++  },
+   grades: {
+     id: 'progress.courseGrade.grades',
+     defaultMessage: 'Grades',
+@@ -88,7 +92,7 @@ const messages = defineMessages({
+   gradeSummaryTooltipBody: {
+     id: 'progress.gradeSummary.tooltip.body',
+     defaultMessage: "Your course assignment's weight is determined by your instructor. "
+-      + 'By multiplying your score by the weight for that assignment type, your weighted grade is calculated. '
++      + 'By multiplying your grade by the weight for that assignment type, your weighted grade is calculated. '
+       + "Your weighted grade is what's used to determine if you pass the course.",
+   },
+   passingGradeLabel: {
+-- 
+2.34.1
+

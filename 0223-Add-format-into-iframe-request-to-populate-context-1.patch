@@ -1,0 +1,102 @@
+From a131a9f9fbd086f0a1b61a03d2b6361765370621 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Tue, 11 Aug 2020 08:32:24 -0700
+Subject: [PATCH 0223/1021] Add format into iframe request to populate context
+ (#174)
+
+The format is used with the due date in the vertical to show
+text like "Homework due ___"
+---
+ src/courseware/course/sequence/SequenceContent.jsx            | 1 +
+ src/courseware/course/sequence/Unit.jsx                       | 4 +++-
+ src/courseware/course/sequence/Unit.test.jsx                  | 3 ++-
+ src/courseware/data/__factories__/sequenceMetadata.factory.js | 1 +
+ src/courseware/data/api.js                                    | 1 +
+ 5 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index 1926adf..c646713 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -50,6 +50,7 @@ function SequenceContent({
+   return (
+     <Unit
+       courseId={courseId}
++      format={sequence.format}
+       key={unitId}
+       id={unitId}
+       onLoaded={unitLoadedHandler}
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 9c39255..059c5ad 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -52,11 +52,12 @@ function useLoadBearingHook(id) {
+ 
+ function Unit({
+   courseId,
++  format,
+   onLoaded,
+   id,
+   intl,
+ }) {
+-  const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0`;
++  const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0&format=${format}`;
+ 
+   const [iframeHeight, setIframeHeight] = useState(0);
+   const [hasLoaded, setHasLoaded] = useState(false);
+@@ -150,6 +151,7 @@ function Unit({
+ 
+ Unit.propTypes = {
+   courseId: PropTypes.string.isRequired,
++  format: PropTypes.string.isRequired,
+   id: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
+   onLoaded: PropTypes.func,
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 6f65251..111feb7 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -27,6 +27,7 @@ describe('Unit', () => {
+     mockData = {
+       id: unit.id,
+       courseId: courseMetadata.id,
++      format: 'Homework',
+     };
+   });
+ 
+@@ -37,7 +38,7 @@ describe('Unit', () => {
+     const renderedUnit = screen.getByTitle(unit.display_name);
+     expect(renderedUnit).toHaveAttribute('height', String(0));
+     expect(renderedUnit).toHaveAttribute(
+-      'src', `http://localhost:18000/xblock/${mockData.id}?show_title=0&show_bookmark_button=0`,
++      'src', `http://localhost:18000/xblock/${mockData.id}?show_title=0&show_bookmark_button=0&format=${mockData.format}`,
+     );
+   });
+ 
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index c53962d..95d0ad2 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -60,6 +60,7 @@ Factory.define('sequenceMetadata')
+     is_time_limited: false,
+     show_completion: true,
+     banner_text: null,
++    format: 'Homework',
+   });
+ 
+ /**
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index e967c6a..f65171a 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -150,6 +150,7 @@ function normalizeSequenceMetadata(sequence) {
+       id: sequence.item_id,
+       unitIds: sequence.items.map(unit => unit.id),
+       bannerText: sequence.banner_text,
++      format: sequence.format,
+       title: sequence.display_name,
+       gatedContent: camelCaseObject(sequence.gated_content),
+       isTimeLimited: sequence.is_time_limited,
+-- 
+2.34.1
+

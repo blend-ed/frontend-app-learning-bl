@@ -1,0 +1,90 @@
+From 6fa6de454371ac957a39f63f59aa006aa08ccbd4 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Tue, 11 May 2021 16:16:41 -0400
+Subject: [PATCH 0459/1021] fix: don't throw an error when there is no verified
+ mode (#444)
+
+AA-759
+---
+ .../StreakCelebrationModal.jsx                | 31 ++++++++++++-------
+ src/tab-page/LoadedTabPage.jsx                |  5 ++-
+ 2 files changed, 22 insertions(+), 14 deletions(-)
+
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index f4d6020..c9fe09d 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -45,6 +45,9 @@ function StreakModal({
+   courseId, metadataModel, streakLengthToCelebrate, intl, isStreakCelebrationOpen,
+   closeStreakCelebration, AA759ExperimentEnabled, verifiedMode, ...rest
+ }) {
++  if (!isStreakCelebrationOpen) {
++    return null;
++  }
+   const { org, celebrations } = useModel(metadataModel, courseId);
+   const factoid = getRandomFactoid(intl, streakLengthToCelebrate);
+   // eslint-disable-next-line no-unused-vars
+@@ -74,18 +77,24 @@ function StreakModal({
+     );
+   }
+ 
+-  const upgradeUrl = `${verifiedMode.upgradeUrl}&code=3DayStreak`;
+-  const mode = {
+-    currencySymbol: verifiedMode.currencySymbol,
+-    price: verifiedMode.price,
+-    upgradeUrl,
+-  };
++  let upgradeUrl;
++  let mode;
++  let offer;
++
++  if (verifiedMode) {
++    upgradeUrl = `${verifiedMode.upgradeUrl}&code=3DayStreak`;
++    mode = {
++      currencySymbol: verifiedMode.currencySymbol,
++      price: verifiedMode.price,
++      upgradeUrl,
++    };
+ 
+-  const offer = {
+-    discountedPrice: (mode.price * 0.85).toFixed(2).toString(),
+-    originalPrice: mode.price.toString(),
+-    upgradeUrl: mode.upgradeUrl,
+-  };
++    offer = {
++      discountedPrice: (mode.price * 0.85).toFixed(2).toString(),
++      originalPrice: mode.price.toString(),
++      upgradeUrl: mode.upgradeUrl,
++    };
++  }
+ 
+   const title = `${streakLengthToCelebrate} ${intl.formatMessage(messages.streakHeader)}`;
+ 
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index df38d2f..8450fee 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -28,6 +28,7 @@ function LoadedTabPage({
+     title,
+     celebrations,
+     canViewLegacyCourseware,
++    verifiedMode,
+   } = useModel(metadataModel, courseId);
+ 
+   // Logistration and enrollment alerts are only really used for the outline tab, but loaded here to put them above
+@@ -38,11 +39,9 @@ function LoadedTabPage({
+   const activeTab = tabs.filter(tab => tab.slug === activeTabSlug)[0];
+ 
+   const streakLengthToCelebrate = celebrations && celebrations.streakLengthToCelebrate;
+-  const AA759ExperimentEnabled = celebrations && celebrations.streakDiscountExperimentEnabled;
++  const AA759ExperimentEnabled = celebrations && celebrations.streakDiscountExperimentEnabled && verifiedMode;
+   const [isStreakCelebrationOpen,, closeStreakCelebration] = useToggle(streakLengthToCelebrate);
+ 
+-  const { verifiedMode } = useModel(metadataModel, courseId);
+-
+   return (
+     <>
+       <Helmet>
+-- 
+2.34.1
+

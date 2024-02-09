@@ -1,0 +1,35 @@
+From 26e1eb64c5b630445ada0feb9837b98f4e069049 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Mon, 14 Jun 2021 09:36:15 -0400
+Subject: [PATCH 0495/1021] fix: ensure clicking the bookmarks button doesn't
+ break the unitHasLoaded property (#481)
+
+---
+ src/courseware/course/sequence/Sequence.jsx | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index af7c641..196982e 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -117,11 +117,16 @@ function Sequence({
+   const handleUnitLoaded = () => {
+     setUnitHasLoaded(true);
+   };
++
++  // We want hide the unit navigation if we're in the middle of navigating to another unit
++  // but not if other things about the unit change, like the bookmark status.
++  // The array property of this useEffect ensures that we only hide the unit navigation
++  // while navigating to another unit.
+   useEffect(() => {
+     if (unit) {
+       setUnitHasLoaded(false);
+     }
+-  }, [unit]);
++  }, [(unit || {}).id]);
+ 
+   if (sequenceStatus === 'loading') {
+     if (!sequenceId) {
+-- 
+2.34.1
+

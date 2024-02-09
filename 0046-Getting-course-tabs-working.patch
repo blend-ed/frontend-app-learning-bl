@@ -1,0 +1,181 @@
+From 740e22e4c8ff540d7319c217415a2f17470c810e Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Thu, 16 Jan 2020 17:05:03 -0500
+Subject: [PATCH 0046/1021] Getting course tabs working.
+
+---
+ src/courseware/CourseContainer.jsx            |  6 +--
+ src/courseware/course/Course.jsx              | 11 ++++-
+ .../course/CourseTabsNavigation.jsx           | 41 ++-----------------
+ src/courseware/course/NavTab.jsx              |  5 ++-
+ 4 files changed, 20 insertions(+), 43 deletions(-)
+
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index 9764f31..6a78313 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -52,7 +52,6 @@ function useLoadCourse(courseUsageKey) {
+   };
+ }
+ 
+-
+ function CourseContainer(props) {
+   const { intl, match } = props;
+   const {
+@@ -60,7 +59,7 @@ function CourseContainer(props) {
+     sequenceId,
+     unitId,
+   } = match.params;
+-  const { models, courseId } = useLoadCourse(courseUsageKey);
++  const { models, courseId, metadata } = useLoadCourse(courseUsageKey);
+ 
+   useEffect(() => {
+     if (courseId && !sequenceId) {
+@@ -80,13 +79,14 @@ function CourseContainer(props) {
+     );
+   }
+ 
+-  return (
++  return metadata && (
+     <Course
+       courseUsageKey={courseUsageKey}
+       courseId={courseId}
+       sequenceId={sequenceId}
+       unitId={unitId}
+       models={models}
++      tabs={metadata.tabs}
+     />
+   );
+ }
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index f612a8e..6625e1c 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -10,7 +10,7 @@ import CourseHeader from './CourseHeader';
+ import CourseTabsNavigation from './CourseTabsNavigation';
+ 
+ export default function Course({
+-  courseUsageKey, courseId, sequenceId, unitId, models,
++  courseUsageKey, courseId, sequenceId, unitId, models, tabs,
+ }) {
+   const nextSequenceHandler = useCallback(() => {
+     const sequenceIds = createSequenceIdList(models, courseId);
+@@ -39,7 +39,7 @@ export default function Course({
+       <CourseHeader courseId={courseId} models={models} />
+       <main className="d-flex flex-column flex-grow-1">
+         <div className="container-fluid">
+-          <CourseTabsNavigation className="mb-3" activeTabSlug="course" />
++          <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug="courseware" />
+           <AlertList topic="course" className="mb-3" />
+           <CourseBreadcrumbs
+             courseUsageKey={courseUsageKey}
+@@ -75,6 +75,13 @@ Course.propTypes = {
+     children: PropTypes.arrayOf(PropTypes.string),
+     parentId: PropTypes.string,
+   })).isRequired,
++  tabs: PropTypes.arrayOf(PropTypes.shape({
++    slug: PropTypes.string.isRequired,
++    priority: PropTypes.number.isRequired,
++    title: PropTypes.string.isRequired,
++    type: PropTypes.string.isRequired,
++    url: PropTypes.string.isRequired,
++  })).isRequired,
+ };
+ 
+ Course.defaultProps = {
+diff --git a/src/courseware/course/CourseTabsNavigation.jsx b/src/courseware/course/CourseTabsNavigation.jsx
+index 2c4fc06..696d6e2 100644
+--- a/src/courseware/course/CourseTabsNavigation.jsx
++++ b/src/courseware/course/CourseTabsNavigation.jsx
+@@ -7,9 +7,9 @@ import messages from './messages';
+ import NavTab from './NavTab';
+ 
+ function CourseTabsNavigation({
+-  activeTabSlug, courseTabs, intl, className,
++  activeTabSlug, tabs, intl, className,
+ }) {
+-  const courseNavTabs = courseTabs.map(({ slug, ...courseTab }) => (
++  const courseNavTabs = tabs.map(({ slug, ...courseTab }) => (
+     <NavTab
+       isActive={slug === activeTabSlug}
+       key={slug}
+@@ -30,51 +30,18 @@ function CourseTabsNavigation({
+ CourseTabsNavigation.propTypes = {
+   activeTabSlug: PropTypes.string,
+   className: PropTypes.string,
+-  courseTabs: PropTypes.arrayOf(PropTypes.shape({
++  tabs: PropTypes.arrayOf(PropTypes.shape({
+     title: PropTypes.string.isRequired,
+     priority: PropTypes.number.isRequired,
+     slug: PropTypes.string.isRequired,
+     url: PropTypes.string.isRequired,
+-  })),
++  })).isRequired,
+   intl: intlShape.isRequired,
+ };
+ 
+ CourseTabsNavigation.defaultProps = {
+   activeTabSlug: undefined,
+   className: null,
+-  courseTabs: [
+-    {
+-      title: 'Course',
+-      slug: 'course',
+-      priority: 1,
+-      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course/',
+-    },
+-
+-    {
+-      title: 'Discussion',
+-      slug: 'discussion',
+-      priority: 2,
+-      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/discussion/forum/',
+-    },
+-    {
+-      title: 'Wiki',
+-      slug: 'wiki',
+-      priority: 3,
+-      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/course_wiki',
+-    },
+-    {
+-      title: 'Progress',
+-      slug: 'progress',
+-      priority: 4,
+-      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/progress',
+-    },
+-    {
+-      title: 'Instructor',
+-      slug: 'instructor',
+-      priority: 5,
+-      url: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/instructor',
+-    },
+-  ],
+ };
+ 
+ export default injectIntl(CourseTabsNavigation);
+diff --git a/src/courseware/course/NavTab.jsx b/src/courseware/course/NavTab.jsx
+index 6f01712..1bb3f1e 100644
+--- a/src/courseware/course/NavTab.jsx
++++ b/src/courseware/course/NavTab.jsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
++import { getConfig } from '@edx/frontend-platform';
+ 
+ 
+ export default function NavTab(props) {
+@@ -14,7 +15,9 @@ export default function NavTab(props) {
+     attrs.className,
+   );
+ 
+-  return <a {...attrs} className={className} href={url}>{title}</a>;
++  // TODO: We probably don't want to blindly add LMS_BASE_URL here.  I think it's more likely
++  // that the course metadata API should provide us fully qualified URLs.
++  return <a {...attrs} className={className} href={`${getConfig().LMS_BASE_URL}${url}`}>{title}</a>;
+ }
+ 
+ NavTab.propTypes = {
+-- 
+2.34.1
+

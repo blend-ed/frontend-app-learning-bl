@@ -1,0 +1,932 @@
+From ab98cca421887cd9e6924c905243913c147b853a Mon Sep 17 00:00:00 2001
+From: Ben Holt <bholt+github@edx.org>
+Date: Mon, 15 Mar 2021 14:31:21 -0400
+Subject: [PATCH 0406/1021] Cleaned up all references to REV-1512's value prop
+ experiment (#379)
+
+Cleaned up all references to REV-1512's value prop experiment [REV-2123]
+---
+ src/alerts/offer-alert/OfferAlert.jsx         |   3 +-
+ src/courseware/course/Course.jsx              |  37 +--
+ src/courseware/course/CourseBreadcrumbs.jsx   |  30 +--
+ src/courseware/course/sequence/Sequence.jsx   | 189 +-------------
+ src/courseware/course/sequence/Unit.jsx       |  13 +-
+ .../lock-paywall-value-prop/LockPaywall.jsx   | 238 ------------------
+ .../lock-paywall-value-prop/LockPaywall.scss  |  93 -------
+ .../LockPaywall.test.jsx                      |  44 ----
+ .../sequence/lock-paywall-value-prop/index.js |   2 -
+ .../SequenceNavigation.jsx                    |  31 +--
+ .../upgrade-button/FormattedPricing.jsx       |   3 +-
+ 11 files changed, 10 insertions(+), 673 deletions(-)
+ delete mode 100644 src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
+ delete mode 100644 src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.scss
+ delete mode 100644 src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
+ delete mode 100644 src/courseware/course/sequence/lock-paywall-value-prop/index.js
+
+diff --git a/src/alerts/offer-alert/OfferAlert.jsx b/src/alerts/offer-alert/OfferAlert.jsx
+index f271e11..a21e3df 100644
+--- a/src/alerts/offer-alert/OfferAlert.jsx
++++ b/src/alerts/offer-alert/OfferAlert.jsx
+@@ -29,8 +29,7 @@ function OfferAlert({ intl, payload }) {
+ 
+   return (
+     <Alert type={ALERT_TYPES.INFO}>
+-      {/* the first-purchase-offer-banner class can be removed post REV-1512 experiment */}
+-      <span className="font-weight-bold first-purchase-offer-banner">
++      <span className="font-weight-bold">
+         <FormattedMessage
+           id="learning.offer.header"
+           defaultMessage="Upgrade by {date} and save {percentage}% [{fullPricing}]"
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index afae988..bfd8f67 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React from 'react';
+ import PropTypes from 'prop-types';
+ import { Helmet } from 'react-helmet';
+ import { useDispatch } from 'react-redux';
+@@ -57,35 +57,6 @@ function Course({
+     courseId, sequenceId, unitId, celebrateFirstSection, dispatch, celebrations,
+   );
+ 
+-  // The below block of code should be reverted after the REV1512 experiment
+-  const [REV1512FlyoverEnabled, setREV1512FlyoverEnabled] = useState(false);
+-  window.enableREV1512Flyover = () => {
+-    setREV1512FlyoverEnabled(true);
+-  };
+-  const getCookie = (name) => {
+-    const match = document.cookie.match(`${name}=([^;]*)`);
+-    return match ? match[1] : undefined;
+-  };
+-  const userAgent = typeof window.navigator === 'undefined' ? '' : navigator.userAgent;
+-  const isMobile = Boolean(
+-    userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i),
+-  );
+-  const [REV1512FlyoverVisible, setREV1512FlyoverVisible] = useState(isMobile ? false : !(getCookie(`REV1512FlyoverVisible${courseId}`) === 'false'));
+-  const isREV1512FlyoverVisible = () => REV1512FlyoverEnabled && (REV1512FlyoverVisible || getCookie('REV1512FlyoverVisible') === 'true');
+-  const toggleREV1512Flyover = () => {
+-    const setCookie = (cookieName, value, domain) => {
+-      const cookieDomain = (typeof domain === 'undefined') ? '' : `domain=${domain};`;
+-      const exdate = new Date();
+-      exdate.setHours(exdate.getHours() + 4);
+-      const cookieValue = `${escape(value)}; expires=${exdate.toUTCString()}`;
+-      document.cookie = `${cookieName}=${cookieValue};${cookieDomain}path=/`;
+-    };
+-    const isVisible = isREV1512FlyoverVisible();
+-    setCookie(`REV1512FlyoverVisible${courseId}`, !isVisible);
+-    setREV1512FlyoverVisible(!isVisible);
+-  };
+-  // The above block of code should be reverted after the REV1512 experiment
+-
+   /** [MM-P2P] Experiment */
+   const MMP2P = initCoursewareMMP2P(courseId, sequenceId, unitId);
+ 
+@@ -109,9 +80,6 @@ function Course({
+         courseId={courseId}
+         sectionId={section ? section.id : null}
+         sequenceId={sequenceId}
+-        toggleREV1512Flyover={toggleREV1512Flyover} /* This line should be reverted after REV1512 experiment */
+-        REV1512FlyoverEnabled={REV1512FlyoverEnabled} /* This line should be reverted after REV1512 experiment */
+-        isREV1512FlyoverVisible={isREV1512FlyoverVisible} /* This line should be reverted after REV1512 experiment */
+         //* * [MM-P2P] Experiment */
+         mmp2p={MMP2P}
+       />
+@@ -123,9 +91,6 @@ function Course({
+         unitNavigationHandler={unitNavigationHandler}
+         nextSequenceHandler={nextSequenceHandler}
+         previousSequenceHandler={previousSequenceHandler}
+-        toggleREV1512Flyover={toggleREV1512Flyover} /* This line should be reverted after REV1512 experiment */
+-        isREV1512FlyoverVisible={isREV1512FlyoverVisible} /* This line should be reverted after REV1512 experiment */
+-        REV1512FlyoverEnabled={REV1512FlyoverEnabled} /* This line should be reverted after REV1512 experiment */
+         //* * [MM-P2P] Experiment */
+         mmp2p={MMP2P}
+       />
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 1111182..a90dd5e 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -39,9 +39,6 @@ export default function CourseBreadcrumbs({
+   courseId,
+   sectionId,
+   sequenceId,
+-  toggleREV1512Flyover, /* This line should be reverted after the REV1512 experiment */
+-  REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
+-  isREV1512FlyoverVisible, /* This line should be reverted after the REV1512 experiment */
+   /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
+@@ -62,12 +59,6 @@ export default function CourseBreadcrumbs({
+     return [];
+   }, [courseStatus, sequenceStatus]);
+ 
+-  // These should be reverted after the REV1512 experiment
+-  const userAgent = typeof window.navigator === 'undefined' ? '' : navigator.userAgent;
+-  const isMobile = Boolean(
+-    userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i),
+-  );
+-
+   return (
+     <nav aria-label="breadcrumb" className="my-4">
+       <ol className="list-unstyled d-flex m-0">
+@@ -96,22 +87,7 @@ export default function CourseBreadcrumbs({
+             {label}
+           </CourseBreadcrumb>
+         ))}
+-        {/* The below block of code should be reverted after the REV1512 experiment */}
+-        {/** [MM-P2P] Experiment (additional conditional) */}
+-        {REV1512FlyoverEnabled && !mmp2p.state.isEnabled && !isMobile && (
+-          <div
+-            className="toggleFlyoverButton"
+-            aria-hidden="true"
+-            style={{ marginLeft: 'auto', marginTop: '-16px', borderBottom: isREV1512FlyoverVisible() ? '2px solid #00262b' : 'none' }}
+-            onClick={() => {
+-              toggleREV1512Flyover();
+-            }}
+-          >
+-            <svg width="54" height="40" viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+-              <rect x="0.5" y="0.5" width="53" height="39" rx="1.5" fill="white" stroke="#E7E8E9" /><path d="M36 20C36 15.6 32.4 12 28 12C27.7 12 27.5 12.2 27.5 12.5C27.5 12.8 27.7 13 28 13C31.85 13 35 16.15 35 20C35 23.85 31.85 27 28 27C24.15 27 21 23.85 21 20C21 19.7 20.8 19.5 20.5 19.5C20.3 19.5 20.1 19.65 20.05 19.8C20 19.85 20 19.95 20 20C20 24.4 23.6 28 28 28C32.4 28 36 24.4 36 20Z" fill="black" stroke="black" strokeWidth="0.6" /><path d="M23.1065 14.52C22.9403 14.36 22.691 14.36 22.5247 14.52C22.3585 14.68 22.3585 14.92 22.5247 15.08C22.6078 15.16 22.7325 15.2 22.8156 15.2C22.9403 15.2 23.0234 15.16 23.1065 15.08C23.2312 14.96 23.2312 14.68 23.1065 14.52Z" fill="black" stroke="black" strokeWidth="0.6" /><path d="M27.6848 15.2C27.3939 15.2 27.2 15.3973 27.2 15.6932V19.6384C27.2 19.6877 27.2 19.7863 27.2484 19.8356C27.2969 19.8849 27.2969 19.9343 27.3454 19.9836L29.5757 22.2521C29.6727 22.3507 29.8181 22.4 29.9151 22.4C30.0121 22.4 30.1575 22.3507 30.2545 22.2521C30.4484 22.0548 30.4484 21.7589 30.2545 21.5617L28.1696 19.4411V15.6932C28.1696 15.3973 27.9757 15.2 27.6848 15.2Z" fill="black" stroke="black" strokeWidth="0.6" /><circle cx="35.5" cy="14.5" r="4.5" fill="#C32D3A" />
+-            </svg>
+-          </div>
+-        )}
++
+         {/** [MM-P2P] Experiment */}
+         {mmp2p.state.isEnabled && (
+           <MMP2PFlyoverTrigger options={mmp2p} />
+@@ -125,10 +101,6 @@ CourseBreadcrumbs.propTypes = {
+   courseId: PropTypes.string.isRequired,
+   sectionId: PropTypes.string,
+   sequenceId: PropTypes.string,
+-  toggleREV1512Flyover: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+-  REV1512FlyoverEnabled: PropTypes.bool.isRequired, /* This line should be reverted after the REV1512 experiment */
+-  isREV1512FlyoverVisible: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+-
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+     state: PropTypes.shape({
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 36d2106..010a683 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -11,10 +11,6 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useSelector } from 'react-redux';
+ import { history } from '@edx/frontend-platform';
+ 
+-// These should be reverted after the REV1512 experiment
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
+-
+ import PageLoading from '../../../generic/PageLoading';
+ import { UserMessagesContext, ALERT_TYPES } from '../../../generic/user-messages';
+ import { useModel } from '../../../generic/model-store';
+@@ -25,165 +21,9 @@ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import SequenceContent from './SequenceContent';
+ 
+ /** [MM-P2P] Experiment */
++import { isMobile } from '../../../experiments/mm-p2p/utils';
+ import { MMP2PFlyover, MMP2PFlyoverMobile } from '../../../experiments/mm-p2p';
+ 
+-function REV1512Flyover({ toggleREV1512Flyover }) {
+-  // This component should be reverted after the REV1512 experiment
+-  return (
+-    <div
+-      className="rev-1512-box"
+-      style={{
+-        border: 'solid 1px #e1dddb',
+-        height: '393px',
+-        width: '330px',
+-        verticalAlign: 'top',
+-        marginLeft: '20px',
+-        padding: '0 20px 20px 20px',
+-      }}
+-    >
+-      <div
+-        className="rev-1512-notification-div"
+-        style={{
+-          margin: '0 -20px 15px',
+-          padding: '9px 20px 0',
+-          fontSize: '16px',
+-        }}
+-      >
+-        <span className="rev-1512-notification-span">Notifications</span>
+-        <span
+-          onClick={() => {
+-            toggleREV1512Flyover();
+-          }}
+-          className="hideFlyover"
+-          onKeyPress={(event) => {
+-            if (event.key === 'Enter') {
+-              toggleREV1512Flyover();
+-            }
+-          }}
+-          role="button"
+-          tabIndex={0}
+-        >
+-          <svg
+-            width="14"
+-            height="14"
+-            viewBox="0 0 14 14"
+-            fill="none"
+-            xmlns="http://www.w3.org/2000/svg"
+-            style={{
+-              float: 'right',
+-              marginTop: '5.5px',
+-            }}
+-          >
+-            <path d="M9.60625 7L13.5152 3.09102C13.9949 2.61133 13.9949 1.83359 13.5152 1.35352L12.6465 0.484766C12.1668 0.00507814 11.3891 0.00507814 10.909 0.484766L7 4.39375L3.09102 0.484766C2.61133 0.00507814 1.83359 0.00507814 1.35352 0.484766L0.484766 1.35352C0.00507814 1.8332 0.00507814 2.61094 0.484766 3.09102L4.39375 7L0.484766 10.909C0.00507814 11.3887 0.00507814 12.1664 0.484766 12.6465L1.35352 13.5152C1.8332 13.9949 2.61133 13.9949 3.09102 13.5152L7 9.60625L10.909 13.5152C11.3887 13.9949 12.1668 13.9949 12.6465 13.5152L13.5152 12.6465C13.9949 12.1668 13.9949 11.3891 13.5152 10.909L9.60625 7Z" fill="black" />
+-          </svg>
+-        </span>
+-        <div
+-          className="rev-1512-notification-block"
+-          style={{
+-            height: '9px',
+-            background: '#F9F9F9',
+-            margin: '7px -20px 0',
+-            borderTop: '1px solid rgb(225, 221, 219)',
+-            borderBottom: '1px solid rgb(225, 221, 219)',
+-          }}
+-        />
+-      </div>
+-      <div className="rev-1512-optimizely-flyover-container" />
+-    </div>
+-  );
+-}
+-REV1512Flyover.propTypes = {
+-  toggleREV1512Flyover: PropTypes.func.isRequired,
+-};
+-
+-function REV1512FlyoverMobile({ toggleREV1512Flyover }) {
+-  // This component should be reverted after the REV1512 experiment
+-  return (
+-    <div
+-      className="rev-1512-box"
+-      style={{
+-        verticalAlign: 'top',
+-        padding: '0 20px 20px 20px',
+-        position: 'fixed',
+-        backgroundColor: 'white',
+-        zIndex: 1,
+-        height: '100%',
+-        width: '100%',
+-        top: 0,
+-        left: 0,
+-      }}
+-    >
+-      <div
+-        className="rev-1512-mobile-return-div"
+-        style={{
+-          margin: '0 -20px',
+-          padding: '9px 20px 15px',
+-          fontSize: '16px',
+-          borderBottom: '1px solid rgb(225, 221, 219)',
+-        }}
+-      >
+-        <span
+-          className="rev-1512-mobile-return-span"
+-          onClick={toggleREV1512Flyover}
+-          onKeyPress={(event) => {
+-            if (event.key === 'Enter') {
+-              toggleREV1512Flyover();
+-            }
+-          }}
+-          role="button"
+-          tabIndex={0}
+-          style={{
+-            color: '#00262B',
+-            cursor: 'pointer',
+-          }}
+-        >
+-          <FontAwesomeIcon
+-            icon={faChevronLeft}
+-            className="mr-2 fa-lg"
+-            style={{
+-              marginBottom: 2,
+-            }}
+-          />
+-          <span className="rev-1512-mobile-return-text">
+-            Back to course
+-          </span>
+-        </span>
+-      </div>
+-      <div
+-        className="rev-1512-notification-div"
+-        style={{
+-          margin: '0 -20px 15px',
+-          padding: '9px 20px 0',
+-          fontSize: '16px',
+-        }}
+-      >
+-        <span
+-          className="rev-1512-notification-span"
+-          style={{
+-            color: '#00262B',
+-          }}
+-        >
+-          Notifications
+-        </span>
+-        <div
+-          className="rev-1512-notification-block"
+-          style={{
+-            height: '9px',
+-            background: '#F9F9F9',
+-            margin: '7px -20px 0',
+-            borderTop: '1px solid rgb(225, 221, 219)',
+-            borderBottom: '1px solid rgb(225, 221, 219)',
+-          }}
+-        />
+-      </div>
+-      <div className="rev-1512-optimizely-flyover-container" />
+-    </div>
+-  );
+-}
+-REV1512FlyoverMobile.propTypes = {
+-  toggleREV1512Flyover: PropTypes.func.isRequired,
+-};
+-
+ function Sequence({
+   unitId,
+   sequenceId,
+@@ -192,10 +32,6 @@ function Sequence({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   intl,
+-  isREV1512FlyoverVisible, /* This line should be reverted after the REV1512 experiment */
+-  REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
+-  toggleREV1512Flyover, /* This line should be reverted after the REV1512 experiment */
+-  /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+@@ -212,12 +48,6 @@ function Sequence({
+     }
+   };
+ 
+-  // These should be reverted after the REV1512 experiment:
+-  const userAgent = typeof window.navigator === 'undefined' ? '' : navigator.userAgent;
+-  const isMobile = Boolean(
+-    userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i),
+-  );
+-
+   const handlePrevious = () => {
+     const previousIndex = sequence.unitIds.indexOf(unitId) - 1;
+     if (previousIndex >= 0) {
+@@ -320,9 +150,7 @@ function Sequence({
+               sequenceId={sequenceId}
+               unitId={unitId}
+               className="mb-4"
+-              toggleREV1512Flyover={toggleREV1512Flyover} /* This line should be reverted after REV1512 experiment */
+-              REV1512FlyoverEnabled={REV1512FlyoverEnabled} /* This line should be reverted after REV1512 experiment */
+-              isREV1512FlyoverVisible={isREV1512FlyoverVisible} /* should be reverted after REV1512 experiment */
++
+               /** [MM-P2P] Experiment */
+               mmp2p={mmp2p}
+ 
+@@ -367,16 +195,10 @@ function Sequence({
+               )}
+             </div>
+           </div>
+-          {/* This block of code should be reverted post REV1512 experiment */}
+-          {/** [MM-P2P] Experiment (additional conditional) */}
+-          {!mmp2p.state.isEnabled && REV1512FlyoverEnabled && isREV1512FlyoverVisible() && (
+-            isMobile
+-              ? <REV1512FlyoverMobile toggleREV1512Flyover={toggleREV1512Flyover} />
+-              : <REV1512Flyover toggleREV1512Flyover={toggleREV1512Flyover} />
+-          )}
++
+           {/** [MM-P2P] Experiment */}
+           {(mmp2p.state.isEnabled && mmp2p.flyover.isVisible) && (
+-            isMobile
++            isMobile()
+               ? <MMP2PFlyoverMobile options={mmp2p} />
+               : <MMP2PFlyover options={mmp2p} />
+           )}
+@@ -402,9 +224,6 @@ Sequence.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   intl: intlShape.isRequired,
+-  toggleREV1512Flyover: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+-  isREV1512FlyoverVisible: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+-  REV1512FlyoverEnabled: PropTypes.bool.isRequired, /* This line should be reverted after the REV1512 experiment */
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 74ade1b..19b8fcc 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -22,7 +22,6 @@ import { fetchCourse } from '../../data/thunks';
+ import { MMP2PLockPaywall } from '../../../experiments/mm-p2p';
+ 
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
+-const LockPaywallValuePropExperiment = React.lazy(() => import('./lock-paywall-value-prop'));
+ 
+ /**
+  * We discovered an error in Firefox where - upon iframe load - React would cease to call any
+@@ -75,14 +74,6 @@ function Unit({
+   const [iframeHeight, setIframeHeight] = useState(0);
+   const [hasLoaded, setHasLoaded] = useState(false);
+   const [modalOptions, setModalOptions] = useState({ open: false });
+-  const [rev1512ValuePropExperimentLock, setRev1512ValuePropExperimentLock] = useState(
+-    window.rev1512ValuePropExperimentLock,
+-  );
+-  /* TODO: The code block below + code referencing it should be deleted after REV1512 value prop experiment */
+-  window.rev1512ToggleValuePropPaywallLock = () => {
+-    window.rev1512ValuePropExperimentLock = !rev1512ValuePropExperimentLock;
+-    setRev1512ValuePropExperimentLock(!rev1512ValuePropExperimentLock);
+-  };
+ 
+   const unit = useModel('units', id);
+   const course = useModel('coursewareMeta', courseId);
+@@ -142,9 +133,7 @@ function Unit({
+             />
+           )}
+         >
+-          {(rev1512ValuePropExperimentLock)
+-            ? <LockPaywallValuePropExperiment courseId={courseId} />
+-            : <LockPaywall courseId={courseId} />}
++          <LockPaywall courseId={courseId} />
+         </Suspense>
+       )}
+       { /** [MM-P2P] Experiment */ }
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
+deleted file mode 100644
+index 0501c7d..0000000
+--- a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
++++ /dev/null
+@@ -1,238 +0,0 @@
+-/* TODO: This file should be deleted after REV1512 value prop experiment */
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faLock } from '@fortawesome/free-solid-svg-icons';
+-import { faCheckCircle } from '@fortawesome/free-regular-svg-icons';
+-import {
+-  injectIntl, getLocale,
+-} from '@edx/frontend-platform/i18n';
+-import { Button } from '@edx/paragon';
+-import classNames from 'classnames';
+-
+-import VerifiedCert from '../../../../generic/assets/edX_certificate.png';
+-import { useModel } from '../../../../generic/model-store';
+-import './LockPaywall.scss';
+-
+-function LockPaywall({
+-  courseId,
+-}) {
+-  const course = useModel('coursewareMeta', courseId);
+-  const {
+-    verifiedMode,
+-  } = course;
+-  if (!verifiedMode) {
+-    return null;
+-  }
+-  const {
+-    currencySymbol,
+-    price,
+-    upgradeUrl,
+-  } = verifiedMode;
+-
+-  const isSpanish = getLocale() === 'es-419';
+-
+-  let upgradeButtonText;
+-
+-  if (document.querySelector('.price.discount') !== null) {
+-    let discountPrice = document.querySelector('.price.discount').textContent;
+-    if (discountPrice !== null) {
+-      discountPrice = discountPrice.replace(/[^0-9.]/g, '');
+-    }
+-
+-    if (isSpanish) {
+-      upgradeButtonText = (
+-        <>
+-          <span className="font-weight-bold" style={{ paddingRight: '5px' }}>
+-            Cómpralo por {currencySymbol}{discountPrice}
+-          </span>
+-          <span style={{ textDecoration: 'line-through' }}>
+-            ({currencySymbol}{price})
+-          </span>
+-        </>
+-      );
+-    } else {
+-      upgradeButtonText = (
+-        <>
+-          <span className="font-weight-bold" style={{ paddingRight: '5px' }}>
+-            Upgrade for {currencySymbol}{discountPrice}
+-          </span>
+-          <span style={{ textDecoration: 'line-through' }}>
+-            ({currencySymbol}{price})
+-          </span>
+-        </>
+-      );
+-    }
+-  } else if (isSpanish) {
+-    upgradeButtonText = (
+-      <>
+-        <span className="font-weight-bold" style={{ paddingRight: '5px' }}>
+-          Cómpralo por {currencySymbol}{price}
+-        </span>
+-      </>
+-    );
+-  } else {
+-    upgradeButtonText = (
+-      <>
+-        <span className="font-weight-bold" style={{ paddingRight: '5px' }}>
+-          Upgrade for {currencySymbol}{price}
+-        </span>
+-      </>
+-    );
+-  }
+-
+-  const circleCheckIcon = (
+-    <FontAwesomeIcon
+-      icon={faCheckCircle}
+-      className="float-left mt-1"
+-      fixedWidth
+-      aria-hidden="true"
+-      title="icon"
+-      style={{ marginRight: '15px' }}
+-    />
+-  );
+-  const verifiedCertificateLink = (
+-    <b>
+-      <a
+-        className="value-prop-verified-certificate-link"
+-        style={{ textDecoration: 'underline', color: '#00688D' }}
+-        rel="noopener noreferrer"
+-        target="_blank"
+-        href="https://www.edx.org/verified-certificate"
+-      >
+-        { (isSpanish) ? 'certificado verificado' : 'verified certificate' }
+-      </a>
+-    </b>
+-  );
+-
+-  const userAgent = typeof window.navigator === 'undefined' ? '' : navigator.userAgent;
+-  const isMobile = Boolean(
+-    userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i),
+-  );
+-
+-  return (
+-    <div className="border border-gray d-flex justify-content-between mt-2 p-3 value-prop-lock-paywall-banner">
+-      <div className={classNames({ 'is-mobile': isMobile })}>
+-        <div className="font-weight-bold top-banner-text-header">
+-          <FontAwesomeIcon icon={faLock} className="text-black mr-2 ml-1 lock-icon" style={{ fontSize: '1rem' }} />
+-          <span className="top-banner-title">
+-            {
+-              isSpanish
+-                ? 'Las tareas calificadas están bloqueadas'
+-                : 'Graded assignments are locked'
+-            }
+-          </span>
+-        </div>
+-        <div className="font-weight top-banner-text">
+-          {
+-            isSpanish
+-              ? 'Cámbiate a la opción verificada para obtener acceso a funciones bloqueadas como esta y aprovechar al máximo tu curso.'
+-              : 'Upgrade to gain access to locked features like this one and get the most out of your course.'
+-          }
+-        </div>
+-
+-        <div className={classNames('mb-0', 'cert-list-wrapper', { 'd-flex': !isMobile })}>
+-
+-          <div className="certificate-image-banner-container">
+-            <img
+-              alt="Example Certificate"
+-              src={VerifiedCert}
+-              className="border-0 certificate-image-banner"
+-            />
+-          </div>
+-          <div className="list-container" style={{ float: 'left', paddingLeft: '18px', paddingBottom: '24px' }}>
+-            <div style={{ paddingBottom: '5px' }}>
+-              {
+-                isSpanish
+-                  ? 'Cuando te cambias a la opción verificada, tú:'
+-                  : 'When you upgrade, you:'
+-              }
+-            </div>
+-
+-            <div className="list-item-row">
+-              <div className="check-circle-icon-wrapper">{circleCheckIcon}</div>
+-              <div className="list-item-wrapper">
+-                <span>
+-                  {
+-                      isSpanish
+-                        ? <>Obtén un {verifiedCertificateLink} de finalización para compartirlo en tu currículum</>
+-                        : <>Earn a {verifiedCertificateLink} of completion to showcase on your resume</>
+-                    }
+-                </span>
+-              </div>
+-            </div>
+-
+-            <div className="list-item-row">
+-              <div className="check-circle-icon-wrapper">{circleCheckIcon}</div>
+-              <div className="list-item-wrapper">
+-                {
+-                  isSpanish
+-                    ? 'Desbloquea el acceso a todas las actividades del curso, incluidas las '
+-                    : 'Unlock access to all course activities, including '
+-                }
+-                <span className="font-weight-bold">
+-                  {
+-                    isSpanish
+-                      ? 'tareas calificadas'
+-                      : 'graded assignments'
+-                  }
+-                </span>
+-              </div>
+-            </div>
+-
+-            <div className="list-item-row">
+-              <div className="check-circle-icon-wrapper">{circleCheckIcon}</div>
+-              <div className="list-item-wrapper">
+-                <span className="font-weight-bold">
+-                  {
+-                    isSpanish
+-                      ? 'Acceso completo'
+-                      : 'Gain full access'
+-                  }
+-                </span>
+-                {
+-                  isSpanish
+-                    ? ' al contenido y los materiales del curso, incluso después de que finalice el curso'
+-                    : ' to course content and materials, even after the course ends'
+-                }
+-              </div>
+-            </div>
+-
+-            <div className="list-item-row">
+-              <div className="check-circle-icon-wrapper">{circleCheckIcon}</div>
+-              <div className="list-item-wrapper">
+-                {
+-                  isSpanish
+-                    ? 'Apoya nuestra '
+-                    : 'Support our '
+-                }
+-                <span className="font-weight-bold">
+-                  {
+-                    isSpanish
+-                      ? 'misión sin fines de lucro'
+-                      : 'non-profit mission'
+-                  }
+-                </span>
+-                {
+-                  isSpanish
+-                    ? ' en edX'
+-                    : ' at edX'
+-                }
+-              </div>
+-            </div>
+-          </div>
+-        </div>
+-
+-        <div className="value-prop-upgrade-button-container">
+-          <Button variant="primary" href={upgradeUrl} className="value-prop-lock-paywall-upgrade-link">
+-            {upgradeButtonText}
+-          </Button>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-LockPaywall.propTypes = {
+-  courseId: PropTypes.string.isRequired,
+-};
+-export default injectIntl(LockPaywall);
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.scss b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.scss
+deleted file mode 100644
+index d539bee..0000000
+--- a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.scss
++++ /dev/null
+@@ -1,93 +0,0 @@
+-/* TODO: This file should be deleted after REV1512 value prop experiment */
+-.value-prop-lock-paywall-banner {
+-    background-color: #f8f9fa;
+-
+-    .list-item-row {
+-        display: flex;
+-        margin-left: -7px;
+-        line-height: 1.5rem;
+-        padding-left: 5px;
+-    }
+-    .certificate-image-banner {
+-        width: 172px;
+-        height: 123px;
+-        margin-top: 6px;
+-    }
+-    .certificate-image-banner-container {
+-        display: inline-block;
+-        float: left;
+-        padding-left: 20px;
+-        flex-shrink: 0;
+-    }
+-    .top-banner-text {
+-        margin-bottom: 16px;
+-        padding-left: 20px;
+-    }
+-    .top-banner-text-header {
+-        padding-left: 20px;
+-    }
+-    .value-prop-upgrade-button-container {
+-        padding-left: 20px;
+-    }
+-    .is-mobile {
+-        padding-top: 10px;
+-
+-        .certificate-image-banner-container {
+-            text-align: center;
+-            display: block;
+-            float: none;
+-            padding-left: 0px;
+-        }
+-        .certificate-image-banner {
+-            width: 180px;
+-            height: 128px;
+-            margin-top: 3px;
+-            margin-bottom: 5px;
+-        }
+-        .top-banner-text-header {
+-            margin-left:36px;
+-            position: relative;
+-            padding-left: 10px;
+-        }
+-        .top-banner-text {
+-            margin-left:36px;
+-            margin-bottom: 4px;
+-            position: relative;
+-            padding-left: 10px;
+-        }
+-        .lock-icon {
+-            position: absolute;
+-            left: -28px;
+-            top: 4px;
+-        }
+-        .value-prop-upgrade-button-container {
+-            text-align: center;
+-            padding-bottom: 20px;
+-            padding-top: 20px;
+-            padding-left: 0px;
+-        }
+-    }
+-
+-    @media only screen and (max-width: 576px) {
+-        .top-banner-text-header {
+-            padding-top: 10px;
+-        }
+-        .top-banner-text {
+-            padding-left: 47px !important;
+-        }
+-        .cert-list-wrapper {
+-            display: block !important;
+-        }
+-        .certificate-image-banner-container {
+-            width: 100%;
+-            padding-bottom: 10px;
+-            padding-left: 0px !important;
+-            text-align: center;
+-        }
+-        .value-prop-upgrade-button-container {
+-            padding-bottom: 20px;
+-            text-align: center;
+-            padding-left: 0px !important;
+-        }
+-    }
+-}
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
+deleted file mode 100644
+index 11fe281..0000000
+--- a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/* TODO: This file should be deleted after REV1512 value prop experiment */
+-import React from 'react';
+-import { Factory } from 'rosie';
+-import { initializeTestStore, render, screen } from '../../../../setupTest';
+-import LockPaywall from './LockPaywall';
+-
+-describe('Lock Paywall', () => {
+-  let store;
+-  const mockData = {};
+-
+-  beforeAll(async () => {
+-    store = await initializeTestStore();
+-    const { courseware } = store.getState();
+-    mockData.courseId = courseware.courseId;
+-  });
+-
+-  it('displays message along with lock icon', () => {
+-    const { container } = render(<LockPaywall {...mockData} />);
+-
+-    const lockIcon = container.querySelector('svg');
+-    expect(lockIcon).toHaveClass('fa-lock');
+-    expect(lockIcon.parentElement).toHaveTextContent('Graded assignments are locked');
+-  });
+-
+-  it('displays unlock link with price', () => {
+-    const {
+-      currencySymbol,
+-      price,
+-      upgradeUrl,
+-    } = store.getState().models.coursewareMeta[mockData.courseId].verifiedMode;
+-    render(<LockPaywall {...mockData} />);
+-
+-    const upgradeLink = screen.getByRole('link', { name: `Upgrade for ${currencySymbol}${price}` });
+-    expect(upgradeLink).toHaveAttribute('href', `${upgradeUrl}`);
+-  });
+-
+-  it('does not display anything if course does not have verified mode', async () => {
+-    const courseMetadata = Factory.build('courseMetadata', { verified_mode: null });
+-    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
+-    const { container } = render(<LockPaywall {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+-
+-    expect(container).toBeEmptyDOMElement();
+-  });
+-});
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/index.js b/src/courseware/course/sequence/lock-paywall-value-prop/index.js
+deleted file mode 100644
+index 5fd1242..0000000
+--- a/src/courseware/course/sequence/lock-paywall-value-prop/index.js
++++ /dev/null
+@@ -1,2 +0,0 @@
+-/* TODO: This file + folder should be deleted after REV1512 value prop experiment */
+-export { default } from './LockPaywall';
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 67aa715..aaa6eb4 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -27,10 +27,6 @@ function SequenceNavigation({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   goToCourseExitPage,
+-  toggleREV1512Flyover, /* This line should be reverted after the REV1512 experiment */
+-  REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
+-  isREV1512FlyoverVisible, /* This line should be reverted after the REV1512 experiment */
+-  /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
+   const sequence = useModel('sequences', sequenceId);
+@@ -77,12 +73,6 @@ function SequenceNavigation({
+     );
+   };
+ 
+-  // These should be reverted after the REV1512 experiment
+-  const userAgent = typeof window.navigator === 'undefined' ? '' : navigator.userAgent;
+-  const isMobile = Boolean(
+-    userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i),
+-  );
+-
+   return sequenceStatus === LOADED && (
+     <nav className={classNames('sequence-navigation', className)}>
+       <Button variant="link" className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit}>
+@@ -91,22 +81,7 @@ function SequenceNavigation({
+       </Button>
+       {renderUnitButtons()}
+       {renderNextButton()}
+-      {/** [MM-P2P] Experiment (additional conditional) */}
+-      {!mmp2p.state.isEnabled && REV1512FlyoverEnabled
+-        && isMobile && (
+-        <div
+-          className="toggleFlyoverButton toggleFlyoverButtonMobile"
+-          aria-hidden="true"
+-          style={{ borderBottom: isREV1512FlyoverVisible() ? '2px solid #00262b' : 'none' }}
+-          onClick={() => {
+-            toggleREV1512Flyover();
+-          }}
+-        >
+-          <svg width="54" height="40" viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+-            <rect x="0.5" y="0.5" width="53" height="39" rx="1.5" fill="white" stroke="#E7E8E9" /><path d="M36 20C36 15.6 32.4 12 28 12C27.7 12 27.5 12.2 27.5 12.5C27.5 12.8 27.7 13 28 13C31.85 13 35 16.15 35 20C35 23.85 31.85 27 28 27C24.15 27 21 23.85 21 20C21 19.7 20.8 19.5 20.5 19.5C20.3 19.5 20.1 19.65 20.05 19.8C20 19.85 20 19.95 20 20C20 24.4 23.6 28 28 28C32.4 28 36 24.4 36 20Z" fill="black" stroke="black" strokeWidth="0.6" /><path d="M23.1065 14.52C22.9403 14.36 22.691 14.36 22.5247 14.52C22.3585 14.68 22.3585 14.92 22.5247 15.08C22.6078 15.16 22.7325 15.2 22.8156 15.2C22.9403 15.2 23.0234 15.16 23.1065 15.08C23.2312 14.96 23.2312 14.68 23.1065 14.52Z" fill="black" stroke="black" strokeWidth="0.6" /><path d="M27.6848 15.2C27.3939 15.2 27.2 15.3973 27.2 15.6932V19.6384C27.2 19.6877 27.2 19.7863 27.2484 19.8356C27.2969 19.8849 27.2969 19.9343 27.3454 19.9836L29.5757 22.2521C29.6727 22.3507 29.8181 22.4 29.9151 22.4C30.0121 22.4 30.1575 22.3507 30.2545 22.2521C30.4484 22.0548 30.4484 21.7589 30.2545 21.5617L28.1696 19.4411V15.6932C28.1696 15.3973 27.9757 15.2 27.6848 15.2Z" fill="black" stroke="black" strokeWidth="0.6" /><circle cx="35.5" cy="14.5" r="4.5" fill="#C32D3A" />
+-          </svg>
+-        </div>
+-      )}
++
+       {/** [MM-P2P] Experiment */}
+       { mmp2p.state.isEnabled && <MMP2PFlyoverTriggerMobile options={mmp2p} /> }
+       <div className="rev1512ToggleFlyoverSequenceLocation" />
+@@ -123,10 +98,6 @@ SequenceNavigation.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   goToCourseExitPage: PropTypes.func.isRequired,
+-  toggleREV1512Flyover: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+-  REV1512FlyoverEnabled: PropTypes.bool.isRequired, /* This line should be reverted after the REV1512 experiment */
+-  isREV1512FlyoverVisible: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+-
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+     state: PropTypes.shape({
+diff --git a/src/generic/upgrade-button/FormattedPricing.jsx b/src/generic/upgrade-button/FormattedPricing.jsx
+index 50efc1d..d5d341e 100644
+--- a/src/generic/upgrade-button/FormattedPricing.jsx
++++ b/src/generic/upgrade-button/FormattedPricing.jsx
+@@ -49,8 +49,7 @@ function FormattedPricing(props) {
+         {intl.formatMessage(messages.srPrices, { discountedPrice, originalPrice })}
+       </span>
+       <span aria-hidden="true">
+-        {/* the price discount and price original classes can be removed post REV-1512 experiment */}
+-        <span className="price discount">{discountedPrice}</span> <del className="price original">{originalPrice}</del>
++        <span>{discountedPrice}</span> <del>{originalPrice}</del>
+       </span>
+     </>
+   );
+-- 
+2.34.1
+

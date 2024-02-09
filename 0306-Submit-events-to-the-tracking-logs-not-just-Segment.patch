@@ -1,0 +1,45 @@
+From 122cef6053c61c8df5fb26a58d8a4fde54d4e78d Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 17 Nov 2020 11:01:07 -0800
+Subject: [PATCH 0306/1021] Submit events to the tracking logs, not just
+ Segment
+
+Due to an unfortunate naming choice, we apparently had _not_ been
+sending navigation events to the tracking logs' `/track` backend, but
+just to the Segment.io tracking backend.
+
+Note: There are still other portions of this repo _outside_ the learning
+sequence (Course Tools, Celebration, etc.) that only send to Segment and
+not the tracking logs, though maybe this is by design, those being "new"
+events?
+---
+ src/courseware/course/sequence/Sequence.jsx | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index a4ba8bb..1cad424 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -3,7 +3,10 @@ import React, {
+   useEffect, useContext, useState,
+ } from 'react';
+ import PropTypes from 'prop-types';
+-import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import {
++  sendTrackEvent,
++  sendTrackingLogEvent,
++} from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useSelector } from 'react-redux';
+ import { history } from '@edx/frontend-platform';
+@@ -69,6 +72,7 @@ function Sequence({
+       payload.target_tab = targetIndex + 1;
+     }
+     sendTrackEvent(eventName, payload);
++    sendTrackingLogEvent(eventName, payload);
+   };
+ 
+   const { add, remove } = useContext(UserMessagesContext);
+-- 
+2.34.1
+

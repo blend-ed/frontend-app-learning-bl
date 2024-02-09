@@ -1,0 +1,378 @@
+From 9edac2519a0d005b1223fe6b8128f98ccf268572 Mon Sep 17 00:00:00 2001
+From: David Ormsbee <dave@edx.org>
+Date: Thu, 10 Jun 2021 09:15:22 -0400
+Subject: [PATCH 0513/1021] fix: remove sequences we shouldn't see by using
+ learning_sequences
+
+Removes sequences we shouldn't see by using the Learning Sequences API
+(TNL-8377). Depends on https://github.com/edx/edx-platform/pull/27955
+
+It works by adding a call to the Learning Sequences API and (if that
+endpoint is enabled, i.e. returns 200 for this user+course), uses the
+results of that endpoint to remove sequences from the Course Blocks API
+call. Learning Sequences knows how to do things like bubble up the
+content group settings of units to sequences for the case where all
+units have the same restrictions and the user would see an empty
+sequence.
+---
+ src/courseware/CoursewareContainer.test.jsx   |  3 ++
+ .../course/course-exit/CourseExit.test.jsx    |  5 ++
+ .../learningSequencesOutline.factory.js       | 37 +++++++++++++
+ src/courseware/data/api.js                    | 24 +++++++++
+ src/courseware/data/redux.test.js             | 53 ++++++++++++++++++-
+ src/courseware/data/thunks.js                 | 43 +++++++++++++--
+ src/setupTest.js                              |  2 +
+ 7 files changed, 163 insertions(+), 4 deletions(-)
+ create mode 100644 src/courseware/data/__factories__/learningSequencesOutline.factory.js
+
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 0abd616..09e3cc0 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -121,6 +121,9 @@ describe('CoursewareContainer', () => {
+     const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+     axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+ 
++    const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
++    axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++
+     const courseMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+ 
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 4e992ef..0a1e2c2 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -33,6 +33,8 @@ describe('Course Exit Pages', () => {
+   const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+   const discoveryRecommendationsUrl = new RegExp(`${getConfig().DISCOVERY_API_BASE_URL}/api/v1/course_recommendations/*`);
+   const enrollmentsUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment*`);
++  const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
++
+   function setMetadata(attributes) {
+     const courseMetadata = { ...defaultMetadata, ...attributes };
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+@@ -51,6 +53,8 @@ describe('Course Exit Pages', () => {
+     axiosMock.onGet(discoveryRecommendationsUrl).reply(200,
+       Factory.build('courseRecommendations', {}, { numRecs: 2 }));
+     axiosMock.onGet(enrollmentsUrl).reply(200, []);
++    axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++
+     logUnhandledRequests(axiosMock);
+   });
+ 
+@@ -366,6 +370,7 @@ describe('Course Exit Pages', () => {
+       const courseBlocks = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name,
+         { hasScheduledContent: true });
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+ 
+       await fetchAndRender(<CourseInProgress />);
+       expect(screen.getByText('More content is coming soon!')).toBeInTheDocument();
+diff --git a/src/courseware/data/__factories__/learningSequencesOutline.factory.js b/src/courseware/data/__factories__/learningSequencesOutline.factory.js
+new file mode 100644
+index 0000000..7dc566a
+--- /dev/null
++++ b/src/courseware/data/__factories__/learningSequencesOutline.factory.js
+@@ -0,0 +1,37 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('learningSequencesOutline')
++  .option('courseId', (courseId) => {
++    if (courseId) {
++      return courseId;
++    }
++    throw new Error('courseId must be specified for learningSequencesOutline factory.');
++  })
++  .attrs({
++    outline: {
++      sequences: {
++      },
++    },
++  });
++
++export function buildEmptyOutline(courseId) {
++  return Factory.build(
++    'learningSequencesOutline',
++    {},
++    { courseId },
++  );
++}
++
++export function buildSimpleOutline(courseId, sequenceBlocks) {
++  return Factory.build(
++    'learningSequencesOutline',
++    {
++      outline: {
++        sequences: Object.fromEntries(
++          sequenceBlocks.map(({ id }) => [id, {}]),
++        ),
++      },
++    },
++    { courseId },
++  );
++}
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index c5d69e6..369e81c 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -10,6 +10,7 @@ export function normalizeBlocks(courseId, blocks) {
+     sequences: {},
+     units: {},
+   };
++
+   Object.values(blocks).forEach(block => {
+     switch (block.type) {
+       case 'course':
+@@ -105,6 +106,29 @@ export async function getCourseBlocks(courseId) {
+   return normalizeBlocks(courseId, data.blocks);
+ }
+ 
++// Returns the output of the Learning Sequences API, or null if that API is not
++// currently available for this user in this course.
++export async function getLearningSequencesOutline(courseId) {
++  const outlineUrl = new URL(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/${courseId}`);
++
++  try {
++    const { data } = await getAuthenticatedHttpClient().get(outlineUrl.href, {});
++    return data;
++  } catch (error) {
++    // This is not a critical API to use at the moment. If it errors for any
++    // reason, just send back a null so the higher layers know to ignore it.
++    if (error.response) {
++      if (error.response.status === 403) {
++        logInfo('Learning Sequences API not enabled for this user.');
++      } else {
++        logInfo(`Unexpected error calling Learning Sequences API (${error.response.status}). Ignoring.`);
++      }
++      return null;
++    }
++    throw error;
++  }
++}
++
+ function normalizeTabUrls(id, tabs) {
+   // If api doesn't return the mfe base url, change tab url to point back to LMS
+   return tabs.map((tab) => {
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index 40ef4eb..c577766 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -9,6 +9,7 @@ import * as thunks from './thunks';
+ import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
+ 
+ import { buildSimpleCourseBlocks } from '../../shared/data/__factories__/courseBlocks.factory';
++import { buildEmptyOutline, buildSimpleOutline } from './__factories__/learningSequencesOutline.factory';
+ import { initializeMockApp } from '../../setupTest';
+ import initializeStore from '../../store';
+ 
+@@ -19,6 +20,7 @@ const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+ describe('Data layer integration tests', () => {
+   const courseBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course`;
+   const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
++  const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+   const sequenceBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence`;
+ 
+   // building minimum set of api responses to test all thunks
+@@ -30,6 +32,8 @@ describe('Data layer integration tests', () => {
+     {},
+     { courseId, unitBlocks, sequenceBlock: sequenceBlocks[0] },
+   );
++  const emptyOutline = buildEmptyOutline(courseId);
++  const simpleOutline = buildSimpleOutline(courseId, sequenceBlocks);
+ 
+   let courseUrl = `${courseBaseUrl}/${courseId}`;
+   courseUrl = appendBrowserTimezoneToUrl(courseUrl);
+@@ -51,6 +55,7 @@ describe('Data layer integration tests', () => {
+     it('Should fail to fetch course and blocks if request error happens', async () => {
+       axiosMock.onGet(courseUrl).networkError();
+       axiosMock.onGet(courseBlocksUrlRegExp).networkError();
++      axiosMock.onGet(learningSequencesUrlRegExp).networkError();
+ 
+       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
+ 
+@@ -70,12 +75,12 @@ describe('Data layer integration tests', () => {
+       const forbiddenCourseBlocks = Factory.build('courseBlocks', {
+         courseId: forbiddenCourseMetadata.id,
+       });
+-
+       let forbiddenCourseUrl = `${courseBaseUrl}/${forbiddenCourseMetadata.id}`;
+       forbiddenCourseUrl = appendBrowserTimezoneToUrl(forbiddenCourseUrl);
+ 
+       axiosMock.onGet(forbiddenCourseUrl).reply(200, forbiddenCourseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, forbiddenCourseBlocks);
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+ 
+       await executeThunk(thunks.fetchCourse(forbiddenCourseMetadata.id), store.dispatch);
+ 
+@@ -90,6 +95,49 @@ describe('Data layer integration tests', () => {
+     it('Should fetch, normalize, and save metadata', async () => {
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++
++      await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
++
++      const state = store.getState();
++
++      expect(state.courseware.courseStatus).toEqual('loaded');
++      expect(state.courseware.courseId).toEqual(courseId);
++      expect(state.courseware.sequenceStatus).toEqual('loading');
++      expect(state.courseware.sequenceId).toEqual(null);
++
++      // check that at least one key camel cased, thus course data normalized
++      expect(state.models.coursewareMeta[courseId].canLoadCourseware).not.toBeUndefined();
++    });
++
++    it('Should fetch, normalize, and save metadata; filtering has no effect', async () => {
++      // Very similar to previous test, but pass back an outline for filtering
++      // (even though it won't actually filter down in this case).
++      axiosMock.onGet(courseUrl).reply(200, courseMetadata);
++      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, simpleOutline);
++
++      await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
++
++      const state = store.getState();
++
++      expect(state.courseware.courseStatus).toEqual('loaded');
++      expect(state.courseware.courseId).toEqual(courseId);
++      expect(state.courseware.sequenceStatus).toEqual('loading');
++      expect(state.courseware.sequenceId).toEqual(null);
++
++      // check that at least one key camel cased, thus course data normalized
++      expect(state.models.coursewareMeta[courseId].canLoadCourseware).not.toBeUndefined();
++      expect(state.models.sequences.length === 1);
++      Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 1));
++    });
++
++    it('Should fetch, normalize, and save metadata; filtering removes sequence', async () => {
++      // Very similar to previous test, but pass back an outline for filtering
++      // (even though it won't actually filter down in this case).
++      axiosMock.onGet(courseUrl).reply(200, courseMetadata);
++      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, emptyOutline);
+ 
+       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
+ 
+@@ -102,6 +150,8 @@ describe('Data layer integration tests', () => {
+ 
+       // check that at least one key camel cased, thus course data normalized
+       expect(state.models.coursewareMeta[courseId].canLoadCourseware).not.toBeUndefined();
++      expect(state.models.sequences === null);
++      Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 0));
+     });
+   });
+ 
+@@ -134,6 +184,7 @@ describe('Data layer integration tests', () => {
+     it('Should fetch and normalize metadata, and then update existing models with sequence metadata', async () => {
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+       axiosMock.onGet(sequenceUrl).reply(200, sequenceMetadata);
+ 
+       // setting course with blocks before sequence to check that blocks receive
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 4c860a8..74e3a58 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -4,6 +4,7 @@ import {
+   postSequencePosition,
+   getCourseMetadata,
+   getCourseBlocks,
++  getLearningSequencesOutline,
+   getSequenceMetadata,
+   postIntegritySignature,
+ } from './api';
+@@ -22,13 +23,27 @@ import {
+   fetchSequenceFailure,
+ } from './slice';
+ 
++// Make a copy of the sectionData and return it, but with the sequences filtered
++// down to only those sequences in allowedSequences
++function filterSequencesFromSection(sectionData, allowedSequences) {
++  return Object.fromEntries(
++    Object.entries(sectionData).map(
++      ([key, value]) => [
++        key,
++        (key === 'sequenceIds') ? value.filter(seqId => seqId in allowedSequences) : value,
++      ],
++    ),
++  );
++}
++
+ export function fetchCourse(courseId) {
+   return async (dispatch) => {
+     dispatch(fetchCourseRequest({ courseId }));
+     Promise.allSettled([
+       getCourseMetadata(courseId),
+       getCourseBlocks(courseId),
+-    ]).then(([courseMetadataResult, courseBlocksResult]) => {
++      getLearningSequencesOutline(courseId),
++    ]).then(([courseMetadataResult, courseBlocksResult, learningSequencesOutlineResult]) => {
+       if (courseMetadataResult.status === 'fulfilled') {
+         dispatch(addModel({
+           modelType: 'coursewareMeta',
+@@ -47,6 +62,28 @@ export function fetchCourse(courseId) {
+           courses, sections, sequences, units,
+         } = courseBlocksResult.value;
+ 
++        // Filter the data we get from the Course Blocks API using the data we
++        // get back from the Learning Sequences API (which knows to hide certain
++        // sequences that users shouldn't see).
++        //
++        // This is temporary – all this data should come from Learning Sequences
++        // soon.
++        let filteredSections = sections;
++        let filteredSequences = sequences;
++        if (learningSequencesOutlineResult.value) {
++          const allowedSequences = learningSequencesOutlineResult.value.outline.sequences;
++          filteredSequences = Object.fromEntries(
++            Object.entries(sequences).filter(
++              ([blockId]) => blockId in allowedSequences,
++            ),
++          );
++          filteredSections = Object.fromEntries(
++            Object.entries(sections).map(
++              ([blockId, sectionData]) => [blockId, filterSequencesFromSection(sectionData, allowedSequences)],
++            ),
++          );
++        }
++
+         // This updates the course with a sectionIds array from the blocks data.
+         dispatch(updateModelsMap({
+           modelType: 'coursewareMeta',
+@@ -54,12 +91,12 @@ export function fetchCourse(courseId) {
+         }));
+         dispatch(addModelsMap({
+           modelType: 'sections',
+-          modelsMap: sections,
++          modelsMap: filteredSections,
+         }));
+         // We update for sequences and units because the sequence metadata may have come back first.
+         dispatch(updateModelsMap({
+           modelType: 'sequences',
+-          modelsMap: sequences,
++          modelsMap: filteredSequences,
+         }));
+         dispatch(updateModelsMap({
+           modelType: 'units',
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 2868ea6..fdfcf91 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -152,9 +152,11 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
+   forbiddenCourseUrl = appendBrowserTimezoneToUrl(forbiddenCourseUrl);
+ 
+   const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
++  const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+ 
+   axiosMock.onGet(forbiddenCourseUrl).reply(200, courseMetadata);
+   axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++  axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+   sequenceMetadata.forEach(metadata => {
+     const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${metadata.item_id}`;
+     axiosMock.onGet(sequenceMetadataUrl).reply(200, metadata);
+-- 
+2.34.1
+

@@ -1,0 +1,73 @@
+From bfad5cf684bcb5a4255500b3bcdf8b34e431ec9f Mon Sep 17 00:00:00 2001
+From: Abderraouf Mehdi Bouhali <armbouhali@gmail.com>
+Date: Thu, 15 Sep 2022 17:46:52 +0100
+Subject: [PATCH 0941/1021] fix(rtl): use backslash to write fractions (grades)
+
+---
+ .../grades/detailed-grades/DetailedGradesTable.jsx         | 7 +++++--
+ .../grades/detailed-grades/ProblemScoreDrawer.jsx          | 7 +++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index a25c1a7..0e34907 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -1,7 +1,9 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ 
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  getLocale, injectIntl, intlShape, isRtl,
++} from '@edx/frontend-platform/i18n';
+ import { DataTable } from '@edx/paragon';
+ 
+ import { useModel } from '../../../../generic/model-store';
+@@ -17,6 +19,7 @@ function DetailedGradesTable({ intl }) {
+     sectionScores,
+   } = useModel('progress', courseId);
+ 
++  const isLocaleRtl = isRtl(getLocale());
+   return (
+     sectionScores.map((chapter) => {
+       const subsectionScores = chapter.subsections.filter(
+@@ -32,7 +35,7 @@ function DetailedGradesTable({ intl }) {
+ 
+       const detailedGradesData = subsectionScores.map((subsection) => ({
+         subsectionTitle: <SubsectionTitleCell subsection={subsection} />,
+-        score: <span className={subsection.learnerHasAccess ? '' : 'greyed-out'}>{subsection.numPointsEarned}/{subsection.numPointsPossible}</span>,
++        score: <span className={subsection.learnerHasAccess ? '' : 'greyed-out'}>{subsection.numPointsEarned}{isLocaleRtl ? '\\' : '/'}{subsection.numPointsPossible}</span>,
+       }));
+ 
+       return (
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+index 2a90551..7f64aa8 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+@@ -2,18 +2,21 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ 
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  getLocale, injectIntl, intlShape, isRtl,
++} from '@edx/frontend-platform/i18n';
+ 
+ import messages from '../messages';
+ 
+ function ProblemScoreDrawer({ intl, problemScores, subsection }) {
++  const isLocaleRtl = isRtl(getLocale());
+   return (
+     <span className="row w-100 m-0 x-small ml-4 pt-2 pl-1 text-gray-700 flex-nowrap">
+       <span id="problem-score-label" className="col-auto p-0">{intl.formatMessage(messages.problemScoreLabel)}</span>
+       <div className={classNames('col', 'p-0', { 'greyed-out': !subsection.learnerHasAccess })}>
+         <ul className="list-unstyled row w-100 m-0" aria-labelledby="problem-score-label">
+           {problemScores.map(problemScore => (
+-            <li className="ml-3">{problemScore.earned}/{problemScore.possible}</li>
++            <li className="ml-3">{problemScore.earned}{isLocaleRtl ? '\\' : '/'}{problemScore.possible}</li>
+           ))}
+         </ul>
+       </div>
+-- 
+2.34.1
+

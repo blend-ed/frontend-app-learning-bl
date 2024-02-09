@@ -1,0 +1,1174 @@
+From d8ed3d6bf8de618f5b6faca6fbf9844e728d5461 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 17 Sep 2020 11:01:33 -0400
+Subject: [PATCH 0253/1021] AA-265: Add more tests for the dates tab (#207)
+
+* Prepare some initial test refactoring
+
+- Expand test data for course home metadata
+- Don't test courseware metadata in course-home redux tests
+
+This is Dillon's work.
+
+* AA-265: Add more tests for the dates tab
+
+Add an ADR to talk about how we want to test in this repo.
+
+And refactor the fake dates tab data used for debugging to also be
+used for tests.
+---
+ docs/decisions/0007-testing.md                |  41 ++++
+ .../courseHomeMetadata.factory.js             |  75 +++++-
+ .../__factories__/datesTabData.factory.js     | 205 +++++++++++++++-
+ .../data/__snapshots__/redux.test.js.snap     | 221 +++++++++++++++--
+ src/course-home/data/api.js                   |   5 +
+ src/course-home/data/redux.test.js            |  25 +-
+ src/course-home/dates-tab/Badge.jsx           |   5 +-
+ src/course-home/dates-tab/DatesTab.test.jsx   | 136 +++++++++++
+ src/course-home/dates-tab/Day.jsx             |   8 +-
+ src/course-home/dates-tab/fakeData.js         | 228 ------------------
+ 10 files changed, 657 insertions(+), 292 deletions(-)
+ create mode 100644 docs/decisions/0007-testing.md
+ create mode 100644 src/course-home/dates-tab/DatesTab.test.jsx
+ delete mode 100644 src/course-home/dates-tab/fakeData.js
+
+diff --git a/docs/decisions/0007-testing.md b/docs/decisions/0007-testing.md
+new file mode 100644
+index 0000000..ffdb1fd
+--- /dev/null
++++ b/docs/decisions/0007-testing.md
+@@ -0,0 +1,41 @@
++# Testing
++
++## Status
++Draft
++
++Let's live with this a bit longer before deciding it's a solid approach and marking this Approved.
++
++## Context
++We'd like to all be on the same page about how to approach testing, what is
++worth testing, and how to do it.
++
++## React Testing Library
++We'll use react-testing-library and jest as the main testing tools.
++
++This has some implications about how to test. You can read the React Testing Library's
++[Guiding Principles](https://testing-library.com/docs/guiding-principles), but the main
++takeaway is that you should be interacting with React as closely as possible to the way
++the user will interact with it.
++
++For example, they discourage using class or element name selectors to find components
++during a test. Instead, you should find them by user-oriented attributes like labels,
++text, or roles. As a last resort, by a `data-testid` tag.
++
++## What to Test
++We have not found exhaustive unit testing of frontend code to be worth the trouble.
++Rather, let's focus on testing non-obvious behavior.
++
++In essence: `test behavior that wouldn't present itself to a developer playing around`.
++
++Practically speaking, this means error states, interactive components, corner cases,
++or anything that wouldn't come up in a demo course. Something a developer wouldn't
++notice in the normal course of working in devstack.
++
++## Snapshots
++In practice, we've found snapshots of component trees to be too brittle to be worth it,
++as refactors occur or external libraries change.
++
++They can still be useful for data (like redux tests) or tiny isolated components.
++
++But please avoid for any "interesting" component. Prefer inspecting the explicit behavior
++under test, rather than just snapshotting the entire component tree.
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 65d8215..5acedcf 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -2,10 +2,8 @@ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dep
+ 
+ Factory.define('courseHomeMetadata')
+   .sequence(
+-    'course_id',
+-    (courseId) => `course-v1:edX+DemoX+Demo_Course_${courseId}`,
++    'courseId', (courseId) => `course-v1:edX+DemoX+Demo_Course_${courseId}`,
+   )
+-  .option('courseTabs', [])
+   .option('host', 'http://localhost:18000')
+   .attrs({
+     is_staff: false,
+@@ -15,10 +13,67 @@ Factory.define('courseHomeMetadata')
+     title: 'Demonstration Course',
+     is_self_paced: false,
+   })
+-  .attr('tabs', ['courseTabs', 'host'], (courseTabs, host) => courseTabs.map(
+-    tab => ({
+-      tab_id: tab.slug,
+-      title: tab.title,
+-      url: `${host}${tab.url}`,
+-    }),
+-  ));
++  .attr(
++    'tabs', ['courseId', 'host'], (courseId, host) => {
++      const tabs = [
++        Factory.build(
++          'tab',
++          {
++            title: 'Course',
++            priority: 0,
++            slug: 'courseware',
++            type: 'courseware',
++          },
++          { courseId, path: 'course/' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Discussion',
++            priority: 1,
++            slug: 'discussion',
++            type: 'discussion',
++          },
++          { courseId, path: 'discussion/forum/' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Wiki',
++            priority: 2,
++            slug: 'wiki',
++            type: 'wiki',
++          },
++          { courseId, path: 'course_wiki' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Progress',
++            priority: 3,
++            slug: 'progress',
++            type: 'progress',
++          },
++          { courseId, path: 'progress' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Instructor',
++            priority: 4,
++            slug: 'instructor',
++            type: 'instructor',
++          },
++          { courseId, path: 'instructor' },
++        ),
++      ];
++
++      return tabs.map(
++        tab => ({
++          tab_id: tab.slug,
++          title: tab.title,
++          url: `${host}${tab.url}`,
++        }),
++      );
++    },
++  );
+diff --git a/src/course-home/data/__factories__/datesTabData.factory.js b/src/course-home/data/__factories__/datesTabData.factory.js
+index 6f173fe..4a70a7d 100644
+--- a/src/course-home/data/__factories__/datesTabData.factory.js
++++ b/src/course-home/data/__factories__/datesTabData.factory.js
+@@ -1,5 +1,8 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ 
++// Sample data helpful when developing & testing, to see a variety of configurations.
++// This set of data is not realistic (mix of having access and not), but it
++// is intended to demonstrate many UI results.
+ Factory.define('datesTabData')
+   .attrs({
+     dates_banner_info: {
+@@ -9,19 +12,213 @@ Factory.define('datesTabData')
+     },
+     course_date_blocks: [
+       {
+-        assigment_type: 'Homework',
+-        date: '2013-02-05T05:00:00Z',
++        date: '2020-05-01T17:59:41Z',
+         date_type: 'course-start-date',
+         description: '',
+         learner_has_access: true,
+         link: '',
+         title: 'Course Starts',
+-        extraInfo: '',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        complete: true,
++        date: '2020-05-04T02:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        title: 'Multi Badges Completed',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2020-05-05T02:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        title: 'Multi Badges Past Due',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2020-05-27T02:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'Both Past Due 1',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2020-05-27T02:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'Both Past Due 2',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        complete: true,
++        date: '2020-05-28T08:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'One Completed/Due 1',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2020-05-28T08:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'One Completed/Due 2',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        complete: true,
++        date: '2020-05-29T08:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'Both Completed 1',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        complete: true,
++        date: '2020-05-29T08:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'Both Completed 2',
++        extra_info: null,
++      },
++      {
++        date: '2020-06-16T17:59:40.942669Z',
++        date_type: 'verified-upgrade-deadline',
++        description: "Don't miss the opportunity to highlight your new knowledge and skills by earning a verified certificate.",
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'Upgrade to Verified Certificate',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-17T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: false,
++        link: 'https://example.com/',
++        title: 'One Verified 1',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-17T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'One Verified 2',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-17T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'ORA Verified 2',
++        extra_info: "ORA Dates are set by the instructor, and can't be changed",
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-18T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: false,
++        link: 'https://example.com/',
++        title: 'Both Verified 1',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-18T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: false,
++        link: 'https://example.com/',
++        title: 'Both Verified 2',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-19T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        title: 'One Unreleased 1',
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-19T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        link: 'https://example.com/',
++        title: 'One Unreleased 2',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-20T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        title: 'Both Unreleased 1',
++        extra_info: null,
++      },
++      {
++        assignment_type: 'Homework',
++        date: '2030-08-20T05:59:40.942669Z',
++        date_type: 'assignment-due-date',
++        description: '',
++        learner_has_access: true,
++        title: 'Both Unreleased 2',
++        extra_info: null,
++      },
++      {
++        date: '2030-08-23T00:00:00Z',
++        date_type: 'course-end-date',
++        description: '',
++        learner_has_access: true,
++        link: '',
++        title: 'Course Ends',
++        extra_info: null,
++      },
++      {
++        date: '2030-09-01T00:00:00Z',
++        date_type: 'verification-deadline-date',
++        description: 'You must successfully complete verification before this date to qualify for a Verified Certificate.',
++        learner_has_access: false,
++        link: 'https://example.com/',
++        title: 'Verification Deadline',
++        extra_info: null,
+       },
+     ],
+     missed_deadlines: false,
+     missed_gated_content: false,
+     learner_is_full_access: true,
+-    user_timezone: null,
++    user_timezone: 'America/New_York',
+     verified_upgrade_link: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+   });
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 4c95629..78bcb64 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -1,24 +1,5 @@
+ // Jest Snapshot v1, https://goo.gl/fbAQLP
+ 
+-exports[`Data layer integration tests Should initialize store 1`] = `
+-Object {
+-  "courseHome": Object {
+-    "courseId": null,
+-    "courseStatus": "loading",
+-    "toastBodyLink": null,
+-    "toastBodyText": null,
+-    "toastHeader": "",
+-  },
+-  "courseware": Object {
+-    "courseId": null,
+-    "courseStatus": "loading",
+-    "sequenceId": null,
+-    "sequenceStatus": "loading",
+-  },
+-  "models": Object {},
+-}
+-`;
+-
+ exports[`Data layer integration tests Test fetchDatesTab Should fetch, normalize, and save metadata 1`] = `
+ Object {
+   "courseHome": Object {
+@@ -78,15 +59,209 @@ Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "courseDateBlocks": Array [
+           Object {
+-            "assigmentType": "Homework",
+-            "date": "2013-02-05T05:00:00Z",
++            "date": "2020-05-01T17:59:41Z",
+             "dateType": "course-start-date",
+             "description": "",
+-            "extraInfo": "",
++            "extraInfo": null,
+             "learnerHasAccess": true,
+             "link": "",
+             "title": "Course Starts",
+           },
++          Object {
++            "assignmentType": "Homework",
++            "complete": true,
++            "date": "2020-05-04T02:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "title": "Multi Badges Completed",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2020-05-05T02:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "title": "Multi Badges Past Due",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2020-05-27T02:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "Both Past Due 1",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2020-05-27T02:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "Both Past Due 2",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "complete": true,
++            "date": "2020-05-28T08:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "One Completed/Due 1",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2020-05-28T08:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "One Completed/Due 2",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "complete": true,
++            "date": "2020-05-29T08:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "Both Completed 1",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "complete": true,
++            "date": "2020-05-29T08:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "Both Completed 2",
++          },
++          Object {
++            "date": "2020-06-16T17:59:40.942669Z",
++            "dateType": "verified-upgrade-deadline",
++            "description": "Don't miss the opportunity to highlight your new knowledge and skills by earning a verified certificate.",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "Upgrade to Verified Certificate",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-17T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": false,
++            "link": "https://example.com/",
++            "title": "One Verified 1",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-17T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "One Verified 2",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-17T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": "ORA Dates are set by the instructor, and can't be changed",
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "ORA Verified 2",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-18T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": false,
++            "link": "https://example.com/",
++            "title": "Both Verified 1",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-18T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": false,
++            "link": "https://example.com/",
++            "title": "Both Verified 2",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-19T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "learnerHasAccess": true,
++            "title": "One Unreleased 1",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-19T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "https://example.com/",
++            "title": "One Unreleased 2",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-20T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "title": "Both Unreleased 1",
++          },
++          Object {
++            "assignmentType": "Homework",
++            "date": "2030-08-20T05:59:40.942669Z",
++            "dateType": "assignment-due-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "title": "Both Unreleased 2",
++          },
++          Object {
++            "date": "2030-08-23T00:00:00Z",
++            "dateType": "course-end-date",
++            "description": "",
++            "extraInfo": null,
++            "learnerHasAccess": true,
++            "link": "",
++            "title": "Course Ends",
++          },
++          Object {
++            "date": "2030-09-01T00:00:00Z",
++            "dateType": "verification-deadline-date",
++            "description": "You must successfully complete verification before this date to qualify for a Verified Certificate.",
++            "extraInfo": null,
++            "learnerHasAccess": false,
++            "link": "https://example.com/",
++            "title": "Verification Deadline",
++          },
+         ],
+         "datesBannerInfo": Object {
+           "contentTypeGatingEnabled": false,
+@@ -97,7 +272,7 @@ Object {
+         "learnerIsFullAccess": true,
+         "missedDeadlines": false,
+         "missedGatedContent": false,
+-        "userTimezone": null,
++        "userTimezone": "America/New_York",
+         "verifiedUpgradeLink": "http://localhost:18130/basket/add/?sku=8CF08E5",
+       },
+     },
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 41ba798..8bdedb9 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -89,7 +89,12 @@ export async function getCourseHomeCourseMetadata(courseId) {
+   return normalizeCourseHomeCourseMetadata(data);
+ }
+ 
++// For debugging purposes, you might like to see a fully loaded dates tab.
++// Just uncomment the next few lines and the immediate 'return' in the function below
++// import { Factory } from 'rosie';
++// import './__factories__';
+ export async function getDatesTabData(courseId) {
++  // return camelCaseObject(Factory.build('datesTabData'));
+   const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`;
+   try {
+     const { data } = await getAuthenticatedHttpClient().get(url);
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index 2446eeb..460ff53 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -16,20 +16,9 @@ const { loggingService } = initializeMockApp();
+ const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+ 
+ describe('Data layer integration tests', () => {
+-  const courseMetadata = Factory.build('courseMetadata');
+-  const courseHomeMetadata = Factory.build(
+-    'courseHomeMetadata', {
+-      course_id: courseMetadata.id,
+-    },
+-    { courseTabs: courseMetadata.tabs },
+-  );
+-
+-  const courseId = courseMetadata.id;
+-  const courseBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course`;
+-  const courseMetadataBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata`;
+-
+-  const courseUrl = `${courseBaseUrl}/${courseId}`;
+-  const courseMetadataUrl = `${courseMetadataBaseUrl}/${courseId}`;
++  const courseHomeMetadata = Factory.build('courseHomeMetadata');
++  const { courseId } = courseHomeMetadata;
++  const courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
+ 
+   let store;
+ 
+@@ -40,15 +29,10 @@ describe('Data layer integration tests', () => {
+     store = initializeStore();
+   });
+ 
+-  it('Should initialize store', () => {
+-    expect(store.getState()).toMatchSnapshot();
+-  });
+-
+   describe('Test fetchDatesTab', () => {
+     const datesBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dates`;
+ 
+     it('Should fail to fetch if error occurs', async () => {
+-      axiosMock.onGet(courseUrl).networkError();
+       axiosMock.onGet(courseMetadataUrl).networkError();
+       axiosMock.onGet(`${datesBaseUrl}/${courseId}`).networkError();
+ 
+@@ -63,7 +47,6 @@ describe('Data layer integration tests', () => {
+ 
+       const datesUrl = `${datesBaseUrl}/${courseId}`;
+ 
+-      axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(datesUrl).reply(200, datesTabData);
+ 
+@@ -79,7 +62,6 @@ describe('Data layer integration tests', () => {
+     const outlineBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline`;
+ 
+     it('Should result in fetch failure if error occurs', async () => {
+-      axiosMock.onGet(courseUrl).networkError();
+       axiosMock.onGet(courseMetadataUrl).networkError();
+       axiosMock.onGet(`${outlineBaseUrl}/${courseId}`).networkError();
+ 
+@@ -94,7 +76,6 @@ describe('Data layer integration tests', () => {
+ 
+       const outlineUrl = `${outlineBaseUrl}/${courseId}`;
+ 
+-      axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(outlineUrl).reply(200, outlineTabData);
+ 
+diff --git a/src/course-home/dates-tab/Badge.jsx b/src/course-home/dates-tab/Badge.jsx
+index a945366..fdf84c0 100644
+--- a/src/course-home/dates-tab/Badge.jsx
++++ b/src/course-home/dates-tab/Badge.jsx
+@@ -4,7 +4,10 @@ import classNames from 'classnames';
+ 
+ export default function Badge({ children, className }) {
+   return (
+-    <span className={classNames('dates-badge badge align-text-bottom font-italic ml-2 px-2 py-1', className)}>
++    <span
++      className={classNames('dates-badge badge align-text-bottom font-italic ml-2 px-2 py-1', className)}
++      data-testid="dates-badge"
++    >
+       {children}
+     </span>
+   );
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+new file mode 100644
+index 0000000..6f8e124
+--- /dev/null
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -0,0 +1,136 @@
++import React from 'react';
++import { Route } from 'react-router';
++import MockAdapter from 'axios-mock-adapter';
++import { Factory } from 'rosie';
++import { getConfig, history } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { AppProvider } from '@edx/frontend-platform/react';
++import { waitForElementToBeRemoved } from '@testing-library/dom';
++import { render, screen, within } from '@testing-library/react';
++import userEvent from '@testing-library/user-event';
++
++import DatesTab from './DatesTab';
++import { fetchDatesTab } from '../data';
++import initializeMockApp from '../../setupTest';
++import initializeStore from '../../store';
++import { TabContainer } from '../../tab-page';
++import { UserMessagesProvider } from '../../generic/user-messages';
++
++initializeMockApp();
++
++describe('DatesTab', () => {
++  let store;
++  let component;
++  let axiosMock;
++  let courseId;
++
++  beforeEach(() => {
++    store = initializeStore();
++    component = (
++      <AppProvider store={store}>
++        <UserMessagesProvider>
++          <Route path="/course/:courseId/dates">
++            <TabContainer tab="dates" fetch={fetchDatesTab}>
++              <DatesTab />
++            </TabContainer>
++          </Route>
++        </UserMessagesProvider>
++      </AppProvider>
++    );
++
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++
++    const courseMetadata = Factory.build('courseHomeMetadata');
++    courseId = courseMetadata.courseId;
++    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`).reply(200, courseMetadata);
++
++    history.push(`/course/${courseId}/dates`); // so tab can pull course id from url
++  });
++
++  // The dates tab is largely repetitive non-interactive static data. Thus it's a little tough to follow
++  // testing-library's advice around testing the way your user uses the site (i.e. can't find form elements by label or
++  // anything). Instead, we find elements by printed date (which is what the user sees) and data-testid. Which is
++  // better than assuming anything about how the surrounding elements are organized by div and span or whatever. And
++  // better than adding non-style class names.
++  // Hence the following getDay query helper.
++  async function getDay(date) {
++    const dateNode = await screen.findByText(date);
++    let parent = dateNode.parentElement;
++    while (parent) {
++      if (parent.dataset && parent.dataset.testid === 'dates-day') {
++        return {
++          day: parent,
++          header: within(parent).getByTestId('dates-header'),
++          items: within(parent).queryAllByTestId('dates-item'),
++        };
++      }
++      parent = parent.parentElement;
++    }
++    throw new Error('Did not find day container');
++  }
++
++  describe('when receiving a full set of dates data', () => {
++    beforeEach(() => {
++      const datesTabData = Factory.build('datesTabData');
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`).reply(200, datesTabData);
++      render(component);
++    });
++
++    it('handles unreleased & complete', async () => {
++      const { header } = await getDay('Sun, May 3, 2020');
++      const badges = within(header).getAllByTestId('dates-badge');
++      expect(badges).toHaveLength(2);
++      expect(badges[0]).toHaveTextContent('Completed');
++      expect(badges[1]).toHaveTextContent('Not Yet Released');
++    });
++
++    it('handles unreleased & past due', async () => {
++      const { header } = await getDay('Mon, May 4, 2020');
++      const badges = within(header).getAllByTestId('dates-badge');
++      expect(badges).toHaveLength(2);
++      expect(badges[0]).toHaveTextContent('Past Due');
++      expect(badges[1]).toHaveTextContent('Not Yet Released');
++    });
++
++    it('handles verified only', async () => {
++      const { day } = await getDay('Sun, Aug 18, 2030');
++      const badge = within(day).getByTestId('dates-badge');
++      expect(badge).toHaveTextContent('Verified Only');
++    });
++
++    it('verified only has no link', async () => {
++      const { day } = await getDay('Sun, Aug 18, 2030');
++      expect(within(day).queryByRole('link')).toBeNull();
++    });
++
++    it('same status items have header badge', async () => {
++      const { day, header } = await getDay('Tue, May 26, 2020');
++      const badge = within(header).getByTestId('dates-badge');
++      expect(badge).toHaveTextContent('Past Due'); // one header badge
++      expect(within(day).getAllByTestId('dates-badge')).toHaveLength(1); // no other badges
++    });
++
++    it('different status items have individual badges', async () => {
++      const { header, items } = await getDay('Thu, May 28, 2020');
++      const headerBadges = within(header).queryAllByTestId('dates-badge');
++      expect(headerBadges).toHaveLength(0); // no header badges
++      expect(items).toHaveLength(2);
++      expect(within(items[0]).getByTestId('dates-badge')).toHaveTextContent('Completed');
++      expect(within(items[1]).getByTestId('dates-badge')).toHaveTextContent('Past Due');
++    });
++
++    it('shows extra info', async () => {
++      const { items } = await getDay('Sat, Aug 17, 2030');
++      expect(items).toHaveLength(3);
++
++      const tipIcon = within(items[2]).getByTestId('dates-extra-info');
++      const tipText = "ORA Dates are set by the instructor, and can't be changed";
++
++      expect(screen.queryByText(tipText)).toBeNull(); // tooltip does not start in DOM
++      userEvent.hover(tipIcon);
++      const tooltip = screen.getByText(tipText); // now it's there
++      userEvent.unhover(tipIcon);
++      waitForElementToBeRemoved(tooltip); // and it's gone again
++    });
++  });
++});
+diff --git a/src/course-home/dates-tab/Day.jsx b/src/course-home/dates-tab/Day.jsx
+index 6fc85aa..c01c4a1 100644
+--- a/src/course-home/dates-tab/Day.jsx
++++ b/src/course-home/dates-tab/Day.jsx
+@@ -27,7 +27,7 @@ function Day({
+   const { color, badges } = getBadgeListAndColor(date, intl, null, items);
+ 
+   return (
+-    <li className="dates-day pb-4">
++    <li className="dates-day pb-4" data-testid="dates-day">
+       {/* Top Line */}
+       {!first && <div className="dates-line-top border-1 border-left border-gray-900 bg-gray-900" />}
+ 
+@@ -39,7 +39,7 @@ function Day({
+ 
+       {/* Content */}
+       <div className="d-inline-block ml-3 pl-2">
+-        <div className="mb-1">
++        <div className="mb-1" data-testid="dates-header">
+           <p className="d-inline text-dark-500 font-weight-bold">
+             <FormattedDate
+               value={date}
+@@ -59,7 +59,7 @@ function Day({
+           const available = item.learnerHasAccess && (item.link || !isLearnerAssignment(item));
+           const textColor = available ? 'text-dark-500' : 'text-dark-200';
+           return (
+-            <div key={item.title + item.date} className={textColor}>
++            <div key={item.title + item.date} className={textColor} data-testid="dates-item">
+               <div>
+                 <span className="font-weight-bold small mt-1">
+                   {item.assignmentType && `${item.assignmentType}: `}{title}
+@@ -72,7 +72,7 @@ function Day({
+                       <Tooltip>{item.extraInfo}</Tooltip>
+                     }
+                   >
+-                    <FontAwesomeIcon icon={faInfoCircle} className="fa-xs ml-1 text-gray-700" />
++                    <FontAwesomeIcon icon={faInfoCircle} className="fa-xs ml-1 text-gray-700" data-testid="dates-extra-info" />
+                   </OverlayTrigger>
+                 )}
+               </div>
+diff --git a/src/course-home/dates-tab/fakeData.js b/src/course-home/dates-tab/fakeData.js
+deleted file mode 100644
+index f135da3..0000000
+--- a/src/course-home/dates-tab/fakeData.js
++++ /dev/null
+@@ -1,228 +0,0 @@
+-// Sample data helpful when developing, to see a variety of configurations.
+-// This set of data is not realistic (mix of having access and not), but it
+-// is intended to demonstrate many UI results.
+-// To use, have getDatesTabData in api.js return the result of this call instead:
+-/*
+-import fakeDatesData from '../dates-tab/fakeData';
+-export async function getDatesTabData(courseId, version) {
+-  if (tab === 'dates') { return camelCaseObject(fakeDatesData()); }
+-  ...
+-}
+-*/
+-
+-export default function fakeDatesData() {
+-  return JSON.parse(`
+-{
+-  "course_date_blocks": [
+-    {
+-      "date": "2020-05-01T17:59:41Z",
+-      "date_type": "course-start-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "",
+-      "title": "Course Starts",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "complete": true,
+-      "date": "2020-05-04T02:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "title": "Multi Badges Completed",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2020-05-05T02:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "title": "Multi Badges Past Due",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2020-05-27T02:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "Both Past Due 1",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2020-05-27T02:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "Both Past Due 2",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "complete": true,
+-      "date": "2020-05-28T08:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "One Completed/Due 1",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2020-05-28T08:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "One Completed/Due 2",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "complete": true,
+-      "date": "2020-05-29T08:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "Both Completed 1",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "complete": true,
+-      "date": "2020-05-29T08:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "Both Completed 2",
+-      "extra_info": null
+-    },
+-    {
+-      "date": "2020-06-16T17:59:40.942669Z",
+-      "date_type": "verified-upgrade-deadline",
+-      "description": "Don't miss the opportunity to highlight your new knowledge and skills by earning a verified certificate.",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "Upgrade to Verified Certificate",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-17T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": false,
+-      "link": "https://example.com/",
+-      "title": "One Verified 1",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-17T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "One Verified 2",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-17T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "ORA Verified 2",
+-      "extra_info": "ORA Dates are set by the instructor, and can't be changed"
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-18T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": false,
+-      "link": "https://example.com/",
+-      "title": "Both Verified 1",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-18T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": false,
+-      "link": "https://example.com/",
+-      "title": "Both Verified 2",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-19T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "title": "One Unreleased 1"
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-19T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "https://example.com/",
+-      "title": "One Unreleased 2",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-20T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "title": "Both Unreleased 1",
+-      "extra_info": null
+-    },
+-    {
+-      "assignment_type": "Homework",
+-      "date": "2030-08-20T05:59:40.942669Z",
+-      "date_type": "assignment-due-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "title": "Both Unreleased 2",
+-      "extra_info": null
+-    },
+-    {
+-      "date": "2030-08-23T00:00:00Z",
+-      "date_type": "course-end-date",
+-      "description": "",
+-      "learner_has_access": true,
+-      "link": "",
+-      "title": "Course Ends",
+-      "extra_info": null
+-    },
+-    {
+-      "date": "2030-09-01T00:00:00Z",
+-      "date_type": "verification-deadline-date",
+-      "description": "You must successfully complete verification before this date to qualify for a Verified Certificate.",
+-      "learner_has_access": false,
+-      "link": "https://example.com/",
+-      "title": "Verification Deadline",
+-      "extra_info": null
+-    }
+-  ],
+-  "display_reset_dates_text": false,
+-  "learner_is_verified": false,
+-  "user_timezone": "America/New_York",
+-  "verified_upgrade_link": "https://example.com/"
+-}
+-  `);
+-}
+-- 
+2.34.1
+

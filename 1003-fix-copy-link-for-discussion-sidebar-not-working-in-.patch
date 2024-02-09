@@ -1,0 +1,26 @@
+From 7519bbe28e53e1a256632d61c6198e0ba3d48cbd Mon Sep 17 00:00:00 2001
+From: Muhammad Adeel Tajamul
+ <77053848+muhammadadeeltajamul@users.noreply.github.com>
+Date: Fri, 10 Mar 2023 06:01:24 +0500
+Subject: [PATCH 1003/1021] fix: copy link for discussion sidebar not working
+ in chrome (#1079)
+
+---
+ .../course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx   | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+index c3dc90b..b7d063d 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -34,6 +34,7 @@ const DiscussionsSidebar = ({ intl }) => {
+         src={`${discussionsUrl}?inContextSidebar`}
+         className="d-flex w-100 h-100 border-0"
+         title={intl.formatMessage(messages.discussionsTitle)}
++        allow="clipboard-write"
+       />
+     </SidebarBase>
+   );
+-- 
+2.34.1
+

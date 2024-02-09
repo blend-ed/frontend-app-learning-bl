@@ -1,0 +1,1536 @@
+From c25ec8f1ae52b4f969fa9da56b6f2495ddd4e257 Mon Sep 17 00:00:00 2001
+From: Ghassan Maslamani <ghassan.maslamani@gmail.com>
+Date: Mon, 28 Feb 2022 16:10:57 +0200
+Subject: [PATCH 0817/1021] feat: add descriptions for i18n messages (#815)
+
+It fixes: openedx/frontend-wg/issues/74
+---
+ .../AccessExpirationAlert.jsx                 |  3 ++
+ .../AccessExpirationMasqueradeBanner.jsx      |  1 +
+ .../access-expiration-alert/messages.js       |  1 +
+ .../course-start-alert/CourseStartAlert.jsx   |  1 +
+ .../CourseStartMasqueradeBanner.jsx           |  1 +
+ src/course-home/dates-tab/messages.js         |  7 +++
+ src/course-home/goal-unsubscribe/messages.js  |  6 +++
+ src/course-home/outline-tab/messages.js       | 44 +++++++++++++++++++
+ .../certificate-status/CertificateStatus.jsx  |  3 ++
+ .../certificate-status/messages.js            | 21 +++++++++
+ .../course-completion/messages.js             |  9 ++++
+ .../credit-information/CreditInformation.jsx  |  3 ++
+ .../credit-information/messages.js            |  6 +++
+ .../grades/detailed-grades/DetailedGrades.jsx |  1 +
+ .../progress-tab/grades/messages.js           | 38 ++++++++++++++++
+ src/course-home/progress-tab/messages.js      |  2 +
+ .../progress-tab/related-links/messages.js    |  5 +++
+ .../suggested-schedule-messaging/messages.js  |  5 +++
+ .../WeeklyGoalCelebrationModal.jsx            |  2 +
+ src/courseware/course/celebration/messages.js |  5 +++
+ .../content-tools/calculator/Calculator.jsx   | 25 +++++++++++
+ .../course/course-exit/CatalogSuggestion.jsx  |  1 +
+ .../course/course-exit/CourseCelebration.jsx  |  5 +++
+ .../course/course-exit/DashboardFootnote.jsx  |  1 +
+ .../course/course-exit/ProgramCompletion.jsx  |  1 +
+ .../course/course-exit/UpgradeFootnote.jsx    |  1 +
+ src/courseware/course/course-exit/messages.js | 13 ++++++
+ .../sequence/hidden-after-due/messages.js     |  3 ++
+ .../course/sequence/honor-code/HonorCode.jsx  |  1 +
+ src/courseware/social-share/messages.js       |  1 +
+ src/shared/streak-celebration/messages.js     |  2 +
+ src/tab-page/messages.js                      |  2 +
+ 32 files changed, 220 insertions(+)
+
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index 8fc8327..b3a46bc 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -65,6 +65,7 @@ function AccessExpirationAlert({ intl, payload }) {
+         <FormattedMessage
+           id="learning.accessExpiration.deadline"
+           defaultMessage="Upgrade by {date} to get unlimited access to the course as long as it exists on the site."
++          description="Warning shown to learner to upgrade while they are enrolled on the audit version and it's possible to upgrade"
+           values={{
+             date: (
+               <FormattedDate
+@@ -97,6 +98,7 @@ function AccessExpirationAlert({ intl, payload }) {
+         <FormattedMessage
+           id="learning.accessExpiration.header"
+           defaultMessage="Audit Access Expires {date}"
++          description="Headline for auditing deadline"
+           values={{
+             date: (
+               <FormattedDate
+@@ -115,6 +117,7 @@ function AccessExpirationAlert({ intl, payload }) {
+       <FormattedMessage
+         id="learning.accessExpiration.body"
+         defaultMessage="You lose all access to this course, including your progress, on {date}."
++        description="Message body to tell learner the consequences of course expiration."
+         values={{
+           date: (
+             <FormattedDate
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx b/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
+index 3e64c07..2ad9b6d 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
+@@ -16,6 +16,7 @@ function AccessExpirationMasqueradeBanner({ payload }) {
+       <FormattedMessage
+         id="instructorToolbar.pageBanner.courseHasExpired"
+         defaultMessage="This learner no longer has access to this course. Their access expired on {date}."
++        description="It's a warning that is shown to course author when being masqueraded as learner, while the course has expired for the real learner."
+         values={{
+           date: <FormattedDate
+             key="instructorToolbar.pageBanner.accessExpirationDate"
+diff --git a/src/alerts/access-expiration-alert/messages.js b/src/alerts/access-expiration-alert/messages.js
+index 32d3f9a..8c6a02f 100644
+--- a/src/alerts/access-expiration-alert/messages.js
++++ b/src/alerts/access-expiration-alert/messages.js
+@@ -4,6 +4,7 @@ const messages = defineMessages({
+   upgradeNow: {
+     id: 'learning.accessExpiration.upgradeNow',
+     defaultMessage: 'Upgrade now',
++    description: 'The anchor text for the upgrading link',
+   },
+ });
+ 
+diff --git a/src/alerts/course-start-alert/CourseStartAlert.jsx b/src/alerts/course-start-alert/CourseStartAlert.jsx
+index 036676f..884fb62 100644
+--- a/src/alerts/course-start-alert/CourseStartAlert.jsx
++++ b/src/alerts/course-start-alert/CourseStartAlert.jsx
+@@ -86,6 +86,7 @@ function CourseStartAlert({ payload }) {
+       <FormattedMessage
+         id="learning.outline.alert.end.calendar"
+         defaultMessage="Don’t forget to add a calendar reminder!"
++        description="It's just a recommendation for learners to set a reminder for the course starting date and is shown when the course starting date is more than a day. "
+       />
+     </Alert>
+   );
+diff --git a/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx b/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
+index deb2277..ad85a07 100644
+--- a/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
++++ b/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
+@@ -22,6 +22,7 @@ function CourseStartMasqueradeBanner({ payload }) {
+       <FormattedMessage
+         id="instructorToolbar.pageBanner.courseHasNotStarted"
+         defaultMessage="This learner does not yet have access to this course. The course starts on {date}."
++        description="It's a warning that is shown to course author when being masqueraded as learner, while the course hasn't started for the real learner yet."
+         values={{
+           date: <FormattedDate
+             key="instructorToolbar.pageBanner.courseStartDate"
+diff --git a/src/course-home/dates-tab/messages.js b/src/course-home/dates-tab/messages.js
+index 87bc5ea..404f806 100644
+--- a/src/course-home/dates-tab/messages.js
++++ b/src/course-home/dates-tab/messages.js
+@@ -4,30 +4,37 @@ const messages = defineMessages({
+   completed: {
+     id: 'learning.dates.badge.completed',
+     defaultMessage: 'Completed',
++    description: 'shown as label for the assignments which learner has completed.',
+   },
+   dueNext: {
+     id: 'learning.dates.badge.dueNext',
+     defaultMessage: 'Due next',
++    description: 'Shown as label for the assignment which date is in the future',
+   },
+   pastDue: {
+     id: 'learning.dates.badge.pastDue',
+     defaultMessage: 'Past due',
++    description: 'Shown as label for the assignments which deadline has passed',
+   },
+   title: {
+     id: 'learning.dates.title',
+     defaultMessage: 'Important dates',
++    description: 'The title of dates tab (course timeline).',
+   },
+   today: {
+     id: 'learning.dates.badge.today',
+     defaultMessage: 'Today',
++    description: 'Label used when the scheduled date for the assignment matches the current day',
+   },
+   unreleased: {
+     id: 'learning.dates.badge.unreleased',
+     defaultMessage: 'Not yet released',
++    description: 'Shown as label for assignments which date is unknown yet',
+   },
+   verifiedOnly: {
+     id: 'learning.dates.badge.verifiedOnly',
+     defaultMessage: 'Verified only',
++    description: 'Shown as label for assignments which learner has no access to.',
+   },
+ });
+ 
+diff --git a/src/course-home/goal-unsubscribe/messages.js b/src/course-home/goal-unsubscribe/messages.js
+index db789df..4eec06a 100644
+--- a/src/course-home/goal-unsubscribe/messages.js
++++ b/src/course-home/goal-unsubscribe/messages.js
+@@ -4,26 +4,32 @@ const messages = defineMessages({
+   contactSupport: {
+     id: 'learning.goals.unsubscribe.contact',
+     defaultMessage: 'contact support',
++    description: 'Its shown as a suggestion or recommendation for learner when their unsubscribing request has failed',
+   },
+   description: {
+     id: 'learning.goals.unsubscribe.description',
+     defaultMessage: 'You will no longer receive email reminders about your goal for {courseTitle}.',
++    description: 'It describes the consequences to learner when they unsubscribe of goal reminder service',
+   },
+   errorHeader: {
+     id: 'learning.goals.unsubscribe.errorHeader',
+     defaultMessage: 'Something went wrong',
++    description: 'It indicate that the unsubscribing request has failed',
+   },
+   goToDashboard: {
+     id: 'learning.goals.unsubscribe.goToDashboard',
+     defaultMessage: 'Go to dashboard',
++    description: 'Anchor text for button that redirects to dashboard page',
+   },
+   header: {
+     id: 'learning.goals.unsubscribe.header',
+     defaultMessage: 'You’ve unsubscribed from goal reminders',
++    description: 'It indicate that the unsubscribing request was successful',
+   },
+   loading: {
+     id: 'learning.goals.unsubscribe.loading',
+     defaultMessage: 'Unsubscribing…',
++    description: 'Message shown when the unsubscribing request is processing',
+   },
+ });
+ 
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index f52e3e5..48c56a1 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -4,10 +4,12 @@ const messages = defineMessages({
+   allDates: {
+     id: 'learning.outline.dates.all',
+     defaultMessage: 'View all course dates',
++    description: 'Text anchor for link that redirects to dates or course timeline tab',
+   },
+   casualGoalButtonText: {
+     id: 'learning.outline.goalButton.casual.text',
+     defaultMessage: '1 day a week',
++    description: 'Text shown for casual goal button',
+   },
+   casualGoalButtonTitle: {
+     id: 'learning.outline.goalButton.screenReader.text',
+@@ -37,6 +39,7 @@ const messages = defineMessages({
+   dates: {
+     id: 'learning.outline.dates',
+     defaultMessage: 'Important dates',
++    description: 'Headline for the (summary of dates) section of the outline page',
+   },
+   editGoal: {
+     id: 'learning.outline.editGoal',
+@@ -56,6 +59,7 @@ const messages = defineMessages({
+   goalReminderDetail: {
+     id: 'learning.outline.goalReminderDetail',
+     defaultMessage: 'If we notice you’re not quite at your goal, we’ll send you an email reminder.',
++    description: 'It describe to learner what is goal reminder service',
+   },
+   goalUnsure: {
+     id: 'learning.outline.goalUnsure',
+@@ -64,6 +68,7 @@ const messages = defineMessages({
+   handouts: {
+     id: 'learning.outline.handouts',
+     defaultMessage: 'Course Handouts',
++    description: 'Header for (Course Handouts) section in course outline',
+   },
+   incompleteAssignment: {
+     id: 'learning.outline.incompleteAssignment',
+@@ -78,6 +83,7 @@ const messages = defineMessages({
+   intenseGoalButtonText: {
+     id: 'learning.outline.goalButton.intense.text',
+     defaultMessage: '5 days a week',
++    description: 'Text shown for intense goal button',
+   },
+   intenseGoalButtonTitle: {
+     id: 'learning.outline.goalButton.intense.title',
+@@ -96,10 +102,13 @@ const messages = defineMessages({
+   proctoringInfoPanel: {
+     id: 'learning.proctoringPanel.header',
+     defaultMessage: 'This course contains proctored exams',
++    description: 'Used as a label to indicate that course has proctored exams',
+   },
+   regularGoalButtonText: {
+     id: 'learning.outline.goalButton.regular.text',
+     defaultMessage: '3 days a week',
++    description: 'Text shown for regular goal button',
++
+   },
+   regularGoalButtonTitle: {
+     id: 'learning.outline.goalButton.regular.title',
+@@ -114,14 +123,17 @@ const messages = defineMessages({
+   resume: {
+     id: 'learning.outline.resume',
+     defaultMessage: 'Resume course',
++    description: 'Anchor text for button that would resume course',
+   },
+   setGoal: {
+     id: 'learning.outline.setGoal',
+     defaultMessage: 'To start, set a course goal by selecting the option below that best describes your learning plan.',
++    description: 'In indicate to learner how to set or use the goal reminder service',
+   },
+   setGoalReminder: {
+     id: 'learning.outline.setGoalReminder',
+     defaultMessage: 'Set a goal reminder',
++    description: 'The text for the radio button which activate or deactivate the goal reminder service',
+   },
+   setLearningGoalButtonScreenReaderText: {
+     id: 'learning.outline.goalButton.casual.title',
+@@ -131,14 +143,17 @@ const messages = defineMessages({
+   setWeeklyGoal: {
+     id: 'learning.outline.setWeeklyGoal',
+     defaultMessage: 'Set a weekly learning goal',
++    description: 'The headline for (goal reminder service) section in course outline',
+   },
+   setWeeklyGoalDetail: {
+     id: 'learning.outline.setWeeklyGoalDetail',
+     defaultMessage: 'Setting a goal motivates you to finish the course. You can always change it later.',
++    description: 'It indiacate the gaol or the purpose of the goal reminder service to learners',
+   },
+   start: {
+     id: 'learning.outline.start',
+     defaultMessage: 'Start course',
++    description: 'The text for button which starts the course',
+   },
+   startBlurb: {
+     id: 'learning.outline.startBlurb',
+@@ -147,14 +162,17 @@ const messages = defineMessages({
+   tools: {
+     id: 'learning.outline.tools',
+     defaultMessage: 'Course Tools',
++    description: 'Headline for the (course tools) section in course outline. course tool might include links to course bookmarks, financial assistance...etc',
+   },
+   upgradeButton: {
+     id: 'learning.outline.upgradeButton',
+     defaultMessage: 'Upgrade ({symbol}{price})',
++    description: 'Text for the button which redirects to the upgrading page',
+   },
+   upgradeTitle: {
+     id: 'learning.outline.upgradeTitle',
+     defaultMessage: 'Pursue a verified certificate',
++    description: 'Upgrade title',
+   },
+   welcomeMessage: {
+     id: 'learning.outline.welcomeMessage',
+@@ -176,106 +194,132 @@ const messages = defineMessages({
+   notStartedProctoringStatus: {
+     id: 'learning.proctoringPanel.status.notStarted',
+     defaultMessage: 'Not Started',
++    description: 'It indcate that proctortrack onboarding exam hasn’t started yet',
+   },
+   startedProctoringStatus: {
+     id: 'learning.proctoringPanel.status.started',
+     defaultMessage: 'Started',
++    description: 'Label to indicate the starting status of the proctortrack onboarding exam',
+   },
+   submittedProctoringStatus: {
+     id: 'learning.proctoringPanel.status.submitted',
+     defaultMessage: 'Submitted',
++    description: 'Label to indicate the submitted status of proctortrack onboarding exam',
+   },
+   verifiedProctoringStatus: {
+     id: 'learning.proctoringPanel.status.verified',
+     defaultMessage: 'Verified',
++    description: 'Label to indicate the verified status of the proctortrack onboarding exam',
+   },
+   rejectedProctoringStatus: {
+     id: 'learning.proctoringPanel.status.rejected',
+     defaultMessage: 'Rejected',
++    description: 'Label to indicate the rejection status of the proctortrack onboarding exam',
+   },
+   errorProctoringStatus: {
+     id: 'learning.proctoringPanel.status.error',
+     defaultMessage: 'Error',
++    description: 'Label to indicate that there is error in proctortrack onboarding exam',
+   },
+   otherCourseApprovedProctoringStatus: {
+     id: 'learning.proctoringPanel.status.otherCourseApproved',
+     defaultMessage: 'Approved in Another Course',
++    description: 'Label to indicate that the proctortrack onboarding exam is verified based on taking onboarding exam on another course',
+   },
+   expiringSoonProctoringStatus: {
+     id: 'learning.proctoringPanel.status.expiringSoon',
+     defaultMessage: 'Expiring Soon',
++    description: 'A label to indicate that proctortrack onboarding exam will expire soon',
+   },
+   proctoringCurrentStatus: {
+     id: 'learning.proctoringPanel.status',
+     defaultMessage: 'Current Onboarding Status:',
++    description: 'The text that precede the status label of proctortrack onboarding exam',
+   },
+   notStartedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.notStarted',
+     defaultMessage: 'You have not started your onboarding exam.',
++    description: 'The text that explain the meaning of (not started) label of the proctortrack onboarding exam',
+   },
+   startedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.started',
+     defaultMessage: 'You have started your onboarding exam.',
++    description: 'The text that explain the meaning of (started) label of the proctortrack onboarding exam',
+   },
+   submittedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.submitted',
+     defaultMessage: 'You have submitted your onboarding exam.',
++    description: 'The text that explain the meaning of (submitted) label of the proctortrack onboarding exam',
+   },
+   verifiedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.verified',
+     defaultMessage: 'Your onboarding exam has been approved in this course.',
++    description: 'The text that explain the meaning of (verified) label of the proctortrack onboarding exam',
+   },
+   rejectedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.rejected',
+     defaultMessage: 'Your onboarding exam has been rejected. Please retry onboarding.',
++    description: 'The text that explain the meaning of (rejected) label of the proctortrack onboarding exam',
+   },
+   errorProctoringMessage: {
+     id: 'learning.proctoringPanel.message.error',
+     defaultMessage: 'An error has occurred during your onboarding exam. Please retry onboarding.',
++    description: 'The text that explain the meaning of (error) label of the proctortrack onboarding exam',
+   },
+   otherCourseApprovedProctoringMessage: {
+     id: 'learning.proctoringPanel.message.otherCourseApproved',
+     defaultMessage: 'Your onboarding exam has been approved in another course.',
++    description: 'The text that explain the meaning of (approved in another course) label of the proctortrack onboarding exam',
+   },
+   otherCourseApprovedProctoringDetail: {
+     id: 'learning.proctoringPanel.detail.otherCourseApproved',
+     defaultMessage: 'If your device has changed, we recommend that you complete this course\'s onboarding exam in order to ensure that your setup still meets the requirements for proctoring.',
++    description: 'The text that recommend an action when the status of the proctortrack onboarding exam is (approved in another course)',
+   },
+   expiringSoonProctoringMessage: {
+     id: 'learning.proctoringPanel.message.expiringSoon',
+     defaultMessage: 'Your onboarding profile has been approved in another course. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.',
++    description: 'The text that recommend an action when the status of the proctortrack onboarding exam is (expiring soon)',
+   },
+   proctoringPanelGeneralInfo: {
+     id: 'learning.proctoringPanel.generalInfo',
+     defaultMessage: 'You must complete the onboarding process prior to taking any proctored exam. ',
++    description: 'It indicate key and important fact to learner about the importance of taking proctortrack onboarding exam',
+   },
+   proctoringPanelGeneralInfoSubmitted: {
+     id: 'learning.proctoringPanel.generalInfoSubmitted',
+     defaultMessage: 'Your submitted profile is in review.',
++    description: 'The text that explain the meaning of (in review) label of the proctortrack onboarding exam',
+   },
+   proctoringPanelGeneralTime: {
+     id: 'learning.proctoringPanel.generalTime',
+     defaultMessage: 'Onboarding profile review can take 2+ business days.',
++    description: 'This text explain for how long the (in review) status of the proctortrack onboarding exam might remain',
+   },
+   proctoringOnboardingButton: {
+     id: 'learning.proctoringPanel.onboardingButton',
+     defaultMessage: 'Complete Onboarding',
++    description: 'Text shown on the button that starts the actual proctortrack onboarding exam when it is released',
+   },
+   proctoringOnboardingPracticeButton: {
+     id: 'learning.proctoringPanel.onboardingPracticeButton',
+     defaultMessage: 'View Onboarding Exam',
++    description: 'The text that appears on onboarding exam while its not released, so learners can take or view it as a practice',
+   },
+   proctoringOnboardingButtonNotOpen: {
+     id: 'learning.proctoringPanel.onboardingButtonNotOpen',
+     defaultMessage: 'Onboarding Opens: {releaseDate}',
++    description: 'It indicate when or from when the learner can take the proctortrack onboarding exam',
+   },
+   proctoringReviewRequirementsButton: {
+     id: 'learning.proctoringPanel.reviewRequirementsButton',
+     defaultMessage: 'Review instructions and system requirements',
++    description: 'Anchor text for button which redirect leaner to doc or a detailed page about proctortrack onboarding exam',
+   },
+   proctoringOnboardingButtonPastDue: {
+     id: 'learning.proctoringPanel.onboardingButtonPastDue',
+     defaultMessage: 'Onboarding Past Due',
++    description: 'Text that show when the deadline of proctortrack onboarding exam has passed, it appears on button that start the onboarding exam however for this case the button is disabled for obvious reason',
+   },
+ });
+ 
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index 0afcb79..abf1c05 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -115,6 +115,7 @@ function CertificateStatus({ intl }) {
+             <FormattedMessage
+               id="progress.certificateStatus.unverifiedBody"
+               defaultMessage="In order to generate a certificate, you must complete ID verification. {idVerificationSupportLink}."
++              description="Its shown when learner are not verified thus it recommends going over the verification process"
+               values={{ idVerificationSupportLink }}
+             />
+           );
+@@ -133,6 +134,7 @@ function CertificateStatus({ intl }) {
+               Showcase your accomplishment on LinkedIn or your resumé today.
+               You can download your certificate now and access it any time from your
+               {dashboardLink} and {profileLink}."
++            description="Recommending an action for learner when course certificate is available"
+             values={{ dashboardLink, profileLink }}
+           />
+         );
+@@ -157,6 +159,7 @@ function CertificateStatus({ intl }) {
+             id="courseCelebration.certificateBody.notAvailable.endDate"
+             defaultMessage="This course ends on {endDate}. Final grades and certificates are
+             scheduled to be available after {certAvailabilityDate}."
++            description="This shown for leaner when they are eligible for certifcate but it't not available yet, it could because leaners just finished the course quickly!"
+             values={{ endDate, certAvailabilityDate }}
+           />
+         );
+diff --git a/src/course-home/progress-tab/certificate-status/messages.js b/src/course-home/progress-tab/certificate-status/messages.js
+index 741abd9..f9eb1fd 100644
+--- a/src/course-home/progress-tab/certificate-status/messages.js
++++ b/src/course-home/progress-tab/certificate-status/messages.js
+@@ -4,86 +4,107 @@ const messages = defineMessages({
+   notPassingHeader: {
+     id: 'progress.certificateStatus.notPassingHeader',
+     defaultMessage: 'Certificate status',
++    description: 'Header text when learner certifcate status is not passing',
+   },
+   notPassingBody: {
+     id: 'progress.certificateStatus.notPassingBody',
+     defaultMessage: 'In order to qualify for a certificate, you must have a passing grade.',
++    description: 'Body text when learner certifcate status is not passing',
+   },
+   inProgressHeader: {
+     id: 'progress.certificateStatus.inProgressHeader',
+     defaultMessage: 'More content is coming soon!',
++    description: 'Header text when learner certifcate is in progress',
+   },
+   inProgressBody: {
+     id: 'progress.certificateStatus.inProgressBody',
+     defaultMessage: 'It looks like there is more content in this course that will be released in the future. Look out for email updates or check back on your course for when this content will be available.',
++    description: 'Body text when learner certifcate is in progress',
+   },
+   requestableHeader: {
+     id: 'progress.certificateStatus.requestableHeader',
+     defaultMessage: 'Certificate status',
++    description: 'Header text when learner certifcate status is requestable',
+   },
+   requestableBody: {
+     id: 'progress.certificateStatus.requestableBody',
+     defaultMessage: 'Congratulations, you qualified for a certificate! In order to access your certificate, request it below.',
++    description: 'Body text when learner certifcate status is requestable',
+   },
+   requestableButton: {
+     id: 'progress.certificateStatus.requestableButton',
+     defaultMessage: 'Request certificate',
++    description: 'Button text when learner certifcate status is requestable',
+   },
+   unverifiedHeader: {
+     id: 'progress.certificateStatus.unverifiedHeader',
+     defaultMessage: 'Certificate status',
++    description: 'Header text when learner certifcate status is unverified',
+   },
+   unverifiedButton: {
+     id: 'progress.certificateStatus.unverifiedButton',
+     defaultMessage: 'Verify ID',
++    description: 'Button text when learner certifcate status is unverified',
+   },
+   unverifiedPendingBody: {
+     id: 'progress.certificateStatus.courseCelebration.verificationPending',
+     defaultMessage: 'Your ID verification is pending and your certificate will be available once approved.',
++    description: 'Body text when learner certifcate status is unverified pending',
+   },
+   downloadableHeader: {
+     id: 'progress.certificateStatus.downloadableHeader',
+     defaultMessage: 'Your certificate is available!',
++    description: 'Header text when the certifcate is available',
+   },
+   downloadableBody: {
+     id: 'progress.certificateStatus.downloadableBody',
+     defaultMessage: 'Showcase your accomplishment on LinkedIn or your resumé today. You can download your certificate now and access it any time from your Dashboard and Profile.',
++    description: 'Recommending an action for learner when course certificate is available',
+   },
+   downloadableButton: {
+     id: 'progress.certificateStatus.downloadableButton',
+     defaultMessage: 'Download my certificate',
++    description: 'Button text when learner certifcate status is downloadable',
+   },
+   viewableButton: {
+     id: 'progress.certificateStatus.viewableButton',
+     defaultMessage: 'View my certificate',
++    description: 'Button text which view or links to the certifcate',
+   },
+   notAvailableHeader: {
+     id: 'progress.certificateStatus.notAvailableHeader',
+     defaultMessage: 'Certificate status',
++    description: 'Header text when the certifcate is not available',
+   },
+   upgradeHeader: {
+     id: 'progress.certificateStatus.upgradeHeader',
+     defaultMessage: 'Earn a certificate',
++    description: 'Header text when the learner needs to upgrade to earn a certifcate ',
+   },
+   upgradeBody: {
+     id: 'progress.certificateStatus.upgradeBody',
+     defaultMessage: 'You are in an audit track and do not qualify for a certificate. In order to work towards a certificate, upgrade your course today.',
++    description: 'Body text when the learner needs to upgrade to earn a certifcate ',
+   },
+   upgradeButton: {
+     id: 'progress.certificateStatus.upgradeButton',
+     defaultMessage: 'Upgrade now',
++    description: 'Button text which leaner needs to upgrade to get the certifcate',
+   },
+   unverifiedHomeHeader: {
+     id: 'progress.certificateStatus.unverifiedHomeHeader',
+     defaultMessage: 'Verify your identity to earn a certificate!',
++    description: 'Header text when the learner needs to do verification to earn a certifcate ',
+   },
+   unverifiedHomeButton: {
+     id: 'progress.certificateStatus.unverifiedHomeButton',
+     defaultMessage: 'Verify my ID',
++    description: 'Button text which leaner needs to do verification to earn a certifcate',
+   },
+   unverifiedHomeBody: {
+     id: 'progress.certificateStatus.unverifiedHomeBody',
+     defaultMessage: 'In order to generate a certificate for this course, you must complete the ID verification process.',
++    description: 'Body text when the learner needs to do verification to earn a certifcate',
+   },
+ });
+ 
+diff --git a/src/course-home/progress-tab/course-completion/messages.js b/src/course-home/progress-tab/course-completion/messages.js
+index 8d66f4f..08bb8f5 100644
+--- a/src/course-home/progress-tab/course-completion/messages.js
++++ b/src/course-home/progress-tab/course-completion/messages.js
+@@ -4,38 +4,47 @@ const messages = defineMessages({
+   donutLabel: {
+     id: 'progress.completion.donut.label',
+     defaultMessage: 'completed',
++    description: 'Label text for progress donut chart',
+   },
+   completionBody: {
+     id: 'progress.completion.body',
+     defaultMessage: 'This represents how much of the course content you have completed. Note that some content may not yet be released.',
++    description: 'It explains the meaning of progress donut chart',
+   },
+   completeContentTooltip: {
+     id: 'progress.completion.tooltip.locked',
+     defaultMessage: 'Content that you have completed.',
++    description: 'It expalains the meaning of content that is completed',
+   },
+   courseCompletion: {
+     id: 'progress.completion.header',
+     defaultMessage: 'Course completion',
++    description: 'Header text for (completion donut chart) section of the progress tab',
+   },
+   incompleteContentTooltip: {
+     id: 'progress.completion.tooltip',
+     defaultMessage: 'Content that you have access to and have not completed.',
++    description: 'It explain the meaning for content is completed',
+   },
+   lockedContentTooltip: {
+     id: 'progress.completion.tooltip.complete',
+     defaultMessage: 'Content that is locked and available only to those who upgrade.',
++    description: 'It expalains the meaning of content that is locked',
+   },
+   percentComplete: {
+     id: 'progress.completion.donut.percentComplete',
+     defaultMessage: 'You have completed {percent}% of content in this course.',
++    description: 'It summarize the progress in the course (100% - %incomplete)',
+   },
+   percentIncomplete: {
+     id: 'progress.completion.donut.percentIncomplete',
+     defaultMessage: 'You have not completed {percent}% of content in this course that you have access to.',
++    description: 'It summarize the progress in the course (100% - %complete)',
+   },
+   percentLocked: {
+     id: 'progress.completion.donut.percentLocked',
+     defaultMessage: '{percent}% of content in this course is locked and available only for those who upgrade.',
++    description: 'It indicate the relative size of content that is locked in the course (100% - %open_content)',
+   },
+ });
+ 
+diff --git a/src/course-home/progress-tab/credit-information/CreditInformation.jsx b/src/course-home/progress-tab/credit-information/CreditInformation.jsx
+index 673b18c..8683fb2 100644
+--- a/src/course-home/progress-tab/credit-information/CreditInformation.jsx
++++ b/src/course-home/progress-tab/credit-information/CreditInformation.jsx
+@@ -40,6 +40,7 @@ function CreditInformation({ intl }) {
+         <FormattedMessage
+           id="progress.creditInformation.creditNotEligible"
+           defaultMessage="You are no longer eligible for credit in this course. Learn more about {creditLink}."
++          description="Message to learner who are not eligible for course credit, it can because the a requirement deadline have passed"
+           values={{ creditLink }}
+         />
+       );
+@@ -51,6 +52,7 @@ function CreditInformation({ intl }) {
+           defaultMessage="
+           You have met the requirements for credit in this course. Go to your
+           {dashboardLink} to purchase course credit. Or learn more about {creditLink}."
++          description="After the credit requirements are met, leaners can then do the last step which purchasing the credit. Note that is only doable for leaners after they met all the requirements"
+           values={{ dashboardLink, creditLink }}
+         />
+       );
+@@ -60,6 +62,7 @@ function CreditInformation({ intl }) {
+         <FormattedMessage
+           id="progress.creditInformation.creditPartialEligible"
+           defaultMessage="You have not yet met the requirements for credit. Learn more about {creditLink}."
++          description="This means that one or more requirements is not satisfied yet"
+           values={{ creditLink }}
+         />
+       );
+diff --git a/src/course-home/progress-tab/credit-information/messages.js b/src/course-home/progress-tab/credit-information/messages.js
+index c80b252..939f6ca 100644
+--- a/src/course-home/progress-tab/credit-information/messages.js
++++ b/src/course-home/progress-tab/credit-information/messages.js
+@@ -4,10 +4,12 @@ const messages = defineMessages({
+   completed: {
+     id: 'progress.creditInformation.completed',
+     defaultMessage: 'Completed',
++    description: 'Label text if a requirement for (course credit) is satisfied',
+   },
+   courseCredit: {
+     id: 'progress.creditInformation.courseCredit',
+     defaultMessage: 'course credit',
++    description: 'Anchor text for link that redirects (course credit) help page',
+   },
+   minimumGrade: {
+     id: 'progress.creditInformation.minimumGrade',
+@@ -16,18 +18,22 @@ const messages = defineMessages({
+   requirementsHeader: {
+     id: 'progress.creditInformation.requirementsHeader',
+     defaultMessage: 'Requirements for course credit',
++    description: 'Header for the requirements section in course credit',
+   },
+   upcoming: {
+     id: 'progress.creditInformation.upcoming',
+     defaultMessage: 'Upcoming',
++    description: 'It indicate that the a (credit requirement) status is not known yet',
+   },
+   verificationFailed: {
+     id: 'progress.creditInformation.verificationFailed',
+     defaultMessage: 'Verification failed',
++    description: 'It indicate that the learner submitted a requirement but is either failed or declined',
+   },
+   verificationSubmitted: {
+     id: 'progress.creditInformation.verificationSubmitted',
+     defaultMessage: 'Verification submitted',
++    description: 'It indicate that the learner submitted a requirement but is not graded or reviewed yet',
+   },
+ });
+ 
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 6a6a2b3..4920071 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -68,6 +68,7 @@ function DetailedGrades({ intl }) {
+         <FormattedMessage
+           id="progress.ungradedAlert"
+           defaultMessage="For progress on ungraded aspects of the course, view your {outlineLink}."
++          description="Text that precede link that redirect to course outline page"
+           values={{ outlineLink }}
+         />
+       </p>
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 2d3f73f..72a6624 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -4,156 +4,194 @@ const messages = defineMessages({
+   assignmentType: {
+     id: 'progress.assignmentType',
+     defaultMessage: 'Assignment type',
++    description: 'Header for column that indicate type of the assignment in grade summary table',
+   },
+   backToContent: {
+     id: 'progress.footnotes.backToContent',
+     defaultMessage: 'Back to content',
++    description: 'Text for button that redirects to contnet',
+   },
+   courseGradeBody: {
+     id: 'progress.courseGrade.body',
+     defaultMessage: 'This represents your weighted grade against the grade needed to pass this course.',
++    description: 'This text is shown to explain the meaning of the (grade bar) chart',
+   },
+   courseGradeBarAltText: {
+     id: 'progress.courseGrade.gradeBar.altText',
+     defaultMessage: 'Your current grade is {currentGrade}%. A weighted grade of {passingGrade}% is required to pass in this course.',
++    description: 'Alt text for the grade chart bar',
+   },
+   courseGradeFooterGenericPassing: {
+     id: 'progress.courseGrade.footer.generic.passing',
+     defaultMessage: 'You’re currently passing this course',
++    description: 'This shown when learner weighted grade is greater or equal course passing grade',
+   },
+   courseGradeFooterNonPassing: {
+     id: 'progress.courseGrade.footer.nonPassing',
+     defaultMessage: 'A weighted grade of {passingGrade}% is required to pass in this course',
++    description: 'This shown when learner weighted grade is less than course passing grade',
+   },
+   courseGradeFooterPassingWithGrade: {
+     id: 'progress.courseGrade.footer.passing',
+     defaultMessage: 'You’re currently passing this course with a grade of {letterGrade} ({minGrade}-{maxGrade}%)',
++    description: 'This shown when learner weighted grade is greater or equal course passing grade amd course is using letter grade',
+   },
+   courseGradePreviewHeaderLocked: {
+     id: 'progress.courseGrade.preview.headerLocked',
+     defaultMessage: 'locked feature',
++    description: 'This when (progress page) feature is locked, sometimes learner needs to upgrade to get insight about their progress',
+   },
+   courseGradePreviewHeaderLimited: {
+     id: 'progress.courseGrade.preview.headerLimited',
+     defaultMessage: 'limited feature',
++    description: 'This when (progress page) feature is partially locked, it means leaners can see their progress but not get to a certificate',
+   },
+   courseGradePreviewHeaderAriaHidden: {
+     id: 'progress.courseGrade.preview.header.ariaHidden',
+     defaultMessage: 'Preview of a ',
++    description: 'This text precedes either (locked feature) or (limited feature)',
+   },
+   courseGradePreviewUnlockCertificateBody: {
+     id: 'progress.courseGrade.preview.body.unlockCertificate',
+     defaultMessage: 'Unlock to view grades and work towards a certificate.',
++    description: 'Recommending an action for learner when they need to upgrade to view progress and get a certificate',
+   },
+   courseGradePartialPreviewUnlockCertificateBody: {
+     id: 'progress.courseGrade.partialpreview.body.unlockCertificate',
+     defaultMessage: 'Unlock to work towards a certificate.',
++    description: 'Recommending an action for learner when they need to upgrade to get a certificate',
+   },
+   courseGradePreviewUpgradeDeadlinePassedBody: {
+     id: 'progress.courseGrade.preview.body.upgradeDeadlinePassed',
+     defaultMessage: 'The deadline to upgrade in this course has passed.',
++    description: 'Shown when learner no longer can upgrade',
+   },
+   courseGradePreviewUpgradeButton: {
+     id: 'progress.courseGrade.preview.button.upgrade',
+     defaultMessage: 'Upgrade now',
++    description: 'Text for button that redirects to the upgrade page',
+   },
+   courseGradeRangeTooltip: {
+     id: 'progress.courseGrade.gradeRange.tooltip',
+     defaultMessage: 'Grade ranges for this course:',
++    description: 'This shown when course is using (letter grade) to explain e.g. range for A, B, and C...etc',
+   },
+   courseOutline: {
+     id: 'progress.courseOutline',
+     defaultMessage: 'Course Outline',
++    description: 'Anchor text for link that redirects to (course outline) tab',
+   },
+   currentGradeLabel: {
+     id: 'progress.courseGrade.label.currentGrade',
+     defaultMessage: 'Your current grade',
++    description: 'Text label current leaner grade on (grade bar) chart',
+   },
+   detailedGrades: {
+     id: 'progress.detailedGrades',
+     defaultMessage: 'Detailed grades',
++    description: 'Headline for the (detailed grade) section in the progress tab',
+   },
+   detailedGradesEmpty: {
+     id: 'progress.detailedGrades.emptyTable',
+     defaultMessage: 'You currently have no graded problem scores.',
++    description: 'It indicate that there are no problem or assignments to be scored',
+   },
+   footnotesTitle: {
+     id: 'progress.footnotes.title',
+     defaultMessage: 'Grade summary footnotes',
++    description: 'Title for grade summary footnotes, if exists',
+   },
+   grade: {
+     id: 'progress.gradeSummary.grade',
+     defaultMessage: 'Grade',
++    description: 'Headline for (grade column) in grade summary table',
+   },
+   grades: {
+     id: 'progress.courseGrade.grades',
+     defaultMessage: 'Grades',
++    description: 'Headline for grades section in progress tab',
+   },
+   gradesAndCredit: {
+     id: 'progress.courseGrade.gradesAndCredit',
+     defaultMessage: 'Grades & Credit',
++    description: 'Headline for (grades and credit) section in progress tab',
+   },
+   gradeRangeTooltipAlt: {
+     id: 'progress.courseGrade.gradeRange.Tooltip',
+     defaultMessage: 'Grade range tooltip',
++    description: 'Alt text for icon which that triggers (tip box) for grade range',
+   },
+   gradeSummary: {
+     id: 'progress.gradeSummary',
+     defaultMessage: 'Grade summary',
++    description: 'Headline for the (grade summary) section in (grades) section in progress tab',
+   },
+   gradeSummaryLimitedAccessExplanation: {
+     id: 'progress.gradeSummary.limitedAccessExplanation',
+     defaultMessage: 'You have limited access to graded assignments as part of the audit track in this course.',
++    description: 'Text shown when learner has limited access to grade feature',
+   },
+   gradeSummaryTooltipAlt: {
+     id: 'progress.gradeSummary.tooltip.alt',
+     defaultMessage: 'Grade summary tooltip',
++    description: 'Alt text for icon which that triggers (tip box) for grade summary',
+   },
+   gradeSummaryTooltipBody: {
+     id: 'progress.gradeSummary.tooltip.body',
+     defaultMessage: "Your course assignment's weight is determined by your instructor. "
+       + 'By multiplying your grade by the weight for that assignment type, your weighted grade is calculated. '
+       + "Your weighted grade is what's used to determine if you pass the course.",
++    description: 'The content of (tip box) for the grade summary section',
+   },
+   noAccessToAssignmentType: {
+     id: 'progress.noAcessToAssignmentType',
+     defaultMessage: 'You do not have access to assignments of type {assignmentType}',
++    description: 'Its alt text for locked icon which is shown if assignment type in (grade summary table) is locked',
+   },
+   noAccessToSubsection: {
+     id: 'progress.noAcessToSubsection',
+     defaultMessage: 'You do not have access to subsection {displayName}',
++    description: 'Text shown when learner have limited access to grades feature',
+   },
+   passingGradeLabel: {
+     id: 'progress.courseGrade.label.passingGrade',
+     defaultMessage: 'Passing grade',
++    description: 'Label for mark on the (grade bar) chart which indicate the poisition of passing grade on the bar',
+   },
+   problemScoreLabel: {
+     id: 'progress.detailedGrades.problemScore.label',
+     defaultMessage: 'Problem Scores:',
++    description: 'Label text which precedes detailed view of all scores per assignment',
+   },
+   problemScoreToggleAltText: {
+     id: 'progress.detailedGrades.problemScore.toggleButton',
+     defaultMessage: 'Toggle individual problem scores for {subsectionTitle}',
++    description: 'Alt text for button which switches detailed view per module',
+   },
+   sectionGradeOverridden: {
+     id: 'progress.detailedGrades.overridden',
+     defaultMessage: 'Section grade has been overridden.',
++    description: 'This indicate that the graded score has been changed, it can happen if leaner initial assessment was not fair, might be for other reasons as well',
+   },
+   score: {
+     id: 'progress.score',
+     defaultMessage: 'Score',
++    description: 'It indicate how many points the learner have socred scored in particular assignment, or exam',
+   },
+   weight: {
+     id: 'progress.weight',
+     defaultMessage: 'Weight',
++    description: 'It indicate the weight of particular assignment on overall course grade, it is demeterined by course author',
+   },
+   weightedGrade: {
+     id: 'progress.weightedGrade',
+     defaultMessage: 'Weighted grade',
++    description: 'Weighed grade is calculated by (weight %) * (grade score) ',
+   },
+   weightedGradeSummary: {
+     id: 'progress.weightedGradeSummary',
+     defaultMessage: 'Your current weighted grade summary',
++    description: 'It the text precede the sum of weighted grades of all the assignment',
+   },
+ 
+ });
+diff --git a/src/course-home/progress-tab/messages.js b/src/course-home/progress-tab/messages.js
+index 1359c31..91fff7e 100644
+--- a/src/course-home/progress-tab/messages.js
++++ b/src/course-home/progress-tab/messages.js
+@@ -4,6 +4,7 @@ const messages = defineMessages({
+   progressHeader: {
+     id: 'progress.header',
+     defaultMessage: 'Your progress',
++    description: 'Headline or title for the progress tab',
+   },
+   progressHeaderForTargetUser: {
+     id: 'progress.header.targetUser',
+@@ -13,6 +14,7 @@ const messages = defineMessages({
+   studioLink: {
+     id: 'progress.link.studio',
+     defaultMessage: 'View grading in Studio',
++    description: 'Text shown for button that redirects to the studio if the user is a staff memember',
+   },
+ });
+ 
+diff --git a/src/course-home/progress-tab/related-links/messages.js b/src/course-home/progress-tab/related-links/messages.js
+index b696f88..80d7271 100644
+--- a/src/course-home/progress-tab/related-links/messages.js
++++ b/src/course-home/progress-tab/related-links/messages.js
+@@ -4,22 +4,27 @@ const messages = defineMessages({
+   datesCardDescription: {
+     id: 'progress.relatedLinks.datesCard.description',
+     defaultMessage: 'A schedule view of your course due dates and upcoming assignments.',
++    description: 'It explain the content of the dates tab',
+   },
+   datesCardLink: {
+     id: 'progress.relatedLinks.datesCard.link',
+     defaultMessage: 'Dates',
++    description: 'Anchor text for link that redirects to dates tab',
+   },
+   outlineCardDescription: {
+     id: 'progress.relatedLinks.outlineCard.description',
+     defaultMessage: 'A birds-eye view of your course content.',
++    description: 'It explain the content of the course outline tab',
+   },
+   outlineCardLink: {
+     id: 'progress.relatedLinks.outlineCard.link',
+     defaultMessage: 'Course Outline',
++    description: 'Anchor text for link that redirects to course outline tab',
+   },
+   relatedLinks: {
+     id: 'progress.relatedLinks',
+     defaultMessage: 'Related links',
++    description: 'Headline for (related links) section in progress tab',
+   },
+ });
+ 
+diff --git a/src/course-home/suggested-schedule-messaging/messages.js b/src/course-home/suggested-schedule-messaging/messages.js
+index 4880130..185ea66 100644
+--- a/src/course-home/suggested-schedule-messaging/messages.js
++++ b/src/course-home/suggested-schedule-messaging/messages.js
+@@ -5,6 +5,7 @@ const messages = defineMessages({
+     id: 'datesBanner.suggestedSchedule',
+     defaultMessage: 'We’ve built a suggested schedule to help you stay on track. But don’t worry—it’s flexible so you'
+       + ' can learn at your own pace.',
++    description: 'Messaging that explain the gaol and the effect fo the suggested schedule',
+   },
+   upgradeToCompleteHeader: {
+     id: 'datesBanner.upgradeToCompleteGradedBanner.header',
+@@ -15,6 +16,7 @@ const messages = defineMessages({
+     id: 'datesBanner.upgradeToCompleteGradedBanner.body',
+     defaultMessage: 'You are auditing this course, which means that you are unable to participate in graded'
+       + ' assignments. To complete graded assignments as part of this course, you can upgrade today.',
++    description: 'It explain the effect of upgrading the course',
+   },
+   upgradeToCompleteButton: {
+     id: 'datesBanner.upgradeToCompleteGradedBanner.button',
+@@ -25,6 +27,7 @@ const messages = defineMessages({
+     id: 'datesBanner.upgradeToResetBanner.body',
+     defaultMessage: 'To keep yourself on track, you can update this schedule and shift the past due assignments into'
+       + ' the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.',
++    description: 'Text that explain the consequences of resetting dates when learner needs to upgrade to do so',
+   },
+   upgradeToShiftButton: {
+     id: 'datesBanner.upgradeToResetBanner.button',
+@@ -35,11 +38,13 @@ const messages = defineMessages({
+   missedDeadlines: {
+     id: 'datesBanner.resetDatesBanner.header',
+     defaultMessage: 'It looks like you missed some important deadlines based on our suggested schedule.',
++    description: 'Text shown when leaner missed assignment due date',
+   },
+   shiftDatesBody: {
+     id: 'datesBanner.resetDatesBanner.body',
+     defaultMessage: 'To keep yourself on track, you can update this schedule and shift the past due assignments into'
+       + ' the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.',
++    description: 'Text that explain the consequences of resetting dates',
+   },
+   shiftDatesButton: {
+     id: 'datesBanner.resetDatesBanner.button',
+diff --git a/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx b/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
+index 402e72c..6bc6c17 100644
+--- a/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
++++ b/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
+@@ -42,6 +42,7 @@ function WeeklyGoalCelebrationModal({
+           <FormattedMessage
+             id="learning.celebration.goalCongrats"
+             defaultMessage="Congratulations, you met your learning goal of {nTimes} a week."
++            description="Greeting for learners for their weekly goal, it as well indicate their gaol, i.e. (1,3 or 5 time(s) a week)"
+             values={{
+               nTimes: (<strong>{daysPerWeek} {daysPerWeek === 1 ? 'time' : 'times'}</strong>),
+             }}
+@@ -59,6 +60,7 @@ function WeeklyGoalCelebrationModal({
+           <FormattedMessage
+             id="learning.celebration.setGoal"
+             defaultMessage="Setting a goal can help you {strongText} in your course."
++            description="It explain the advantages of setting goal"
+             values={{
+               strongText: (<strong>achieve higher performance</strong>),
+             }}
+diff --git a/src/courseware/course/celebration/messages.js b/src/courseware/course/celebration/messages.js
+index 4f3f79d..48bc484 100644
+--- a/src/courseware/course/celebration/messages.js
++++ b/src/courseware/course/celebration/messages.js
+@@ -4,14 +4,17 @@ const messages = defineMessages({
+   completed: {
+     id: 'learning.celebration.completed',
+     defaultMessage: 'You just completed the first section of your course.',
++    description: 'Shown only once to leaner when they complete their first section',
+   },
+   congrats: {
+     id: 'learning.celebration.congrats',
+     defaultMessage: 'Congratulations!',
++    description: 'Greeting for learners when they complete their weekly goal or finish the first section',
+   },
+   earned: {
+     id: 'learning.celebration.earned',
+     defaultMessage: 'You earned it!',
++    description: 'Shown below congrats messaging when leaner complete a goal',
+   },
+   emailSubject: {
+     id: 'learning.celebration.emailSubject',
+@@ -26,6 +29,7 @@ const messages = defineMessages({
+   goalMet: {
+     id: 'learning.celebration.goalMet',
+     defaultMessage: 'You met your goal!',
++    description: 'Headline for (weekly gaol celebration) section in courseware',
+   },
+   keepItUp: {
+     id: 'learning.celebration.keepItUp',
+@@ -35,6 +39,7 @@ const messages = defineMessages({
+   share: {
+     id: 'learning.celebration.share',
+     defaultMessage: 'Take a moment to celebrate and share your progress.',
++    description: 'Text that precedes the (sharing icon) for goal accomplishment ',
+   },
+   socialMessage: {
+     id: 'learning.celebration.social',
+diff --git a/src/courseware/course/content-tools/calculator/Calculator.jsx b/src/courseware/course/content-tools/calculator/Calculator.jsx
+index 7fb3a86..db57760 100644
+--- a/src/courseware/course/content-tools/calculator/Calculator.jsx
++++ b/src/courseware/course/content-tools/calculator/Calculator.jsx
+@@ -99,12 +99,14 @@ class Calculator extends Component {
+                 tagName="h6"
+                 id="calculator.instructions"
+                 defaultMessage="For detailed information, see the {expressions_link}."
++                description="Text that precedes the link which redirects to help page calculator"
+                 values={{
+                   expressions_link: (
+                     <a href={getConfig().SUPPORT_URL_CALCULATOR_MATH}>
+                       <FormattedMessage
+                         id="calculator.instructions.support.title"
+                         defaultMessage="Help Center"
++                        description="Anchor text for link which redirects to help page calculator"
+                       />
+                     </a>
+                   ),
+@@ -115,6 +117,7 @@ class Calculator extends Component {
+                   <FormattedMessage
+                     id="calculator.instructions.useful.tips"
+                     defaultMessage="Useful tips:"
++                    description="Headline for the (list of tips) about using the calculator"
+                   />
+                 </strong>
+               </p>
+@@ -123,18 +126,21 @@ class Calculator extends Component {
+                   <FormattedMessage
+                     id="calculator.hint1"
+                     defaultMessage="Use parentheses () to make expressions clear. You can use parentheses inside other parentheses."
++                    description="The text indicate that the calculator supports parentheses"
+                   />
+                 </li>
+                 <li className="hint-item" id="hint-spaces">
+                   <FormattedMessage
+                     id="calculator.hint2"
+                     defaultMessage="Do not use spaces in expressions."
++                    description="It indicate that using a space might cause un expected behavior"
+                   />
+                 </li>
+                 <li className="hint-item" id="hint-howto-constants">
+                   <FormattedMessage
+                     id="calculator.hint3"
+                     defaultMessage="For constants, indicate multiplication explicitly (example: 5*c)."
++                    description="It indicate the style of math notation"
+                   />
+                 </li>
+                 <li className="hint-item" id="hint-howto-maffixes">
+@@ -147,6 +153,7 @@ class Calculator extends Component {
+                   <FormattedMessage
+                     id="calculator.hint5"
+                     defaultMessage="For functions, type the name of the function, then the expression in parentheses."
++                    description="It indicate how to use a math function, e.g. exp(4)."
+                   />
+                 </li>
+               </ul>
+@@ -157,18 +164,21 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.heading"
+                         defaultMessage="To Use"
++                        description="Column header which indicate  calculator functionality"
+                       />
+                     </th>
+                     <th scope="col">
+                       <FormattedMessage
+                         id="calculator.instruction.table.type.heading"
+                         defaultMessage="Type"
++                        description="Column header which indicate the supported type(s) of a the calculator functionality"
+                       />
+                     </th>
+                     <th scope="col">
+                       <FormattedMessage
+                         id="calculator.instruction.table.examples.heading"
+                         defaultMessage="Examples"
++                        description="Column header which list examples of  calculator functionality"
+                       />
+                     </th>
+                   </tr>
+@@ -179,6 +189,7 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.numbers"
+                         defaultMessage="Numbers"
++                        description="A calculator functionality"
+                       />
+                     </th>
+                     <td>
+@@ -187,18 +198,21 @@ class Calculator extends Component {
+                           <FormattedMessage
+                             id="calculator.instruction.table.to.use.numbers.type1"
+                             defaultMessage="Integers"
++                            description="Type of numbers that is supported the calculator"
+                           />
+                         </li>
+                         <li>
+                           <FormattedMessage
+                             id="calculator.instruction.table.to.use.numbers.type2"
+                             defaultMessage="Fractions"
++                            description="Type of numbers that is supported by the calculator"
+                           />
+                         </li>
+                         <li>
+                           <FormattedMessage
+                             id="calculator.instruction.table.to.use.numbers.type3"
+                             defaultMessage="Decimals"
++                            description="Type of numbers that is supported by the calculator"
+                           />
+                         </li>
+                       </ul>
+@@ -216,6 +230,7 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.operators"
+                         defaultMessage="Operators"
++                        description="A calculator functionality"
+                       />
+                     </th>
+                     <td dir="auto">
+@@ -225,6 +240,7 @@ class Calculator extends Component {
+                           <FormattedMessage
+                             id="calculator.instruction.table.to.use.operators.type1"
+                             defaultMessage="(add, subtract, multiply, divide)"
++                            description="Type of opprators that are supported by the calculator"
+                           />
+                         </li>
+                         <li>
+@@ -232,6 +248,7 @@ class Calculator extends Component {
+                           <FormattedMessage
+                             id="calculator.instruction.table.to.use.operators.type2"
+                             defaultMessage="(raise to a power)"
++                            description="It indicate that symbol (^) is being used to raise power, e.g. 2^2 = 4"
+                           />
+                         </li>
+                         <li>
+@@ -239,6 +256,7 @@ class Calculator extends Component {
+                           <FormattedMessage
+                             id="calculator.instruction.table.to.use.operators.type3"
+                             defaultMessage="(parallel resistors)"
++                            description="It indicate that the sympol (||) is being used to calculate (parallel resistor), it is a concept in electrical/electronic engineering"
+                           />
+                         </li>
+                       </ul>
+@@ -257,6 +275,7 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.constants"
+                         defaultMessage="Constants"
++                        description="It indicate that the calculator support constants, e.g. the speed of light"
+                       />
+                     </th>
+                     <td dir="auto">e, pi</td>
+@@ -291,6 +310,7 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.basic.functions"
+                         defaultMessage="Basic functions"
++                        description="It indicate that calculator supports mathematical function"
+                       />
+                     </th>
+                     <td dir="auto">abs, exp, fact, factorial, ln, log2, log10, sqrt</td>
+@@ -306,6 +326,7 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.trig.functions"
+                         defaultMessage="Trigonometric functions"
++                        description="Type of mathematical function that is supported by the calculator"
+                       />
+                     </th>
+                     <td dir="auto">
+@@ -327,12 +348,14 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.scientific.notation"
+                         defaultMessage="Scientific notation"
++                        description="It indicate that calculator supports scientific notation"
+                       />
+                     </th>
+                     <td dir="auto">
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.scientific.notation.type1"
+                         defaultMessage="{exponentSyntax} and the exponent"
++                        description="Type of scientific notation that is  supported by the calculator"
+                         values={{
+                           exponentSyntax: '10^',
+                         }}
+@@ -345,6 +368,7 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.scientific.notation.type2"
+                         defaultMessage="{notationSyntax} notation"
++                        description="It indicate that calculator supports (e) to be used in notation"
+                         values={{
+                           notationSyntax: 'e',
+                         }}
+@@ -354,6 +378,7 @@ class Calculator extends Component {
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.scientific.notation.type3"
+                         defaultMessage="{notationSyntax} and the exponent"
++                        description="An example for using (e) in notation"
+                         values={{
+                           notationSyntax: '1e',
+                         }}
+diff --git a/src/courseware/course/course-exit/CatalogSuggestion.jsx b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+index 2f91868..e8931b2 100644
+--- a/src/courseware/course/course-exit/CatalogSuggestion.jsx
++++ b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+@@ -40,6 +40,7 @@ function CatalogSuggestion({ intl, variant }) {
+           id="courseExit.catalogSearchSuggestion"
+           defaultMessage="Looking to learn more? {searchOurCatalogLink} to find more courses and programs to explore."
+           values={{ searchOurCatalogLink }}
++          description="Suggesting to learner to explore other course. Shown when they finish the course"
+         />
+       </div>
+     </div>
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 87c61b3..71a18b8 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -93,6 +93,7 @@ function CourseCelebration({ intl }) {
+               You can download your certificate now and access it any time from your
+               {dashboardLink} and {profileLink}."
+             values={{ dashboardLink, profileLink }}
++            description="Recommending an action for learner when course certificate is available"
+           />
+         </p>
+       );
+@@ -132,6 +133,7 @@ function CourseCelebration({ intl }) {
+               defaultMessage="This course ended on {endDate} and final grades and certificates are scheduled to be
+               available after {certAvailableDate}."
+               values={{ endDate, certAvailableDate }}
++              description="This shown for leaner when they are eligible for certifcate but it't not available yet, it could because leaners just finished the course quickly!"
+             />
+           </p>
+           <p>
+@@ -181,6 +183,7 @@ function CourseCelebration({ intl }) {
+               defaultMessage="In order to generate a certificate, you must complete ID verification.
+                 {idVerificationSupportLink} now."
+               values={{ idVerificationSupportLink }}
++              description="Its shown when learner are not verified thus it recommends going over the verification process"
+             />
+           </p>
+         );
+@@ -199,6 +202,7 @@ function CourseCelebration({ intl }) {
+                 valuable credential to improve your job prospects and advance your career, or highlight your
+                 certificate in school applications."
+               values={{ price: <FormattedPricing inline offer={offer} verifiedMode={verifiedMode} /> }}
++              description="Body text when the learner needs to upgrade to earn a certifcate and they have passed the course"
+             />
+             <br />
+             {getConfig().SUPPORT_URL_VERIFIED_CERTIFICATE && (
+@@ -226,6 +230,7 @@ function CourseCelebration({ intl }) {
+                   code: (<b>{offer.code}</b>),
+                   percent: offer.percentage,
+                 }}
++                description="Shown if learner can use a discount code when they upgrade the course"
+               />
+             </span>
+           );
+diff --git a/src/courseware/course/course-exit/DashboardFootnote.jsx b/src/courseware/course/course-exit/DashboardFootnote.jsx
+index c6e3a10..37a22dd 100644
+--- a/src/courseware/course/course-exit/DashboardFootnote.jsx
++++ b/src/courseware/course/course-exit/DashboardFootnote.jsx
+@@ -39,6 +39,7 @@ function DashboardFootnote({ intl, variant }) {
+         <FormattedMessage
+           id="courseCelebration.dashboardInfo" // for historical reasons
+           defaultMessage="You can access this course and its materials on your {dashboardLink}."
++          description="Text that precedes link to learner's dashboard"
+           values={{ dashboardLink }}
+         />
+       )}
+diff --git a/src/courseware/course/course-exit/ProgramCompletion.jsx b/src/courseware/course/course-exit/ProgramCompletion.jsx
+index 816f418..0114f65 100644
+--- a/src/courseware/course/course-exit/ProgramCompletion.jsx
++++ b/src/courseware/course/course-exit/ProgramCompletion.jsx
+@@ -50,6 +50,7 @@ function ProgramCompletion({
+               id="courseExit.programCompletion.dashboardMessage"
+               defaultMessage="To view your certificate status, check the Programs section of your {programLink}."
+               values={{ programLink }}
++              description="Text that precedes link to program page"
+             />
+           </p>
+           {type === 'microbachelors' && (
+diff --git a/src/courseware/course/course-exit/UpgradeFootnote.jsx b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+index 0cfb46d..fb3cd59 100644
+--- a/src/courseware/course/course-exit/UpgradeFootnote.jsx
++++ b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+@@ -50,6 +50,7 @@ function UpgradeFootnote({ deadline, href, intl }) {
+             expirationDate,
+             upgradeLink,
+           }}
++          description="Message body to tell learner until when the materiel will be available, and to suggest to upgrade"
+         />
+       )}
+     />
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index 9f36d38..4a5ab1d 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -34,6 +34,7 @@ const messages = defineMessages({
+   certificateHeaderUpgradable: {
+     id: 'courseCelebration.certificateHeader.upgradable',
+     defaultMessage: 'Upgrade to pursue a verified certificate',
++    description: 'Header when learner finished or pass the course but need to upgrade to get a certificate',
+   },
+   certificateImage: {
+     id: 'courseCelebration.certificateImage',
+@@ -43,10 +44,12 @@ const messages = defineMessages({
+   completedCourseHeader: {
+     id: 'courseCelebration.completedCourseHeader',
+     defaultMessage: 'You have completed your course.',
++    description: 'Header text for course exit section',
+   },
+   congratulationsHeader: {
+     id: 'courseCelebration.congratulationsHeader',
+     defaultMessage: 'Congratulations!',
++    description: 'Greeting learner for finishing the course',
+   },
+   congratulationsImage: {
+     id: 'courseCelebration.congratulationsImage',
+@@ -56,10 +59,12 @@ const messages = defineMessages({
+   courseInProgressDescription: {
+     id: 'courseExit.courseInProgressDescription',
+     defaultMessage: 'It looks like there is more content in this course that will be released in the future. Look out for email updates or check back on your course for when this content will be available.',
++    description: 'Shown to learner when they finish all available assignments, but not the whole course',
+   },
+   courseInProgressHeader: {
+     id: 'courseExit.courseInProgressHeader',
+     defaultMessage: 'More content is coming soon!',
++    description: 'Header when the status of the course not all of (contents or assignments) available yet',
+   },
+   dashboardLink: {
+     id: 'courseExit.dashboardLink',
+@@ -74,6 +79,7 @@ const messages = defineMessages({
+   endOfCourseDescription: {
+     id: 'courseExit.endOfCourseDescription',
+     defaultMessage: 'Unfortunately, you are not currently eligible for a certificate. You need to receive a passing grade to be eligible for a certificate.',
++    description: 'Shown to learner when they did not pass the course',
+   },
+   endOfCourseHeader: {
+     id: 'courseExit.endOfCourseHeader',
+@@ -108,10 +114,12 @@ const messages = defineMessages({
+   nextButtonComplete: {
+     id: 'learn.sequence.navigation.complete.button', // for historical reasons
+     defaultMessage: 'Complete the course',
++    description: 'This text is shown on the button which usually links to the next unit or assignment in course sequence, however when it is the last unit. The button will link to course exit page',
+   },
+   nextButtonEnd: {
+     id: 'courseExit.nextButton.endOfCourse',
+     defaultMessage: 'Next (end of course)',
++    description: 'This shown for the button which links to the next unit, when learner did not pass the course',
+   },
+   profileLink: {
+     id: 'courseExit.profileLink',
+@@ -121,10 +129,12 @@ const messages = defineMessages({
+   programsLastCourseHeader: {
+     id: 'courseExit.programs.lastCourse',
+     defaultMessage: 'You have completed the last course in {title}!',
++    description: 'This shown to learner when the course they completed is the last one of a program, the program might be mircomaster, or microbachelors...etc',
+   },
+   requestCertificateBodyText: {
+     id: 'courseCelebration.requestCertificateBodyText',
+     defaultMessage: 'In order to access your certificate, request it below.',
++    description: 'Shown when learner need to request the certifcate',
+   },
+   requestCertificateButton: {
+     id: 'courseCelebration.requestCertificateButton',
+@@ -139,6 +149,7 @@ const messages = defineMessages({
+   shareMessage: {
+     id: 'courseCelebration.shareMessage',
+     defaultMessage: 'Share your success on social media or email.',
++    description: 'Recommending an action when learner pass the course',
+   },
+   socialMessage: {
+     id: 'courseExit.social.shareCompletionMessage',
+@@ -156,10 +167,12 @@ const messages = defineMessages({
+   verificationPending: {
+     id: 'courseCelebration.verificationPending',
+     defaultMessage: 'Your ID verification is pending and your certificate will be available once approved.',
++    description: 'Shown when the status of verification is pending',
+   },
+   verifiedCertificateSupportLink: {
+     id: 'courseExit.verifiedCertificateSupportLink',
+     defaultMessage: 'Learn more about verified certificates',
++    description: 'Anchor text for link that redirect to external help page about verified certificates',
+   },
+   verifyIdentityButton: {
+     id: 'courseCelebration.verifyIdentityButton',
+diff --git a/src/courseware/course/sequence/hidden-after-due/messages.js b/src/courseware/course/sequence/hidden-after-due/messages.js
+index 6170663..3222b80 100644
+--- a/src/courseware/course/sequence/hidden-after-due/messages.js
++++ b/src/courseware/course/sequence/hidden-after-due/messages.js
+@@ -4,14 +4,17 @@ const messages = defineMessages({
+   header: {
+     id: 'learn.hiddenAfterDue.header',
+     defaultMessage: 'The due date for this assignment has passed.',
++    description: 'Shown when content of a course is longer available because due date passed',
+   },
+   description: {
+     id: 'learn.hiddenAfterDue.description',
+     defaultMessage: 'Because the due date has passed, this assignment is no longer available.',
++    description: 'It explain why the content is not available',
+   },
+   gradeAvailable: {
+     id: 'learn.hiddenAfterDue.gradeAvailable',
+     defaultMessage: 'If you have completed this assignment, your grade is available on the {progressPage}.',
++    description: 'Text that precedes link that redirect to progress page',
+   },
+   progressPage: {
+     id: 'learn.hiddenAfterDue.progressPage',
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.jsx b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+index 0866d29..4525482 100644
+--- a/src/courseware/course/sequence/honor-code/HonorCode.jsx
++++ b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+@@ -48,6 +48,7 @@ function HonorCode({ intl, courseId }) {
+             siteName,
+             link: <a href={honorCodeUrl}>{intl.formatMessage(messages['learn.honorCode.name'])}</a>,
+           }}
++          description="This is shown to learner, when course author wants to learners to explicity agree on their (Term of use or conduct), hence it links honor code page. "
+         />
+       </p>
+ 
+diff --git a/src/courseware/social-share/messages.js b/src/courseware/social-share/messages.js
+index 3fc85ff..d394be1 100644
+--- a/src/courseware/social-share/messages.js
++++ b/src/courseware/social-share/messages.js
+@@ -9,6 +9,7 @@ const messages = defineMessages({
+   shareEmail: {
+     id: 'learning.social.shareEmail',
+     defaultMessage: 'Share your progress via email.',
++    description: 'Text email share button',
+   },
+   shareService: {
+     id: 'learning.social.shareService',
+diff --git a/src/shared/streak-celebration/messages.js b/src/shared/streak-celebration/messages.js
+index e137bb2..3578f4b 100644
+--- a/src/shared/streak-celebration/messages.js
++++ b/src/shared/streak-celebration/messages.js
+@@ -4,6 +4,7 @@ const messages = defineMessages({
+   congratulations: {
+     id: 'learning.streakCelebration.congratulations',
+     defaultMessage: 'Congratulations!',
++    description: 'Shown to learners when are using the learning app for X days in a row',
+   },
+   streakBody: {
+     id: 'learning.streakCelebration.body',
+@@ -12,6 +13,7 @@ const messages = defineMessages({
+   streakButton: {
+     id: 'learning.streakCelebration.button',
+     defaultMessage: 'Keep it up',
++    description: 'Text on the button which closes the celebration dialog',
+   },
+   streakButtonSrOnly: {
+     id: 'learning.streakCelebration.buttonSrOnly',
+diff --git a/src/tab-page/messages.js b/src/tab-page/messages.js
+index 3e913c0..e29ff0e 100644
+--- a/src/tab-page/messages.js
++++ b/src/tab-page/messages.js
+@@ -4,10 +4,12 @@ const messages = defineMessages({
+   failure: {
+     id: 'learning.loading.failure',
+     defaultMessage: 'There was an error loading this course.',
++    description: 'Can be because internet connection or any technical other reason',
+   },
+   loading: {
+     id: 'learning.loading',
+     defaultMessage: 'Loading course page…',
++    description: 'When content of the course is still loading...etc',
+   },
+ });
+ 
+-- 
+2.34.1
+

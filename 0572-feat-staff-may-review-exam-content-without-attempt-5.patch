@@ -1,0 +1,58 @@
+From d4a4cd24ec6da3567253f3e7c10d3485195f70fe Mon Sep 17 00:00:00 2001
+From: Zachary Hancock <zhancock@edx.org>
+Date: Wed, 4 Aug 2021 13:50:44 -0400
+Subject: [PATCH 0572/1021] feat: staff may review exam content without attempt
+ (#576)
+
+---
+ package-lock.json                           | 6 +++---
+ package.json                                | 2 +-
+ src/courseware/course/sequence/Sequence.jsx | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 108e9d5..b136b6e 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1383,9 +1383,9 @@
+       }
+     },
+     "@edx/frontend-lib-special-exams": {
+-      "version": "1.11.0",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-1.11.0.tgz",
+-      "integrity": "sha512-T8b5caCjYgqVstnFlT5o50KnLsMmqIkBUXjwP9OCFlc8wDo2MUuc58nZ0xJUGaL2C0RGbtILPH+pzlXtPubrOw==",
++      "version": "1.12.0",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-1.12.0.tgz",
++      "integrity": "sha512-JxbsVlAYpmRmeIU8H7ftEvitrB9A54jAvY2uIFltLA2lTosThmjfq7Rf/F9UUGsJNLDHd77Kqtils5AHD3JiJw==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "1.2.34",
+         "@fortawesome/free-brands-svg-icons": "5.11.2",
+diff --git a/package.json b/package.json
+index 39bb6e2..44179c7 100644
+--- a/package.json
++++ b/package.json
+@@ -38,7 +38,7 @@
+     "@edx/brand": "npm:@edx/brand-openedx@1.1.0",
+     "@edx/frontend-component-footer": "10.1.5",
+     "@edx/frontend-enterprise": "4.2.3",
+-    "@edx/frontend-lib-special-exams": "1.11.0",
++    "@edx/frontend-lib-special-exams": "1.12.0",
+     "@edx/frontend-platform": "1.11.0",
+     "@edx/paragon": "16.5.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index c274a65..3af5518 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -244,7 +244,7 @@ function Sequence({
+   if (sequenceStatus === 'loaded') {
+     return (
+       <div>
+-        <SequenceExamWrapper sequence={sequence} courseId={courseId}>
++        <SequenceExamWrapper sequence={sequence} courseId={courseId} isStaff={course.isStaff}>
+           {defaultContent}
+         </SequenceExamWrapper>
+         <CourseLicense license={course.license || undefined} />
+-- 
+2.34.1
+

@@ -1,0 +1,93 @@
+From 608db6d4238d2ad0b182a49ad8cc04161842ba27 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 3 May 2021 14:25:56 -0400
+Subject: [PATCH 0441/1021] AA-723: scss fixes (#430)
+
+---
+ .../progress-tab/grades/course-grade/GradeBar.scss           | 2 +-
+ src/courseware/course/Sidebar.jsx                            | 1 -
+ src/courseware/course/Sidebar.scss                           | 5 -----
+ src/courseware/course/SidebarNotificationButton.jsx          | 1 -
+ src/courseware/course/SidebarNotificationButton.scss         | 5 -----
+ src/index.scss                                               | 2 +-
+ 6 files changed, 2 insertions(+), 14 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.scss b/src/course-home/progress-tab/grades/course-grade/GradeBar.scss
+index 6d373b9..c3a557e 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.scss
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.scss
+@@ -26,7 +26,7 @@
+ }
+ 
+ .arrow {
+-  margin: 0;
++  margin: 0 !important;
+ }
+ 
+ #minimum-grade-tooltip {
+diff --git a/src/courseware/course/Sidebar.jsx b/src/courseware/course/Sidebar.jsx
+index 7fa5f45..f2f4571 100644
+--- a/src/courseware/course/Sidebar.jsx
++++ b/src/courseware/course/Sidebar.jsx
+@@ -4,7 +4,6 @@ import classNames from 'classnames';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Icon } from '@edx/paragon';
+ import { ArrowBackIos, Close } from '@edx/paragon/icons';
+-import './Sidebar.scss';
+ import messages from './messages';
+ import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWindowSize';
+ 
+diff --git a/src/courseware/course/Sidebar.scss b/src/courseware/course/Sidebar.scss
+index 4f40cd6..c7ee65f 100644
+--- a/src/courseware/course/Sidebar.scss
++++ b/src/courseware/course/Sidebar.scss
+@@ -1,8 +1,3 @@
+-@import "~@edx/brand/paragon/fonts";
+-@import "~@edx/brand/paragon/variables";
+-@import "~@edx/paragon/scss/core/core";
+-@import "~@edx/brand/paragon/overrides";
+-
+ .sidebar-container {
+     border: 1px solid $light-400;
+     border-radius: 4px;
+diff --git a/src/courseware/course/SidebarNotificationButton.jsx b/src/courseware/course/SidebarNotificationButton.jsx
+index 0c77aa3..9f35eea 100644
+--- a/src/courseware/course/SidebarNotificationButton.jsx
++++ b/src/courseware/course/SidebarNotificationButton.jsx
+@@ -4,7 +4,6 @@ import classNames from 'classnames';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import NotificationIcon from './NotificationIcon';
+-import './SidebarNotificationButton.scss';
+ import messages from './messages';
+ 
+ function SidebarNotificationButton({ intl, toggleSidebar, isSidebarVisible }) {
+diff --git a/src/courseware/course/SidebarNotificationButton.scss b/src/courseware/course/SidebarNotificationButton.scss
+index a4fdb0a..1502f70 100644
+--- a/src/courseware/course/SidebarNotificationButton.scss
++++ b/src/courseware/course/SidebarNotificationButton.scss
+@@ -1,8 +1,3 @@
+-@import "~@edx/brand/paragon/fonts";
+-@import "~@edx/brand/paragon/variables";
+-@import "~@edx/paragon/scss/core/core";
+-@import "~@edx/brand/paragon/overrides";
+-
+ .sidebar-notification-btn {
+     border: 1px solid $light-400;
+     background: none;
+diff --git a/src/index.scss b/src/index.scss
+index dfdd0de..a068f27 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -362,7 +362,7 @@
+ }
+ 
+ .locked-overlay {
+-  opacity: 30%;
++  opacity: .3;
+   pointer-events: none;
+ 
+   &.grades {
+-- 
+2.34.1
+

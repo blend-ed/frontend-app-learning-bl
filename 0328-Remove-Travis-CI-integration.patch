@@ -1,0 +1,67 @@
+From 6549e2b8a28f5d6a6fbaee5b6cda70cfb5ee8651 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Wed, 9 Dec 2020 07:52:55 -0800
+Subject: [PATCH 0328/1021] Remove Travis-CI integration
+
+This is admittedly the much abridged version, but...
+Due to changes at Travis-CI that lead to prohibitively slow build/wait
+times, we (edx) decided to switch CI/validation provider to Github
+Actions [1].
+
+While we had originally intended to keep the integration available,
+following Travis-CI's drop in available open-source credits, it no
+longer appears to be a viable option for the community.
+
+As such, and given our already present vendor lock-in at Github,
+we recommend using Github Actions for CI/validation in this repo.
+
+However, for those not hosting in the Github ecosystem, you can
+configure your testrunner to run `make validate.ci`, for the same
+effect; the Github Action is just a wrapper for this call.
+
+- [0] Fixes: TNL-7784
+- [1] #276
+---
+ .travis.yml | 10 ----------
+ README.rst  |  4 +---
+ 2 files changed, 1 insertion(+), 13 deletions(-)
+ delete mode 100755 .travis.yml
+
+diff --git a/.travis.yml b/.travis.yml
+deleted file mode 100755
+index 8b73eee..0000000
+--- a/.travis.yml
++++ /dev/null
+@@ -1,10 +0,0 @@
+-language: node_js
+-node_js: 12
+-before_install:
+-- npm install -g npm@6
+-install:
+-- npm ci
+-script:
+-- make validate
+-after_success:
+-- codecov
+diff --git a/README.rst b/README.rst
+index a0296c7..5f5f259 100644
+--- a/README.rst
++++ b/README.rst
+@@ -1,4 +1,4 @@
+-|Build Status| |Coveralls| |npm_version| |npm_downloads| |license|
++|Coveralls| |npm_version| |npm_downloads| |license|
+ 
+ frontend-app-learning
+ =========================
+@@ -10,8 +10,6 @@ Introduction
+ 
+ React app for edX learning.
+ 
+-.. |Build Status| image:: https://api.travis-ci.org/edx/frontend-app-learning.svg?branch=master
+-   :target: https://travis-ci.org/edx/frontend-app-learning
+ .. |Coveralls| image:: https://img.shields.io/coveralls/edx/frontend-app-learning.svg?branch=master
+    :target: https://coveralls.io/github/edx/frontend-app-learning
+ .. |npm_version| image:: https://img.shields.io/npm/v/@edx/frontend-app-learning.svg
+-- 
+2.34.1
+

@@ -1,0 +1,173 @@
+From d897663b739022636f1400023cd08c5f28752f2e Mon Sep 17 00:00:00 2001
+From: alangsto <46360176+alangsto@users.noreply.github.com>
+Date: Thu, 6 Apr 2023 09:55:06 -0400
+Subject: [PATCH 1013/1021] feat: upgrade special exams version and add
+ required config values (#1097)
+
+---
+ .env              |  2 ++
+ .env.development  |  2 ++
+ .env.test         |  2 ++
+ package-lock.json | 33 +++++++++++++++++++--------------
+ package.json      |  2 +-
+ src/index.jsx     |  2 ++
+ 6 files changed, 28 insertions(+), 15 deletions(-)
+
+diff --git a/.env b/.env
+index f781fa0..62cf2ad 100644
+--- a/.env
++++ b/.env
+@@ -29,6 +29,8 @@ LOGO_WHITE_URL=''
+ LEGACY_THEME_NAME=''
+ MARKETING_SITE_BASE_URL=''
+ ORDER_HISTORY_URL=''
++PROCTORED_EXAM_FAQ_URL=''
++PROCTORED_EXAM_RULES_URL=''
+ REFRESH_ACCESS_TOKEN_ENDPOINT=''
+ SEARCH_CATALOG_URL=''
+ SEGMENT_KEY=''
+diff --git a/.env.development b/.env.development
+index 603564b..94f8a19 100644
+--- a/.env.development
++++ b/.env.development
+@@ -29,6 +29,8 @@ LEGACY_THEME_NAME=''
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
++PROCTORED_EXAM_FAQ_URL=''
++PROCTORED_EXAM_RULES_URL=''
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+ SEARCH_CATALOG_URL='http://localhost:18000/courses'
+ SEGMENT_KEY=''
+diff --git a/.env.test b/.env.test
+index ff7ddff..d183517 100644
+--- a/.env.test
++++ b/.env.test
+@@ -29,6 +29,8 @@ LEGACY_THEME_NAME=''
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
++PROCTORED_EXAM_FAQ_URL=''
++PROCTORED_EXAM_RULES_URL=''
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+ SEARCH_CATALOG_URL='http://localhost:18000/courses'
+ SEGMENT_KEY=''
+diff --git a/package-lock.json b/package-lock.json
+index 9a8b612..200b618 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -12,7 +12,7 @@
+         "@edx/brand": "npm:@edx/brand-openedx@1.2.0",
+         "@edx/frontend-component-footer": "11.6.3",
+         "@edx/frontend-component-header": "3.6.4",
+-        "@edx/frontend-lib-special-exams": "~2.4.0",
++        "@edx/frontend-lib-special-exams": "~2.8.0",
+         "@edx/frontend-platform": "3.4.1",
+         "@edx/paragon": "20.28.4",
+         "@fortawesome/fontawesome-svg-core": "1.3.0",
+@@ -3272,9 +3272,9 @@
+       }
+     },
+     "node_modules/@edx/frontend-lib-special-exams": {
+-      "version": "2.4.0",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-2.4.0.tgz",
+-      "integrity": "sha512-p1O3K/jEausWckVX+Gp2OAZ2xT2uSWy5/J+St9bqCUXvoAO6UjQHINtzOjqw76PKX8WwYfioUOul2ejq3WUG9w==",
++      "version": "2.8.0",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-2.8.0.tgz",
++      "integrity": "sha512-a3YqQVlYvjp5msOeFSD2bgPMEcxsesHpfrFs0VmxKJj4GYT7dt8k9qgVRblryKuFb7v6UFr/VhF3uJQhnTZFQg==",
+       "dependencies": {
+         "@fortawesome/fontawesome-svg-core": "1.2.34",
+         "@fortawesome/free-brands-svg-icons": "5.11.2",
+@@ -6853,6 +6853,8 @@
+       "resolved": "https://registry.npmjs.org/ajv/-/ajv-8.11.2.tgz",
+       "integrity": "sha512-E4bfmKAhGiSTvMfL1Myyycaub+cUEU2/IvpylXkUu7CHBkBj1f/ikdzbD7YQ6FKUbixDxeYvB/xY4fvyroDlQg==",
+       "dev": true,
++      "optional": true,
++      "peer": true,
+       "dependencies": {
+         "fast-deep-equal": "^3.1.1",
+         "json-schema-traverse": "^1.0.0",
+@@ -6868,7 +6870,9 @@
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/json-schema-traverse/-/json-schema-traverse-1.0.0.tgz",
+       "integrity": "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==",
+-      "dev": true
++      "dev": true,
++      "optional": true,
++      "peer": true
+     },
+     "node_modules/ajv-keywords": {
+       "version": "3.5.2",
+@@ -28482,9 +28486,9 @@
+       }
+     },
+     "@edx/frontend-lib-special-exams": {
+-      "version": "2.4.0",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-2.4.0.tgz",
+-      "integrity": "sha512-p1O3K/jEausWckVX+Gp2OAZ2xT2uSWy5/J+St9bqCUXvoAO6UjQHINtzOjqw76PKX8WwYfioUOul2ejq3WUG9w==",
++      "version": "2.8.0",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-2.8.0.tgz",
++      "integrity": "sha512-a3YqQVlYvjp5msOeFSD2bgPMEcxsesHpfrFs0VmxKJj4GYT7dt8k9qgVRblryKuFb7v6UFr/VhF3uJQhnTZFQg==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "1.2.34",
+         "@fortawesome/free-brands-svg-icons": "5.11.2",
+@@ -31345,15 +31349,14 @@
+       "resolved": "https://registry.npmjs.org/ajv-formats/-/ajv-formats-2.1.1.tgz",
+       "integrity": "sha512-Wx0Kx52hxE7C18hkMEggYlEifqWZtYaRgouJor+WMdPnQyEK13vgEWyVNup7SoeeoLMsr4kf5h6dOW11I15MUA==",
+       "dev": true,
+-      "requires": {
+-        "ajv": "^8.0.0"
+-      },
++      "requires": {},
+       "dependencies": {
+         "ajv": {
+-          "version": "8.11.2",
+-          "resolved": "https://registry.npmjs.org/ajv/-/ajv-8.11.2.tgz",
++          "version": "https://registry.npmjs.org/ajv/-/ajv-8.11.2.tgz",
+           "integrity": "sha512-E4bfmKAhGiSTvMfL1Myyycaub+cUEU2/IvpylXkUu7CHBkBj1f/ikdzbD7YQ6FKUbixDxeYvB/xY4fvyroDlQg==",
+           "dev": true,
++          "optional": true,
++          "peer": true,
+           "requires": {
+             "fast-deep-equal": "^3.1.1",
+             "json-schema-traverse": "^1.0.0",
+@@ -31365,7 +31368,9 @@
+           "version": "1.0.0",
+           "resolved": "https://registry.npmjs.org/json-schema-traverse/-/json-schema-traverse-1.0.0.tgz",
+           "integrity": "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==",
+-          "dev": true
++          "dev": true,
++          "optional": true,
++          "peer": true
+         }
+       }
+     },
+diff --git a/package.json b/package.json
+index 965a780..2cedd38 100644
+--- a/package.json
++++ b/package.json
+@@ -32,7 +32,7 @@
+     "@edx/brand": "npm:@edx/brand-openedx@1.2.0",
+     "@edx/frontend-component-footer": "11.6.3",
+     "@edx/frontend-component-header": "3.6.4",
+-    "@edx/frontend-lib-special-exams": "~2.4.0",
++    "@edx/frontend-lib-special-exams": "~2.8.0",
+     "@edx/frontend-platform": "3.4.1",
+     "@edx/paragon": "20.28.4",
+     "@fortawesome/fontawesome-svg-core": "1.3.0",
+diff --git a/src/index.jsx b/src/index.jsx
+index a6806af..7fec13b 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -137,6 +137,8 @@ initialize({
+         TWITTER_URL: process.env.TWITTER_URL || null,
+         LEGACY_THEME_NAME: process.env.LEGACY_THEME_NAME || null,
+         EXAMS_BASE_URL: process.env.EXAMS_BASE_URL || null,
++        PROCTORED_EXAM_FAQ_URL: process.env.PROCTORED_EXAM_FAQ_URL || null,
++        PROCTORED_EXAM_RULES_URL: process.env.PROCTORED_EXAM_RULES_URL || null,
+       }, 'LearnerAppConfig');
+     },
+   },
+-- 
+2.34.1
+

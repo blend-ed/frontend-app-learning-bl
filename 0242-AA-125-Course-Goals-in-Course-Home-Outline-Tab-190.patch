@@ -1,0 +1,769 @@
+From 37d56b4197cbb33323cf6d32d3f002e18ab778fb Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 31 Aug 2020 09:58:34 -0400
+Subject: [PATCH 0242/1021] AA-125: Course Goals in Course Home Outline Tab
+ (#190)
+
+---
+ .../__factories__/outlineTabData.factory.js   |   4 +
+ .../data/__snapshots__/redux.test.js.snap     |  19 +++-
+ src/course-home/data/api.js                   |   7 ++
+ src/course-home/data/index.js                 |   1 +
+ src/course-home/data/redux.test.js            |  12 ++
+ src/course-home/data/slice.js                 |  17 +--
+ src/course-home/data/thunks.js                |  29 +++--
+ src/course-home/outline-tab/OutlineTab.jsx    |  39 ++++++-
+ src/course-home/outline-tab/messages.js       |  23 ++++
+ .../outline-tab/widgets/CourseGoalCard.jsx    |  94 +++++++++++++++
+ .../widgets/UpdateGoalSelector.jsx            | 107 ++++++++++++++++++
+ src/tab-page/TabPage.jsx                      |  16 +--
+ src/toast/LearningToast.jsx                   |  28 ++---
+ src/toast/LearningToast.scss                  |  20 +++-
+ 14 files changed, 364 insertions(+), 52 deletions(-)
+ create mode 100644 src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+ create mode 100644 src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 4f332c3..381a7c7 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -17,6 +17,10 @@ Factory.define('outlineTabData')
+       blocks: courseBlocks.blocks,
+     };
+   })
++  .attr('course_goals', [], () => ({
++    goal_options: [],
++    selected_goal: {},
++  }))
+   .attr('enroll_alert', {
+     can_enroll: true,
+     extra_text: 'Contact the administrator.',
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 8ebc3f7..8a5cd8d 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -5,8 +5,9 @@ Object {
+   "courseHome": Object {
+     "courseId": null,
+     "courseStatus": "loading",
+-    "resetDatesToastBody": null,
+-    "resetDatesToastHeader": null,
++    "toastBodyLink": null,
++    "toastBodyText": null,
++    "toastHeader": null,
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -23,8 +24,9 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+-    "resetDatesToastBody": null,
+-    "resetDatesToastHeader": null,
++    "toastBodyLink": null,
++    "toastBodyText": null,
++    "toastHeader": null,
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -108,8 +110,9 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+-    "resetDatesToastBody": null,
+-    "resetDatesToastHeader": null,
++    "toastBodyLink": null,
++    "toastBodyText": null,
++    "toastHeader": null,
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -201,6 +204,10 @@ Object {
+           },
+         },
+         "courseExpiredHtml": "<div>Course expired</div>",
++        "courseGoals": Object {
++          "goalOptions": Array [],
++          "selectedGoal": Object {},
++        },
+         "courseTools": Object {
+           "analyticsId": "edx.bookmarks",
+           "title": "Bookmarks",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 41cc6ad..5dca115 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -69,6 +69,7 @@ export async function getOutlineTabData(courseId) {
+     data,
+   } = tabData;
+   const courseBlocks = normalizeBlocks(courseId, data.course_blocks.blocks);
++  const courseGoals = camelCaseObject(data.course_goals);
+   const courseExpiredHtml = data.course_expired_html;
+   const courseTools = camelCaseObject(data.course_tools);
+   const datesWidget = camelCaseObject(data.dates_widget);
+@@ -80,6 +81,7 @@ export async function getOutlineTabData(courseId) {
+ 
+   return {
+     courseBlocks,
++    courseGoals,
+     courseExpiredHtml,
+     courseTools,
+     datesWidget,
+@@ -96,6 +98,11 @@ export async function postCourseDeadlines(courseId) {
+   return getAuthenticatedHttpClient().post(url.href, { course_key: courseId });
+ }
+ 
++export async function postCourseGoals(courseId, goalKey) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/v1/save_course_goal`);
++  return getAuthenticatedHttpClient().post(url.href, { course_id: courseId, goal_key: goalKey });
++}
++
+ export async function postDismissWelcomeMessage(courseId) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dismiss_welcome_message`);
+   await getAuthenticatedHttpClient().post(url.href, { course_id: courseId });
+diff --git a/src/course-home/data/index.js b/src/course-home/data/index.js
+index 5c08887..c5f79fa 100644
+--- a/src/course-home/data/index.js
++++ b/src/course-home/data/index.js
+@@ -3,6 +3,7 @@ export {
+   fetchOutlineTab,
+   fetchProgressTab,
+   resetDeadlines,
++  saveCourseGoal,
+ } from './thunks';
+ 
+ export { reducer } from './slice';
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index ad15269..2446eeb 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -106,6 +106,18 @@ describe('Data layer integration tests', () => {
+     });
+   });
+ 
++  describe('Test saveCourseGoal', () => {
++    it('Should save course goal', async () => {
++      const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/save_course_goal`;
++      axiosMock.onPost(goalUrl).reply(200, {});
++
++      await thunks.saveCourseGoal(courseId, 'unsure');
++
++      expect(axiosMock.history.post[0].url).toEqual(goalUrl);
++      expect(axiosMock.history.post[0].data).toEqual(`{"course_id":"${courseId}","goal_key":"unsure"}`);
++    });
++  });
++
+   describe('Test resetDeadlines', () => {
+     it('Should reset course deadlines', async () => {
+       const resetUrl = `${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`;
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index a78dc8b..8b55f61 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -10,8 +10,9 @@ const slice = createSlice({
+   initialState: {
+     courseStatus: 'loading',
+     courseId: null,
+-    resetDatesToastBody: null,
+-    resetDatesToastHeader: null,
++    toastBodyText: null,
++    toastBodyLink: null,
++    toastHeader: null,
+   },
+   reducers: {
+     fetchTabRequest: (state, { payload }) => {
+@@ -26,13 +27,15 @@ const slice = createSlice({
+       state.courseId = payload.courseId;
+       state.courseStatus = FAILED;
+     },
+-    setResetDatesToast: (state, { payload }) => {
++    setCallToActionToast: (state, { payload }) => {
+       const {
+-        body,
+         header,
++        link,
++        linkText,
+       } = payload;
+-      state.resetDatesToastBody = body;
+-      state.resetDatesToastHeader = header;
++      state.toastBodyLink = link;
++      state.toastBodyText = linkText;
++      state.toastHeader = header;
+     },
+   },
+ });
+@@ -41,7 +44,7 @@ export const {
+   fetchTabRequest,
+   fetchTabSuccess,
+   fetchTabFailure,
+-  setResetDatesToast,
++  setCallToActionToast,
+ } = slice.actions;
+ 
+ export const {
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index bd4373b..4c8f66f 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -7,6 +7,7 @@ import {
+   getOutlineTabData,
+   getProgressTabData,
+   postCourseDeadlines,
++  postCourseGoals,
+   postDismissWelcomeMessage,
+   postRequestCert,
+ } from './api';
+@@ -19,7 +20,7 @@ import {
+   fetchTabFailure,
+   fetchTabRequest,
+   fetchTabSuccess,
+-  setResetDatesToast,
++  setCallToActionToast,
+ } from './slice';
+ 
+ const eventTypes = {
+@@ -81,26 +82,31 @@ export function fetchOutlineTab(courseId) {
+   return fetchTab(courseId, 'outline', getOutlineTabData);
+ }
+ 
++export function dismissWelcomeMessage(courseId) {
++  return async () => postDismissWelcomeMessage(courseId);
++}
++
++export function requestCert(courseId) {
++  return async () => postRequestCert(courseId);
++}
++
+ export function resetDeadlines(courseId, getTabData) {
+   return async (dispatch) => {
+     postCourseDeadlines(courseId).then(response => {
+       const { data } = response;
+       const {
+-        body,
+         header,
++        link,
++        link_text: linkText,
+       } = data;
+       dispatch(getTabData(courseId));
+-      dispatch(setResetDatesToast({ body, header }));
++      dispatch(setCallToActionToast({ header, link, linkText }));
+     });
+   };
+ }
+ 
+-export function dismissWelcomeMessage(courseId) {
+-  return async () => postDismissWelcomeMessage(courseId);
+-}
+-
+-export function requestCert(courseId) {
+-  return async () => postRequestCert(courseId);
++export async function saveCourseGoal(courseId, goalKey) {
++  return postCourseGoals(courseId, goalKey);
+ }
+ 
+ export function processEvent(eventData, getTabData) {
+@@ -110,11 +116,12 @@ export function processEvent(eventData, getTabData) {
+       executePostFromPostEvent(event.postData).then(response => {
+         const { data } = response;
+         const {
+-          body,
+           header,
++          link,
++          link_text: linkText,
+         } = data;
+         dispatch(getTabData(event.postData.bodyParams.courseId));
+-        dispatch(setResetDatesToast({ body, header }));
++        dispatch(setCallToActionToast({ header, link, linkText }));
+       });
+     }
+   };
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index d249d1a..f0ba8a2 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -1,14 +1,17 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import { useSelector } from 'react-redux';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { AlertList } from '../../generic/user-messages';
+ 
+ import CourseDates from './widgets/CourseDates';
++import CourseGoalCard from './widgets/CourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
++import LearningToast from '../../toast/LearningToast';
+ import messages from './messages';
+ import Section from './Section';
++import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+ import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
+ import useCertificateAvailableAlert from './alerts/certificate-available-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+@@ -39,6 +42,10 @@ function OutlineTab({ intl }) {
+       courses,
+       sections,
+     },
++    courseGoals: {
++      goalOptions,
++      selectedGoal,
++    },
+     courseExpiredHtml,
+     resumeCourse: {
+       hasVisitedCourse,
+@@ -47,6 +54,9 @@ function OutlineTab({ intl }) {
+     offerHtml,
+   } = useModel('outline', courseId);
+ 
++  const [courseGoalToDisplay, setCourseGoalToDisplay] = useState(selectedGoal);
++  const [goalToastHeader, setGoalToastHeader] = useState(null);
++
+   // Above the tab alerts (appearing in the order listed here)
+   const logistrationAlert = useLogistrationAlert();
+   const enrollmentAlert = useEnrollmentAlert(courseId);
+@@ -71,6 +81,11 @@ function OutlineTab({ intl }) {
+           ...logistrationAlert,
+         }}
+       />
++      <LearningToast
++        header={goalToastHeader}
++        onClose={() => setGoalToastHeader(null)}
++        show={!!(goalToastHeader)}
++      />
+       <div className="d-flex justify-content-between mb-3">
+         <div role="heading" aria-level="1" className="h4">{title}</div>
+         {resumeCourseUrl && (
+@@ -80,7 +95,16 @@ function OutlineTab({ intl }) {
+         )}
+       </div>
+       <div className="row">
+-        <div className="col col-8">
++        <div className="col col-12 col-md-8">
++          {!courseGoalToDisplay && goalOptions && (
++            <CourseGoalCard
++              courseId={courseId}
++              goalOptions={goalOptions}
++              title={title}
++              setGoalToDisplay={(newGoal) => { setCourseGoalToDisplay(newGoal); }}
++              setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
++            />
++          )}
+           <WelcomeMessage courseId={courseId} />
+           <AlertList
+             topic="outline-course-alerts"
+@@ -102,7 +126,16 @@ function OutlineTab({ intl }) {
+             />
+           ))}
+         </div>
+-        <div className="col col-4">
++        <div className="col col-12 col-md-4">
++          {courseGoalToDisplay && goalOptions && (
++            <UpdateGoalSelector
++              courseId={courseId}
++              goalOptions={goalOptions}
++              selectedGoal={courseGoalToDisplay}
++              setGoalToDisplay={(newGoal) => { setCourseGoalToDisplay(newGoal); }}
++              setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
++            />
++          )}
+           <CourseTools
+             courseId={courseId}
+           />
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index c914ad0..66b9fe4 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -9,6 +9,25 @@ const messages = defineMessages({
+     id: 'learning.outline.dates',
+     defaultMessage: 'Upcoming Dates',
+   },
++  editGoal: {
++    id: 'learning.outline.editGoal',
++    defaultMessage: 'Edit goal',
++    description: 'Edit course goal button',
++  },
++  goal: {
++    id: 'learning.outline.goal',
++    defaultMessage: 'Goal',
++    description: 'Label for the selected course goal',
++  },
++  goalUnsure: {
++    id: 'learning.outline.goalUnsure',
++    defaultMessage: 'Not sure yet',
++  },
++  goalWelcome: {
++    id: 'learning.outline.goalWelcome',
++    defaultMessage: 'Welcome to',
++    description: 'This precedes the title of the course',
++  },
+   handouts: {
+     id: 'learning.outline.handouts',
+     defaultMessage: 'Course Handouts',
+@@ -17,6 +36,10 @@ const messages = defineMessages({
+     id: 'learning.outline.resume',
+     defaultMessage: 'Resume Course',
+   },
++  setGoal: {
++    id: 'learning.outline.setGoal',
++    defaultMessage: 'To start, set a course goal by selecting the option below that best describes your learning plan.',
++  },
+   start: {
+     id: 'learning.outline.start',
+     defaultMessage: 'Start Course',
+diff --git a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx b/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+new file mode 100644
+index 0000000..7c06842
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+@@ -0,0 +1,94 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { Button, Card } from '@edx/paragon';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from '../messages';
++
++import { saveCourseGoal } from '../../data';
++
++function CourseGoalCard({
++  courseId,
++  goalOptions,
++  intl,
++  title,
++  setGoalToDisplay,
++  setGoalToastHeader,
++}) {
++  function selectGoalHandler(event) {
++    const selectedGoal = {
++      key: event.currentTarget.getAttribute('data-goal-key'),
++      text: event.currentTarget.getAttribute('data-goal-text'),
++    };
++
++    saveCourseGoal(courseId, selectedGoal.key).then((response) => {
++      const { data } = response;
++      const {
++        header,
++      } = data;
++
++      setGoalToDisplay(selectedGoal);
++      setGoalToastHeader(header);
++    });
++  }
++
++  return (
++    <Card className="mb-3">
++      <Card.Body>
++        <div className="row w-100 m-0 justify-content-between align-items-center">
++          <div className="col col-8 p-0">
++            <Card.Title className="h6 m-0">{intl.formatMessage(messages.goalWelcome)} {title}</Card.Title>
++          </div>
++          <div className="col col-auto p-0">
++            <Button
++              variant="link"
++              className="p-0"
++              size="sm"
++              block
++              data-goal-key="unsure"
++              data-goal-text={`${intl.formatMessage(messages.goalUnsure)}`}
++              onClick={(event) => { selectGoalHandler(event); }}
++            >
++              {intl.formatMessage(messages.goalUnsure)}
++            </Button>
++          </div>
++        </div>
++        <Card.Text className="my-2 mx-1">{intl.formatMessage(messages.setGoal)}</Card.Text>
++        <div className="row w-100 m-0">
++          {goalOptions.map((goal) => {
++            const [goalKey, goalText] = goal;
++            return (
++              (goalKey !== 'unsure') && (
++                <div key={`goal-${goalKey}`} className="col-auto flex-grow-1 mx-1 my-2 p-0">
++                  <Button
++                    variant="outline-primary"
++                    block
++                    data-goal-key={goalKey}
++                    data-goal-text={goalText}
++                    onClick={(event) => { selectGoalHandler(event); }}
++                  >
++                    {goalText}
++                  </Button>
++                </div>
++              )
++            );
++          })}
++        </div>
++      </Card.Body>
++    </Card>
++  );
++}
++
++CourseGoalCard.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  goalOptions: PropTypes.arrayOf(
++    PropTypes.arrayOf(PropTypes.string),
++  ).isRequired,
++  intl: intlShape.isRequired,
++  title: PropTypes.string.isRequired,
++  setGoalToDisplay: PropTypes.func.isRequired,
++  setGoalToastHeader: PropTypes.func.isRequired,
++};
++
++export default injectIntl(CourseGoalCard);
+diff --git a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+new file mode 100644
+index 0000000..4a234cf
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+@@ -0,0 +1,107 @@
++import React, { useState } from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button, Card, Input } from '@edx/paragon';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faPencilAlt } from '@fortawesome/free-solid-svg-icons';
++
++import messages from '../messages';
++import { saveCourseGoal } from '../../data';
++
++function UpdateGoalSelector({
++  courseId,
++  goalOptions,
++  intl,
++  selectedGoal,
++  setGoalToDisplay,
++  setGoalToastHeader,
++}) {
++  const [editingGoal, setEditingGoal] = useState(false);
++
++  function selectGoalHandler(event) {
++    const key = event.currentTarget.value;
++    const { options } = event.currentTarget;
++    const { text } = options[options.selectedIndex];
++    const newGoal = {
++      key,
++      text,
++    };
++
++    setEditingGoal(false);
++    setGoalToDisplay(newGoal);
++    saveCourseGoal(courseId, key).then((response) => {
++      const { data } = response;
++      const {
++        header,
++      } = data;
++
++      setGoalToastHeader(header);
++    });
++  }
++
++  return (
++    <>
++      <section className="mb-3">
++        <div className="row w-100 m-0">
++          <div className="col-12 p-0">
++            <label className="h6" htmlFor="edit-goal-selector">
++              {intl.formatMessage(messages.goal)}
++            </label>
++          </div>
++          <div className="col-12 p-0">
++            <Card>
++              <Card.Body className="px-3 py-2">
++                <div className="row w-100 m-0 justify-content-between align-items-center">
++                  <div className="col-10 p-0">
++                    {!editingGoal && (
++                      <p className="m-0">{selectedGoal.text}</p>
++                    )}
++                    {editingGoal && (
++                      <Input
++                        id="edit-goal-selector"
++                        type="select"
++                        defaultValue={selectedGoal.key}
++                        onBlur={() => { setEditingGoal(false); }}
++                        onChange={(event) => { selectGoalHandler(event); }}
++                        options={goalOptions.map(([goalKey, goalText]) => (
++                          { value: goalKey, label: goalText }
++                        ))}
++                        autoFocus
++                      />
++                    )}
++                  </div>
++                  <Button
++                    aria-label={intl.formatMessage(messages.editGoal)}
++                    className="p-1"
++                    size="sm"
++                    variant="light"
++                    onClick={() => { setEditingGoal(true); }}
++                  >
++                    <FontAwesomeIcon icon={faPencilAlt} />
++                  </Button>
++                </div>
++              </Card.Body>
++            </Card>
++          </div>
++        </div>
++      </section>
++    </>
++  );
++}
++
++UpdateGoalSelector.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  goalOptions: PropTypes.arrayOf(
++    PropTypes.arrayOf(PropTypes.string),
++  ).isRequired,
++  intl: intlShape.isRequired,
++  selectedGoal: PropTypes.shape({
++    key: PropTypes.string,
++    text: PropTypes.string,
++  }).isRequired,
++  setGoalToDisplay: PropTypes.func.isRequired,
++  setGoalToastHeader: PropTypes.func.isRequired,
++};
++
++export default injectIntl(UpdateGoalSelector);
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index 54d8fc5..ca3fc12 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -9,7 +9,7 @@ import PageLoading from '../generic/PageLoading';
+ import messages from './messages';
+ import LoadedTabPage from './LoadedTabPage';
+ import LearningToast from '../toast/LearningToast';
+-import { setResetDatesToast } from '../course-home/data/slice';
++import { setCallToActionToast } from '../course-home/data/slice';
+ 
+ function TabPage({
+   intl,
+@@ -17,8 +17,9 @@ function TabPage({
+   ...passthroughProps
+ }) {
+   const {
+-    resetDatesToastBody,
+-    resetDatesToastHeader,
++    toastBodyLink,
++    toastBodyText,
++    toastHeader,
+   } = useSelector(state => state.courseHome);
+   const dispatch = useDispatch();
+ 
+@@ -37,10 +38,11 @@ function TabPage({
+     return (
+       <>
+         <LearningToast
+-          body={resetDatesToastBody}
+-          header={resetDatesToastHeader}
+-          onClose={() => dispatch(setResetDatesToast({ body: null, header: null }))}
+-          show={!!(resetDatesToastBody && resetDatesToastHeader)}
++          bodyLink={toastBodyLink}
++          bodyText={toastBodyText}
++          header={toastHeader}
++          onClose={() => dispatch(setCallToActionToast({ header: null, link: null, link_text: null }))}
++          show={!!(toastHeader)}
+         />
+         <LoadedTabPage {...passthroughProps} />
+       </>
+diff --git a/src/toast/LearningToast.jsx b/src/toast/LearningToast.jsx
+index 66274fd..8335145 100644
+--- a/src/toast/LearningToast.jsx
++++ b/src/toast/LearningToast.jsx
+@@ -5,7 +5,8 @@ import { Toast } from '@edx/paragon';
+ import './LearningToast.scss';
+ 
+ export default function LearningToast({
+-  body,
++  bodyLink,
++  bodyText,
+   header,
+   onClose,
+   show,
+@@ -14,36 +15,37 @@ export default function LearningToast({
+     <Toast
+       onClose={onClose}
+       show={show}
+-      delay={3000}
++      delay={5000}
+       autohide
++      className="bg-gray-700 learning-toast"
+       style={{
+         boxShadow: 'none',
+         position: 'fixed',
+-        bottom: '1rem',
+-        left: '1rem',
+         zIndex: 2,
+       }}
+     >
+-      <Toast.Header className="bg-gray-700 border-bottom-0 text-light">
+-        {/* eslint-disable-next-line react/no-danger */}
+-        <div dangerouslySetInnerHTML={{ __html: header }} />
++      <Toast.Header className="bg-gray-700 border-bottom-0 p-0 text-light justify-content-between align-items-center">
++        <p className="small m-0 mr-4">{header}</p>
+       </Toast.Header>
+-      <Toast.Body className="bg-gray-700 text-light">
+-        {/* eslint-disable-next-line react/no-danger */}
+-        <div dangerouslySetInnerHTML={{ __html: body }} />
+-      </Toast.Body>
++      {bodyLink && bodyText && (
++        <Toast.Body className="bg-gray-700 text-light p-0 pt-3">
++          <a className="btn btn-sm btn-outline-light" href={bodyLink}>{bodyText}</a>
++        </Toast.Body>
++      )}
+     </Toast>
+   );
+ }
+ 
+ LearningToast.propTypes = {
+-  body: PropTypes.string,
++  bodyLink: PropTypes.string,
++  bodyText: PropTypes.string,
+   header: PropTypes.string,
+   onClose: PropTypes.func.isRequired,
+   show: PropTypes.bool.isRequired,
+ };
+ 
+ LearningToast.defaultProps = {
+-  body: null,
++  bodyLink: null,
++  bodyText: null,
+   header: null,
+ };
+diff --git a/src/toast/LearningToast.scss b/src/toast/LearningToast.scss
+index 437e916..f2bed04 100644
+--- a/src/toast/LearningToast.scss
++++ b/src/toast/LearningToast.scss
+@@ -1,8 +1,18 @@
+-.toast-header {
+-  div {
+-    margin-top: 10px;
++.learning-toast {
++  bottom: 20px;
++  radius: 3px;
++  left: 20px;
++  max-width: 400px;
++  padding: 11px 20px;
++
++  @media only screen and (max-width: 768px) {
++    bottom: 10px;
++    left: 10px;
++    right: 10px;
+   }
++}
+ 
++.toast-header {
+   button {
+     align-self: flex-start;
+     color: #FFFFFF;
+@@ -13,7 +23,7 @@
+ }
+ 
+ .toast-body {
+-  a {
+-    text-decoration: underline;
++  a:hover {
++    color: #2D323E;
+   }
+ }
+-- 
+2.34.1
+

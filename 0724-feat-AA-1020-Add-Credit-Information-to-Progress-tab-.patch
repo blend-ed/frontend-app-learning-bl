@@ -1,0 +1,623 @@
+From 64eb268cb06ecdceab9c1611f385455c11081985 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Fri, 5 Nov 2021 11:08:29 -0700
+Subject: [PATCH 0724/1021] feat: AA-1020: Add Credit Information to Progress
+ tab (#726)
+
+This is to match what the old Progress tab would show so we
+can enable this for all credit courses as well
+---
+ .env                                          |  10 +-
+ .env.development                              |   8 +-
+ .env.test                                     |   8 +-
+ README.rst                                    |  14 ++-
+ .../__factories__/progressTabData.factory.js  |   1 +
+ .../data/__snapshots__/redux.test.js.snap     |   1 +
+ .../progress-tab/ProgressTab.test.jsx         |  71 +++++++++++
+ .../credit-information/CreditInformation.jsx  | 112 ++++++++++++++++++
+ .../credit-information/messages.js            |  34 ++++++
+ .../grades/course-grade/CourseGrade.jsx       |  12 +-
+ .../grades/course-grade/GradeBar.jsx          |   2 +-
+ .../grades/detailed-grades/DetailedGrades.jsx |   3 +-
+ .../detailed-grades/SubsectionTitleCell.jsx   |  11 +-
+ .../grade-summary/GradeSummaryTable.jsx       |   2 +-
+ .../progress-tab/grades/messages.js           |   4 +
+ src/index.jsx                                 |   1 +
+ src/shared/links.jsx                          |  12 +-
+ 17 files changed, 279 insertions(+), 27 deletions(-)
+ create mode 100644 src/course-home/progress-tab/credit-information/CreditInformation.jsx
+ create mode 100644 src/course-home/progress-tab/credit-information/messages.js
+
+diff --git a/.env b/.env
+index 912f29c..0dc298d 100644
+--- a/.env
++++ b/.env
+@@ -2,14 +2,19 @@
+ # If you add a new learning MFE-specific variable, please note it there!
+ 
+ NODE_ENV='production'
++
+ ACCESS_TOKEN_COOKIE_NAME=''
+ BASE_URL=''
+ CONTACT_URL=''
+ CREDENTIALS_BASE_URL=''
++CREDIT_HELP_LINK_URL=''
+ CSRF_TOKEN_API_PATH=''
+ DISCOVERY_API_BASE_URL=''
+ ECOMMERCE_BASE_URL=''
++ENABLE_JUMPNAV='true'
++ENABLE_NOTICES=''
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME=''
++FAVICON_URL=''
+ IGNORED_ERROR_REGEX=''
+ INSIGHTS_BASE_URL=''
+ LANGUAGE_PREFERENCE_COOKIE_NAME=''
+@@ -19,12 +24,12 @@ LOGOUT_URL=''
+ LOGO_URL=''
+ LOGO_TRADEMARK_URL=''
+ LOGO_WHITE_URL=''
+-FAVICON_URL=''
+ MARKETING_SITE_BASE_URL=''
+ ORDER_HISTORY_URL=''
+ REFRESH_ACCESS_TOKEN_ENDPOINT=''
+ SEARCH_CATALOG_URL=''
+ SEGMENT_KEY=''
++SESSION_COOKIE_DOMAIN=''
+ SITE_NAME=''
+ SOCIAL_UTM_MILESTONE_CAMPAIGN=''
+ STUDIO_BASE_URL=''
+@@ -36,6 +41,3 @@ TERMS_OF_SERVICE_URL=''
+ TWITTER_HASHTAG=''
+ TWITTER_URL=''
+ USER_INFO_COOKIE_NAME=''
+-SESSION_COOKIE_DOMAIN=''
+-ENABLE_JUMPNAV='true'
+-ENABLE_NOTICES=''
+diff --git a/.env.development b/.env.development
+index 16d6764..ec78360 100644
+--- a/.env.development
++++ b/.env.development
+@@ -2,14 +2,19 @@
+ # If you add a new learning MFE-specific variable, please note it there!
+ 
+ NODE_ENV='development'
++
+ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+ BASE_URL='http://localhost:2000'
+ CONTACT_URL='http://localhost:18000/contact'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
++CREDIT_HELP_LINK_URL='https://edx.readthedocs.io/projects/edx-guide-for-students/en/latest/SFD_credit_courses.html#keep-track-of-credit-requirements'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ DISCOVERY_API_BASE_URL='http://localhost:18381'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
++ENABLE_JUMPNAV='true'
++ENABLE_NOTICES=''
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME='localhost:8734'
++FAVICON_URL=https://edx-cdn.org/v3/default/favicon.ico
+ IGNORED_ERROR_REGEX=''
+ LANGUAGE_PREFERENCE_COOKIE_NAME='openedx-language-preference'
+ LMS_BASE_URL='http://localhost:18000'
+@@ -18,7 +23,6 @@ LOGOUT_URL='http://localhost:18000/logout'
+ LOGO_URL=https://edx-cdn.org/v3/default/logo.svg
+ LOGO_TRADEMARK_URL=https://edx-cdn.org/v3/default/logo-trademark.svg
+ LOGO_WHITE_URL=https://edx-cdn.org/v3/default/logo-white.svg
+-FAVICON_URL=https://edx-cdn.org/v3/default/favicon.ico
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
+@@ -37,5 +41,3 @@ TWITTER_HASHTAG='myedxjourney'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+ SESSION_COOKIE_DOMAIN='localhost'
+-ENABLE_JUMPNAV='true'
+-ENABLE_NOTICES=''
+diff --git a/.env.test b/.env.test
+index 24a5c93..699950a 100644
+--- a/.env.test
++++ b/.env.test
+@@ -2,14 +2,19 @@
+ # If you add a new learning MFE-specific variable, please note it there!
+ 
+ NODE_ENV='test'
++
+ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+ BASE_URL='http://localhost:2000'
+ CONTACT_URL='http://localhost:18000/contact'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
++CREDIT_HELP_LINK_URL='https://edx.readthedocs.io/projects/edx-guide-for-students/en/latest/SFD_credit_courses.html#keep-track-of-credit-requirements'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ DISCOVERY_API_BASE_URL='http://localhost:18381'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
++ENABLE_JUMPNAV='true'
++ENABLE_NOTICES=''
+ ENTERPRISE_LEARNER_PORTAL_HOSTNAME='localhost:8734'
++FAVICON_URL=https://edx-cdn.org/v3/default/favicon.ico
+ IGNORED_ERROR_REGEX=''
+ LANGUAGE_PREFERENCE_COOKIE_NAME='openedx-language-preference'
+ LMS_BASE_URL='http://localhost:18000'
+@@ -18,7 +23,6 @@ LOGOUT_URL='http://localhost:18000/logout'
+ LOGO_URL=https://edx-cdn.org/v3/default/logo.svg
+ LOGO_TRADEMARK_URL=https://edx-cdn.org/v3/default/logo-trademark.svg
+ LOGO_WHITE_URL=https://edx-cdn.org/v3/default/logo-white.svg
+-FAVICON_URL=https://edx-cdn.org/v3/default/favicon.ico
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
+@@ -36,5 +40,3 @@ TERMS_OF_SERVICE_URL='https://www.edx.org/edx-terms-service'
+ TWITTER_HASHTAG='myedxjourney'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+-ENABLE_JUMPNAV='true'
+-ENABLE_NOTICES=''
+diff --git a/README.rst b/README.rst
+index 4af4a22..7f869df 100644
+--- a/README.rst
++++ b/README.rst
+@@ -71,6 +71,15 @@ as documented in the Open edX Developer Guide under
+ 
+ The learning micro-frontend also supports the following additional variables:
+ 
++CREDIT_HELP_LINK_URL
++  A link to resources to help explain what course credit is and how to earn it.
++
++ENABLE_JUMPNAV
++  Enables the new Jump Navigation feature in the course breadcrumbs, defaulted to  the string 'true'.
++  Disable to have simple hyperlinks for breadcrumbs. Setting it to any other value but 'true' ('false','I love flags', 'etc' would disable the Jumpnav).
++  This feature flag is slated to be removed as jumpnav becomes default. Follow the progress of this ticket here:
++  https://openedx.atlassian.net/browse/TNL-8678
++
+ SOCIAL_UTM_MILESTONE_CAMPAIGN
+   This value is passed as the ``utm_campaign`` parameter for social-share
+   links when celebrating learning milestones in the course. Optional.
+@@ -110,8 +119,3 @@ TWITTER_URL
+ 
+   Example: https://twitter.com/edXOnline
+ 
+-ENABLE_JUMPNAV
+-  Enables the new Jump Navigation feature in the course breadcrumbs, defaulted to  the string 'true'.
+-  Disable to have simple hyperlinks for breadcrumbs. Setting it to any other value but 'true' ('false','I love flags', 'etc' would disable the Jumpnav).
+-  This feature flag is slated to be removed as jumpnav becomes default. Follow the progress of this ticket here:
+-  https://openedx.atlassian.net/browse/TNL-8678
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+index aa555ed..1ff8324 100644
+--- a/src/course-home/data/__factories__/progressTabData.factory.js
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -17,6 +17,7 @@ Factory.define('progressTabData')
+       percent: 1,
+       is_passing: true,
+     },
++    credit_course_requirements: null,
+     section_scores: [
+       {
+         display_name: 'First section',
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 1f119f2..17c85ee 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -581,6 +581,7 @@ Object {
+           "visiblePercent": 1,
+         },
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++        "creditCourseRequirements": null,
+         "end": "3027-03-31T00:00:00Z",
+         "enrollmentMode": "audit",
+         "gradesFeatureIsFullyLocked": false,
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 9bf7432..2bacafc 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -487,6 +487,29 @@ describe('Progress Tab', () => {
+       // visible to them, which is non-passing
+       expect(screen.getByText('A weighted grade of 75% is required to pass in this course')).toBeInTheDocument();
+     });
++
++    it('renders correct title when credit information is available', async () => {
++      setTabData({
++        credit_course_requirements: {
++          eligibility_status: 'eligible',
++          requirements: [
++            {
++              namespace: 'proctored_exam',
++              name: 'i4x://edX/DemoX/proctoring-block/final_uuid',
++              display_name: 'Proctored Mid Term Exam',
++              criteria: {},
++              reason: {},
++              status: 'satisfied',
++              status_date: '2015-06-26 11:07:42',
++              order: 1,
++            },
++          ],
++        },
++      });
++
++      await fetchAndRender();
++      expect(screen.getByText('Grades & Credit')).toBeInTheDocument();
++    });
+   });
+ 
+   describe('Grade Summary', () => {
+@@ -1189,6 +1212,54 @@ describe('Progress Tab', () => {
+     });
+   });
+ 
++  describe('Credit Information', () => {
++    it('renders credit information when provided', async () => {
++      setTabData({
++        credit_course_requirements: {
++          eligibility_status: 'eligible',
++          requirements: [
++            {
++              namespace: 'proctored_exam',
++              name: 'i4x://edX/DemoX/proctoring-block/final_uuid',
++              display_name: 'Proctored Mid Term Exam',
++              criteria: {},
++              reason: {},
++              status: null,
++              status_date: '2015-06-26 11:07:42',
++              order: 1,
++            },
++            {
++              namespace: 'grade',
++              name: 'i4x://edX/DemoX/proctoring-block/final_uuid',
++              display_name: 'Minimum Passing Grade',
++              criteria: { min_grade: 0.8 },
++              reason: { final_grade: 0.95 },
++              status: 'satisfied',
++              status_date: '2015-06-26 11:07:44',
++              order: 2,
++            },
++          ],
++        },
++      });
++
++      await fetchAndRender();
++      expect(screen.getByText('Grades & Credit')).toBeInTheDocument();
++      expect(screen.getByText('Requirements for course credit')).toBeInTheDocument();
++      expect(screen.getByText('You have met the requirements for credit in this course.', { exact: false })).toBeInTheDocument();
++      expect(screen.getByText('Proctored Mid Term Exam:')).toBeInTheDocument();
++      // 80% comes from the criteria.minGrade being 0.8
++      expect(screen.getByText('Minimum grade for credit (80%):')).toBeInTheDocument();
++      // Completed because the grade requirement has been satisfied
++      expect(screen.getByText('Completed')).toBeInTheDocument();
++    });
++
++    it('does not render credit information when it is not provided', async () => {
++      await fetchAndRender();
++      expect(screen.queryByText('Grades & Credit')).not.toBeInTheDocument();
++      expect(screen.queryByText('Requirements for course credit.')).not.toBeInTheDocument();
++    });
++  });
++
+   describe('Access expiration masquerade banner', () => {
+     it('renders banner when masquerading as a user', async () => {
+       setMetadata({ is_enrolled: true, original_user_is_staff: true });
+diff --git a/src/course-home/progress-tab/credit-information/CreditInformation.jsx b/src/course-home/progress-tab/credit-information/CreditInformation.jsx
+new file mode 100644
+index 0000000..673b18c
+--- /dev/null
++++ b/src/course-home/progress-tab/credit-information/CreditInformation.jsx
+@@ -0,0 +1,112 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import { getConfig } from '@edx/frontend-platform';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { CheckCircle, WarningFilled, WatchFilled } from '@edx/paragon/icons';
++import { Hyperlink, Icon } from '@edx/paragon';
++
++import { useModel } from '../../../generic/model-store';
++import { DashboardLink } from '../../../shared/links';
++
++import messages from './messages';
++
++function CreditInformation({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    creditCourseRequirements,
++  } = useModel('progress', courseId);
++
++  if (!creditCourseRequirements) { return null; }
++
++  let eligibilityStatus;
++  let requirementStatus;
++  const requirements = [];
++  const dashboardLink = <DashboardLink />;
++  const creditLink = (
++    <Hyperlink
++      variant="muted"
++      isInline
++      destination={getConfig().CREDIT_HELP_LINK_URL}
++    >{intl.formatMessage(messages.courseCredit)}
++    </Hyperlink>
++  );
++
++  switch (creditCourseRequirements.eligibilityStatus) {
++    case 'not_eligible':
++      eligibilityStatus = (
++        <FormattedMessage
++          id="progress.creditInformation.creditNotEligible"
++          defaultMessage="You are no longer eligible for credit in this course. Learn more about {creditLink}."
++          values={{ creditLink }}
++        />
++      );
++      break;
++    case 'eligible':
++      eligibilityStatus = (
++        <FormattedMessage
++          id="progress.creditInformation.creditEligible"
++          defaultMessage="
++          You have met the requirements for credit in this course. Go to your
++          {dashboardLink} to purchase course credit. Or learn more about {creditLink}."
++          values={{ dashboardLink, creditLink }}
++        />
++      );
++      break;
++    case 'partial_eligible':
++      eligibilityStatus = (
++        <FormattedMessage
++          id="progress.creditInformation.creditPartialEligible"
++          defaultMessage="You have not yet met the requirements for credit. Learn more about {creditLink}."
++          values={{ creditLink }}
++        />
++      );
++      break;
++    default:
++      break;
++  }
++  creditCourseRequirements.requirements.forEach(requirement => {
++    switch (requirement.status) {
++      case 'submitted':
++        requirementStatus = (<>{intl.formatMessage(messages.verificationSubmitted)} <Icon src={CheckCircle} className="text-success-500 d-inline-flex align-bottom" /></>);
++        break;
++      case 'failed':
++      case 'declined':
++        requirementStatus = (<>{intl.formatMessage(messages.verificationFailed)} <Icon src={WarningFilled} className="d-inline-flex align-bottom" /></>);
++        break;
++      case 'satisfied':
++        requirementStatus = (<>{intl.formatMessage(messages.completed)} <Icon src={CheckCircle} className="text-success-500 d-inline-flex align-bottom" /></>);
++        break;
++      default:
++        requirementStatus = (<>{intl.formatMessage(messages.upcoming)} <Icon src={WatchFilled} className="text-gray-500 d-inline-flex align-bottom" /></>);
++    }
++    requirements.push((
++      <div className="row w-100 m-0 small" key={`requirement-${requirement.order}`}>
++        <p className="font-weight-bold">
++          {requirement.namespace === 'grade'
++            ? `${intl.formatMessage(messages.minimumGrade, { minGrade: Number(requirement.criteria.minGrade) * 100 })}:`
++            : `${requirement.displayName}:`}
++        </p>
++        <div className="ml-1">
++          {requirementStatus}
++        </div>
++      </div>
++    ));
++  });
++
++  return (
++    <>
++      <h3 className="h4 col-12 p-0">{intl.formatMessage(messages.requirementsHeader)}</h3>
++      <p className="small">{eligibilityStatus}</p>
++      {requirements}
++    </>
++  );
++}
++
++CreditInformation.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CreditInformation);
+diff --git a/src/course-home/progress-tab/credit-information/messages.js b/src/course-home/progress-tab/credit-information/messages.js
+new file mode 100644
+index 0000000..c80b252
+--- /dev/null
++++ b/src/course-home/progress-tab/credit-information/messages.js
+@@ -0,0 +1,34 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  completed: {
++    id: 'progress.creditInformation.completed',
++    defaultMessage: 'Completed',
++  },
++  courseCredit: {
++    id: 'progress.creditInformation.courseCredit',
++    defaultMessage: 'course credit',
++  },
++  minimumGrade: {
++    id: 'progress.creditInformation.minimumGrade',
++    defaultMessage: 'Minimum grade for credit ({minGrade}%)',
++  },
++  requirementsHeader: {
++    id: 'progress.creditInformation.requirementsHeader',
++    defaultMessage: 'Requirements for course credit',
++  },
++  upcoming: {
++    id: 'progress.creditInformation.upcoming',
++    defaultMessage: 'Upcoming',
++  },
++  verificationFailed: {
++    id: 'progress.creditInformation.verificationFailed',
++    defaultMessage: 'Verification failed',
++  },
++  verificationSubmitted: {
++    id: 'progress.creditInformation.verificationSubmitted',
++    defaultMessage: 'Verification submitted',
++  },
++});
++
++export default messages;
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+index c350296..410ddfa 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -7,6 +7,7 @@ import { useModel } from '../../../../generic/model-store';
+ import CourseGradeFooter from './CourseGradeFooter';
+ import CourseGradeHeader from './CourseGradeHeader';
+ import GradeBar from './GradeBar';
++import CreditInformation from '../../credit-information/CreditInformation';
+ 
+ import messages from '../messages';
+ 
+@@ -16,6 +17,7 @@ function CourseGrade({ intl }) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    creditCourseRequirements,
+     gradesFeatureIsFullyLocked,
+     gradesFeatureIsPartiallyLocked,
+     gradingPolicy: {
+@@ -32,14 +34,20 @@ function CourseGrade({ intl }) {
+       {(gradesFeatureIsFullyLocked || gradesFeatureIsPartiallyLocked) && <CourseGradeHeader />}
+       <div className={applyLockedOverlay} aria-hidden={gradesFeatureIsFullyLocked}>
+         <div className="row w-100 m-0 p-4">
+-          <div className="col-12 col-sm-6 p-0 pr-sm-2">
+-            <h2>{intl.formatMessage(messages.grades)}</h2>
++          <div className="col-12 col-sm-6 p-0 pr-sm-5.5">
++            <h2>{creditCourseRequirements
++              ? intl.formatMessage(messages.gradesAndCredit)
++              : intl.formatMessage(messages.grades)}
++            </h2>
+             <p className="small">
+               {intl.formatMessage(messages.courseGradeBody)}
+             </p>
+           </div>
+           <GradeBar passingGrade={passingGrade} />
+         </div>
++        <div className="row w-100 m-0 px-4">
++          <CreditInformation />
++        </div>
+         <CourseGradeFooter passingGrade={passingGrade} />
+       </div>
+     </section>
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index 01e5c10..c605cbd 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -27,7 +27,7 @@ function GradeBar({ intl, passingGrade }) {
+   const lockedTooltipClassName = gradesFeatureIsFullyLocked ? 'locked-overlay' : '';
+ 
+   return (
+-    <div className="col-12 col-sm-6 align-self-center">
++    <div className="col-12 col-sm-6 align-self-center p-0">
+       <div className="sr-only">{intl.formatMessage(messages.courseGradeBarAltText, { currentGrade, passingGrade })}</div>
+       <svg width="100%" height="100px" className="grade-bar" aria-hidden="true">
+         <g style={{ transform: 'translateY(2.61em)' }}>
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 51c24ce..6a6a2b3 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -39,7 +39,8 @@ function DetailedGrades({ intl }) {
+ 
+   const outlineLink = (
+     <Hyperlink
+-      className="muted-link inline-link"
++      variant="muted"
++      isInline
+       destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}
+       onClick={logOutlineLinkClick}
+       tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+index 5f5e705..e51006b 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+@@ -87,7 +87,16 @@ function SubsectionTitleCell({ intl, subsection }) {
+ 
+ SubsectionTitleCell.propTypes = {
+   intl: intlShape.isRequired,
+-  subsection: PropTypes.shape.isRequired,
++  subsection: PropTypes.shape({
++    blockKey: PropTypes.string.isRequired,
++    displayName: PropTypes.string.isRequired,
++    learnerHasAccess: PropTypes.bool.isRequired,
++    problemScores: PropTypes.arrayOf(PropTypes.shape({
++      earned: PropTypes.number.isRequired,
++      possible: PropTypes.number.isRequired,
++    })).isRequired,
++    url: PropTypes.string,
++  }).isRequired,
+ };
+ 
+ export default injectIntl(SubsectionTitleCell);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index 3056532..f5f6e78 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -64,7 +64,7 @@ function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+       footnoteMarker = footnotes.length;
+     }
+ 
+-    const locked = !gradesFeatureIsFullyLocked && hasNoAccessToAssignmentsOfType(assignment.type) ? 'greyed-out' : '';
++    const locked = !gradesFeatureIsFullyLocked && hasNoAccessToAssignmentsOfType(assignment.type);
+ 
+     return {
+       type: {
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 53a849b..1f7a65e 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -89,6 +89,10 @@ const messages = defineMessages({
+     id: 'progress.courseGrade.grades',
+     defaultMessage: 'Grades',
+   },
++  gradesAndCredit: {
++    id: 'progress.courseGrade.gradesAndCredit',
++    defaultMessage: 'Grades & Credit',
++  },
+   gradeRangeTooltipAlt: {
+     id: 'progress.courseGrade.gradeRange.Tooltip',
+     defaultMessage: 'Grade range tooltip',
+diff --git a/src/index.jsx b/src/index.jsx
+index 30d4812..f103765 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -97,6 +97,7 @@ initialize({
+       mergeConfig({
+         CONTACT_URL: process.env.CONTACT_URL || null,
+         CREDENTIALS_BASE_URL: process.env.CREDENTIALS_BASE_URL || null,
++        CREDIT_HELP_LINK_URL: process.env.CREDIT_HELP_LINK_URL || null,
+         ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
+         ENABLE_JUMPNAV: process.env.ENABLE_JUMPNAV || null,
+         ENABLE_NOTICES: process.env.ENABLE_NOTICES || null,
+diff --git a/src/shared/links.jsx b/src/shared/links.jsx
+index 7b7316a..cabdcb7 100644
+--- a/src/shared/links.jsx
++++ b/src/shared/links.jsx
+@@ -9,8 +9,8 @@ import messages from '../courseware/course/course-exit/messages';
+ function IntlDashboardLink({ intl }) {
+   return (
+     <Hyperlink
+-      className="text-gray-700"
+-      style={{ textDecoration: 'underline' }}
++      variant="muted"
++      isInline
+       destination={`${getConfig().LMS_BASE_URL}/dashboard`}
+     >
+       {intl.formatMessage(messages.dashboardLink)}
+@@ -28,8 +28,8 @@ function IntlIdVerificationSupportLink({ intl }) {
+   }
+   return (
+     <Hyperlink
+-      className="text-gray-700"
+-      style={{ textDecoration: 'underline' }}
++      variant="muted"
++      isInline
+       destination={getConfig().SUPPORT_URL_ID_VERIFICATION}
+     >
+       {intl.formatMessage(messages.idVerificationSupportLink)}
+@@ -46,8 +46,8 @@ function IntlProfileLink({ intl }) {
+ 
+   return (
+     <Hyperlink
+-      className="text-gray-700"
+-      style={{ textDecoration: 'underline' }}
++      variant="muted"
++      isInline
+       destination={`${getConfig().LMS_BASE_URL}/u/${username}`}
+     >
+       {intl.formatMessage(messages.profileLink)}
+-- 
+2.34.1
+

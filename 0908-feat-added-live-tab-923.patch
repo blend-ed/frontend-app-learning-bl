@@ -1,0 +1,127 @@
+From 9b316bd859e6f2893b269d8bc890eec04059f2fa Mon Sep 17 00:00:00 2001
+From: Muhammad Adeel Tajamul
+ <77053848+muhammadadeeltajamul@users.noreply.github.com>
+Date: Thu, 14 Apr 2022 10:04:26 +0500
+Subject: [PATCH 0908/1021] feat: added live tab (#923)
+
+Co-authored-by: adeel.tajamul <adeel.tajamul@arbisoft.com>
+---
+ src/course-home/data/api.js          | 14 ++++++++++++++
+ src/course-home/data/thunks.js       |  5 +++++
+ src/course-home/live-tab/LiveTab.jsx | 22 ++++++++++++++++++++++
+ src/index.jsx                        |  8 +++++++-
+ 4 files changed, 48 insertions(+), 1 deletion(-)
+ create mode 100644 src/course-home/live-tab/LiveTab.jsx
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 1fa121d..46155d1 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -297,6 +297,20 @@ export async function getProctoringInfoData(courseId, username) {
+   }
+ }
+ 
++export async function getLiveTabIframe(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/course_live/iframe/${courseId}/`;
++  try {
++    const { data } = await getAuthenticatedHttpClient().get(url);
++    return data;
++  } catch (error) {
++    const { httpErrorStatus } = error && error.customAttributes;
++    if (httpErrorStatus === 404) {
++      return {};
++    }
++    throw error;
++  }
++}
++
+ export function getTimeOffsetMillis(headerDate, requestTime, responseTime) {
+   // Time offset computation should move down into the HttpClient wrapper to maintain a global time correction reference
+   // Requires 'Access-Control-Expose-Headers: Date' on the server response per https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#access-control-expose-headers
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index 8d65976..b7c1c3f 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -11,6 +11,7 @@ import {
+   postWeeklyLearningGoal,
+   postDismissWelcomeMessage,
+   postRequestCert,
++  getLiveTabIframe,
+ } from './api';
+ 
+ import {
+@@ -79,6 +80,10 @@ export function fetchOutlineTab(courseId) {
+   return fetchTab(courseId, 'outline', getOutlineTabData);
+ }
+ 
++export function fetchLiveTab(courseId) {
++  return fetchTab(courseId, 'live', getLiveTabIframe);
++}
++
+ export function fetchDiscussionTab(courseId) {
+   return fetchTab(courseId, 'discussion');
+ }
+diff --git a/src/course-home/live-tab/LiveTab.jsx b/src/course-home/live-tab/LiveTab.jsx
+new file mode 100644
+index 0000000..960d66e
+--- /dev/null
++++ b/src/course-home/live-tab/LiveTab.jsx
+@@ -0,0 +1,22 @@
++import React, { useEffect } from 'react';
++import { useSelector } from 'react-redux';
++
++function LiveTab() {
++  const { courseId } = useSelector(state => state.courseHome);
++  const liveModel = useSelector(state => state.models.live);
++  useEffect(() => {
++    const iframe = document.getElementById('lti-tab-embed');
++    if (iframe) {
++      iframe.className += ' vh-100 w-100 border-0';
++    }
++  }, []);
++  return (
++    <div
++      id="live_tab"
++      // eslint-disable-next-line react/no-danger
++      dangerouslySetInnerHTML={{ __html: liveModel[courseId]?.iframe }}
++    />
++  );
++}
++
++export default LiveTab;
+diff --git a/src/index.jsx b/src/index.jsx
+index 7db78a6..fa82aba 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -12,7 +12,7 @@ import { Switch } from 'react-router-dom';
+ 
+ import { messages as footerMessages } from '@edx/frontend-component-footer';
+ import { messages as headerMessages } from '@edx/frontend-component-header';
+-import { fetchDiscussionTab } from './course-home/data/thunks';
++import { fetchDiscussionTab, fetchLiveTab } from './course-home/data/thunks';
+ import DiscussionTab from './course-home/discussion-tab/DiscussionTab';
+ 
+ import appMessages from './i18n';
+@@ -33,6 +33,7 @@ import { fetchCourse } from './courseware/data';
+ import initializeStore from './store';
+ import NoticesProvider from './generic/notices';
+ import PathFixesProvider from './generic/path-fixes';
++import LiveTab from './course-home/live-tab/LiveTab';
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+@@ -48,6 +49,11 @@ subscribe(APP_READY, () => {
+                   <OutlineTab />
+                 </TabContainer>
+               </PageRoute>
++              <PageRoute path="/course/:courseId/live">
++                <TabContainer tab="live" fetch={fetchLiveTab} slice="courseHome">
++                  <LiveTab />
++                </TabContainer>
++              </PageRoute>
+               <PageRoute path="/course/:courseId/dates">
+                 <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
+                   <DatesTab />
+-- 
+2.34.1
+

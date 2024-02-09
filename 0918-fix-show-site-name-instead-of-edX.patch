@@ -1,0 +1,148 @@
+From cafb881a61ed057726e28cde285cddcf7a9aca74 Mon Sep 17 00:00:00 2001
+From: Diana Catalina Olarte <diana.olarte@edunext.co>
+Date: Thu, 12 May 2022 14:04:24 -0500
+Subject: [PATCH 0918/1021] fix: show site name instead of edX
+
+---
+ src/generic/upsell-bullets/UpsellBullets.jsx                  | 4 ++--
+ src/i18n/messages/ar.json                                     | 4 ++--
+ src/i18n/messages/es_419.json                                 | 4 ++--
+ src/i18n/messages/fr.json                                     | 4 ++--
+ src/i18n/messages/zh_CN.json                                  | 4 ++--
+ src/product-tours/messages.js                                 | 2 +-
+ .../newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx      | 2 +-
+ 7 files changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/src/generic/upsell-bullets/UpsellBullets.jsx b/src/generic/upsell-bullets/UpsellBullets.jsx
+index dbce5e6..5557993 100644
+--- a/src/generic/upsell-bullets/UpsellBullets.jsx
++++ b/src/generic/upsell-bullets/UpsellBullets.jsx
+@@ -98,9 +98,9 @@ export function SupportMissionBullet() {
+       <CheckmarkBullet />
+       <FormattedMessage
+         id="learning.generic.upsell.supportMissionBullet"
+-        defaultMessage="Support our {missionInBoldText} at edX"
++        defaultMessage="Support our {missionInBoldText} at {siteName}"
+         description="Bullet encouraging user to support edX's goals."
+-        values={{ missionInBoldText }}
++        values={{ missionInBoldText, siteName: getConfig().SITE_NAME }}
+       />
+     </li>
+   );
+diff --git a/src/i18n/messages/ar.json b/src/i18n/messages/ar.json
+index dda80a3..f088c09 100644
+--- a/src/i18n/messages/ar.json
++++ b/src/i18n/messages/ar.json
+@@ -398,7 +398,7 @@
+   "learning.generic.upsell.fullAccessBullet.fullAccess": "Full access",
+   "learning.generic.upsell.fullAccessBullet": "{fullAccessInBoldText} to course content and materials, even after the course ends",
+   "learning.generic.upsell.supportMissionBullet.mission": "mission",
+-  "learning.generic.upsell.supportMissionBullet": "ادعم {missionInBoldText} في edX",
++  "learning.generic.upsell.supportMissionBullet": "ادعم {missionInBoldText} في {siteName}",
+   "masquerade-widget.userName.error.generic": "حدث خطأ؛ يرجى المحاولة مرة أخرى.",
+   "masquerade-widget.userName.input.placeholder": "اسم المستخدم أو البريد الإلكتروني",
+   "masquerade-widget.userName.input.label": "عرف كهذا المستخدم",
+@@ -410,7 +410,7 @@
+   "tours.button.okay": "تمام",
+   "tours.button.beginTour": "ابدأ الجولة",
+   "tours.button.launchTour": "انطلاق الجولة",
+-  "tours.newUserModal.body": "Let’s take a quick tour of edX so you can get the most out of your course.",
++  "tours.newUserModal.body": "Let’s take a quick tour of {siteName} so you can get the most out of your course.",
+   "tours.newUserModal.title.welcome": "مرحبًا بك في",
+   "tours.button.skipForNow": "تخطي في الوقت الراهن",
+   "tours.datesCheckpoint.body": "Important dates can help you stay on track.",
+diff --git a/src/i18n/messages/es_419.json b/src/i18n/messages/es_419.json
+index e88a17e..dedf285 100644
+--- a/src/i18n/messages/es_419.json
++++ b/src/i18n/messages/es_419.json
+@@ -398,7 +398,7 @@
+   "learning.generic.upsell.fullAccessBullet.fullAccess": "Acceso completo",
+   "learning.generic.upsell.fullAccessBullet": "{fullAccessInBoldText} al contenido y los materiales del curso, incluso después de que finalice el curso",
+   "learning.generic.upsell.supportMissionBullet.mission": "misión",
+-  "learning.generic.upsell.supportMissionBullet": "Apoya nuestra {missionInBoldText} en edX",
++  "learning.generic.upsell.supportMissionBullet": "Apoya nuestra {missionInBoldText} en {siteName}",
+   "masquerade-widget.userName.error.generic": "Se ha producido un error. Inténtalo de nuevo.",
+   "masquerade-widget.userName.input.placeholder": "Nombre de usuario o correo electrónico",
+   "masquerade-widget.userName.input.label": "Hazte pasar por este usuario",
+@@ -410,7 +410,7 @@
+   "tours.button.okay": "Okey",
+   "tours.button.beginTour": "Comenzar recorrido",
+   "tours.button.launchTour": "gira de lanzamiento",
+-  "tours.newUserModal.body": "Hagamos un recorrido rápido por edX para que pueda aprovechar al máximo su curso.",
++  "tours.newUserModal.body": "Hagamos un recorrido rápido por {siteName} para que pueda aprovechar al máximo su curso.",
+   "tours.newUserModal.title.welcome": "Te damos la bienvenida a tu",
+   "tours.button.skipForNow": "Saltar por ahora ",
+   "tours.datesCheckpoint.body": "Las fechas importantes pueden ayudarlo a mantenerse encaminado.",
+diff --git a/src/i18n/messages/fr.json b/src/i18n/messages/fr.json
+index 8af48dd..8421d9b 100644
+--- a/src/i18n/messages/fr.json
++++ b/src/i18n/messages/fr.json
+@@ -398,7 +398,7 @@
+   "learning.generic.upsell.fullAccessBullet.fullAccess": "Accès complet",
+   "learning.generic.upsell.fullAccessBullet": "{fullAccessInBoldText} au contenu et aux supports du cours, même après la fin du cours",
+   "learning.generic.upsell.supportMissionBullet.mission": "mission",
+-  "learning.generic.upsell.supportMissionBullet": "Supportez notre {missionInBoldText} chez edX",
++  "learning.generic.upsell.supportMissionBullet": "Supportez notre {missionInBoldText} chez {siteName}",
+   "masquerade-widget.userName.error.generic": "Une erreur est survenue; veuillez réessayer.",
+   "masquerade-widget.userName.input.placeholder": "Nom d'utilisateur ou courriel",
+   "masquerade-widget.userName.input.label": "Se faire passer pour cet utilisateur",
+@@ -410,7 +410,7 @@
+   "tours.button.okay": "Okay",
+   "tours.button.beginTour": "Commencer la visite guidée",
+   "tours.button.launchTour": "Lancer la visite guidée",
+-  "tours.newUserModal.body": "Faisons une visite guidée de edX afin de profiter au maximum de votre cours.",
++  "tours.newUserModal.body": "Faisons une visite guidée de {siteName} afin de profiter au maximum de votre cours.",
+   "tours.newUserModal.title.welcome": "Bienvenue à votre",
+   "tours.button.skipForNow": "Ignorer pour l'instant",
+   "tours.datesCheckpoint.body": "Dates importantes afin de vous maintenir sur la bonne voie.",
+diff --git a/src/i18n/messages/zh_CN.json b/src/i18n/messages/zh_CN.json
+index d363a93..6119324 100644
+--- a/src/i18n/messages/zh_CN.json
++++ b/src/i18n/messages/zh_CN.json
+@@ -398,7 +398,7 @@
+   "learning.generic.upsell.fullAccessBullet.fullAccess": "Full access",
+   "learning.generic.upsell.fullAccessBullet": "{fullAccessInBoldText} to course content and materials, even after the course ends",
+   "learning.generic.upsell.supportMissionBullet.mission": "mission",
+-  "learning.generic.upsell.supportMissionBullet": "Support our {missionInBoldText} at edX",
++  "learning.generic.upsell.supportMissionBullet": "Support our {missionInBoldText} at {siteName}",
+   "masquerade-widget.userName.error.generic": "An error has occurred; please try again.",
+   "masquerade-widget.userName.input.placeholder": "Username or email",
+   "masquerade-widget.userName.input.label": "Masquerade as this user",
+@@ -410,7 +410,7 @@
+   "tours.button.okay": "Okay",
+   "tours.button.beginTour": "Begin tour",
+   "tours.button.launchTour": "Launch tour",
+-  "tours.newUserModal.body": "Let’s take a quick tour of edX so you can get the most out of your course.",
++  "tours.newUserModal.body": "Let’s take a quick tour of {siteName} so you can get the most out of your course.",
+   "tours.newUserModal.title.welcome": "Welcome to your",
+   "tours.button.skipForNow": "Skip for now",
+   "tours.datesCheckpoint.body": "Important dates can help you stay on track.",
+diff --git a/src/product-tours/messages.js b/src/product-tours/messages.js
+index ce8f2d9..89248bd 100644
+--- a/src/product-tours/messages.js
++++ b/src/product-tours/messages.js
+@@ -13,7 +13,7 @@ const messages = defineMessages({
+   },
+   newUserModalBody: {
+     id: 'tours.newUserModal.body',
+-    defaultMessage: 'Let’s take a quick tour of edX so you can get the most out of your course.',
++    defaultMessage: 'Let’s take a quick tour of {siteName} so you can get the most out of your course.',
+   },
+   newUserModalTitleWelcome: {
+     id: 'tours.newUserModal.title.welcome',
+diff --git a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+index 5fdfd14..66eb3a6 100644
+--- a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
++++ b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+@@ -58,7 +58,7 @@ function NewUserCourseHomeTourModal({
+       )}
+       onClose={onDismiss}
+     >
+-      <p className="text-dark-900">{intl.formatMessage(messages.newUserModalBody)}</p>
++      <p className="text-dark-900">{intl.formatMessage(messages.newUserModalBody, { siteName: getConfig().SITE_NAME })}</p>
+     </MarketingModal>
+   );
+ }
+-- 
+2.34.1
+

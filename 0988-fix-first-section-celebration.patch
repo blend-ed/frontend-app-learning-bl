@@ -1,0 +1,144 @@
+From cd430ebb5d4f55141b60485afe7dfd4f2ba6238f Mon Sep 17 00:00:00 2001
+From: Eugene Dyudyunov <evgen.dyudyunov@raccoongang.com>
+Date: Wed, 14 Sep 2022 16:20:55 +0300
+Subject: [PATCH 0988/1021] fix: first section celebration
+
+Fix the first section celebration modal showing logic.
+
+On Nutmeg+ it's shown only after the page reload or after going directly
+to the second section from the course home. Going through the course
+with the Next/Previous buttons has no effect (which worked on Maple).
+
+Notes:
+- the weekly goal has the same showing logic, but I assume that is
+correct behavior so no changes are added for it in this commit.
+- showing a celebration modal for the first section completion when
+going directly to the first unit of the second section seems to be a bug
+(reproduces on Maple too)
+---
+ src/courseware/course/Course.jsx              | 19 ++++++++++++++-----
+ .../course/celebration/CelebrationModal.jsx   |  6 ++++--
+ src/courseware/course/celebration/utils.jsx   | 13 ++++++++++++-
+ .../course/celebration/utils.test.jsx         | 15 +++++++++++++++
+ 4 files changed, 45 insertions(+), 8 deletions(-)
+ create mode 100644 src/courseware/course/celebration/utils.test.jsx
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 4bc56f1..607f8f3 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React, { useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
+ import { Helmet } from 'react-helmet';
+ import { useDispatch } from 'react-redux';
+@@ -43,10 +43,8 @@ const Course = ({
+ 
+   // Below the tabs, above the breadcrumbs alerts (appearing in the order listed here)
+   const dispatch = useDispatch();
+-  const celebrateFirstSection = celebrations && celebrations.firstSection;
+-  const [firstSectionCelebrationOpen, setFirstSectionCelebrationOpen] = useState(
+-    shouldCelebrateOnSectionLoad(courseId, sequenceId, celebrateFirstSection, dispatch, celebrations),
+-  );
++
++  const [firstSectionCelebrationOpen, setFirstSectionCelebrationOpen] = useState(false);
+   // If streakLengthToCelebrate is populated, that modal takes precedence. Wait til the next load to display
+   // the weekly goal celebration modal.
+   const [weeklyGoalCelebrationOpen, setWeeklyGoalCelebrationOpen] = useState(
+@@ -68,6 +66,17 @@ const Course = ({
+     }
+   }
+ 
++  useEffect(() => {
++    const celebrateFirstSection = celebrations && celebrations.firstSection;
++    setFirstSectionCelebrationOpen(shouldCelebrateOnSectionLoad(
++      courseId,
++      sequenceId,
++      celebrateFirstSection,
++      dispatch,
++      celebrations,
++    ));
++  }, [sequenceId]);
++
+   return (
+     <SidebarProvider courseId={courseId} unitId={unitId}>
+       <Helmet>
+diff --git a/src/courseware/course/celebration/CelebrationModal.jsx b/src/courseware/course/celebration/CelebrationModal.jsx
+index 6b0f2e7..5ba5f4e 100644
+--- a/src/courseware/course/celebration/CelebrationModal.jsx
++++ b/src/courseware/course/celebration/CelebrationModal.jsx
+@@ -9,6 +9,7 @@ import {
+   useWindowSize,
+ } from '@edx/paragon';
+ 
++import { useDispatch } from 'react-redux';
+ import ClapsMobile from './assets/claps_280x201.gif';
+ import ClapsTablet from './assets/claps_456x328.gif';
+ import messages from './messages';
+@@ -19,12 +20,13 @@ import { useModel } from '../../../generic/model-store';
+ const CelebrationModal = ({
+   courseId, intl, isOpen, onClose, ...rest
+ }) => {
+-  const { org } = useModel('courseHomeMeta', courseId);
++  const { org, celebrations } = useModel('courseHomeMeta', courseId);
++  const dispatch = useDispatch();
+   const wideScreen = useWindowSize().width >= breakpoints.small.minWidth;
+ 
+   useEffect(() => {
+     if (isOpen) {
+-      recordFirstSectionCelebration(org, courseId);
++      recordFirstSectionCelebration(org, courseId, celebrations, dispatch);
+     }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isOpen]);
+diff --git a/src/courseware/course/celebration/utils.jsx b/src/courseware/course/celebration/utils.jsx
+index 7206efb..aa5b02f 100644
+--- a/src/courseware/course/celebration/utils.jsx
++++ b/src/courseware/course/celebration/utils.jsx
+@@ -15,9 +15,20 @@ function handleNextSectionCelebration(sequenceId, nextSequenceId) {
+   });
+ }
+ 
+-function recordFirstSectionCelebration(org, courseId) {
++function recordFirstSectionCelebration(org, courseId, celebrations, dispatch) {
+   // Tell the LMS
+   postCelebrationComplete(courseId, { first_section: false });
++  // Update our local copy of course data from LMS
++  dispatch(updateModel({
++    modelType: 'courseHomeMeta',
++    model: {
++      id: courseId,
++      celebrations: {
++        ...celebrations,
++        firstSection: false,
++      },
++    },
++  }));
+ 
+   // Tell our analytics
+   const { administrator } = getAuthenticatedUser();
+diff --git a/src/courseware/course/celebration/utils.test.jsx b/src/courseware/course/celebration/utils.test.jsx
+new file mode 100644
+index 0000000..8c5ce66
+--- /dev/null
++++ b/src/courseware/course/celebration/utils.test.jsx
+@@ -0,0 +1,15 @@
++import { recordFirstSectionCelebration } from './utils';
++
++jest.mock('@edx/frontend-platform/analytics');
++jest.mock('./data/api');
++jest.mock('@edx/frontend-platform/auth', () => ({
++  getAuthenticatedUser: jest.fn(() => ({ administrator: 'admin' })),
++}));
++
++describe('recordFirstSectionCelebration', () => {
++  it('updates the local copy of the course data from the LMS', async () => {
++    const dispatchMock = jest.fn();
++    recordFirstSectionCelebration('org', 'courseId', 'celebration', dispatchMock);
++    expect(dispatchMock).toHaveBeenCalled();
++  });
++});
+-- 
+2.34.1
+

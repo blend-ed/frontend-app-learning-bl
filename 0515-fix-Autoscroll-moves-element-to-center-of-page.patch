@@ -1,0 +1,31 @@
+From cf08fa5eb9747d5aaea4c786d66bd3d1e5492eb2 Mon Sep 17 00:00:00 2001
+From: Kristin Aoki <42981026+KristinAoki@users.noreply.github.com>
+Date: Tue, 29 Jun 2021 09:05:04 -0400
+Subject: [PATCH 0515/1021] fix: Autoscroll moves element to center of page
+
+This PR fixes the anchor tag's position on the page when autoscrolling
+is used. Previously, the scroll would move the element to the center of
+the page. Now the scroll moves the element to the top of the page. The
+only case where the element will not be at the top of the page is when
+the element is too close to the bottom of the page and there is not
+enough page remaining to force the element to the top.
+---
+ src/courseware/course/sequence/Unit.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 73c2f9c..6c08d7c 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -139,7 +139,7 @@ function Unit({
+       } else if (event.data.offset) {
+         // We listen for this message from LMS to know when the page needs to
+         // be scrolled to another location on the page.
+-        window.scrollTo(0, event.data.offset);
++        window.scrollTo(0, event.data.offset + document.getElementById('unit-iframe').offsetTop);
+       }
+     }
+     // If we currently have an event listener, remove it.
+-- 
+2.34.1
+

@@ -1,0 +1,36 @@
+From 7086bdc9ab2ae7e932ca9f5b7b26b6d06bd549cc Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 17 Nov 2020 12:19:48 -0800
+Subject: [PATCH 0324/1021] Add Github workflow for CI tests
+
+---
+ .github/workflows/validate.yml | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 .github/workflows/validate.yml
+
+diff --git a/.github/workflows/validate.yml b/.github/workflows/validate.yml
+new file mode 100644
+index 0000000..a647b07
+--- /dev/null
++++ b/.github/workflows/validate.yml
+@@ -0,0 +1,17 @@
++name: validate
++on:
++- push
++- pull_request
++jobs:
++  build:
++    runs-on: ubuntu-latest
++    strategy:
++      matrix:
++        node-version:
++        - 12
++    steps:
++    - uses: actions/checkout@v2
++    - uses: actions/setup-node@v1
++      with:
++        node-version: ${{ matrix.node-version }}
++    - run: make validate.ci
+-- 
+2.34.1
+

@@ -1,0 +1,567 @@
+From 964bde180a43b4315888a660c7db2a3fbfa16322 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 1 Jun 2020 09:45:35 -0400
+Subject: [PATCH 0134/1021] Further UI tweaks to the Dates tab (#76)
+
+Allow for per-item badges if not all items in a given day match
+for the badge. And some minor spacing changes.
+---
+ src/dates-tab/Badge.jsx     |   2 +-
+ src/dates-tab/Badge.scss    |   1 -
+ src/dates-tab/Day.jsx       |  89 ++----------------
+ src/dates-tab/Day.scss      |   2 +-
+ src/dates-tab/Timeline.jsx  |  11 +--
+ src/dates-tab/badgelist.jsx | 115 ++++++++++++++++++++++
+ src/dates-tab/fakeData.js   | 183 ++++++++++++++++++++++++++++++++++++
+ 7 files changed, 313 insertions(+), 90 deletions(-)
+ create mode 100644 src/dates-tab/badgelist.jsx
+ create mode 100644 src/dates-tab/fakeData.js
+
+diff --git a/src/dates-tab/Badge.jsx b/src/dates-tab/Badge.jsx
+index ecacde5..bde5477 100644
+--- a/src/dates-tab/Badge.jsx
++++ b/src/dates-tab/Badge.jsx
+@@ -6,7 +6,7 @@ import './Badge.scss';
+ 
+ export default function Badge({ children, className }) {
+   return (
+-    <span className={classNames('dates-badge badge align-bottom font-italic ml-2 px-2', className)}>
++    <span className={classNames('dates-badge badge align-text-bottom font-italic ml-2 px-2', className)}>
+       {children}
+     </span>
+   );
+diff --git a/src/dates-tab/Badge.scss b/src/dates-tab/Badge.scss
+index 87dd456..d3c81e5 100644
+--- a/src/dates-tab/Badge.scss
++++ b/src/dates-tab/Badge.scss
+@@ -1,4 +1,3 @@
+ .dates-badge {
+   font-size: 0.9rem;
+-  line-height: 1.25;
+ }
+diff --git a/src/dates-tab/Day.jsx b/src/dates-tab/Day.jsx
+index ae50e18..ca00ff1 100644
+--- a/src/dates-tab/Day.jsx
++++ b/src/dates-tab/Day.jsx
+@@ -3,19 +3,16 @@ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { useSelector } from 'react-redux';
+ import { FormattedDate, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faLock } from '@fortawesome/free-solid-svg-icons';
+ 
+ import { useModel } from '../model-store';
+ 
+-import Badge from './Badge';
+-import messages from './messages';
+-import { daycmp, isLearnerAssignment } from './utils';
++import { getBadgeListAndColor } from './badgelist';
++import { isLearnerAssignment } from './utils';
+ 
+ import './Day.scss';
+ 
+ function Day({
+-  date, first, hasDueNextAssignment, intl, items, last,
++  date, first, intl, items, last,
+ }) {
+   const {
+     courseId,
+@@ -24,86 +21,20 @@ function Day({
+   const {
+     userTimezone,
+   } = useModel('dates', courseId);
+-
+-  const now = new Date();
+-  const learnerHasAccess = items.every(x => x.learnerHasAccess);
+-  const assignments = items.filter(isLearnerAssignment);
+-  const isComplete = assignments.length && assignments.every(x => x.complete);
+-  const isPastDue = assignments.some(x => !x.complete && new Date(x.date) < now);
+-  const unreleased = assignments.some(x => !x.link);
+-  const isInFuture = daycmp(date, now) > 0;
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+-  // This badge info list is in order of priority (they will appear left to right in this order and the first badge
+-  // sets the color of the dot in the timeline).
+-  const badgesInfo = [
+-    {
+-      message: messages.today,
+-      shown: daycmp(date, now) === 0,
+-      bg: 'dates-bg-today',
+-    },
+-    {
+-      message: messages.completed,
+-      shown: isComplete,
+-      bg: 'bg-dark-100',
+-    },
+-    {
+-      message: messages.pastDue,
+-      shown: isPastDue,
+-      bg: 'bg-dark-200',
+-    },
+-    {
+-      message: messages.dueNext,
+-      shown: hasDueNextAssignment,
+-      bg: 'bg-gray-500',
+-      className: 'text-white',
+-    },
+-    {
+-      message: messages.unreleased,
+-      shown: unreleased,
+-      className: 'border border-dark-200 text-gray-500',
+-    },
+-    {
+-      message: messages.verifiedOnly,
+-      shown: !learnerHasAccess,
+-      icon: faLock,
+-      bg: 'bg-dark-500',
+-      className: 'text-white',
+-    },
+-  ];
+-  let dotColor = null;
+-  const badges = (
+-    <>
+-      {badgesInfo.map(b => {
+-        if (b.shown) {
+-          if (!dotColor && !isInFuture) {
+-            dotColor = b.bg;
+-          }
+-          return (
+-            <Badge key={b.message.id} className={classNames(b.bg, b.className)}>
+-              {b.icon && <FontAwesomeIcon icon={b.icon} className="mr-1" />}
+-              {intl.formatMessage(b.message)}
+-            </Badge>
+-          );
+-        }
+-        return null;
+-      })}
+-    </>
+-  );
+-  if (!dotColor && isInFuture) {
+-    dotColor = 'bg-gray-900';
+-  }
++  const { color, badges } = getBadgeListAndColor(date, intl, null, items);
+ 
+   return (
+     <div className="dates-day pb-4">
+       {/* Top Line */}
+-      {!first && <div className="dates-line-top border border-left border-gray-900" />}
++      {!first && <div className="dates-line-top border border-left border-gray-900 bg-gray-900" />}
+ 
+       {/* Dot */}
+-      <div className={classNames(dotColor, 'dates-dot border border-gray-900')} />
++      <div className={classNames(color, 'dates-dot border border-gray-900')} />
+ 
+       {/* Bottom Line */}
+-      {!last && <div className="dates-line-bottom border border-left border-gray-900" />}
++      {!last && <div className="dates-line-bottom border border-left border-gray-900 bg-gray-900" />}
+ 
+       {/* Content */}
+       <div className="d-inline-block ml-3 pl-3">
+@@ -121,13 +52,14 @@ function Day({
+           {badges}
+         </div>
+         {items.map((item) => {
++          const { badges: itemBadges } = getBadgeListAndColor(date, intl, item, items);
+           const showLink = item.link && isLearnerAssignment(item);
+           const title = showLink ? (<u><a href={item.link} className="text-reset">{item.title}</a></u>) : item.title;
+           const available = item.learnerHasAccess && (item.link || !isLearnerAssignment(item));
+           const textColor = available ? 'text-dark-500' : 'text-dark-200';
+           return (
+             <div key={item.title + item.date} className={textColor}>
+-              <div className="font-weight-bold">{title}</div>
++              <div><span className="font-weight-bold">{title}</span>{itemBadges}</div>
+               <div>{item.description}</div>
+             </div>
+           );
+@@ -140,12 +72,12 @@ function Day({
+ Day.propTypes = {
+   date: PropTypes.objectOf(Date).isRequired,
+   first: PropTypes.bool,
+-  hasDueNextAssignment: PropTypes.bool,
+   intl: intlShape.isRequired,
+   items: PropTypes.arrayOf(PropTypes.shape({
+     date: PropTypes.string,
+     dateType: PropTypes.string,
+     description: PropTypes.string,
++    dueNext: PropTypes.bool,
+     learnerHasAccess: PropTypes.bool,
+     link: PropTypes.string,
+     title: PropTypes.string,
+@@ -155,7 +87,6 @@ Day.propTypes = {
+ 
+ Day.defaultProps = {
+   first: false,
+-  hasDueNextAssignment: false,
+   last: false,
+ };
+ 
+diff --git a/src/dates-tab/Day.scss b/src/dates-tab/Day.scss
+index 87d1894..0578cc5 100644
+--- a/src/dates-tab/Day.scss
++++ b/src/dates-tab/Day.scss
+@@ -1,7 +1,7 @@
+ $dot-radius: 0.3rem;
+ $dot-size: $dot-radius * 2;
+ $top-offset: 0.45rem;
+-$left-offset: 0.2rem + $dot-radius;
++$left-offset: 0.225rem + $dot-radius;
+ 
+ .dates-day {
+   position: relative;
+diff --git a/src/dates-tab/Timeline.jsx b/src/dates-tab/Timeline.jsx
+index a352528..54c24ec 100644
+--- a/src/dates-tab/Timeline.jsx
++++ b/src/dates-tab/Timeline.jsx
+@@ -20,13 +20,13 @@ export default function Timeline() {
+   const now = new Date();
+   let foundNextDue = false;
+   let foundToday = false;
+-  courseDateBlocks.forEach(dateInfo => {
++  courseDateBlocks.forEach(courseDateBlock => {
++    const dateInfo = { ...courseDateBlock };
+     const parsedDate = new Date(dateInfo.date);
+ 
+-    let hasDueNextAssignment = false;
+     if (!foundNextDue && parsedDate >= now && isLearnerAssignment(dateInfo) && !dateInfo.complete) {
+       foundNextDue = true;
+-      hasDueNextAssignment = true;
++      dateInfo.dueNext = true;
+     }
+ 
+     if (!foundToday) {
+@@ -37,7 +37,6 @@ export default function Timeline() {
+         foundToday = true;
+         groupedDates.push({
+           date: now,
+-          hasDueNextAssignment: false,
+           items: [],
+         });
+       }
+@@ -47,14 +46,10 @@ export default function Timeline() {
+       // Add new grouped date
+       groupedDates.push({
+         date: parsedDate,
+-        hasDueNextAssignment,
+         items: [dateInfo],
+         first: groupedDates.length === 0,
+       });
+     } else {
+-      if (hasDueNextAssignment) {
+-        groupedDates[groupedDates.length - 1].hasNextAssigment = true;
+-      }
+       groupedDates[groupedDates.length - 1].items.push(dateInfo);
+     }
+   });
+diff --git a/src/dates-tab/badgelist.jsx b/src/dates-tab/badgelist.jsx
+new file mode 100644
+index 0000000..2a0108c
+--- /dev/null
++++ b/src/dates-tab/badgelist.jsx
+@@ -0,0 +1,115 @@
++import React from 'react';
++import classNames from 'classnames';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faLock } from '@fortawesome/free-solid-svg-icons';
++
++import Badge from './Badge';
++import messages from './messages';
++import { daycmp, isLearnerAssignment } from './utils';
++
++function hasAccess(item) {
++  return item.learnerHasAccess;
++}
++
++function isComplete(assignment) {
++  return assignment.complete;
++}
++
++function isPastDue(assignment) {
++  return !isComplete(assignment) && (new Date(assignment.date) < new Date());
++}
++
++function isUnreleased(assignment) {
++  return !assignment.link;
++}
++
++// Pass a null item if you want to get a whole day's badge list, not just one item's list.
++// Returns an object with 'color' and 'badges' properties.
++function getBadgeListAndColor(date, intl, item, items) {
++  const now = new Date();
++  const assignments = items.filter(isLearnerAssignment);
++  const isToday = daycmp(date, now) === 0;
++  const isInFuture = daycmp(date, now) > 0;
++
++  // This badge info list is in order of priority (they will appear left to right in this order and the first badge
++  // sets the color of the dot in the timeline).
++  const badgesInfo = [
++    {
++      message: messages.today,
++      shownForDay: isToday,
++      bg: 'dates-bg-today',
++    },
++    {
++      message: messages.completed,
++      shownForDay: assignments.length && assignments.every(isComplete),
++      shownForItem: x => isLearnerAssignment(x) && isComplete(x),
++      bg: 'bg-dark-100',
++    },
++    {
++      message: messages.pastDue,
++      shownForDay: assignments.length && assignments.every(isPastDue),
++      shownForItem: x => isLearnerAssignment(x) && isPastDue(x),
++      bg: 'bg-dark-200',
++    },
++    {
++      message: messages.dueNext,
++      shownForDay: !isToday && assignments.some(x => x.dueNext),
++      shownForItem: x => x.dueNext,
++      bg: 'bg-gray-500',
++      className: 'text-white',
++    },
++    {
++      message: messages.unreleased,
++      shownForDay: assignments.length && assignments.every(isUnreleased),
++      shownForItem: x => isLearnerAssignment(x) && isUnreleased(x),
++      className: 'border border-dark-200 text-gray-500 align-top',
++    },
++    {
++      message: messages.verifiedOnly,
++      shownForDay: items.every(x => !hasAccess(x)),
++      shownForItem: x => !hasAccess(x),
++      icon: faLock,
++      bg: 'bg-dark-500',
++      className: 'text-white',
++    },
++  ];
++  let color = null; // first color of any badge
++  const badges = (
++    <>
++      {badgesInfo.map(b => {
++        let shown = b.shownForDay;
++        if (item) {
++          if (b.shownForDay) {
++            shown = false; // don't double up, if the day already has this badge
++          } else {
++            shown = b.shownForItem && b.shownForItem(item);
++          }
++        }
++        if (!shown) {
++          return null;
++        }
++
++        if (!color && !isInFuture) {
++          color = b.bg;
++        }
++        return (
++          <Badge key={b.message.id} className={classNames(b.bg, b.className)}>
++            {b.icon && <FontAwesomeIcon icon={b.icon} className="mr-1" />}
++            {intl.formatMessage(b.message)}
++          </Badge>
++        );
++      })}
++    </>
++  );
++  if (!color && isInFuture) {
++    color = 'bg-gray-900';
++  }
++
++  return {
++    color,
++    badges,
++  };
++}
++
++// eslint-disable-next-line import/prefer-default-export
++export { getBadgeListAndColor };
+diff --git a/src/dates-tab/fakeData.js b/src/dates-tab/fakeData.js
+new file mode 100644
+index 0000000..d8854c3
+--- /dev/null
++++ b/src/dates-tab/fakeData.js
+@@ -0,0 +1,183 @@
++// Sample data helpful when developing, to see a variety of configurations.
++// This set of data is not realistic (mix of having access and not), but it
++// is intended to demonstrate many UI results.
++// To use, have getTabData in api.js return the result of this call instead:
++/*
++import fakeDatesData from '../dates-tab/fakeData';
++export async function getTabData(courseId, tab, version) {
++  if (tab === 'dates') { return camelCaseObject(fakeDatesData()); }
++  ...
++}
++*/
++
++export default function fakeDatesData() {
++  return JSON.parse(`
++{
++  "course_date_blocks": [
++    {
++      "date": "2020-05-01T17:59:41Z",
++      "date_type": "course-start-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "",
++      "title": "Course Starts"
++    },
++    {
++      "complete": true,
++      "date": "2020-05-04T02:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "title": "Multi Badges Completed"
++    },
++    {
++      "date": "2020-05-05T02:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "title": "Multi Badges Past Due"
++    },
++    {
++      "date": "2020-05-27T02:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "Both Past Due 1"
++    },
++    {
++      "date": "2020-05-27T02:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "Both Past Due 2"
++    },
++    {
++      "complete": true,
++      "date": "2020-05-28T08:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "One Completed/Due 1"
++    },
++    {
++      "date": "2020-05-28T08:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "One Completed/Due 2"
++    },
++    {
++      "complete": true,
++      "date": "2020-05-29T08:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "Both Completed 1"
++    },
++    {
++      "complete": true,
++      "date": "2020-05-29T08:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "Both Completed 2"
++    },
++    {
++      "date": "2020-06-16T17:59:40.942669Z",
++      "date_type": "verified-upgrade-deadline",
++      "description": "Don't miss the opportunity to highlight your new knowledge and skills by earning a verified certificate.",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "Upgrade to Verified Certificate"
++    },
++    {
++      "date": "2030-08-17T05:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": false,
++      "link": "https://example.com/",
++      "title": "One Verified 1"
++    },
++    {
++      "date": "2030-08-17T05:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "One Verified 2"
++    },
++    {
++      "date": "2030-08-18T05:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": false,
++      "link": "https://example.com/",
++      "title": "Both Verified 1"
++    },
++    {
++      "date": "2030-08-18T05:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": false,
++      "link": "https://example.com/",
++      "title": "Both Verified 2"
++    },
++    {
++      "date": "2030-08-19T05:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "title": "One Unreleased 1"
++    },
++    {
++      "date": "2030-08-19T05:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "https://example.com/",
++      "title": "One Unreleased 2"
++    },
++    {
++      "date": "2030-08-20T05:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "title": "Both Unreleased 1"
++    },
++    {
++      "date": "2030-08-20T05:59:40.942669Z",
++      "date_type": "assignment-due-date",
++      "description": "",
++      "learner_has_access": true,
++      "title": "Both Unreleased 2"
++    },
++    {
++      "date": "2030-08-23T00:00:00Z",
++      "date_type": "course-end-date",
++      "description": "",
++      "learner_has_access": true,
++      "link": "",
++      "title": "Course Ends"
++    },
++    {
++      "date": "2030-09-01T00:00:00Z",
++      "date_type": "verification-deadline-date",
++      "description": "You must successfully complete verification before this date to qualify for a Verified Certificate.",
++      "learner_has_access": false,
++      "link": "https://example.com/",
++      "title": "Verification Deadline"
++    }
++  ],
++  "display_reset_dates_text": false,
++  "learner_is_verified": false,
++  "user_timezone": "America/New_York",
++  "verified_upgrade_link": "https://example.com/"
++}
++  `);
++}
+-- 
+2.34.1
+

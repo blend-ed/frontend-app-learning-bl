@@ -1,0 +1,29 @@
+From 26a7b3b0de862a1713ab8ed4266502bb3f0e6da3 Mon Sep 17 00:00:00 2001
+From: Ben Warzeski <bwarzeski@edx.org>
+Date: Mon, 22 Feb 2021 13:48:43 -0500
+Subject: [PATCH 0388/1021] tie p2p action only to targetted date-summary entry
+ if there are multiple (#367)
+
+---
+ src/course-home/outline-tab/DateSummary.jsx | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index 1b57207..43845c5 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -15,7 +15,10 @@ export default function DateSummary({
+ 
+   /** [MM-P2P experiment] */
+   const [showMMP2P, setShowMMP2P] = useState(window.experiment__home_dates_bShowMMP2P);
+-  if (window.experiment__home_dates_showMMP2P === undefined) {
++  if (
++    dateBlock.dateType === 'verified-upgrade-deadline'
++    && window.experiment__home_dates_showMMP2P === undefined
++  ) {
+     window.experiment__home_dates_showMMP2P = (value) => {
+       setShowMMP2P(!!value);
+       window.experiment__home_dates_bShowMMP2P = !!value;
+-- 
+2.34.1
+

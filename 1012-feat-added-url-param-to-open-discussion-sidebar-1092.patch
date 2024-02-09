@@ -1,0 +1,29 @@
+From 2e4eb158f2930183f8a26c7faeb22ad4494f5343 Mon Sep 17 00:00:00 2001
+From: Muhammad Adeel Tajamul
+ <77053848+muhammadadeeltajamul@users.noreply.github.com>
+Date: Tue, 4 Apr 2023 13:33:35 +0500
+Subject: [PATCH 1012/1021] feat: added url param to open discussion sidebar
+ (#1092)
+
+---
+ src/courseware/course/sidebar/SidebarContextProvider.jsx | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/courseware/course/sidebar/SidebarContextProvider.jsx b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+index c9a3b88..1a64025 100644
+--- a/src/courseware/course/sidebar/SidebarContextProvider.jsx
++++ b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+@@ -19,6 +19,10 @@ const SidebarProvider = ({
+   const shouldDisplayFullScreen = useWindowSize().width < breakpoints.large.minWidth;
+   const shouldDisplaySidebarOpen = useWindowSize().width > breakpoints.medium.minWidth;
+   const showNotificationsOnLoad = getSessionStorage(`notificationTrayStatus.${courseId}`) !== 'closed';
++  const query = new URLSearchParams(window.location.search);
++  if (query.get('sidebar') === 'true') {
++    localStorage.setItem('showDiscussionSidebar', true);
++  }
+   const showDiscussionSidebar = localStorage.getItem('showDiscussionSidebar') !== 'false';
+   const showNotificationSidebar = (verifiedMode && shouldDisplaySidebarOpen && showNotificationsOnLoad)
+     ? SIDEBARS.NOTIFICATIONS.ID
+-- 
+2.34.1
+

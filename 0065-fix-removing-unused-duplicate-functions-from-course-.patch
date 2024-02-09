@@ -1,0 +1,78 @@
+From 1ca797f6e8b4d0ad1c4cd10690a8e320a1855c30 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Thu, 5 Mar 2020 10:52:33 -0500
+Subject: [PATCH 0065/1021] fix: removing unused/duplicate functions from
+ course-meta/api.js
+
+The two functions removed here are duplicated (and actually used from) course-blocks/api.js.  Think it was just a refactoring oversight from a few weeks ago.
+---
+ src/data/course-meta/api.js | 51 ++-----------------------------------
+ 1 file changed, 2 insertions(+), 49 deletions(-)
+
+diff --git a/src/data/course-meta/api.js b/src/data/course-meta/api.js
+index 3f6ec42..b2c1b77 100644
+--- a/src/data/course-meta/api.js
++++ b/src/data/course-meta/api.js
+@@ -1,38 +1,6 @@
++/* eslint-disable import/prefer-default-export */
+ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+-import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-
+-export async function getCourseBlocks(courseUsageKey) {
+-  const { username } = getAuthenticatedUser();
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+-  url.searchParams.append('course_id', courseUsageKey);
+-  url.searchParams.append('username', username);
+-  url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children,show_gated_sections');
+-
+-  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+-  // Camelcase block objects (leave blockId keys alone)
+-  const blocks = Object.entries(data.blocks).reduce((acc, [key, value]) => {
+-    acc[key] = camelCaseObject(value);
+-    return acc;
+-  }, {});
+-
+-  // Next go through the blocksList again - now that we've added them all to the blocks map - and
+-  // append a parent ID to every child found in every `children` list, using the blocks map to find
+-  // them.
+-  Object.values(blocks).forEach((block) => {
+-    if (Array.isArray(block.children)) {
+-      const parentId = block.id;
+-      block.children.forEach((childBlockId) => {
+-        blocks[childBlockId].parentId = parentId;
+-      });
+-    }
+-  });
+-
+-  const processedData = camelCaseObject(data);
+-  processedData.blocks = blocks;
+-
+-  return processedData;
+-}
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ 
+ export async function getCourseMetadata(courseUsageKey) {
+   const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseUsageKey}`;
+@@ -40,18 +8,3 @@ export async function getCourseMetadata(courseUsageKey) {
+   const processedData = camelCaseObject(data);
+   return processedData;
+ }
+-
+-export async function getSequenceMetadata(sequenceId) {
+-  const { data } = await getAuthenticatedHttpClient()
+-    .get(`${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceId}`, {});
+-  const camelCasedData = camelCaseObject(data);
+-
+-  camelCasedData.items = camelCasedData.items.map((item) => {
+-    const processedItem = camelCaseObject(item);
+-    processedItem.contentType = processedItem.type;
+-    delete processedItem.type;
+-    return processedItem;
+-  });
+-
+-  return camelCasedData;
+-}
+-- 
+2.34.1
+

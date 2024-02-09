@@ -1,0 +1,65 @@
+From 56decd8ed09e9aac2f420d3b5b2f70b7660a5bd6 Mon Sep 17 00:00:00 2001
+From: Brian Mesick <bmesick@edx.org>
+Date: Mon, 21 Jun 2021 12:55:11 -0400
+Subject: [PATCH 0502/1021] feat: Remove course sock from OutlineTab. (#495)
+
+REV-2122: As part of the Value Prop implementation, we are removing the course sock from Course Home
+---
+ src/course-home/outline-tab/OutlineTab.jsx | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 5b2adcc..c6435c6 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -1,4 +1,4 @@
+-import React, { useRef, useState } from 'react';
++import React, { useState } from 'react';
+ import { useSelector } from 'react-redux';
+ import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -9,7 +9,6 @@ import { AlertList } from '../../generic/user-messages';
+ import CourseDates from './widgets/CourseDates';
+ import CourseGoalCard from './widgets/CourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
+-import CourseSock from '../../generic/course-sock';
+ import CourseTools from './widgets/CourseTools';
+ import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ import { fetchOutlineTab } from '../data';
+@@ -44,7 +43,6 @@ function OutlineTab({ intl }) {
+ 
+   const {
+     accessExpiration,
+-    canShowUpgradeSock,
+     courseBlocks: {
+       courses,
+       sections,
+@@ -94,8 +92,6 @@ function OutlineTab({ intl }) {
+ 
+   const rootCourseId = courses && Object.keys(courses)[0];
+ 
+-  const courseSock = useRef(null);
+-
+   const logUpgradeLinkClick = () => {
+     sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
+       ...eventProperties,
+@@ -245,16 +241,6 @@ function OutlineTab({ intl }) {
+           </div>
+         )}
+       </div>
+-      {canShowUpgradeSock && (
+-        <CourseSock
+-          courseId={courseId}
+-          offer={offer}
+-          orgKey={org}
+-          pageLocation="Home Page"
+-          ref={courseSock}
+-          verifiedMode={verifiedMode}
+-        />
+-      )}
+     </>
+   );
+ }
+-- 
+2.34.1
+

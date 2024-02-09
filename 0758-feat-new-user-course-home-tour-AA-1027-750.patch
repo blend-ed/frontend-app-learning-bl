@@ -1,0 +1,3221 @@
+From 2fa4a837b1bc2bb46f65c98ac0f8272b9eeb8f02 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Tue, 14 Dec 2021 12:53:10 -0500
+Subject: [PATCH 0758/1021] feat: new user course home tour (AA-1027) (#750)
+
+---
+ .../0010-tour-structure-decisions.md          |  32 ++
+ package-lock.json                             |   6 +-
+ package.json                                  |   2 +-
+ src/course-header/CourseTabsNavigation.jsx    |   2 +-
+ src/course-header/Header.jsx                  |   9 +-
+ .../courseHomeMetadata.factory.js             |   1 +
+ .../data/__snapshots__/redux.test.js.snap     |  24 ++
+ src/course-home/outline-tab/OutlineTab.jsx    |   2 +-
+ .../outline-tab/OutlineTab.test.jsx           |   9 +-
+ .../outline-tab/widgets/CourseDates.jsx       |  32 +-
+ .../outline-tab/widgets/CourseTools.jsx       |   4 +
+ .../widgets/WeeklyLearningGoalCard.jsx        |   1 +
+ src/courseware/course/NotificationTray.scss   |   1 +
+ .../SequenceNavigation.jsx                    |   2 +-
+ .../UpgradeNotification.jsx                   |  32 +-
+ src/index.scss                                |   1 +
+ src/product-tours/AbandonTour.jsx             |  22 ++
+ src/product-tours/CoursewareTour.jsx          |  22 ++
+ .../ExistingUserCourseHomeTour.jsx            |  22 ++
+ .../GenericTourFormattedMessages.jsx          |  32 ++
+ src/product-tours/ProductTours.jsx            | 184 +++++++++++
+ src/product-tours/ProductTours.test.jsx       | 308 ++++++++++++++++++
+ src/product-tours/data/api.js                 |  26 ++
+ src/product-tours/data/index.js               |   8 +
+ src/product-tours/data/slice.js               |  58 ++++
+ src/product-tours/data/thunks.js              |  50 +++
+ src/product-tours/messages.js                 |  30 ++
+ .../LaunchCourseHomeTourButton.jsx            |  71 ++++
+ .../NewUserCourseHomeTour.jsx                 | 120 +++++++
+ .../NewUserCourseHomeTourModal.jsx            |  73 +++++
+ .../course_home_tour_modal_hero.png           | Bin 0 -> 18916 bytes
+ src/store.js                                  |   2 +
+ src/tab-page/LoadedTabPage.jsx                |  14 +-
+ src/tab-page/LoadedTabPage.test.jsx           |   1 +
+ src/tab-page/TabPage.jsx                      |   2 +
+ src/tour/Checkpoint.jsx                       |  88 ++++-
+ src/tour/Checkpoint.scss                      |  63 +++-
+ src/tour/CheckpointActionRow.jsx              |   9 +-
+ src/tour/CheckpointBreadcrumbs.jsx            |   4 +-
+ src/tour/README.md                            |   2 +
+ src/tour/Tour.jsx                             | 134 +++-----
+ src/tour/tests/Checkpoint.test.jsx            | 167 +++++-----
+ src/tour/tests/Tour.test.jsx                  | 254 +++++++++------
+ 43 files changed, 1599 insertions(+), 327 deletions(-)
+ create mode 100644 docs/decisions/0010-tour-structure-decisions.md
+ create mode 100644 src/product-tours/AbandonTour.jsx
+ create mode 100644 src/product-tours/CoursewareTour.jsx
+ create mode 100644 src/product-tours/ExistingUserCourseHomeTour.jsx
+ create mode 100644 src/product-tours/GenericTourFormattedMessages.jsx
+ create mode 100644 src/product-tours/ProductTours.jsx
+ create mode 100644 src/product-tours/ProductTours.test.jsx
+ create mode 100644 src/product-tours/data/api.js
+ create mode 100644 src/product-tours/data/index.js
+ create mode 100644 src/product-tours/data/slice.js
+ create mode 100644 src/product-tours/data/thunks.js
+ create mode 100644 src/product-tours/messages.js
+ create mode 100644 src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
+ create mode 100644 src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTour.jsx
+ create mode 100644 src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+ create mode 100644 src/product-tours/newUserCourseHomeTour/course_home_tour_modal_hero.png
+
+diff --git a/docs/decisions/0010-tour-structure-decisions.md b/docs/decisions/0010-tour-structure-decisions.md
+new file mode 100644
+index 0000000..76e3329
+--- /dev/null
++++ b/docs/decisions/0010-tour-structure-decisions.md
+@@ -0,0 +1,32 @@
++# Tour Structure Decisions
++
++## Compartmentalizing the tour objects
++We created the directory `src/tours` in order to organize tours across the MFE. Each tour has its own JSX file where we
++define a tour object to be passed to the `<Tour />` component in `<LoadedTabPage />`.
++
++Although each tour is stored in a JSX file, the tour object itself is meant to be an `object` type. Thus, the structure
++of each tour object is as follows:
++```$xslt
++// Note: this is a simplified version of a tour object
++
++const exampleTour = (enabled) => ({
++    checkpoints: [],
++    enabled,
++    tourId: 'exampleTour',
++});
++```
++
++The reason we use a JSX file rather than a JS file is to allow for use of React components within the objects such as
++`<FormattedMessage />`.
++
++## Implementing i18n in tour objects
++The `<Tour />` component ingests a single prop called `tours` which expects a list of objects.
++Given the structure in which we organized tour objects, there were two considerations in working with i18n:
++- You can't injectIntl into something that isn't a React component without considerable adjustments,
++so using the familiar `{intl.formatMessage(messages.foo)}` syntax would not be possible.
++- You can't return normal objects from a React component, only React elements. I.e. switching these from arrow functions
++ to React function based components would not be ideal because the `tours` prop expects objects.
++
++### Decision
++We chose to use `<FormattedMessage />` directly within the tour objects. We also created shared `<FormattedMessage />`
++components inside of `GenericTourFormattedMessages.jsx` for use across the tours.
+diff --git a/package-lock.json b/package-lock.json
+index 08a0102..6f2bd3c 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -4149,9 +4149,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "16.18.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-16.18.0.tgz",
+-      "integrity": "sha512-VxNYFymoGQx0SG0wuotYPbco98Qk2Ao6gZUFyRCb49QIK0kjmnhdV04ltWfG2X7RNjziuVKsak43NbI53Zo5TQ==",
++      "version": "16.19.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-16.19.0.tgz",
++      "integrity": "sha512-1URyxUC42JT+DF7hWY75SrY4q/zU9dDB8noiIsSVuB2LCoYze209PATmp5L7DBRj6d4m3b859SPqvPD9v2P65Q==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+diff --git a/package.json b/package.json
+index 16eb5c3..e744d79 100644
+--- a/package.json
++++ b/package.json
+@@ -36,7 +36,7 @@
+     "@edx/frontend-enterprise-utils": "1.1.1",
+     "@edx/frontend-lib-special-exams": "1.14.1",
+     "@edx/frontend-platform": "1.14.3",
+-    "@edx/paragon": "16.18.0",
++    "@edx/paragon": "16.19.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.36",
+     "@fortawesome/free-brands-svg-icons": "5.15.4",
+     "@fortawesome/free-regular-svg-icons": "5.15.4",
+diff --git a/src/course-header/CourseTabsNavigation.jsx b/src/course-header/CourseTabsNavigation.jsx
+index 62366ad..ec84ce0 100644
+--- a/src/course-header/CourseTabsNavigation.jsx
++++ b/src/course-header/CourseTabsNavigation.jsx
+@@ -10,7 +10,7 @@ function CourseTabsNavigation({
+   activeTabSlug, className, tabs, intl,
+ }) {
+   return (
+-    <div className={classNames('course-tabs-navigation', className)}>
++    <div id="courseTabsNavigation" className={classNames('course-tabs-navigation', className)}>
+       <div className="container-xl">
+         <Tabs
+           className="nav-underline-tabs"
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index b502399..2999887 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -7,6 +7,8 @@ import { AppContext } from '@edx/frontend-platform/react';
+ 
+ import AnonymousUserMenu from './AnonymousUserMenu';
+ import AuthenticatedUserDropdown from './AuthenticatedUserDropdown';
++import LaunchCourseHomeTourButton from '../product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton';
++
+ import messages from './messages';
+ 
+ function LinkedLogo({
+@@ -29,7 +31,7 @@ LinkedLogo.propTypes = {
+ };
+ 
+ function Header({
+-  courseOrg, courseNumber, courseTitle, intl, showUserDropdown,
++  courseOrg, courseNumber, courseTitle, intl, metadataModel, showLaunchTourButton, showUserDropdown,
+ }) {
+   const { authenticatedUser } = useContext(AppContext);
+ 
+@@ -60,6 +62,7 @@ function Header({
+ 
+   return (
+     <header className="course-header">
++      {showLaunchTourButton && (<LaunchCourseHomeTourButton metadataModel={metadataModel} srOnly />)}
+       <a className="sr-only sr-only-focusable" href="#main-content">{intl.formatMessage(messages.skipNavLink)}</a>
+       <div className="container-xl py-2 d-flex align-items-center">
+         {headerLogo}
+@@ -86,6 +89,8 @@ Header.propTypes = {
+   courseNumber: PropTypes.string,
+   courseTitle: PropTypes.string,
+   intl: intlShape.isRequired,
++  metadataModel: PropTypes.string,
++  showLaunchTourButton: PropTypes.bool,
+   showUserDropdown: PropTypes.bool,
+ };
+ 
+@@ -93,6 +98,8 @@ Header.defaultProps = {
+   courseOrg: null,
+   courseNumber: null,
+   courseTitle: null,
++  metadataModel: 'courseHomeMeta',
++  showLaunchTourButton: false,
+   showUserDropdown: true,
+ };
+ 
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index f6fe95b..02bc83c 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -20,4 +20,5 @@ Factory.define('courseHomeMetadata')
+     },
+     start: '2013-02-05T05:00:00Z',
+     user_timezone: 'UTC',
++    username: 'testuser',
+   });
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index f31764d..ab8ac29 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -71,6 +71,7 @@ Object {
+         ],
+         "title": "Demonstration Course",
+         "userTimezone": "UTC",
++        "username": "testuser",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+@@ -301,6 +302,13 @@ Object {
+   "recommendations": Object {
+     "recommendationsStatus": "loading",
+   },
++  "tours": Object {
++    "showCoursewareTour": false,
++    "showExistingUserCourseHomeTour": false,
++    "showNewUserCourseHomeModal": false,
++    "showNewUserCourseHomeTour": false,
++    "toursEnabled": false,
++  },
+ }
+ `;
+ 
+@@ -375,6 +383,7 @@ Object {
+         ],
+         "title": "Demonstration Course",
+         "userTimezone": "UTC",
++        "username": "testuser",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+@@ -485,6 +494,13 @@ Object {
+   "recommendations": Object {
+     "recommendationsStatus": "loading",
+   },
++  "tours": Object {
++    "showCoursewareTour": false,
++    "showExistingUserCourseHomeTour": false,
++    "showNewUserCourseHomeModal": false,
++    "showNewUserCourseHomeTour": false,
++    "toursEnabled": false,
++  },
+ }
+ `;
+ 
+@@ -559,6 +575,7 @@ Object {
+         ],
+         "title": "Demonstration Course",
+         "userTimezone": "UTC",
++        "username": "testuser",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+@@ -674,5 +691,12 @@ Object {
+   "recommendations": Object {
+     "recommendationsStatus": "loading",
+   },
++  "tours": Object {
++    "showCoursewareTour": false,
++    "showExistingUserCourseHomeTour": false,
++    "showNewUserCourseHomeModal": false,
++    "showNewUserCourseHomeTour": false,
++    "toursEnabled": false,
++  },
+ }
+ `;
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 86f434e..cfcbf8d 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -185,7 +185,7 @@ function OutlineTab({ intl }) {
+                   </Button>
+                 </div>
+               </div>
+-              <ol className="list-unstyled">
++              <ol id="courseHome-outline" className="list-unstyled">
+                 {courses[rootCourseId].sectionIds.map((sectionId) => (
+                   <Section
+                     key={sectionId}
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 56a1c1b..bab3157 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -1,3 +1,6 @@
++/**
++ * @jest-environment jsdom
++ */
+ import React from 'react';
+ import { Factory } from 'rosie';
+ import { getConfig } from '@edx/frontend-platform';
+@@ -32,7 +35,7 @@ describe('Outline Tab', () => {
+   const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
+   const masqueradeUrl = `${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`;
+   const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+-  const proctoringInfoUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=${encodeURIComponent(courseId)}`;
++  const proctoringInfoUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=${encodeURIComponent(courseId)}&username=testuser`;
+ 
+   const store = initializeStore();
+   const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+@@ -1322,7 +1325,7 @@ describe('Outline Tab', () => {
+     });
+   });
+ 
+-  describe('Accont Activation Alert', () => {
++  describe('Account Activation Alert', () => {
+     beforeEach(() => {
+       const intersectionObserverMock = () => ({
+         observe: () => null,
+@@ -1350,7 +1353,7 @@ describe('Outline Tab', () => {
+       expect(screen.queryByRole('button', { name: 'resend the email' })).not.toBeInTheDocument();
+     });
+ 
+-    it('sends account activation email on clicking the resened email in account activation alert', async () => {
++    it('sends account activation email on clicking the re-send email in account activation alert', async () => {
+       Cookies.set = jest.fn();
+       Cookies.get = jest.fn().mockImplementation(() => 'true');
+       Cookies.remove = jest.fn().mockImplementation(() => { Cookies.get = jest.fn(); });
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index e4e0fdc..c78dbef 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -29,21 +29,23 @@ function CourseDates({
+ 
+   return (
+     <section className="mb-4">
+-      <h2 className="h4">{intl.formatMessage(messages.dates)}</h2>
+-      <ol className="list-unstyled">
+-        {courseDateBlocks.map((courseDateBlock) => (
+-          <DateSummary
+-            key={courseDateBlock.title + courseDateBlock.date}
+-            dateBlock={courseDateBlock}
+-            userTimezone={userTimezone}
+-            /** [MM-P2P] Experiment */
+-            mmp2p={mmp2p}
+-          />
+-        ))}
+-      </ol>
+-      <a className="font-weight-bold ml-4 pl-1 small" href={datesTabLink}>
+-        {intl.formatMessage(messages.allDates)}
+-      </a>
++      <div id="courseHome-dates">
++        <h2 className="h4">{intl.formatMessage(messages.dates)}</h2>
++        <ol className="list-unstyled">
++          {courseDateBlocks.map((courseDateBlock) => (
++            <DateSummary
++              key={courseDateBlock.title + courseDateBlock.date}
++              dateBlock={courseDateBlock}
++              userTimezone={userTimezone}
++              /** [MM-P2P] Experiment */
++              mmp2p={mmp2p}
++            />
++          ))}
++        </ol>
++        <a className="font-weight-bold ml-4 pl-1 small" href={datesTabLink}>
++          {intl.formatMessage(messages.allDates)}
++        </a>
++      </div>
+     </section>
+   );
+ }
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 876dece..9ac0927 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -12,6 +12,7 @@ import { faNewspaper } from '@fortawesome/free-regular-svg-icons';
+ 
+ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
++import LaunchCourseHomeTourButton from '../../../product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton';
+ 
+ function CourseTools({ courseId, intl }) {
+   const { org } = useModel('courseHomeMeta', courseId);
+@@ -69,6 +70,9 @@ function CourseTools({ courseId, intl }) {
+             </a>
+           </li>
+         ))}
++        <li className="small" id="courseHome-launchTourLink">
++          <LaunchCourseHomeTourButton />
++        </li>
+       </ul>
+     </section>
+   );
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index 0b5e19b..2d1adfd 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -67,6 +67,7 @@ function WeeklyLearningGoalCard({
+ 
+   return (
+     <Card
++      id="courseHome-weeklyLearningGoal"
+       className="row w-100 m-0 mb-3 shadow-sm border-0"
+       data-testid="weekly-learning-goal-card"
+     >
+diff --git a/src/courseware/course/NotificationTray.scss b/src/courseware/course/NotificationTray.scss
+index b4ac923..abddee9 100644
+--- a/src/courseware/course/NotificationTray.scss
++++ b/src/courseware/course/NotificationTray.scss
+@@ -16,6 +16,7 @@
+         margin: 0;
+         border: none;
+         border-radius: 0;
++        z-index: 1100;
+     }
+ }
+ 
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index c1beb1b..337e921 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -84,7 +84,7 @@ function SequenceNavigation({
+   const prevArrow = isRtl(getLocale()) ? ChevronRight : ChevronLeft;
+ 
+   return sequenceStatus === LOADED && (
+-    <nav className={classNames('sequence-navigation', className)} style={{ width: shouldDisplayNotificationTrigger ? '90%' : null }}>
++    <nav id="courseware-sequenceNavigation" className={classNames('sequence-navigation', className)} style={{ width: shouldDisplayNotificationTrigger ? '90%' : null }}>
+       <Button variant="link" className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit} iconBefore={prevArrow}>
+         {shouldDisplayNotificationTrigger ? null : intl.formatMessage(messages.previousButton)}
+       </Button>
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+index 7a49f30..498c0e4 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -375,22 +375,24 @@ function UpgradeNotification({
+ 
+   return (
+     <section className={classNames('upgrade-notification small', { 'card mb-4': shouldDisplayBorder })}>
+-      <h2 className="h5 upgrade-notification-header" id="outline-sidebar-upgrade-header">
+-        {upgradeNotificationHeaderText}
+-      </h2>
+-      {expirationBanner}
+-      <div className="upgrade-notification-message">
+-        {upsellMessage}
+-      </div>
+-      <div className="upgrade-notification-button">
+-        <UpgradeButton
+-          offer={offer}
+-          onClick={logClick}
+-          verifiedMode={verifiedMode}
+-          block
+-        />
++      <div id="courseHome-upgradeNotification">
++        <h2 className="h5 upgrade-notification-header" id="outline-sidebar-upgrade-header">
++          {upgradeNotificationHeaderText}
++        </h2>
++        {expirationBanner}
++        <div className="upgrade-notification-message">
++          {upsellMessage}
++        </div>
++        <div className="upgrade-notification-button">
++          <UpgradeButton
++            offer={offer}
++            onClick={logClick}
++            verifiedMode={verifiedMode}
++            block
++          />
++        </div>
++        {offerCode}
+       </div>
+-      {offerCode}
+     </section>
+   );
+ }
+diff --git a/src/index.scss b/src/index.scss
+index 781ab27..f764088 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -396,6 +396,7 @@
+ @import "course-home/progress-tab/course-completion/CompletionDonutChart.scss";
+ @import "course-home/progress-tab/grades/course-grade/GradeBar.scss";
+ @import "courseware/course/course-exit/CourseRecommendations";
++@import "src/tour/Checkpoint.scss";
+ 
+ /** [MM-P2P] Experiment */
+ @import "experiments/mm-p2p/index.scss";
+diff --git a/src/product-tours/AbandonTour.jsx b/src/product-tours/AbandonTour.jsx
+new file mode 100644
+index 0000000..2aed9f5
+--- /dev/null
++++ b/src/product-tours/AbandonTour.jsx
+@@ -0,0 +1,22 @@
++import React from 'react';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++
++import { OkayButtonFormattedMessage } from './GenericTourFormattedMessages';
++
++const abandonTour = ({ enabled, onEnd }) => ({
++  checkpoints: [{
++    body: <FormattedMessage
++      id="tours.abandonTour.launchTourCheckpoint.body"
++      defaultMessage="Feeling lost? Launch the tour any time for some quick tips to get the most out of the experience."
++    />,
++    placement: 'left',
++    target: '#courseHome-launchTourLink',
++  }],
++  enabled,
++  endButtonText: <OkayButtonFormattedMessage />,
++  onEnd,
++  onEscape: onEnd,
++  tourId: 'abandonTour',
++});
++
++export default abandonTour;
+diff --git a/src/product-tours/CoursewareTour.jsx b/src/product-tours/CoursewareTour.jsx
+new file mode 100644
+index 0000000..5ab591c
+--- /dev/null
++++ b/src/product-tours/CoursewareTour.jsx
+@@ -0,0 +1,22 @@
++import React from 'react';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++
++import { OkayButtonFormattedMessage } from './GenericTourFormattedMessages';
++
++const coursewareTour = ({ enabled, onEnd }) => ({
++  checkpoints: [{
++    body: <FormattedMessage
++      id="tours.sequenceNavigationCheckpoint.body"
++      defaultMessage="The top bar within your course allows you to easily jump to different sections and shows you what’s coming up."
++    />,
++    placement: 'bottom',
++    target: '#courseware-sequenceNavigation',
++  }],
++  enabled,
++  endButtonText: <OkayButtonFormattedMessage />,
++  onEnd,
++  onEscape: onEnd,
++  tourId: 'coursewareTour',
++});
++
++export default coursewareTour;
+diff --git a/src/product-tours/ExistingUserCourseHomeTour.jsx b/src/product-tours/ExistingUserCourseHomeTour.jsx
+new file mode 100644
+index 0000000..d71a0ac
+--- /dev/null
++++ b/src/product-tours/ExistingUserCourseHomeTour.jsx
+@@ -0,0 +1,22 @@
++import React from 'react';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++
++import { OkayButtonFormattedMessage } from './GenericTourFormattedMessages';
++
++const existingUserCourseHomeTour = ({ enabled, onEnd }) => ({
++  checkpoints: [{
++    body: <FormattedMessage
++      id="tours.existingUserTour.launchTourCheckpoint.body"
++      defaultMessage="We’ve recently added a few new features to the course experience. Want some help looking around? Take a tour to learn more."
++    />,
++    placement: 'left',
++    target: '#courseHome-launchTourLink',
++  }],
++  enabled,
++  endButtonText: <OkayButtonFormattedMessage />,
++  onEnd,
++  onEscape: onEnd,
++  tourId: 'existingUserCourseHomeTour',
++});
++
++export default existingUserCourseHomeTour;
+diff --git a/src/product-tours/GenericTourFormattedMessages.jsx b/src/product-tours/GenericTourFormattedMessages.jsx
+new file mode 100644
+index 0000000..3515491
+--- /dev/null
++++ b/src/product-tours/GenericTourFormattedMessages.jsx
+@@ -0,0 +1,32 @@
++import React from 'react';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++
++export function DismissButtonFormattedMessage() {
++  return (
++    <FormattedMessage
++      id="tours.button.dismiss"
++      defaultMessage="Dismiss"
++      description="A button used to close the tour of the website"
++    />
++  );
++}
++
++export function NextButtonFormattedMessage() {
++  return (
++    <FormattedMessage
++      id="tours.button.next"
++      defaultMessage="Next"
++      description="A button used within a tour of the website to advance to the next piece of information"
++    />
++  );
++}
++
++export function OkayButtonFormattedMessage() {
++  return (
++    <FormattedMessage
++      id="tours.button.okay"
++      defaultMessage="Okay"
++      description="A button used to end the tour of the website"
++    />
++  );
++}
+diff --git a/src/product-tours/ProductTours.jsx b/src/product-tours/ProductTours.jsx
+new file mode 100644
+index 0000000..81e0d20
+--- /dev/null
++++ b/src/product-tours/ProductTours.jsx
+@@ -0,0 +1,184 @@
++import React, { useEffect, useState } from 'react';
++import { useDispatch, useSelector } from 'react-redux';
++import PropTypes from 'prop-types';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++
++import Tour from '../tour/Tour';
++
++import { useModel } from '../generic/model-store';
++
++import abandonTour from './AbandonTour';
++import coursewareTour from './CoursewareTour';
++import existingUserCourseHomeTour from './ExistingUserCourseHomeTour';
++import newUserCourseHomeTour from './newUserCourseHomeTour/NewUserCourseHomeTour';
++import NewUserCourseHomeTourModal from './newUserCourseHomeTour/NewUserCourseHomeTourModal';
++import {
++  closeNewUserCourseHomeModal,
++  endCourseHomeTour,
++  endCoursewareTour,
++  fetchTourData,
++} from './data/thunks';
++
++function ProductTours({
++  activeTab,
++  courseId,
++  isStreakCelebrationOpen,
++  metadataModel,
++  org,
++}) {
++  if (isStreakCelebrationOpen) {
++    return null;
++  }
++
++  const {
++    username,
++    verifiedMode,
++  } = useModel(metadataModel, courseId);
++
++  const {
++    showCoursewareTour,
++    showExistingUserCourseHomeTour,
++    showNewUserCourseHomeModal,
++    showNewUserCourseHomeTour,
++  } = useSelector(state => state.tours);
++
++  const [isAbandonTourEnabled, setIsAbandonTourEnabled] = useState(false);
++  const [isCoursewareTourEnabled, setIsCoursewareTourEnabled] = useState(false);
++  const [isExistingUserCourseHomeTourEnabled, setIsExistingUserCourseHomeTourEnabled] = useState(false);
++  const [isNewUserCourseHomeTourEnabled, setIsNewUserCourseHomeTourEnabled] = useState(false);
++
++  const dispatch = useDispatch();
++  const administrator = getAuthenticatedUser() && getAuthenticatedUser().administrator;
++
++  useEffect(() => {
++    // Tours currently only exist on the Outline Tab and within Courseware, so we'll avoid
++    // calling the tour endpoint unnecessarily.
++    if (username && (activeTab === 'outline' || metadataModel === 'coursewareMeta')) {
++      dispatch(fetchTourData(username));
++    }
++  }, []);
++
++  useEffect(() => {
++    if (metadataModel === 'coursewareMeta' && showCoursewareTour) {
++      setIsCoursewareTourEnabled(true);
++    }
++  }, [showCoursewareTour]);
++
++  useEffect(() => {
++    if (metadataModel === 'courseHomeMeta') {
++      setIsExistingUserCourseHomeTourEnabled(!!showExistingUserCourseHomeTour);
++    }
++  }, [showExistingUserCourseHomeTour]);
++
++  useEffect(() => {
++    if (metadataModel === 'courseHomeMeta' && showNewUserCourseHomeTour) {
++      setIsAbandonTourEnabled(false);
++      setIsNewUserCourseHomeTourEnabled(true);
++    }
++  }, [showNewUserCourseHomeTour]);
++
++  const upgradeData = {
++    courseId,
++    org,
++    upgradeUrl: verifiedMode && verifiedMode.upgradeUrl,
++  };
++
++  // The <Tour /> component cannot handle rendering multiple enabled tours at once.
++  // I.e. when adding new tours, beware that if multiple tours are enabled,
++  // the first enabled tour in the following array will be the only one that renders.
++  // The suggestion for populating these tour objects is to ensure only one tour is enabled at a time.
++  const tours = [
++    abandonTour({
++      enabled: isAbandonTourEnabled,
++      onEnd: () => setIsAbandonTourEnabled(false),
++    }),
++    coursewareTour({
++      enabled: isCoursewareTourEnabled,
++      onEnd: () => {
++        setIsCoursewareTourEnabled(false);
++        sendTrackEvent('edx.ui.lms.courseware_tour.completed', {
++          org_key: org,
++          courserun_key: courseId,
++          is_staff: administrator,
++        });
++        dispatch(endCoursewareTour(username));
++      },
++    }),
++    existingUserCourseHomeTour({
++      enabled: isExistingUserCourseHomeTourEnabled,
++      onEnd: () => {
++        setIsExistingUserCourseHomeTourEnabled(false);
++        sendTrackEvent('edx.ui.lms.existing_user_tour.completed', {
++          org_key: org,
++          courserun_key: courseId,
++          is_staff: administrator,
++        });
++        dispatch(endCourseHomeTour(username));
++      },
++    }),
++    newUserCourseHomeTour({
++      enabled: isNewUserCourseHomeTourEnabled,
++      onDismiss: () => {
++        setIsNewUserCourseHomeTourEnabled(false);
++        setIsAbandonTourEnabled(true);
++        sendTrackEvent('edx.ui.lms.new_user_tour.dismissed', {
++          org_key: org,
++          courserun_key: courseId,
++          is_staff: administrator,
++        });
++        dispatch(endCourseHomeTour(username));
++      },
++      onEnd: () => {
++        setIsNewUserCourseHomeTourEnabled(false);
++        sendTrackEvent('edx.ui.lms.new_user_tour.completed', {
++          org_key: org,
++          courserun_key: courseId,
++          is_staff: administrator,
++        });
++        dispatch(endCourseHomeTour(username));
++      },
++      upgradeData,
++    }),
++  ];
++
++  return (
++    <>
++      <Tour
++        tours={tours}
++      />
++      <NewUserCourseHomeTourModal
++        isOpen={metadataModel === 'courseHomeMeta' && showNewUserCourseHomeModal}
++        onDismiss={() => {
++          sendTrackEvent('edx.ui.lms.new_user_modal.dismissed', {
++            org_key: org,
++            courserun_key: courseId,
++            is_staff: administrator,
++          });
++          dispatch(closeNewUserCourseHomeModal());
++          setIsAbandonTourEnabled(true);
++          dispatch(endCourseHomeTour(username));
++        }}
++        onStartTour={() => {
++          sendTrackEvent('edx.ui.lms.new_user_tour.started', {
++            org_key: org,
++            courserun_key: courseId,
++            is_staff: administrator,
++          });
++          dispatch(closeNewUserCourseHomeModal());
++          setIsNewUserCourseHomeTourEnabled(true);
++        }}
++      />
++    </>
++  );
++}
++
++ProductTours.propTypes = {
++  activeTab: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
++  isStreakCelebrationOpen: PropTypes.bool.isRequired,
++  metadataModel: PropTypes.string.isRequired,
++  org: PropTypes.string.isRequired,
++};
++
++export default ProductTours;
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+new file mode 100644
+index 0000000..37ec3a5
+--- /dev/null
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -0,0 +1,308 @@
++/**
++ * @jest-environment jsdom
++ */
++import React from 'react';
++import { Route, Switch } from 'react-router';
++import { Factory } from 'rosie';
++import { getConfig, history } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { AppProvider } from '@edx/frontend-platform/react';
++import MockAdapter from 'axios-mock-adapter';
++import { waitForElementToBeRemoved } from '@testing-library/dom';
++import * as popper from '@popperjs/core';
++
++import {
++  fireEvent, initializeMockApp, logUnhandledRequests, render, screen,
++} from '../setupTest';
++import initializeStore from '../store';
++import { appendBrowserTimezoneToUrl, executeThunk } from '../utils';
++
++import CoursewareContainer from '../courseware/CoursewareContainer';
++import LoadedTabPage from '../tab-page/LoadedTabPage';
++import OutlineTab from '../course-home/outline-tab/OutlineTab';
++import * as courseHomeThunks from '../course-home/data/thunks';
++import { buildSimpleCourseBlocks } from '../shared/data/__factories__/courseBlocks.factory';
++
++import { UserMessagesProvider } from '../generic/user-messages';
++
++initializeMockApp();
++jest.mock('@edx/frontend-platform/analytics');
++const popperMock = jest.spyOn(popper, 'createPopper');
++
++describe('Course Home Tours', () => {
++  let axiosMock;
++
++  const courseId = 'course-v1:edX+Test+run';
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
++  courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
++  const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
++  const tourDataUrl = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/testuser`;
++
++  const store = initializeStore();
++  const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
++  const defaultTabData = Factory.build('outlineTabData');
++
++  function setMetadata(attributes, options) {
++    const courseMetadata = Factory.build('courseHomeMetadata', { id: courseId, ...attributes }, options);
++    axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++  }
++
++  function setTourData(tourData, response = 200, isEnrolled = true) {
++    setMetadata({ is_enrolled: isEnrolled });
++    axiosMock.onGet(tourDataUrl).reply(response, tourData);
++  }
++
++  async function fetchAndRender() {
++    await executeThunk(courseHomeThunks.fetchOutlineTab(courseId), store.dispatch);
++    render(
++      <LoadedTabPage courseId={courseId} activeTabSlug="outline">
++        <OutlineTab />
++      </LoadedTabPage>,
++      { store },
++    );
++  }
++
++  beforeEach(async () => {
++    popperMock.mockImplementation(jest.fn());
++
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++
++    // Set defaults for network requests
++    axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
++    axiosMock.onGet(outlineUrl).reply(200, defaultTabData);
++    axiosMock.onGet(tourDataUrl).reply(200, {
++      course_home_tour_status: 'no-tour',
++      show_courseware_tour: false,
++    });
++
++    logUnhandledRequests(axiosMock);
++  });
++
++  afterEach(() => {
++    popperMock.mockReset();
++  });
++
++  describe('for new users', () => {
++    beforeEach(async () => {
++      setTourData({
++        course_home_tour_status: 'show-new-user-tour',
++        show_courseware_tour: false,
++      });
++      await fetchAndRender();
++    });
++
++    it('renders modal', async () => {
++      expect(await screen.findByRole('dialog', { name: 'New user course home prompt' })).toBeInTheDocument();
++      expect(screen.getByRole('button', { name: 'Begin tour' })).toBeInTheDocument();
++    });
++
++    it('renders checkpoint on click of "Begin tour"', async () => {
++      const beginTourButton = await screen.findByRole('button', { name: 'Begin tour' });
++      fireEvent.click(beginTourButton);
++
++      expect(await screen.findByRole('dialog', { name: 'Take the course!' }));
++    });
++  });
++
++  describe('for eligible existing users', () => {
++    it('renders correctly', async () => {
++      setTourData({
++        course_home_tour_status: 'show-existing-user-tour',
++        show_courseware_tour: false,
++      });
++      await fetchAndRender();
++
++      expect(await screen.findByRole('dialog')).toBeInTheDocument();
++      expect(screen.getByText('We’ve recently added a few new features to the course experience.', { exact: false })).toBeInTheDocument();
++    });
++  });
++
++  describe('for non-eligible existing users', () => {
++    beforeEach(async () => {
++      setTourData({
++        course_home_tour_status: 'no-tour',
++        show_courseware_tour: false,
++      });
++      await fetchAndRender();
++    });
++
++    it('does not render a tour', async () => {
++      expect(await screen.queryByRole('dialog', { name: 'Take the course!' })).not.toBeInTheDocument();
++    });
++
++    it('launches tour on button click', async () => {
++      const launchTourButton = await screen.findByRole('button', { name: 'Launch tour' });
++      expect(launchTourButton).toBeInTheDocument();
++
++      fireEvent.click(launchTourButton);
++
++      expect(await screen.findByRole('dialog', { name: 'Take the course!' })).toBeInTheDocument();
++    });
++  });
++
++  it.each`
++  errorStatus
++  ${401}
++  ${403}
++  ${404}
++  `('does not render tour components for $errorStatus response', async (errorStatus) => {
++  setTourData({}, errorStatus, false);
++
++  // Verify no launch tour button
++  expect(await screen.queryByRole('button', { name: 'Launch tour' })).not.toBeInTheDocument();
++
++  // Verify no Checkpoint or MarketingModal has rendered
++  expect(await screen.queryByRole('dialog')).not.toBeInTheDocument();
++});
++});
++
++function MockUnit({ courseId, id }) { // eslint-disable-line react/prop-types
++  return (
++    <div id="courseware-sequenceNavigation" className="fake-unit">Unit Contents {courseId} {id}</div>
++  );
++}
++
++jest.mock(
++  '../courseware/course/sequence/Unit',
++  () => MockUnit,
++);
++
++describe('Courseware Tour', () => {
++  let store;
++  let component;
++  let axiosMock;
++
++  // This is a standard set of data that can be used in CoursewareContainer tests.
++  // By default, `setUpMockRequests()` will configure the mock LMS API to return use this data.
++  // Certain test cases override these in order to test with special blocks/metadata.
++  const courseMetadata = Factory.build('courseMetadata');
++  const courseId = courseMetadata.id;
++  const unitBlocks = [
++    Factory.build(
++      'block',
++      { type: 'vertical' },
++      { courseId },
++    ),
++    Factory.build(
++      'block',
++      { type: 'vertical' },
++      { courseId },
++    ),
++    Factory.build(
++      'block',
++      { type: 'vertical' },
++      { courseId },
++    ),
++  ];
++  const {
++    courseBlocks,
++    sequenceBlocks: [defaultSequenceBlock],
++  } = buildSimpleCourseBlocks(
++    courseId,
++    courseMetadata.name,
++    { unitBlocks },
++  );
++
++  beforeEach(() => {
++    popperMock.mockImplementation(jest.fn());
++
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++
++    store = initializeStore();
++
++    component = (
++      <AppProvider store={store}>
++        <UserMessagesProvider>
++          <Switch>
++            <Route
++              path={[
++                '/course/:courseId/:sequenceId/:unitId',
++                '/course/:courseId/:sequenceId',
++                '/course/:courseId',
++              ]}
++              component={CoursewareContainer}
++            />
++          </Switch>
++        </UserMessagesProvider>
++      </AppProvider>
++    );
++  });
++
++  async function loadContainer() {
++    const { container } = render(component);
++    // Wait for the page spinner to be removed, such that we can wait for our main
++    // content to load before making any assertions.
++    await waitForElementToBeRemoved(screen.getByRole('status'));
++    return container;
++  }
++
++  describe('when receiving successful course data', () => {
++    const tourDataUrl = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/testuser`;
++
++    beforeEach(async () => {
++      // On page load, SequenceContext attempts to scroll to the top of the page.
++      global.scrollTo = jest.fn();
++
++      // If we weren't given a list of sequence metadatas for URL mocking,
++      // then construct it ourselves by looking at courseBlocks.
++      const sequenceMetadatas = (
++        Object.values(courseBlocks.blocks)
++          .filter(block => block.type === 'sequential')
++          .map(sequenceBlock => Factory.build(
++            'sequenceMetadata',
++            {},
++            {
++              courseId,
++              sequenceBlock,
++              unitBlocks: sequenceBlock.children.map(unitId => courseBlocks.blocks[unitId]),
++            },
++          ))
++      );
++
++      const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
++      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++
++      const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
++
++      const courseMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`);
++      axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++
++      sequenceMetadatas.forEach(sequenceMetadata => {
++        const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceMetadata.item_id}`;
++        axiosMock.onGet(sequenceMetadataUrl).reply(200, sequenceMetadata);
++        const proctoredExamApiUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/proctored_exam/attempt/course_id/${courseId}/content_id/${sequenceMetadata.item_id}?is_learning_mfe=true`;
++        axiosMock.onGet(proctoredExamApiUrl).reply(200, { exam: {}, active_attempt: {} });
++      });
++
++      axiosMock.onPost(`${courseId}/xblock/${defaultSequenceBlock.id}/handler/get_completion`).reply(200, {
++        complete: true,
++      });
++
++      history.push(`/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[0].id}`);
++    });
++
++    it.each`
++  showCoursewareTour
++  ${true}
++  ${false}
++`('should load courseware checkpoint correctly if tour enabled is $showCoursewareTour', async (showCoursewareTour) => {
++  axiosMock.onGet(tourDataUrl).reply(200, {
++    course_home_tour_status: 'no-tour',
++    show_courseware_tour: showCoursewareTour,
++  });
++
++  const container = await loadContainer();
++
++  const sequenceNavButtons = container.querySelectorAll('nav.sequence-navigation button');
++  const sequenceNextButton = sequenceNavButtons[4];
++  expect(sequenceNextButton).toHaveTextContent('Next');
++  fireEvent.click(sequenceNextButton);
++
++  expect(global.location.href).toEqual(`http://localhost/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[1].id}`);
++
++  const checkpoint = container.querySelectorAll('#checkpoint');
++  expect(checkpoint).toHaveLength(showCoursewareTour ? 1 : 0);
++});
++  });
++});
+diff --git a/src/product-tours/data/api.js b/src/product-tours/data/api.js
+new file mode 100644
+index 0000000..10fc412
+--- /dev/null
++++ b/src/product-tours/data/api.js
+@@ -0,0 +1,26 @@
++import { camelCaseObject, getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++
++export async function getTourData(username) {
++  const url = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/${username}`;
++  try {
++    const { data } = await getAuthenticatedHttpClient().get(url);
++    return { toursEnabled: true, ...camelCaseObject(data) };
++  } catch (error) {
++    const { httpErrorStatus } = error && error.customAttributes;
++    /** The API will return a
++     *    401 if the user is not authenticated
++     *    403 if the tour waffle flag is inactive
++     *    404 if no User Tour objects exist for the given username
++     */
++    if (httpErrorStatus === 401 || httpErrorStatus === 403 || httpErrorStatus === 404) {
++      return { toursEnabled: false };
++    }
++    throw error;
++  }
++}
++
++export async function patchTourData(username, tourData) {
++  const url = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/${username}`;
++  return getAuthenticatedHttpClient().patch(url, tourData);
++}
+diff --git a/src/product-tours/data/index.js b/src/product-tours/data/index.js
+new file mode 100644
+index 0000000..75ea5f3
+--- /dev/null
++++ b/src/product-tours/data/index.js
+@@ -0,0 +1,8 @@
++export {
++  closeNewUserCourseHomeModal,
++  endCourseHomeTour,
++  endCoursewareTour,
++  fetchTourData,
++} from './thunks';
++
++export { reducer } from './slice';
+diff --git a/src/product-tours/data/slice.js b/src/product-tours/data/slice.js
+new file mode 100644
+index 0000000..504906d
+--- /dev/null
++++ b/src/product-tours/data/slice.js
+@@ -0,0 +1,58 @@
++/* eslint-disable no-param-reassign */
++import { createSlice } from '@reduxjs/toolkit';
++
++const slice = createSlice({
++  name: 'tours',
++  initialState: {
++    showCoursewareTour: false,
++    showExistingUserCourseHomeTour: false,
++    showNewUserCourseHomeModal: false,
++    showNewUserCourseHomeTour: false,
++    toursEnabled: false,
++  },
++  reducers: {
++    disableCourseHomeTour: (state) => {
++      state.showNewUserCourseHomeModal = false;
++      state.showNewUserCourseHomeTour = false;
++      state.showExistingUserCourseHomeTour = false;
++    },
++    disableCoursewareTour: (state) => {
++      state.showCoursewareTour = false;
++    },
++    disableNewUserCourseHomeModal: (state) => {
++      state.showNewUserCourseHomeModal = false;
++    },
++    launchCourseHomeTour: (state) => {
++      if (state.showExistingUserCourseHomeTour) {
++        state.showExistingUserCourseHomeTour = false;
++      }
++
++      if (!state.showNewUserCourseHomeModal || !state.showNewUserCourseHomeTour) {
++        state.showNewUserCourseHomeTour = true;
++      }
++    },
++    setTourData: (state, { payload }) => {
++      const {
++        courseHomeTourStatus,
++        showCoursewareTour,
++        toursEnabled,
++      } = payload;
++      state.showCoursewareTour = showCoursewareTour;
++      state.showExistingUserCourseHomeTour = courseHomeTourStatus === 'show-existing-user-tour';
++      state.showNewUserCourseHomeModal = courseHomeTourStatus === 'show-new-user-tour';
++      state.toursEnabled = toursEnabled;
++    },
++  },
++});
++
++export const {
++  disableCourseHomeTour,
++  disableCoursewareTour,
++  disableNewUserCourseHomeModal,
++  launchCourseHomeTour,
++  setTourData,
++} = slice.actions;
++
++export const {
++  reducer,
++} = slice;
+diff --git a/src/product-tours/data/thunks.js b/src/product-tours/data/thunks.js
+new file mode 100644
+index 0000000..3f5d65f
+--- /dev/null
++++ b/src/product-tours/data/thunks.js
+@@ -0,0 +1,50 @@
++import { logError } from '@edx/frontend-platform/logging';
++
++import { getTourData, patchTourData } from './api';
++import {
++  disableCourseHomeTour,
++  disableCoursewareTour,
++  disableNewUserCourseHomeModal,
++  setTourData,
++} from './slice';
++
++export function closeNewUserCourseHomeModal() {
++  return async (dispatch) => dispatch(disableNewUserCourseHomeModal());
++}
++
++export function endCourseHomeTour(username) {
++  return async (dispatch) => {
++    try {
++      await patchTourData(username, {
++        course_home_tour_status: 'no-tour',
++      });
++      dispatch(disableCourseHomeTour());
++    } catch (error) {
++      logError(error);
++    }
++  };
++}
++
++export function endCoursewareTour(username) {
++  return async (dispatch) => {
++    try {
++      await patchTourData(username, {
++        show_courseware_tour: false,
++      });
++      dispatch(disableCoursewareTour());
++    } catch (error) {
++      logError(error);
++    }
++  };
++}
++
++export function fetchTourData(username) {
++  return async (dispatch) => {
++    try {
++      const data = await getTourData(username);
++      dispatch(setTourData(data));
++    } catch (error) {
++      logError(error);
++    }
++  };
++}
+diff --git a/src/product-tours/messages.js b/src/product-tours/messages.js
+new file mode 100644
+index 0000000..ce8f2d9
+--- /dev/null
++++ b/src/product-tours/messages.js
+@@ -0,0 +1,30 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  beginTour: {
++    id: 'tours.button.beginTour',
++    defaultMessage: 'Begin tour',
++    description: 'A button used to start a tour of the website',
++  },
++  launchTour: {
++    id: 'tours.button.launchTour',
++    defaultMessage: 'Launch tour',
++    description: 'A button used to launch a tour of the website',
++  },
++  newUserModalBody: {
++    id: 'tours.newUserModal.body',
++    defaultMessage: 'Let’s take a quick tour of edX so you can get the most out of your course.',
++  },
++  newUserModalTitleWelcome: {
++    id: 'tours.newUserModal.title.welcome',
++    defaultMessage: 'Welcome to your',
++    description: 'The beginning of the phrase "Welcome to your edX course!"',
++  },
++  skipForNow: {
++    id: 'tours.button.skipForNow',
++    defaultMessage: 'Skip for now',
++    description: 'A button used to dismiss the modal and skip the optional tour of the website',
++  },
++});
++
++export default messages;
+diff --git a/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx b/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
+new file mode 100644
+index 0000000..00ca983
+--- /dev/null
++++ b/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
+@@ -0,0 +1,71 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { useDispatch, useSelector } from 'react-redux';
++
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button, Icon } from '@edx/paragon';
++import { Compass } from '@edx/paragon/icons';
++
++import { useModel } from '../../generic/model-store';
++import { launchCourseHomeTour } from '../data/slice';
++import messages from '../messages';
++
++function LaunchCourseHomeTourButton({ intl, metadataModel, srOnly }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    org,
++  } = useModel(metadataModel, courseId);
++
++  const {
++    toursEnabled,
++  } = useSelector(state => state.tours);
++
++  const dispatch = useDispatch();
++
++  const handleClick = () => {
++    const { administrator } = getAuthenticatedUser();
++    sendTrackEvent('edx.ui.lms.launch_tour.clicked', {
++      org_key: org,
++      courserun_key: courseId,
++      is_staff: administrator,
++      tour_variant: 'course_home',
++    });
++
++    dispatch(launchCourseHomeTour());
++  };
++
++  return (
++    <>
++      {toursEnabled && (
++        <Button variant="link" size="inline" className={`p-0 ${srOnly && 'sr-only sr-only-focusable'}`} onClick={handleClick}>
++          {!srOnly && (
++            <Icon
++              src={Compass}
++              className="mr-2"
++              style={{ height: '18px', width: '18px' }}
++            />
++          )}
++          {intl.formatMessage(messages.launchTour)}
++        </Button>
++      )}
++    </>
++  );
++}
++
++LaunchCourseHomeTourButton.defaultProps = {
++  metadataModel: 'courseHomeMeta',
++  srOnly: false,
++};
++
++LaunchCourseHomeTourButton.propTypes = {
++  intl: intlShape.isRequired,
++  metadataModel: PropTypes.string,
++  srOnly: PropTypes.bool,
++};
++
++export default injectIntl(LaunchCourseHomeTourButton);
+diff --git a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTour.jsx b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTour.jsx
+new file mode 100644
+index 0000000..fbfa927
+--- /dev/null
++++ b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTour.jsx
+@@ -0,0 +1,120 @@
++import React from 'react';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++import {
++  DismissButtonFormattedMessage,
++  NextButtonFormattedMessage,
++  OkayButtonFormattedMessage,
++} from '../GenericTourFormattedMessages';
++
++const datesCheckpoint = {
++  body: <FormattedMessage
++    id="tours.datesCheckpoint.body"
++    defaultMessage="Important dates can help you stay on track."
++  />,
++  placement: 'left-start',
++  target: '#courseHome-dates',
++  title: <FormattedMessage
++    id="tours.datesCheckpoint.title"
++    defaultMessage="Keep on top of key dates"
++  />,
++};
++
++const outlineCheckpoint = {
++  body: <FormattedMessage
++    id="tours.outlineCheckpoint.body"
++    defaultMessage="You can explore sections of the course using the outline below."
++  />,
++  placement: 'top',
++  target: '#courseHome-outline',
++  title: <FormattedMessage
++    id="tours.outlineCheckpoint.title"
++    defaultMessage="Take the course!"
++  />,
++};
++
++const tabNavigationCheckpoint = {
++  body: <FormattedMessage
++    id="tours.tabNavigationCheckpoint.body"
++    defaultMessage="These tabs can be used to access other course materials, such as your progress, syllabus, etc."
++  />,
++  placement: 'bottom',
++  target: '#courseTabsNavigation',
++  title: <FormattedMessage
++    id="tours.tabNavigationCheckpoint.title"
++    defaultMessage="Additional course resources"
++  />,
++};
++
++const upgradeCheckpoint = (logUpgradeClick, upgradeLink) => ({
++  body: <FormattedMessage
++    id="tours.upgradeCheckpoint.body"
++    defaultMessage="Work towards a certificate and gain full access to course materials. {upgradeLink}"
++    values={{
++      upgradeLink: (
++        <a href={upgradeLink} onClick={logUpgradeClick}>
++          <FormattedMessage
++            id="tours.upgradeCheckpoint.upgradeLink"
++            defaultMessage="Upgrade now!"
++          />
++        </a>
++      ),
++    }}
++  />,
++  placement: 'left-start',
++  target: '#courseHome-upgradeNotification',
++  title: <FormattedMessage
++    id="tours.upgradeCheckpoint.title"
++    defaultMessage="Unlock your course"
++  />,
++});
++
++const weeklyGoalsCheckpoint = {
++  body: <FormattedMessage
++    id="tours.weeklyGoalsCheckpoint.body"
++    defaultMessage="Setting a goal makes you more likely to complete your course."
++  />,
++  placement: 'left',
++  target: '#courseHome-weeklyLearningGoal',
++  title: <FormattedMessage
++    id="tours.weeklyGoalsCheckpoint.title"
++    defaultMessage="Set a course goal"
++  />,
++};
++
++const newUserCourseHomeTour = ({
++  enabled,
++  onDismiss,
++  onEnd,
++  upgradeData,
++}) => {
++  const logUpgradeClick = () => {
++    sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
++      org_key: upgradeData.org,
++      courserun_key: upgradeData.courseId,
++      linkCategory: '(none)',
++      linkName: 'course_home_upgrade_product_tour',
++      linkType: 'link',
++      pageName: 'course_home',
++    });
++  };
++  return ({
++    advanceButtonText: <NextButtonFormattedMessage />,
++    checkpoints: [
++      outlineCheckpoint,
++      datesCheckpoint,
++      tabNavigationCheckpoint,
++      upgradeCheckpoint(logUpgradeClick, upgradeData.upgradeUrl),
++      weeklyGoalsCheckpoint,
++    ],
++    dismissButtonText: <DismissButtonFormattedMessage />,
++    enabled,
++    endButtonText: <OkayButtonFormattedMessage />,
++    onDismiss,
++    onEnd,
++    onEscape: onDismiss,
++    tourId: 'newUserCourseHomeTour',
++  });
++};
++
++export default newUserCourseHomeTour;
+diff --git a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+new file mode 100644
+index 0000000..5fdfd14
+--- /dev/null
++++ b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+@@ -0,0 +1,73 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
++import {
++  ActionRow, Button, MarketingModal, ModalDialog,
++} from '@edx/paragon';
++
++import heroImage from './course_home_tour_modal_hero.png';
++import messages from '../messages';
++
++function NewUserCourseHomeTourModal({
++  intl,
++  isOpen,
++  onDismiss,
++  onStartTour,
++}) {
++  return (
++    <MarketingModal
++      isOpen={isOpen}
++      title="New user course home prompt"
++      heroIsDark
++      hasCloseButton={false}
++      heroNode={(
++        <ModalDialog.Hero>
++          <ModalDialog.Hero.Background
++            backgroundSrc={heroImage}
++          />
++          <ModalDialog.Hero.Content style={{ maxWidth: '20rem' }}>
++            <ModalDialog.Title as="h2">
++              <FormattedMessage
++                id="tours.newUserModal.title"
++                defaultMessage="{welcome} {siteName} course!"
++                values={{
++                  siteName: getConfig().SITE_NAME,
++                  welcome: <span className="text-accent-b">{intl.formatMessage(messages.newUserModalTitleWelcome)}</span>,
++                }}
++              />
++            </ModalDialog.Title>
++          </ModalDialog.Hero.Content>
++        </ModalDialog.Hero>
++      )}
++      footerNode={(
++        <ActionRow>
++          <Button
++            variant="tertiary"
++            onClick={onDismiss}
++          >
++            {intl.formatMessage(messages.skipForNow)}
++          </Button>
++          <Button
++            variant="brand"
++            onClick={onStartTour}
++          >
++            {intl.formatMessage(messages.beginTour)}
++          </Button>
++        </ActionRow>
++      )}
++      onClose={onDismiss}
++    >
++      <p className="text-dark-900">{intl.formatMessage(messages.newUserModalBody)}</p>
++    </MarketingModal>
++  );
++}
++
++NewUserCourseHomeTourModal.propTypes = {
++  intl: intlShape.isRequired,
++  isOpen: PropTypes.bool.isRequired,
++  onDismiss: PropTypes.func.isRequired,
++  onStartTour: PropTypes.func.isRequired,
++};
++
++export default injectIntl(NewUserCourseHomeTourModal);
+diff --git a/src/product-tours/newUserCourseHomeTour/course_home_tour_modal_hero.png b/src/product-tours/newUserCourseHomeTour/course_home_tour_modal_hero.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..553c8c49af050bcb8c9c57d672fb971659803174
+GIT binary patch
+literal 18916
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/store.js b/src/store.js
+index c7ede6e..e29129f 100644
+--- a/src/store.js
++++ b/src/store.js
+@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
+ import { reducer as courseHomeReducer } from './course-home/data';
+ import { reducer as coursewareReducer } from './courseware/data/slice';
+ import { reducer as recommendationsReducer } from './courseware/course/course-exit/data/slice';
++import { reducer as toursReducer } from './product-tours/data';
+ import { reducer as modelsReducer } from './generic/model-store';
+ 
+ export default function initializeStore() {
+@@ -11,6 +12,7 @@ export default function initializeStore() {
+       courseware: coursewareReducer,
+       courseHome: courseHomeReducer,
+       recommendations: recommendationsReducer,
++      tours: toursReducer,
+     },
+   });
+ }
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 22a8563..9ba67ac 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -13,6 +13,8 @@ import InstructorToolbar from '../instructor-toolbar';
+ import useEnrollmentAlert from '../alerts/enrollment-alert';
+ import useLogistrationAlert from '../alerts/logistration-alert';
+ 
++import ProductTours from '../product-tours/ProductTours';
++
+ function LoadedTabPage({
+   activeTabSlug,
+   children,
+@@ -21,11 +23,12 @@ function LoadedTabPage({
+   unitId,
+ }) {
+   const {
++    celebrations,
++    canViewLegacyCourseware,
++    org,
+     originalUserIsStaff,
+     tabs,
+     title,
+-    celebrations,
+-    canViewLegacyCourseware,
+     verifiedMode,
+   } = useModel(metadataModel, courseId);
+ 
+@@ -42,6 +45,13 @@ function LoadedTabPage({
+ 
+   return (
+     <>
++      <ProductTours
++        activeTab={activeTabSlug}
++        courseId={courseId}
++        isStreakCelebrationOpen={isStreakCelebrationOpen}
++        metadataModel={metadataModel}
++        org={org}
++      />
+       <Helmet>
+         <title>{`${activeTab ? `${activeTab.title} | ` : ''}${title} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+index f75c47f..cccbbe7 100644
+--- a/src/tab-page/LoadedTabPage.test.jsx
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -6,6 +6,7 @@ import LoadedTabPage from './LoadedTabPage';
+ jest.mock('../course-header/CourseTabsNavigation', () => () => <div data-testid="CourseTabsNavigation" />);
+ jest.mock('../instructor-toolbar/InstructorToolbar', () => () => <div data-testid="InstructorToolbar" />);
+ jest.mock('../shared/streak-celebration/StreakCelebrationModal', () => () => <div data-testid="StreakModal" />);
++jest.mock('../product-tours/ProductTours', () => () => <div data-testid="ProductTours" />);
+ 
+ describe('Loaded Tab Page', () => {
+   const mockData = { activeTabSlug: 'courseware', metadataModel: 'coursewareMeta' };
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index 4d2c5c6..bbc3e97 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -77,6 +77,8 @@ function TabPage({ intl, ...props }) {
+           courseOrg={org}
+           courseNumber={number}
+           courseTitle={title}
++          metadataModel={metadataModel}
++          showLaunchTourLink
+         />
+         <LoadedTabPage {...props} />
+         <Footer />
+diff --git a/src/tour/Checkpoint.jsx b/src/tour/Checkpoint.jsx
+index a4db2fb..ebe3e60 100644
+--- a/src/tour/Checkpoint.jsx
++++ b/src/tour/Checkpoint.jsx
+@@ -1,5 +1,7 @@
+-import React from 'react';
++import React, { useEffect, useState } from 'react';
++import { useMediaQuery } from 'react-responsive';
+ import PropTypes from 'prop-types';
++import { createPopper } from '@popperjs/core';
+ 
+ import CheckpointActionRow from './CheckpointActionRow';
+ import CheckpointBody from './CheckpointBody';
+@@ -8,12 +10,75 @@ import CheckpointTitle from './CheckpointTitle';
+ 
+ function Checkpoint({
+   body,
+-  hideCheckpoint,
+   index,
++  placement,
++  target,
+   title,
+   totalCheckpoints,
+   ...props
+ }) {
++  const [checkpointVisible, setCheckpointVisible] = useState(false);
++  const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
++
++  useEffect(() => {
++    const targetElement = document.querySelector(target);
++    const checkpoint = document.querySelector('#checkpoint');
++    if (targetElement && checkpoint) {
++      // Translate the Checkpoint to its target's coordinates
++      const checkpointPopper = createPopper(targetElement, checkpoint, {
++        placement: isMobile ? 'top' : placement,
++        modifiers: [
++          {
++            name: 'arrow',
++            options: {
++              padding: 25,
++            },
++          },
++          {
++            name: 'offset',
++            options: {
++              offset: [0, 20],
++            },
++          },
++          {
++            name: 'preventOverflow',
++            options: {
++              padding: 20,
++              tetherOffset: 35,
++            },
++          },
++        ],
++      });
++      setCheckpointVisible(true);
++      if (checkpointPopper) {
++        checkpointPopper.forceUpdate();
++      }
++    }
++  }, [target, isMobile]);
++
++  useEffect(() => {
++    if (checkpointVisible) {
++      const targetElement = document.querySelector(target);
++      let targetOffset = targetElement.getBoundingClientRect().top;
++      if ((targetOffset < 0) || (targetElement.getBoundingClientRect().bottom > window.innerHeight)) {
++        if (placement.includes('top')) {
++          if (targetOffset < 0) {
++            targetOffset *= -1;
++          }
++          targetOffset -= 280;
++        } else {
++          targetOffset -= 80;
++        }
++
++        window.scrollTo({
++          top: targetOffset, behavior: 'smooth',
++        });
++      }
++
++      const button = document.querySelector('#checkpoint-primary-button');
++      button.focus();
++    }
++  }, [target, checkpointVisible]);
+   const isLastCheckpoint = index + 1 === totalCheckpoints;
+   const isOnlyCheckpoint = totalCheckpoints === 1;
+   return (
+@@ -22,7 +87,7 @@ function Checkpoint({
+       className="checkpoint-popover p-4 bg-light-300"
+       aria-labelledby="checkpoint-title"
+       role="dialog"
+-      style={{ display: hideCheckpoint ? 'none' : 'block' }}
++      style={{ visibility: checkpointVisible ? 'visible' : 'hidden', pointerEvents: checkpointVisible ? 'auto' : 'none' }}
+     >
+       {/* This text is not translated due to Paragon's lack of i18n support */}
+       <span className="sr-only">Top of step {index + 1}</span>
+@@ -49,20 +114,25 @@ Checkpoint.defaultProps = {
+   body: null,
+   dismissButtonText: null,
+   endButtonText: null,
++  placement: 'top',
+   title: null,
+ };
+ 
+ Checkpoint.propTypes = {
+-  advanceButtonText: PropTypes.string,
+-  body: PropTypes.string,
+-  dismissButtonText: PropTypes.string,
+-  endButtonText: PropTypes.string,
+-  hideCheckpoint: PropTypes.bool.isRequired,
++  advanceButtonText: PropTypes.node,
++  body: PropTypes.node,
++  dismissButtonText: PropTypes.node,
++  endButtonText: PropTypes.node,
+   index: PropTypes.number.isRequired,
+   onAdvance: PropTypes.func.isRequired,
+   onDismiss: PropTypes.func.isRequired,
+   onEnd: PropTypes.func.isRequired,
+-  title: PropTypes.string,
++  placement: PropTypes.oneOf([
++    'top', 'top-start', 'top-end', 'right-start', 'right', 'right-end',
++    'left-start', 'left', 'left-end', 'bottom', 'bottom-start', 'bottom-end',
++  ]),
++  target: PropTypes.string.isRequired,
++  title: PropTypes.node,
+   totalCheckpoints: PropTypes.number.isRequired,
+ };
+ 
+diff --git a/src/tour/Checkpoint.scss b/src/tour/Checkpoint.scss
+index 036b087..7074255 100644
+--- a/src/tour/Checkpoint.scss
++++ b/src/tour/Checkpoint.scss
+@@ -1,4 +1,10 @@
++$checkpoint-arrow-width: 15px;
++$checkpoint-arrow-brand: solid $checkpoint-arrow-width $brand;
++$checkpoint-arrow-light-300: solid $checkpoint-arrow-width $light-300;
++$checkpoint-arrow-transparent: solid $checkpoint-arrow-width transparent;
++
+ .checkpoint-popover {
++  position: absolute;
+   border-top: 8px solid $brand;
+   border-radius: $border-radius;
+   box-shadow: $popover-box-shadow;
+@@ -10,21 +16,21 @@
+   }
+ 
+   #checkpoint-arrow,
+-  #checkpoint-arrow::before {
++  #checkpoint-arrow::before,
++  #checkpoint-arrow::after {
+     position: absolute;
+-    width: .65em;
+-    height: .65em;
+-    background: inherit;
++    width: 0;
++    height: 0;
+   }
+ 
+   #checkpoint-arrow {
+     visibility: hidden;
+   }
+ 
+-  #checkpoint-arrow::before {
++  #checkpoint-arrow::before,
++  #checkpoint-arrow::after {
+     visibility: visible;
+     content: '';
+-    transform: rotate(45deg);
+   }
+ 
+   .checkpoint-popover_breadcrumb_active {
+@@ -43,20 +49,55 @@
+ }
+ 
+ .checkpoint-popover[data-popper-placement^='top'] > #checkpoint-arrow {
+-  bottom: -6px;
++  left: -$checkpoint-arrow-width !important;
++  bottom: 1px;
++
++  &::after {
++    border-bottom: $checkpoint-arrow-transparent;
++    border-top: $checkpoint-arrow-light-300;
++    border-left: $checkpoint-arrow-transparent;
++    border-right: $checkpoint-arrow-transparent;
++    -webkit-filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.1));
++    filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.1));
++  }
+ }
+ 
+ .checkpoint-popover[data-popper-placement^='bottom'] > #checkpoint-arrow {
+-  top: -14px;
++  top: -36px;
++  left: -$checkpoint-arrow-width !important;
+   &::before {
+-    background: $brand;
++    border-bottom: $checkpoint-arrow-brand;
++    border-top: $checkpoint-arrow-transparent;
++    border-left: $checkpoint-arrow-transparent;
++    border-right: $checkpoint-arrow-transparent;
+   }
+ }
+ 
+ .checkpoint-popover[data-popper-placement^='left'] > #checkpoint-arrow {
+-  right: -6px;
++  top: -$checkpoint-arrow-width !important;
++  right: 1px;
++
++  &::after {
++    border-bottom: $checkpoint-arrow-transparent;
++    border-top: $checkpoint-arrow-transparent;
++    border-left: $checkpoint-arrow-light-300;
++    border-right: $checkpoint-arrow-transparent;
++    -webkit-filter: drop-shadow(3px 1px 2px rgba(0,0,0,0.1));
++    filter: drop-shadow(3px 1px 2px rgba(0,0,0,0.1));
++  }
+ }
+ 
+ .checkpoint-popover[data-popper-placement^='right'] > #checkpoint-arrow {
+-  left: -6px;
++  top: $checkpoint-arrow-width !important;
++  left: 1px;
++
++  &::after {
++    left: -2 * $checkpoint-arrow-width;
++    border-bottom: $checkpoint-arrow-transparent;
++    border-top: $checkpoint-arrow-transparent;
++    border-left: $checkpoint-arrow-transparent;
++    border-right: $checkpoint-arrow-light-300;
++    -webkit-filter: drop-shadow(-3px 1px 2px rgba(0,0,0,0.1));
++    filter: drop-shadow(-3px 1px 2px rgba(0,0,0,0.1));
++  }
+ }
+diff --git a/src/tour/CheckpointActionRow.jsx b/src/tour/CheckpointActionRow.jsx
+index a7af35b..3fbcd90 100644
+--- a/src/tour/CheckpointActionRow.jsx
++++ b/src/tour/CheckpointActionRow.jsx
+@@ -16,7 +16,6 @@ export default function CheckpointActionRow({
+       {!isLastCheckpoint && (
+         <Button
+           variant="tertiary"
+-          size="sm"
+           className="mr-2"
+           onClick={onDismiss}
+         >
+@@ -24,9 +23,9 @@ export default function CheckpointActionRow({
+         </Button>
+       )}
+       <Button
++        id="checkpoint-primary-button"
+         autoFocus
+         variant="primary"
+-        size="sm"
+         onClick={isLastCheckpoint ? onEnd : onAdvance}
+       >
+         {isLastCheckpoint ? endButtonText : advanceButtonText}
+@@ -46,9 +45,9 @@ CheckpointActionRow.defaultProps = {
+ };
+ 
+ CheckpointActionRow.propTypes = {
+-  advanceButtonText: PropTypes.string,
+-  dismissButtonText: PropTypes.string,
+-  endButtonText: PropTypes.string,
++  advanceButtonText: PropTypes.node,
++  dismissButtonText: PropTypes.node,
++  endButtonText: PropTypes.node,
+   isLastCheckpoint: PropTypes.bool,
+   onAdvance: PropTypes.func,
+   onDismiss: PropTypes.func,
+diff --git a/src/tour/CheckpointBreadcrumbs.jsx b/src/tour/CheckpointBreadcrumbs.jsx
+index 3898229..d2d0cfb 100644
+--- a/src/tour/CheckpointBreadcrumbs.jsx
++++ b/src/tour/CheckpointBreadcrumbs.jsx
+@@ -9,8 +9,8 @@ export default function CheckpointBreadcrumbs({ currentIndex, totalCheckpoints }
+     <span className="d-flex align-items-center" aria-hidden focusable={false}>
+       {new Array(totalCheckpoints).fill(0).map((v, i) => (
+         <svg key={Math.random().toString(36).substr(2, 9)} aria-hidden focusable={false} role="img" width="14px" height="14px" viewBox="0 0 14 14">
+-          {i === currentIndex ? <circle className="checkpoint-popover_breadcrumb checkpoint-popover_breadcrumb_active" cx="7" cy="7" r="3px" />
+-            : <circle className="checkpoint-popover_breadcrumb checkpoint-popover_breadcrumb_inactive" cx="7" cy="7" r="2.5px" />}
++          {i === currentIndex ? <circle className="checkpoint-popover_breadcrumb checkpoint-popover_breadcrumb_active" data-testid="checkpoint-popover_breadcrumb_active" cx="7" cy="7" r="3px" />
++            : <circle className="checkpoint-popover_breadcrumb checkpoint-popover_breadcrumb_inactive" data-testid="checkpoint-popover_breadcrumb_inactive" cx="7" cy="7" r="2.5px" />}
+         </svg>
+       ))}
+     </span>
+diff --git a/src/tour/README.md b/src/tour/README.md
+index ea98a7d..68e4cd9 100644
+--- a/src/tour/README.md
++++ b/src/tour/README.md
+@@ -96,6 +96,8 @@ The text displayed on the button used to end the tour.
+ A function that would be triggered when triggering the `onClick` event of the dismiss button.  
+ - **onEnd** `func`:
+ A function that would be triggered when triggering the `onClick` event of the end button.  
++- **onEscape** `func`:
++A function that would be triggered when pressing the Escape key.  
+ - **startingIndex** `number`:
+ The index of the desired `Checkpoint` to render when the tour starts.  
+ - **tourId** `string` *required*
+diff --git a/src/tour/Tour.jsx b/src/tour/Tour.jsx
+index 9db9b2e..3ed79b2 100644
+--- a/src/tour/Tour.jsx
++++ b/src/tour/Tour.jsx
+@@ -1,7 +1,5 @@
+ import React, { useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
+-import { useMediaQuery } from 'react-responsive';
+-import { createPopper } from '@popperjs/core';
+ 
+ import Checkpoint from './Checkpoint';
+ 
+@@ -9,79 +7,49 @@ function Tour({
+   tours,
+ }) {
+   const tourValue = tours.filter((tour) => tour.enabled)[0];
++
++  const [currentCheckpointData, setCurrentCheckpointData] = useState(null);
+   const [index, setIndex] = useState(0);
+-  const [checkpointData, setCheckpointData] = useState(null);
+-  const [isEnabled, setIsEnabled] = useState(tourValue && tourValue.enabled);
+-  const [hideCheckpoint, setHideCheckpoint] = useState(false);
++  const [isTourEnabled, setIsTourEnabled] = useState(!!tourValue);
++  const [prunedCheckpoints, setPrunedCheckpoints] = useState([]);
++
++  /**
++   * Takes a list of checkpoints and verifies that each target string provided is
++   * an element in the DOM.
++   */
++  const pruneCheckpoints = (checkpoints) => {
++    const checkpointsWithRenderedTargets = checkpoints.filter(
++      (checkpoint) => !!document.querySelector(checkpoint.target),
++    );
++    setPrunedCheckpoints(checkpointsWithRenderedTargets);
++  };
+ 
+   useEffect(() => {
+     if (tourValue) {
+-      setCheckpointData(tourValue.checkpoints[index]);
++      if (!isTourEnabled) {
++        setIsTourEnabled(tourValue.enabled);
++      }
++      pruneCheckpoints(tourValue.checkpoints);
+       setIndex(tourValue.startingIndex || 0);
+     }
+-  }, []);
+-
+-  useEffect(() => {
+-    setIsEnabled(tourValue && tourValue.enabled);
+   }, [tourValue]);
+ 
+   useEffect(() => {
+-    if (tourValue) {
+-      setCheckpointData(tourValue.checkpoints[index]);
+-    }
+-  }, [index, isEnabled]);
+-
+-  const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+-
+-  useEffect(() => {
+-    if (checkpointData && isEnabled) {
+-      const targetElement = document.querySelector(checkpointData.target);
+-      const checkpoint = document.querySelector('#checkpoint');
+-      if (!targetElement) {
+-        setHideCheckpoint(true);
++    if (isTourEnabled) {
++      if (prunedCheckpoints) {
++        setCurrentCheckpointData(prunedCheckpoints[index]);
+       } else {
+-        setHideCheckpoint(false);
+-        createPopper(targetElement, checkpoint, {
+-          placement: isMobile ? 'top' : checkpointData.placement,
+-          modifiers: [
+-            {
+-              name: 'offset',
+-              options: {
+-                offset: [0, 8],
+-              },
+-            },
+-            {
+-              name: 'arrow',
+-              options: {
+-                padding: 5,
+-              },
+-            },
+-          ],
+-        });
+-
+-        let targetOffset = targetElement.getBoundingClientRect().top;
+-        if (checkpointData.placement && checkpointData.placement.includes('top')) {
+-          if (targetOffset < 0) {
+-            targetOffset *= -1;
+-          }
+-          targetOffset -= 280;
+-        } else {
+-          targetOffset -= 80;
+-        }
+-
+-        window.scrollTo({
+-          top: targetOffset, behavior: 'smooth',
+-        });
++        pruneCheckpoints(tourValue.checkpoints);
+       }
+     }
+-  }, [checkpointData, index, isMobile]);
++  }, [index, isTourEnabled, prunedCheckpoints]);
+ 
+   useEffect(() => {
+     const handleEsc = (event) => {
+-      if (isEnabled && event.keyCode === 27) {
+-        setIsEnabled(false);
+-        if (tourValue.onEnd) {
+-          tourValue.onEnd();
++      if (isTourEnabled && event.keyCode === 27) {
++        setIsTourEnabled(false);
++        if (tourValue.onEscape) {
++          tourValue.onEscape();
+         }
+       }
+     };
+@@ -90,50 +58,54 @@ function Tour({
+     return () => {
+       window.removeEventListener('keydown', handleEsc);
+     };
+-  }, [tourValue]);
++  }, [currentCheckpointData]);
+ 
+-  if (!tourValue || !checkpointData || !isEnabled) {
++  if (!tourValue || !currentCheckpointData || !isTourEnabled) {
+     return null;
+   }
+ 
+   const handleAdvance = () => {
+     setIndex(index + 1);
+-    if (checkpointData.onAdvance) {
+-      checkpointData.onAdvance();
++    if (currentCheckpointData.onAdvance) {
++      currentCheckpointData.onAdvance();
+     }
+   };
+ 
+   const handleDismiss = () => {
+     setIndex(0);
+-    setIsEnabled(false);
+-    if (checkpointData.onDismiss) {
+-      checkpointData.onDismiss();
++    setIsTourEnabled(false);
++    if (currentCheckpointData.onDismiss) {
++      currentCheckpointData.onDismiss();
+     } else {
+       tourValue.onDismiss();
+     }
++    setCurrentCheckpointData(null);
+   };
+ 
+   const handleEnd = () => {
+     setIndex(0);
+-    setIsEnabled(false);
++    setIsTourEnabled(false);
+     if (tourValue.onEnd) {
+       tourValue.onEnd();
+     }
++    setCurrentCheckpointData(null);
+   };
+ 
+   return (
+     <Checkpoint
+-      advanceButtonText={checkpointData.advanceButtonText || tourValue.advanceButtonText}
+-      body={checkpointData.body}
+-      dismissButtonText={checkpointData.dismissButtonText || tourValue.dismissButtonText}
+-      endButtonText={checkpointData.endButtonText || tourValue.endButtonText}
+-      hideCheckpoint={hideCheckpoint}
++      advanceButtonText={currentCheckpointData.advanceButtonText || tourValue.advanceButtonText}
++      body={currentCheckpointData.body}
++      currentCheckpointData={currentCheckpointData}
++      dismissButtonText={currentCheckpointData.dismissButtonText || tourValue.dismissButtonText}
++      endButtonText={currentCheckpointData.endButtonText || tourValue.endButtonText}
+       index={index}
+       onAdvance={handleAdvance}
+       onDismiss={handleDismiss}
+       onEnd={handleEnd}
+-      title={checkpointData.title}
+-      totalCheckpoints={tourValue.checkpoints.length}
++      placement={currentCheckpointData.placement}
++      target={currentCheckpointData.target}
++      title={currentCheckpointData.title}
++      totalCheckpoints={prunedCheckpoints.length}
+     />
+   );
+ }
+@@ -155,6 +127,7 @@ Tour.defaultProps = {
+     endButtonText: '',
+     onDismiss: () => {},
+     onEnd: () => {},
++    onEscape: () => {},
+     startingIndex: 0,
+   },
+ };
+@@ -163,10 +136,10 @@ Tour.propTypes = {
+   tours: PropTypes.arrayOf(PropTypes.shape({
+     advanceButtonText: PropTypes.node,
+     checkpoints: PropTypes.arrayOf(PropTypes.shape({
+-      advanceButtonText: PropTypes.string,
+-      body: PropTypes.string,
+-      dismissButtonText: PropTypes.string,
+-      endButtonText: PropTypes.string,
++      advanceButtonText: PropTypes.node,
++      body: PropTypes.node,
++      dismissButtonText: PropTypes.node,
++      endButtonText: PropTypes.node,
+       onAdvance: PropTypes.func,
+       onDismiss: PropTypes.func,
+       placement: PropTypes.oneOf([
+@@ -174,13 +147,14 @@ Tour.propTypes = {
+         'left-start', 'left', 'left-end', 'bottom', 'bottom-start', 'bottom-end',
+       ]),
+       target: PropTypes.string.isRequired,
+-      title: PropTypes.string,
++      title: PropTypes.node,
+     })),
+     dismissButtonText: PropTypes.node,
+     enabled: PropTypes.bool.isRequired,
+     endButtonText: PropTypes.node,
+     onDismiss: PropTypes.func,
+     onEnd: PropTypes.func,
++    onEscape: PropTypes.func,
+     startingIndex: PropTypes.number,
+     tourId: PropTypes.string.isRequired,
+   })),
+diff --git a/src/tour/tests/Checkpoint.test.jsx b/src/tour/tests/Checkpoint.test.jsx
+index 4aa320b..4d258e6 100644
+--- a/src/tour/tests/Checkpoint.test.jsx
++++ b/src/tour/tests/Checkpoint.test.jsx
+@@ -1,124 +1,143 @@
+ /**
+  * @jest-environment jsdom
+  */
+-import Enzyme, { mount } from 'enzyme';
++import Enzyme from 'enzyme';
+ import Adapter from '@wojtekmaj/enzyme-adapter-react-17';
+ import React from 'react';
++import { fireEvent, render, screen } from '@testing-library/react';
++import * as popper from '@popperjs/core';
+ 
+ import Checkpoint from '../Checkpoint';
+ 
+ Enzyme.configure({ adapter: new Adapter() });
++const popperMock = jest.spyOn(popper, 'createPopper');
+ 
+ describe('Checkpoint', () => {
+   const handleAdvance = jest.fn();
+   const handleDismiss = jest.fn();
+   const handleEnd = jest.fn();
+ 
++  beforeEach(() => {
++    popperMock.mockImplementation(jest.fn());
++  });
++
++  afterEach(() => {
++    popperMock.mockReset();
++  });
++
+   describe('second Checkpoint in Tour', () => {
+-    const secondCheckpointWrapper = mount((
+-      <Checkpoint
+-        advanceButtonText="Next"
+-        body="Lorem ipsum checkpoint body"
+-        dismissButtonText="Dismiss"
+-        endButtonText="End"
+-        index={1}
+-        onAdvance={handleAdvance}
+-        onDismiss={handleDismiss}
+-        onEnd={handleEnd}
+-        title="Checkpoint title"
+-        totalCheckpoints={5}
+-      />
+-    ));
+-
+-    it('renders correct active breadcrumb', () => {
+-      const breadcrumbs = secondCheckpointWrapper.find('svg');
++    beforeEach(() => {
++      render(
++        <>
++          <div id="target-element">...</div>
++          <Checkpoint
++            advanceButtonText="Next"
++            body="Lorem ipsum checkpoint body"
++            dismissButtonText="Dismiss"
++            endButtonText="End"
++            index={1}
++            onAdvance={handleAdvance}
++            onDismiss={handleDismiss}
++            onEnd={handleEnd}
++            target="#target-element"
++            title="Checkpoint title"
++            totalCheckpoints={5}
++          />
++        </>,
++      );
++    });
++
++    it('renders correct active breadcrumb', async () => {
++      expect(screen.getByText('Checkpoint title')).toBeInTheDocument();
++      const breadcrumbs = screen.getAllByTestId('checkpoint-popover_breadcrumb_', { exact: false });
+       expect(breadcrumbs.length).toEqual(5);
+-      expect(breadcrumbs.at(0).exists('.checkpoint-popover_breadcrumb_inactive')).toBe(true);
+-      expect(breadcrumbs.at(1).exists('.checkpoint-popover_breadcrumb_active')).toBe(true);
+-      expect(breadcrumbs.at(2).exists('.checkpoint-popover_breadcrumb_inactive')).toBe(true);
+-      expect(breadcrumbs.at(3).exists('.checkpoint-popover_breadcrumb_inactive')).toBe(true);
+-      expect(breadcrumbs.at(4).exists('.checkpoint-popover_breadcrumb_inactive')).toBe(true);
++      expect(breadcrumbs.at(0).classList.contains('checkpoint-popover_breadcrumb_inactive')).toBe(true);
++      expect(breadcrumbs.at(1).classList.contains('checkpoint-popover_breadcrumb_active')).toBe(true);
++      expect(breadcrumbs.at(2).classList.contains('checkpoint-popover_breadcrumb_inactive')).toBe(true);
++      expect(breadcrumbs.at(3).classList.contains('checkpoint-popover_breadcrumb_inactive')).toBe(true);
++      expect(breadcrumbs.at(4).classList.contains('checkpoint-popover_breadcrumb_inactive')).toBe(true);
+     });
+ 
+     it('only renders advance and dismiss buttons (i.e. does not render end button)', () => {
+-      const buttons = secondCheckpointWrapper.find('button');
+-      expect(buttons.length).toEqual(2);
+-
+-      const dismissButton = buttons.at(0);
+-      expect(dismissButton.text()).toEqual('Dismiss');
+-
+-      const advanceButton = buttons.at(1);
+-      expect(advanceButton.text()).toEqual('Next');
++      expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
++      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+     });
+ 
+     it('dismiss button onClick calls handleDismiss', () => {
+-      const dismissButton = secondCheckpointWrapper.find('button').at(0);
+-      dismissButton.simulate('click');
++      const dismissButton = screen.getByRole('button', { name: 'Dismiss' });
++      fireEvent.click(dismissButton);
+       expect(handleDismiss).toHaveBeenCalledTimes(1);
+     });
+ 
+     it('advance button onClick calls handleAdvance', () => {
+-      const advanceButton = secondCheckpointWrapper.find('button').at(1);
+-      advanceButton.simulate('click');
++      const advanceButton = screen.getByRole('button', { name: 'Next' });
++      fireEvent.click(advanceButton);
+       expect(handleAdvance).toHaveBeenCalledTimes(1);
+     });
+   });
+ 
+   describe('last Checkpoint in Tour', () => {
+-    const lastCheckpointWrapper = mount((
+-      <Checkpoint
+-        advanceButtonText="Next"
+-        body="Lorem ipsum checkpoint body"
+-        dismissButtonText="Dismiss"
+-        endButtonText="End"
+-        index={4}
+-        onAdvance={handleAdvance}
+-        onDismiss={handleDismiss}
+-        onEnd={handleEnd}
+-        title="Checkpoint title"
+-        totalCheckpoints={5}
+-      />
+-    ));
++    beforeEach(() => {
++      render(
++        <>
++          <div id="#last-element" />
++          <Checkpoint
++            advanceButtonText="Next"
++            body="Lorem ipsum checkpoint body"
++            dismissButtonText="Dismiss"
++            endButtonText="End"
++            index={4}
++            onAdvance={handleAdvance}
++            onDismiss={handleDismiss}
++            onEnd={handleEnd}
++            target="#last-element"
++            title="Checkpoint title"
++            totalCheckpoints={5}
++          />
++        </>,
++      );
++    });
+ 
+     it('only renders end button (i.e. neither advance nor dismiss buttons)', () => {
+-      const endButton = lastCheckpointWrapper.find('button');
+-      expect(endButton.exists()).toBe(true);
+-      expect(endButton.text()).toEqual('End');
++      expect(screen.getByRole('button', { name: 'End' })).toBeInTheDocument();
+     });
+ 
+     it('end button onClick calls handleEnd', () => {
+-      const endButton = lastCheckpointWrapper.find('button');
+-      endButton.simulate('click');
++      const endButton = screen.getByRole('button', { name: 'End' });
++      fireEvent.click(endButton);
+       expect(handleEnd).toHaveBeenCalledTimes(1);
+     });
+   });
+ 
+   describe('only one Checkpoint in Tour', () => {
+-    const singleCheckpointWrapper = mount((
+-      <Checkpoint
+-        advanceButtonText="Next"
+-        body="Lorem ipsum checkpoint body"
+-        dismissButtonText="Dismiss"
+-        endButtonText="End"
+-        index={0}
+-        onAdvance={handleAdvance}
+-        onDismiss={handleDismiss}
+-        onEnd={handleEnd}
+-        title="Checkpoint title"
+-        totalCheckpoints={1}
+-      />
+-    ));
++    beforeEach(() => {
++      render(
++        <>
++          <div id="#target-element" />
++          <Checkpoint
++            advanceButtonText="Next"
++            body="Lorem ipsum checkpoint body"
++            dismissButtonText="Dismiss"
++            endButtonText="End"
++            index={0}
++            onAdvance={handleAdvance}
++            onDismiss={handleDismiss}
++            onEnd={handleEnd}
++            target="#target-element"
++            title="Checkpoint title"
++            totalCheckpoints={1}
++          />
++        </>,
++      );
++    });
+ 
+     it('only renders end button (i.e. neither advance nor dismiss buttons)', () => {
+-      const endButton = singleCheckpointWrapper.find('button');
+-      expect(endButton.length).toEqual(1);
+-      expect(endButton.exists()).toBe(true);
+-      expect(endButton.text()).toEqual('End');
++      expect(screen.getByRole('button', { name: 'End' })).toBeInTheDocument();
+     });
+ 
+     it('does not render breadcrumbs', () => {
+-      expect(singleCheckpointWrapper.exists('.checkpoint-popover_breadcrumb_inactive')).toBe(false);
+-      expect(singleCheckpointWrapper.exists('.checkpoint-popover_breadcrumb_active')).toBe(false);
++      const breadcrumbs = screen.queryAllByTestId('checkpoint-popover_breadcrumb_', { exact: false });
++      expect(breadcrumbs.length).toEqual(0);
+     });
+   });
+ });
+diff --git a/src/tour/tests/Tour.test.jsx b/src/tour/tests/Tour.test.jsx
+index 626ad4d..9b717bc 100644
+--- a/src/tour/tests/Tour.test.jsx
++++ b/src/tour/tests/Tour.test.jsx
+@@ -1,7 +1,7 @@
+ /**
+  * @jest-environment jsdom
+  */
+-import Enzyme, { mount } from 'enzyme';
++import Enzyme from 'enzyme';
+ import React from 'react';
+ import Adapter from '@wojtekmaj/enzyme-adapter-react-17';
+ import { fireEvent, render, screen } from '@testing-library/react';
+@@ -9,8 +9,9 @@ import * as popper from '@popperjs/core';
+ 
+ import Tour from '../Tour';
+ 
+-// This can be removed once the component is ported over to Paragon
+-Enzyme.configure({ adapter: new Adapter() });
++Enzyme.configure({ adapter: new Adapter() }); // This can be removed once the component is ported over to Paragon
++
++const popperMock = jest.spyOn(popper, 'createPopper');
+ 
+ describe('Tour', () => {
+   const targets = (
+@@ -77,6 +78,14 @@ describe('Tour', () => {
+     ],
+   };
+ 
++  beforeEach(() => {
++    popperMock.mockImplementation(jest.fn());
++  });
++
++  afterEach(() => {
++    popperMock.mockReset();
++  });
++
+   describe('multiple enabled tours', () => {
+     it('renders first enabled tour', () => {
+       const secondEnabledTourData = {
+@@ -96,7 +105,7 @@ describe('Tour', () => {
+         ],
+       };
+ 
+-      const tourWrapper = mount(
++      render(
+         <>
+           <Tour
+             tours={[disabledTourData, tourData, secondEnabledTourData]}
+@@ -105,16 +114,15 @@ describe('Tour', () => {
+         </>,
+       );
+ 
+-      const checkpointTitle = tourWrapper.find('h2');
+-      expect(checkpointTitle.text()).toEqual('Checkpoint 1');
+-      expect(checkpointTitle.text()).not.toEqual('Second enabled tour');
++      expect(screen.getByText('Checkpoint 1')).toBeInTheDocument();
++      expect(screen.queryByText('Second enabled tour')).not.toBeInTheDocument();
+     });
+   });
+ 
+   describe('enabled tour', () => {
+     describe('with default settings', () => {
+       it('renders checkpoint with correct title, body, and breadcrumbs', () => {
+-        const tourWrapper = mount(
++        render(
+           <>
+             <Tour
+               tours={[tourData]}
+@@ -122,14 +130,14 @@ describe('Tour', () => {
+             {targets}
+           </>,
+         );
+-        const checkpoint = tourWrapper.find('#checkpoint');
+-        const checkpointTitle = checkpoint.find('h2');
+-        expect(checkpointTitle.text()).toEqual('Checkpoint 1');
+-        expect(checkpoint.find('svg').at(0).exists('.checkpoint-popover_breadcrumb_active')).toBe(true);
++
++        expect(screen.getByRole('dialog', { name: 'Checkpoint 1' })).toBeInTheDocument();
++        expect(screen.getByText('Checkpoint 1')).toBeInTheDocument();
++        expect(screen.getByTestId('checkpoint-popover_breadcrumb_active')).toBeInTheDocument();
+       });
+ 
+-      it('onClick of advance button advances to next checkpoint', () => {
+-        const tourWrapper = mount(
++      it('onClick of advance button advances to next checkpoint', async () => {
++        render(
+           <>
+             <Tour
+               tours={[tourData]}
+@@ -139,24 +147,18 @@ describe('Tour', () => {
+         );
+ 
+         // Verify the first Checkpoint has rendered
+-        const firstCheckpoint = tourWrapper.find('#checkpoint');
+-        const firstCheckpointTitle = firstCheckpoint.find('h2');
+-        expect(firstCheckpointTitle.text()).toEqual('Checkpoint 1');
++        expect(screen.getByRole('heading', { name: 'Checkpoint 1' })).toBeInTheDocument();
+ 
+         // Click the advance button
+-        const advanceButton = tourWrapper.find('button').at(1);
+-        expect(advanceButton.text()).toEqual('Next');
+-
+-        advanceButton.simulate('click');
++        const advanceButton = screen.getByRole('button', { name: 'Next' });
++        fireEvent.click(advanceButton);
+ 
+         // Verify the second Checkpoint has rendered
+-        const secondCheckpoint = tourWrapper.find('#checkpoint');
+-        const secondCheckpointTitle = secondCheckpoint.find('h2');
+-        expect(secondCheckpointTitle.text()).toEqual('Checkpoint 2');
++        expect(screen.getByRole('heading', { name: 'Checkpoint 2' })).toBeInTheDocument();
+       });
+ 
+       it('onClick of dismiss button disables tour', () => {
+-        const tourWrapper = mount(
++        render(
+           <>
+             <Tour
+               tours={[tourData]}
+@@ -166,20 +168,19 @@ describe('Tour', () => {
+         );
+ 
+         // Verify a Checkpoint has rendered
+-        expect(tourWrapper.exists('#checkpoint')).toBe(true);
++        expect(screen.getByRole('dialog', { name: 'Checkpoint 1' })).toBeInTheDocument();
+ 
+         // Click the dismiss button
+-        const dismissButton = tourWrapper.find('button').at(0);
+-        expect(dismissButton.text()).toEqual('Dismiss');
+-
+-        dismissButton.simulate('click');
++        const dismissButton = screen.getByRole('button', { name: 'Dismiss' });
++        expect(dismissButton).toBeInTheDocument();
++        fireEvent.click(dismissButton);
+ 
+         // Verify no Checkpoints have rendered
+-        expect(tourWrapper.exists('#checkpoint')).toBe(false);
++        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+       });
+ 
+       it('onClick of end button disables tour', () => {
+-        const tourWrapper = mount(
++        render(
+           <>
+             <Tour
+               tours={[tourData]}
+@@ -189,44 +190,36 @@ describe('Tour', () => {
+         );
+ 
+         // Verify a Checkpoint has rendered
+-        expect(tourWrapper.exists('#checkpoint')).toBe(true);
++        expect(screen.getByRole('dialog', { name: 'Checkpoint 1' })).toBeInTheDocument();
+ 
+         // Advance the Tour to the last Checkpoint
+-        const advanceButton = tourWrapper.find('button').at(1);
+-        advanceButton.simulate('click');
+-        const advanceButton1 = tourWrapper.find('button').at(1);
+-        advanceButton1.simulate('click');
+-        const advanceButton2 = tourWrapper.find('button').at(1);
+-        advanceButton2.simulate('click');
++        const advanceButton1 = screen.getByRole('button', { name: 'Next' });
++        fireEvent.click(advanceButton1);
++        const advanceButton2 = screen.getByRole('button', { name: 'Next' });
++        fireEvent.click(advanceButton2);
++        const advanceButton3 = screen.getByRole('button', { name: 'Override advance' });
++        fireEvent.click(advanceButton3);
+ 
+         // Click the end button
+-        const endButton = tourWrapper.find('button');
+-        expect(endButton.text()).toEqual('Override end');
+-
+-        endButton.simulate('click');
++        const endButton = screen.getByRole('button', { name: 'Override end' });
++        fireEvent.click(endButton);
+ 
+         // Verify no Checkpoints have rendered
+-        expect(tourWrapper.exists('#checkpoint')).toBe(false);
++        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+       });
+ 
+       it('onClick of escape key disables tour', () => {
+-        // React Testing Library would not play nice with createPopper
+-        // due to the order in which the Checkpoint renders. We'll mock
+-        // out the function here so this test can proceed as expected.
+-        const mock = jest.spyOn(popper, 'createPopper');
+-        mock.mockImplementation(jest.fn());
+-
+         render(
+-          <div>
++          <>
+             <Tour
+               tours={[tourData]}
+             />
+             {targets}
+-          </div>,
++          </>,
+         );
+ 
+         // Verify a Checkpoint has rendered
+-        expect(screen.getByRole('dialog')).toBeInTheDocument();
++        expect(screen.getByRole('dialog', { name: 'Checkpoint 1' })).toBeInTheDocument();
+ 
+         // Click Escape key
+         fireEvent.keyDown(screen.getByRole('dialog'), {
+@@ -238,91 +231,111 @@ describe('Tour', () => {
+ 
+         // Verify no Checkpoints have been rendered
+         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+-        mock.mockRestore();
+       });
+     });
+ 
+     describe('with Checkpoint override settings', () => {
++      const overrideTourData = {
++        advanceButtonText: 'Next',
++        dismissButtonText: 'Dismiss',
++        enabled: true,
++        endButtonText: 'Okay',
++        onDismiss: handleDismiss,
++        onEnd: handleEnd,
++        tourId: 'enabledTour',
++        startingIndex: 2,
++        checkpoints: [
++          {
++            body: 'Lorem ipsum body',
++            target: '#target-1',
++            title: 'Checkpoint 1',
++          },
++          {
++            body: 'Lorem ipsum body',
++            target: '#target-2',
++            title: 'Checkpoint 2',
++          },
++          {
++            body: 'Lorem ipsum body',
++            target: '#target-3',
++            title: 'Checkpoint 3',
++            onDismiss: customOnDismiss,
++            advanceButtonText: 'Override advance',
++            dismissButtonText: 'Override dismiss',
++
++          },
++          {
++            target: '#target-3',
++            title: 'Checkpoint 4',
++            endButtonText: 'Override end',
++          },
++        ],
++      };
+       it('renders correct checkpoint on index override', () => {
+-        const overrideTourData = tourData;
+-        overrideTourData.startingIndex = 2;
+-        const tourWrapper = mount((
++        render(
+           <>
+             <Tour
+               tours={[overrideTourData]}
+             />
+             {targets}
+-          </>
+-        ));
+-        expect(tourWrapper.exists('#checkpoint')).toBe(true);
+-        const checkpointTitle = tourWrapper.find('h2');
+-        expect(checkpointTitle.text()).toEqual('Checkpoint 3');
+-        expect(tourWrapper.find('svg').at(2).exists('.checkpoint-popover_breadcrumb_active'));
++          </>,
++        );
++        expect(screen.getByRole('dialog', { name: 'Checkpoint 3' })).toBeInTheDocument();
++        expect(screen.getByRole('heading', { name: 'Checkpoint 3' })).toBeInTheDocument();
+       });
+ 
+       it('applies override for advanceButtonText', () => {
+-        const overrideTourData = tourData;
+-        overrideTourData.startingIndex = 2;
+-        const tourWrapper = mount((
++        render(
+           <>
+             <Tour
+               tours={[overrideTourData]}
+             />
+             {targets}
+-          </>
+-        ));
+-        const advanceButton = tourWrapper.find('button').at(1);
+-        expect(advanceButton.text()).toEqual('Override advance');
++          </>,
++        );
++        expect(screen.getByRole('button', { name: 'Override advance' })).toBeInTheDocument();
+       });
+ 
+       it('applies override for dismissButtonText', () => {
+-        const overrideTourData = tourData;
+-        overrideTourData.startingIndex = 2;
+-        const tourWrapper = mount((
++        render(
+           <>
+             <Tour
+               tours={[overrideTourData]}
+             />
+             {targets}
+-          </>
+-        ));
+-        const dismissButton = tourWrapper.find('button').at(0);
+-        expect(dismissButton.text()).toEqual('Override dismiss');
++          </>,
++        );
++        expect(screen.getByRole('button', { name: 'Override dismiss' })).toBeInTheDocument();
+       });
+ 
+       it('applies override for endButtonText', () => {
+-        const overrideTourData = tourData;
+-        overrideTourData.startingIndex = 3;
+-        const tourWrapper = mount((
++        render(
+           <>
+             <Tour
+               tours={[overrideTourData]}
+             />
+             {targets}
+-          </>
+-        ));
+-
+-        const endButton = tourWrapper.find('button');
+-        expect(endButton.text()).toEqual('Override end');
++          </>,
++        );
++        const advanceButton = screen.getByRole('button', { name: 'Override advance' });
++        fireEvent.click(advanceButton);
++        expect(screen.getByRole('button', { name: 'Override end' })).toBeInTheDocument();
+       });
+ 
+       it('calls customHandleDismiss onClick of dismiss button', () => {
+-        const overrideTourData = tourData;
+-        overrideTourData.startingIndex = 2;
+-        const tourWrapper = mount((
++        render(
+           <>
+             <Tour
+               tours={[overrideTourData]}
+             />
+             {targets}
+-          </>
+-        ));
+-        const dismissButton = tourWrapper.find('button').at(0);
+-        expect(dismissButton.text()).toEqual('Override dismiss');
+-        dismissButton.simulate('click');
++          </>,
++        );
++        const dismissButton = screen.getByRole('button', { name: 'Override dismiss' });
++        fireEvent.click(dismissButton);
+ 
+         expect(customOnDismiss).toHaveBeenCalledTimes(1);
+-        expect(tourWrapper.exists('#checkpoint')).toBe(false);
++        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+       });
+     });
+ 
+@@ -345,34 +358,69 @@ describe('Tour', () => {
+           ],
+         };
+ 
+-        const tourWrapper = mount((
++        render(
+           <>
+             <Tour
+               tours={[badTourData]}
+             />
+             {targets}
+-          </>
+-        ));
++          </>,
++        );
++
++        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
++      });
++
++      it('advances to next valid Checkpoint', () => {
++        const badTourData = {
++          advanceButtonText: 'Next',
++          dismissButtonText: 'Dismiss',
++          enabled: true,
++          endButtonText: 'Okay',
++          onDismiss: handleDismiss,
++          onEnd: handleEnd,
++          tourId: 'badTour',
++          checkpoints: [
++            {
++              body: 'Lorem ipsum body',
++              target: 'bad-target-data',
++              title: 'Checkpoint 1',
++            },
++            {
++              body: 'Lorem ipsum body',
++              target: '#target-1',
++              title: 'Checkpoint 2',
++            },
++          ],
++        };
+ 
+-        const checkpoint = tourWrapper.find('#checkpoint');
++        render(
++          <>
++            <Tour
++              tours={[badTourData]}
++            />
++            {targets}
++          </>,
++        );
+ 
+-        expect(checkpoint.props().style.display).toEqual('none');
++        expect(screen.queryByRole('dialog', { name: 'Checkpoint 1' })).not.toBeInTheDocument();
++        expect(screen.getByRole('dialog', { name: 'Checkpoint 2' })).toBeInTheDocument();
++        expect(screen.getByRole('heading', { name: 'Checkpoint 2' })).toBeInTheDocument();
+       });
+     });
+   });
+ 
+   describe('disabled tour', () => {
+     it('does not render', () => {
+-      const tourWrapper = mount((
++      render(
+         <>
+           <Tour
+             tours={[disabledTourData]}
+           />
+           {targets}
+-        </>
+-      ));
++        </>,
++      );
+ 
+-      expect(tourWrapper.exists('#checkpoint')).toBe(false);
++      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+     });
+   });
+ });
+-- 
+2.34.1
+

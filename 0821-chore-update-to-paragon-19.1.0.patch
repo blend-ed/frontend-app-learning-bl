@@ -1,0 +1,1425 @@
+From e9f0a658d6dfc2d96f8a2f2019de2334fbe704a6 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 25 Feb 2022 16:33:03 -0500
+Subject: [PATCH 0821/1021] chore: update to paragon 19.1.0
+
+Replace our custom Tour component with the drop-in ProductTour
+replacement in paragon.
+---
+ .../0010-tour-structure-decisions.md          |  32 --
+ package-lock.json                             |   6 +-
+ package.json                                  |   2 +-
+ src/index.scss                                |   1 -
+ src/product-tours/ProductTours.jsx            |   7 +-
+ src/product-tours/ProductTours.test.jsx       |   2 +-
+ src/tour/Checkpoint.jsx                       | 139 ------
+ src/tour/Checkpoint.scss                      | 103 -----
+ src/tour/CheckpointActionRow.jsx              |  55 ---
+ src/tour/CheckpointBody.jsx                   |  22 -
+ src/tour/CheckpointBreadcrumbs.jsx            |  28 --
+ src/tour/CheckpointTitle.jsx                  |  18 -
+ src/tour/README.md                            | 103 -----
+ src/tour/Tour.jsx                             | 163 -------
+ src/tour/tests/Checkpoint.test.jsx            | 143 ------
+ src/tour/tests/Tour.test.jsx                  | 426 ------------------
+ 16 files changed, 8 insertions(+), 1242 deletions(-)
+ delete mode 100644 docs/decisions/0010-tour-structure-decisions.md
+ delete mode 100644 src/tour/Checkpoint.jsx
+ delete mode 100644 src/tour/Checkpoint.scss
+ delete mode 100644 src/tour/CheckpointActionRow.jsx
+ delete mode 100644 src/tour/CheckpointBody.jsx
+ delete mode 100644 src/tour/CheckpointBreadcrumbs.jsx
+ delete mode 100644 src/tour/CheckpointTitle.jsx
+ delete mode 100644 src/tour/README.md
+ delete mode 100644 src/tour/Tour.jsx
+ delete mode 100644 src/tour/tests/Checkpoint.test.jsx
+ delete mode 100644 src/tour/tests/Tour.test.jsx
+
+diff --git a/docs/decisions/0010-tour-structure-decisions.md b/docs/decisions/0010-tour-structure-decisions.md
+deleted file mode 100644
+index 76e3329..0000000
+--- a/docs/decisions/0010-tour-structure-decisions.md
++++ /dev/null
+@@ -1,32 +0,0 @@
+-# Tour Structure Decisions
+-
+-## Compartmentalizing the tour objects
+-We created the directory `src/tours` in order to organize tours across the MFE. Each tour has its own JSX file where we
+-define a tour object to be passed to the `<Tour />` component in `<LoadedTabPage />`.
+-
+-Although each tour is stored in a JSX file, the tour object itself is meant to be an `object` type. Thus, the structure
+-of each tour object is as follows:
+-```$xslt
+-// Note: this is a simplified version of a tour object
+-
+-const exampleTour = (enabled) => ({
+-    checkpoints: [],
+-    enabled,
+-    tourId: 'exampleTour',
+-});
+-```
+-
+-The reason we use a JSX file rather than a JS file is to allow for use of React components within the objects such as
+-`<FormattedMessage />`.
+-
+-## Implementing i18n in tour objects
+-The `<Tour />` component ingests a single prop called `tours` which expects a list of objects.
+-Given the structure in which we organized tour objects, there were two considerations in working with i18n:
+-- You can't injectIntl into something that isn't a React component without considerable adjustments,
+-so using the familiar `{intl.formatMessage(messages.foo)}` syntax would not be possible.
+-- You can't return normal objects from a React component, only React elements. I.e. switching these from arrow functions
+- to React function based components would not be ideal because the `tours` prop expects objects.
+-
+-### Decision
+-We chose to use `<FormattedMessage />` directly within the tour objects. We also created shared `<FormattedMessage />`
+-components inside of `GenericTourFormattedMessages.jsx` for use across the tours.
+diff --git a/package-lock.json b/package-lock.json
+index 6c76244..9041532 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -4070,9 +4070,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "19.0.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-19.0.0.tgz",
+-      "integrity": "sha512-JBGF+65shm2Mf4s72WMd7RtY045rPZTwxH5zuKpEaF8X3dJfG2NIK8qICOFirpCGQWHHAcYiEOR8AQM8RyzJsw==",
++      "version": "19.1.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-19.1.0.tgz",
++      "integrity": "sha512-n+dO0vqo0tzcHywtjzKakI9VIRVqrbcm2WyPAEU2nru9WsZrQs0icwnVEKPkouWmsxPKfMNHepQf4l+P0CeXUg==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.36",
+         "@fortawesome/free-solid-svg-icons": "^5.15.4",
+diff --git a/package.json b/package.json
+index 1eadd62..2ce4803 100644
+--- a/package.json
++++ b/package.json
+@@ -36,7 +36,7 @@
+     "@edx/frontend-enterprise-utils": "1.1.1",
+     "@edx/frontend-lib-special-exams": "1.15.5",
+     "@edx/frontend-platform": "1.14.3",
+-    "@edx/paragon": "19.0.0",
++    "@edx/paragon": "19.1.0",
+     "@edx/frontend-component-header": "^2.4.2",
+     "@fortawesome/fontawesome-svg-core": "1.2.36",
+     "@fortawesome/free-brands-svg-icons": "5.15.4",
+diff --git a/src/index.scss b/src/index.scss
+index eb0a0a5..6145a90 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -378,7 +378,6 @@
+ @import "course-home/progress-tab/course-completion/CompletionDonutChart.scss";
+ @import "course-home/progress-tab/grades/course-grade/GradeBar.scss";
+ @import "courseware/course/course-exit/CourseRecommendations";
+-@import "src/tour/Checkpoint.scss";
+ 
+ /** [MM-P2P] Experiment */
+ @import "experiments/mm-p2p/index.scss";
+diff --git a/src/product-tours/ProductTours.jsx b/src/product-tours/ProductTours.jsx
+index acaa241..89a1f98 100644
+--- a/src/product-tours/ProductTours.jsx
++++ b/src/product-tours/ProductTours.jsx
+@@ -3,8 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-
+-import Tour from '../tour/Tour';
++import { ProductTour } from '@edx/paragon';
+ 
+ import abandonTour from './AbandonTour';
+ import coursewareTour from './CoursewareTour';
+@@ -82,7 +81,7 @@ function ProductTours({
+     }
+   }, [showNewUserCourseHomeTour]);
+ 
+-  // The <Tour /> component cannot handle rendering multiple enabled tours at once.
++  // The <ProductTour /> component cannot handle rendering multiple enabled tours at once.
+   // I.e. when adding new tours, beware that if multiple tours are enabled,
+   // the first enabled tour in the following array will be the only one that renders.
+   // The suggestion for populating these tour objects is to ensure only one tour is enabled at a time.
+@@ -142,7 +141,7 @@ function ProductTours({
+ 
+   return (
+     <>
+-      <Tour
++      <ProductTour
+         tours={tours}
+       />
+       <NewUserCourseHomeTourModal
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+index e1befff..24ec467 100644
+--- a/src/product-tours/ProductTours.test.jsx
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -306,7 +306,7 @@ describe('Courseware Tour', () => {
+ 
+   expect(global.location.href).toEqual(`http://localhost/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[1].id}`);
+ 
+-  const checkpoint = container.querySelectorAll('#checkpoint');
++  const checkpoint = container.querySelectorAll('#pgn__checkpoint');
+   expect(checkpoint).toHaveLength(showCoursewareTour ? 1 : 0);
+ });
+   });
+diff --git a/src/tour/Checkpoint.jsx b/src/tour/Checkpoint.jsx
+deleted file mode 100644
+index a54cca9..0000000
+--- a/src/tour/Checkpoint.jsx
++++ /dev/null
+@@ -1,139 +0,0 @@
+-import React, { useEffect, useState } from 'react';
+-import PropTypes from 'prop-types';
+-import { useMediaQuery } from '@edx/paragon';
+-import { createPopper } from '@popperjs/core';
+-
+-import CheckpointActionRow from './CheckpointActionRow';
+-import CheckpointBody from './CheckpointBody';
+-import CheckpointBreadcrumbs from './CheckpointBreadcrumbs';
+-import CheckpointTitle from './CheckpointTitle';
+-
+-function Checkpoint({
+-  body,
+-  index,
+-  placement,
+-  target,
+-  title,
+-  totalCheckpoints,
+-  ...props
+-}) {
+-  const [checkpointVisible, setCheckpointVisible] = useState(false);
+-  const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+-
+-  useEffect(() => {
+-    const targetElement = document.querySelector(target);
+-    const checkpoint = document.querySelector('#checkpoint');
+-    if (targetElement && checkpoint) {
+-      // Translate the Checkpoint to its target's coordinates
+-      const checkpointPopper = createPopper(targetElement, checkpoint, {
+-        placement: isMobile ? 'top' : placement,
+-        modifiers: [
+-          {
+-            name: 'arrow',
+-            options: {
+-              padding: 25,
+-            },
+-          },
+-          {
+-            name: 'offset',
+-            options: {
+-              offset: [0, 20],
+-            },
+-          },
+-          {
+-            name: 'preventOverflow',
+-            options: {
+-              padding: 20,
+-              tetherOffset: 35,
+-            },
+-          },
+-        ],
+-      });
+-      setCheckpointVisible(true);
+-      if (checkpointPopper) {
+-        checkpointPopper.forceUpdate();
+-      }
+-    }
+-  }, [target, isMobile]);
+-
+-  useEffect(() => {
+-    if (checkpointVisible) {
+-      const targetElement = document.querySelector(target);
+-      let targetOffset = targetElement.getBoundingClientRect().top;
+-      if ((targetOffset < 0) || (targetElement.getBoundingClientRect().bottom > window.innerHeight)) {
+-        if (placement.includes('top')) {
+-          if (targetOffset < 0) {
+-            targetOffset *= -1;
+-          }
+-          targetOffset -= 280;
+-        } else {
+-          targetOffset -= 80;
+-        }
+-
+-        window.scrollTo({
+-          top: targetOffset, behavior: 'smooth',
+-        });
+-      }
+-
+-      const button = document.querySelector('#checkpoint-primary-button');
+-      button.focus();
+-    }
+-  }, [target, checkpointVisible]);
+-  const isLastCheckpoint = index + 1 === totalCheckpoints;
+-  const isOnlyCheckpoint = totalCheckpoints === 1;
+-  return (
+-    <div
+-      id="checkpoint"
+-      className="checkpoint-popover p-4 bg-light-300"
+-      aria-labelledby="checkpoint-title"
+-      role="dialog"
+-      style={{ visibility: checkpointVisible ? 'visible' : 'hidden', pointerEvents: checkpointVisible ? 'auto' : 'none' }}
+-    >
+-      {/* This text is not translated due to Paragon's lack of i18n support */}
+-      <span className="sr-only">Top of step {index + 1}</span>
+-      {(title || !isOnlyCheckpoint) && (
+-        <div className="d-flex justify-content-between mb-2.5">
+-          <CheckpointTitle>{title}</CheckpointTitle>
+-          <CheckpointBreadcrumbs currentIndex={index} totalCheckpoints={totalCheckpoints} />
+-        </div>
+-      )}
+-      <CheckpointBody>{body}</CheckpointBody>
+-      <CheckpointActionRow
+-        isLastCheckpoint={isLastCheckpoint}
+-        {...props}
+-      />
+-      <div id="checkpoint-arrow" data-popper-arrow />
+-      {/* This text is not translated due to Paragon's lack of i18n support */}
+-      <span className="sr-only">Bottom of step {index + 1}</span>
+-    </div>
+-  );
+-}
+-
+-Checkpoint.defaultProps = {
+-  advanceButtonText: null,
+-  body: null,
+-  dismissButtonText: null,
+-  endButtonText: null,
+-  placement: 'top',
+-  title: null,
+-};
+-
+-Checkpoint.propTypes = {
+-  advanceButtonText: PropTypes.node,
+-  body: PropTypes.node,
+-  dismissButtonText: PropTypes.node,
+-  endButtonText: PropTypes.node,
+-  index: PropTypes.number.isRequired,
+-  onAdvance: PropTypes.func.isRequired,
+-  onDismiss: PropTypes.func.isRequired,
+-  onEnd: PropTypes.func.isRequired,
+-  placement: PropTypes.oneOf([
+-    'top', 'top-start', 'top-end', 'right-start', 'right', 'right-end',
+-    'left-start', 'left', 'left-end', 'bottom', 'bottom-start', 'bottom-end',
+-  ]),
+-  target: PropTypes.string.isRequired,
+-  title: PropTypes.node,
+-  totalCheckpoints: PropTypes.number.isRequired,
+-};
+-
+-export default Checkpoint;
+diff --git a/src/tour/Checkpoint.scss b/src/tour/Checkpoint.scss
+deleted file mode 100644
+index 7074255..0000000
+--- a/src/tour/Checkpoint.scss
++++ /dev/null
+@@ -1,103 +0,0 @@
+-$checkpoint-arrow-width: 15px;
+-$checkpoint-arrow-brand: solid $checkpoint-arrow-width $brand;
+-$checkpoint-arrow-light-300: solid $checkpoint-arrow-width $light-300;
+-$checkpoint-arrow-transparent: solid $checkpoint-arrow-width transparent;
+-
+-.checkpoint-popover {
+-  position: absolute;
+-  border-top: 8px solid $brand;
+-  border-radius: $border-radius;
+-  box-shadow: $popover-box-shadow;
+-  z-index: 1060;
+-  max-width: $popover-max-width;
+-  @media (max-width: map-get($grid-breakpoints, 'md')) {
+-    min-width: 90%;
+-    max-width: 90%;
+-  }
+-
+-  #checkpoint-arrow,
+-  #checkpoint-arrow::before,
+-  #checkpoint-arrow::after {
+-    position: absolute;
+-    width: 0;
+-    height: 0;
+-  }
+-
+-  #checkpoint-arrow {
+-    visibility: hidden;
+-  }
+-
+-  #checkpoint-arrow::before,
+-  #checkpoint-arrow::after {
+-    visibility: visible;
+-    content: '';
+-  }
+-
+-  .checkpoint-popover_breadcrumb_active {
+-    fill: $primary;
+-  }
+-
+-  .checkpoint-popover_breadcrumb_inactive {
+-    fill: transparent;
+-    stroke: $primary;
+-    stroke-width: 1px;
+-  }
+-
+-  .checkpoint-popover_breadcrumb:not(:first-child) {
+-    margin-left: 4px;
+-  }
+-}
+-
+-.checkpoint-popover[data-popper-placement^='top'] > #checkpoint-arrow {
+-  left: -$checkpoint-arrow-width !important;
+-  bottom: 1px;
+-
+-  &::after {
+-    border-bottom: $checkpoint-arrow-transparent;
+-    border-top: $checkpoint-arrow-light-300;
+-    border-left: $checkpoint-arrow-transparent;
+-    border-right: $checkpoint-arrow-transparent;
+-    -webkit-filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.1));
+-    filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.1));
+-  }
+-}
+-
+-.checkpoint-popover[data-popper-placement^='bottom'] > #checkpoint-arrow {
+-  top: -36px;
+-  left: -$checkpoint-arrow-width !important;
+-  &::before {
+-    border-bottom: $checkpoint-arrow-brand;
+-    border-top: $checkpoint-arrow-transparent;
+-    border-left: $checkpoint-arrow-transparent;
+-    border-right: $checkpoint-arrow-transparent;
+-  }
+-}
+-
+-.checkpoint-popover[data-popper-placement^='left'] > #checkpoint-arrow {
+-  top: -$checkpoint-arrow-width !important;
+-  right: 1px;
+-
+-  &::after {
+-    border-bottom: $checkpoint-arrow-transparent;
+-    border-top: $checkpoint-arrow-transparent;
+-    border-left: $checkpoint-arrow-light-300;
+-    border-right: $checkpoint-arrow-transparent;
+-    -webkit-filter: drop-shadow(3px 1px 2px rgba(0,0,0,0.1));
+-    filter: drop-shadow(3px 1px 2px rgba(0,0,0,0.1));
+-  }
+-}
+-
+-.checkpoint-popover[data-popper-placement^='right'] > #checkpoint-arrow {
+-  top: $checkpoint-arrow-width !important;
+-  left: 1px;
+-
+-  &::after {
+-    left: -2 * $checkpoint-arrow-width;
+-    border-bottom: $checkpoint-arrow-transparent;
+-    border-top: $checkpoint-arrow-transparent;
+-    border-left: $checkpoint-arrow-transparent;
+-    border-right: $checkpoint-arrow-light-300;
+-    -webkit-filter: drop-shadow(-3px 1px 2px rgba(0,0,0,0.1));
+-    filter: drop-shadow(-3px 1px 2px rgba(0,0,0,0.1));
+-  }
+-}
+diff --git a/src/tour/CheckpointActionRow.jsx b/src/tour/CheckpointActionRow.jsx
+deleted file mode 100644
+index 3fbcd90..0000000
+--- a/src/tour/CheckpointActionRow.jsx
++++ /dev/null
+@@ -1,55 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { Button } from '@edx/paragon';
+-
+-export default function CheckpointActionRow({
+-  advanceButtonText,
+-  dismissButtonText,
+-  endButtonText,
+-  isLastCheckpoint,
+-  onAdvance,
+-  onDismiss,
+-  onEnd,
+-}) {
+-  return (
+-    <div className="d-flex justify-content-end">
+-      {!isLastCheckpoint && (
+-        <Button
+-          variant="tertiary"
+-          className="mr-2"
+-          onClick={onDismiss}
+-        >
+-          {dismissButtonText}
+-        </Button>
+-      )}
+-      <Button
+-        id="checkpoint-primary-button"
+-        autoFocus
+-        variant="primary"
+-        onClick={isLastCheckpoint ? onEnd : onAdvance}
+-      >
+-        {isLastCheckpoint ? endButtonText : advanceButtonText}
+-      </Button>
+-    </div>
+-  );
+-}
+-
+-CheckpointActionRow.defaultProps = {
+-  advanceButtonText: '',
+-  dismissButtonText: '',
+-  endButtonText: '',
+-  isLastCheckpoint: false,
+-  onAdvance: () => {},
+-  onDismiss: () => {},
+-  onEnd: () => {},
+-};
+-
+-CheckpointActionRow.propTypes = {
+-  advanceButtonText: PropTypes.node,
+-  dismissButtonText: PropTypes.node,
+-  endButtonText: PropTypes.node,
+-  isLastCheckpoint: PropTypes.bool,
+-  onAdvance: PropTypes.func,
+-  onDismiss: PropTypes.func,
+-  onEnd: PropTypes.func,
+-};
+diff --git a/src/tour/CheckpointBody.jsx b/src/tour/CheckpointBody.jsx
+deleted file mode 100644
+index ae27d35..0000000
+--- a/src/tour/CheckpointBody.jsx
++++ /dev/null
+@@ -1,22 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-export default function CheckpointBody({ children }) {
+-  if (!children) {
+-    return null;
+-  }
+-
+-  return (
+-    <div className="text-gray-700 mb-3.5">
+-      {children}
+-    </div>
+-  );
+-}
+-
+-CheckpointBody.defaultProps = {
+-  children: null,
+-};
+-
+-CheckpointBody.propTypes = {
+-  children: PropTypes.node,
+-};
+diff --git a/src/tour/CheckpointBreadcrumbs.jsx b/src/tour/CheckpointBreadcrumbs.jsx
+deleted file mode 100644
+index d2d0cfb..0000000
+--- a/src/tour/CheckpointBreadcrumbs.jsx
++++ /dev/null
+@@ -1,28 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-export default function CheckpointBreadcrumbs({ currentIndex, totalCheckpoints }) {
+-  if (totalCheckpoints === 1) {
+-    return null;
+-  }
+-  return (
+-    <span className="d-flex align-items-center" aria-hidden focusable={false}>
+-      {new Array(totalCheckpoints).fill(0).map((v, i) => (
+-        <svg key={Math.random().toString(36).substr(2, 9)} aria-hidden focusable={false} role="img" width="14px" height="14px" viewBox="0 0 14 14">
+-          {i === currentIndex ? <circle className="checkpoint-popover_breadcrumb checkpoint-popover_breadcrumb_active" data-testid="checkpoint-popover_breadcrumb_active" cx="7" cy="7" r="3px" />
+-            : <circle className="checkpoint-popover_breadcrumb checkpoint-popover_breadcrumb_inactive" data-testid="checkpoint-popover_breadcrumb_inactive" cx="7" cy="7" r="2.5px" />}
+-        </svg>
+-      ))}
+-    </span>
+-  );
+-}
+-
+-CheckpointBreadcrumbs.defaultProps = {
+-  currentIndex: null,
+-  totalCheckpoints: null,
+-};
+-
+-CheckpointBreadcrumbs.propTypes = {
+-  currentIndex: PropTypes.number,
+-  totalCheckpoints: PropTypes.number,
+-};
+diff --git a/src/tour/CheckpointTitle.jsx b/src/tour/CheckpointTitle.jsx
+deleted file mode 100644
+index d90ec64..0000000
+--- a/src/tour/CheckpointTitle.jsx
++++ /dev/null
+@@ -1,18 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-export default function CheckpointTitle({ children }) {
+-  return (
+-    <h2 id="checkpoint-title" className="h3 mb-0 mr-2.5">
+-      {children}
+-    </h2>
+-  );
+-}
+-
+-CheckpointTitle.defaultProps = {
+-  children: null,
+-};
+-
+-CheckpointTitle.propTypes = {
+-  children: PropTypes.node,
+-};
+diff --git a/src/tour/README.md b/src/tour/README.md
+deleted file mode 100644
+index 68e4cd9..0000000
+--- a/src/tour/README.md
++++ /dev/null
+@@ -1,103 +0,0 @@
+-Tour
+-=========================
+-
+-Basic Usage
+-------------
+-
+-A `Tour` takes a list of tour objects. `Tour` will only support one enabled tour at a time. If multiple
+-tours are enabled, Tour will only render the first enabled in the `tours` list.
+-
+-`Checkpoints` are rendered in the order they're listed in the checkpoint array.
+-The checkpoint objects themselves have additional props that can override the props defined in a `Tour`.
+-
+-```$xslt
+-const [isTourEnabled, setIsTourEnabled] = useState(false);
+-const myFirstTour = {
+-  tourId: 'myFirstTour',
+-  advanceButtonText: 'Next',
+-  dismissButtonText: 'Dismiss',
+-  endButtonText: 'Okay',
+-  enabled: isTourEnabled,
+-  onDismiss: () => setIsTourEnabled(false),
+-  onEnd: () => setIsTourEnabled(false),
+-  checkpoints: [
+-    {
+-      body: 'Here's the first stop!',
+-      placement: 'top',
+-      target: '#checkpoint-1',
+-      title: 'First checkpoint',
+-    },
+-    {
+-      body: 'Here's the second stop!',
+-      onDismiss: () => console.log('Dismissed the second checkpoint'),
+-      placement: 'right',
+-      target: '#checkpoint-2',
+-      title: 'Second checkpoint',
+-    },
+-    {
+-      body: 'Here's the third stop!',
+-      placement: 'bottom',
+-      target: '#checkpoint-3',
+-      title: 'Third checkpoint',
+-    }
+-  ],
+-};
+-
+-return (
+-  <>
+-    <Tour
+-      tours={[myFirstTour]}
+-    />
+-    <Container>
+-      <Button onClick={() => setIsTourEnabled(true)}>Start tour</Button>
+-      <div id="checkpoint-1">...</div>
+-      <Row>
+-        <div id="checkpoint-2">...</div>
+-        <div id="checkpoint-3">...</div>
+-      </Row>
+-    <Container>
+-  </>
+-);
+-```
+-
+-Tour Props API
+-------------
+-
+-tours `array`  
+-: comprised of objects with the following values:  
+-
+-- **advanceButtonText** `string`:  
+-The text displayed on all buttons used to advance the tour.  
+-- **checkpoints** `array`:
+-An array comprised of checkpoint objects supporting the following values:  
+-  - **advanceButtonText** `string`:
+-  The text displayed on the button used to advance the tour for the given Checkpoint (overrides the `advanceButtonText` defined in the parent tour object).  
+-  - **body** `string`  
+-  - **dismissButtonText** `string`:
+- The text displayed on the button used to dismiss the tour for the given Checkpoint (overrides the `dismissButtonText` defined in the parent tour object).  
+-  - **endButtonText** `string`:
+-  The text displayed on the button used to end the tour for the given Checkpoint (overrides the `endButtonText` defined in the parent tour object).  
+-  - **onAdvance** `func`:
+-  A function that would be triggered when triggering the `onClick` event of the advance button for the given Checkpoint.  
+-  - **onDismiss** `func`:
+-  A function that would be triggered when triggering the `onClick` event of the dismiss button for the given Checkpoint (overrides the `onDismiss` function defined in the parent tour object).  
+-  - **placement** `string`:
+-  A string that dictates the alignment of the Checkpoint around its target.  
+-  - **target** `string` *required*:
+-  The CSS selector for the Checkpoint's desired target.  
+-  - **title** `string`
+-- **dismissButtonText** `string`:
+-The text displayed on the button used to dismiss the tour.  
+-- **enabled** `bool` *required*:
+-Whether the tour is enabled. If there are multiple tours defined, only one should be enabled at a time.  
+-- **endButtonText** `string`:
+-The text displayed on the button used to end the tour.  
+-- **onDismiss** `func`:
+-A function that would be triggered when triggering the `onClick` event of the dismiss button.  
+-- **onEnd** `func`:
+-A function that would be triggered when triggering the `onClick` event of the end button.  
+-- **onEscape** `func`:
+-A function that would be triggered when pressing the Escape key.  
+-- **startingIndex** `number`:
+-The index of the desired `Checkpoint` to render when the tour starts.  
+-- **tourId** `string` *required*
+diff --git a/src/tour/Tour.jsx b/src/tour/Tour.jsx
+deleted file mode 100644
+index 3ed79b2..0000000
+--- a/src/tour/Tour.jsx
++++ /dev/null
+@@ -1,163 +0,0 @@
+-import React, { useEffect, useState } from 'react';
+-import PropTypes from 'prop-types';
+-
+-import Checkpoint from './Checkpoint';
+-
+-function Tour({
+-  tours,
+-}) {
+-  const tourValue = tours.filter((tour) => tour.enabled)[0];
+-
+-  const [currentCheckpointData, setCurrentCheckpointData] = useState(null);
+-  const [index, setIndex] = useState(0);
+-  const [isTourEnabled, setIsTourEnabled] = useState(!!tourValue);
+-  const [prunedCheckpoints, setPrunedCheckpoints] = useState([]);
+-
+-  /**
+-   * Takes a list of checkpoints and verifies that each target string provided is
+-   * an element in the DOM.
+-   */
+-  const pruneCheckpoints = (checkpoints) => {
+-    const checkpointsWithRenderedTargets = checkpoints.filter(
+-      (checkpoint) => !!document.querySelector(checkpoint.target),
+-    );
+-    setPrunedCheckpoints(checkpointsWithRenderedTargets);
+-  };
+-
+-  useEffect(() => {
+-    if (tourValue) {
+-      if (!isTourEnabled) {
+-        setIsTourEnabled(tourValue.enabled);
+-      }
+-      pruneCheckpoints(tourValue.checkpoints);
+-      setIndex(tourValue.startingIndex || 0);
+-    }
+-  }, [tourValue]);
+-
+-  useEffect(() => {
+-    if (isTourEnabled) {
+-      if (prunedCheckpoints) {
+-        setCurrentCheckpointData(prunedCheckpoints[index]);
+-      } else {
+-        pruneCheckpoints(tourValue.checkpoints);
+-      }
+-    }
+-  }, [index, isTourEnabled, prunedCheckpoints]);
+-
+-  useEffect(() => {
+-    const handleEsc = (event) => {
+-      if (isTourEnabled && event.keyCode === 27) {
+-        setIsTourEnabled(false);
+-        if (tourValue.onEscape) {
+-          tourValue.onEscape();
+-        }
+-      }
+-    };
+-    window.addEventListener('keydown', handleEsc);
+-
+-    return () => {
+-      window.removeEventListener('keydown', handleEsc);
+-    };
+-  }, [currentCheckpointData]);
+-
+-  if (!tourValue || !currentCheckpointData || !isTourEnabled) {
+-    return null;
+-  }
+-
+-  const handleAdvance = () => {
+-    setIndex(index + 1);
+-    if (currentCheckpointData.onAdvance) {
+-      currentCheckpointData.onAdvance();
+-    }
+-  };
+-
+-  const handleDismiss = () => {
+-    setIndex(0);
+-    setIsTourEnabled(false);
+-    if (currentCheckpointData.onDismiss) {
+-      currentCheckpointData.onDismiss();
+-    } else {
+-      tourValue.onDismiss();
+-    }
+-    setCurrentCheckpointData(null);
+-  };
+-
+-  const handleEnd = () => {
+-    setIndex(0);
+-    setIsTourEnabled(false);
+-    if (tourValue.onEnd) {
+-      tourValue.onEnd();
+-    }
+-    setCurrentCheckpointData(null);
+-  };
+-
+-  return (
+-    <Checkpoint
+-      advanceButtonText={currentCheckpointData.advanceButtonText || tourValue.advanceButtonText}
+-      body={currentCheckpointData.body}
+-      currentCheckpointData={currentCheckpointData}
+-      dismissButtonText={currentCheckpointData.dismissButtonText || tourValue.dismissButtonText}
+-      endButtonText={currentCheckpointData.endButtonText || tourValue.endButtonText}
+-      index={index}
+-      onAdvance={handleAdvance}
+-      onDismiss={handleDismiss}
+-      onEnd={handleEnd}
+-      placement={currentCheckpointData.placement}
+-      target={currentCheckpointData.target}
+-      title={currentCheckpointData.title}
+-      totalCheckpoints={prunedCheckpoints.length}
+-    />
+-  );
+-}
+-
+-Tour.defaultProps = {
+-  tours: {
+-    advanceButtonText: '',
+-    checkpoints: {
+-      advanceButtonText: '',
+-      body: '',
+-      dismissButtonText: '',
+-      endButtonText: '',
+-      onAdvance: () => {},
+-      onDismiss: () => {},
+-      placement: 'top',
+-      title: '',
+-    },
+-    dismissButtonText: '',
+-    endButtonText: '',
+-    onDismiss: () => {},
+-    onEnd: () => {},
+-    onEscape: () => {},
+-    startingIndex: 0,
+-  },
+-};
+-
+-Tour.propTypes = {
+-  tours: PropTypes.arrayOf(PropTypes.shape({
+-    advanceButtonText: PropTypes.node,
+-    checkpoints: PropTypes.arrayOf(PropTypes.shape({
+-      advanceButtonText: PropTypes.node,
+-      body: PropTypes.node,
+-      dismissButtonText: PropTypes.node,
+-      endButtonText: PropTypes.node,
+-      onAdvance: PropTypes.func,
+-      onDismiss: PropTypes.func,
+-      placement: PropTypes.oneOf([
+-        'top', 'top-start', 'top-end', 'right-start', 'right', 'right-end',
+-        'left-start', 'left', 'left-end', 'bottom', 'bottom-start', 'bottom-end',
+-      ]),
+-      target: PropTypes.string.isRequired,
+-      title: PropTypes.node,
+-    })),
+-    dismissButtonText: PropTypes.node,
+-    enabled: PropTypes.bool.isRequired,
+-    endButtonText: PropTypes.node,
+-    onDismiss: PropTypes.func,
+-    onEnd: PropTypes.func,
+-    onEscape: PropTypes.func,
+-    startingIndex: PropTypes.number,
+-    tourId: PropTypes.string.isRequired,
+-  })),
+-};
+-
+-export default Tour;
+diff --git a/src/tour/tests/Checkpoint.test.jsx b/src/tour/tests/Checkpoint.test.jsx
+deleted file mode 100644
+index 4d258e6..0000000
+--- a/src/tour/tests/Checkpoint.test.jsx
++++ /dev/null
+@@ -1,143 +0,0 @@
+-/**
+- * @jest-environment jsdom
+- */
+-import Enzyme from 'enzyme';
+-import Adapter from '@wojtekmaj/enzyme-adapter-react-17';
+-import React from 'react';
+-import { fireEvent, render, screen } from '@testing-library/react';
+-import * as popper from '@popperjs/core';
+-
+-import Checkpoint from '../Checkpoint';
+-
+-Enzyme.configure({ adapter: new Adapter() });
+-const popperMock = jest.spyOn(popper, 'createPopper');
+-
+-describe('Checkpoint', () => {
+-  const handleAdvance = jest.fn();
+-  const handleDismiss = jest.fn();
+-  const handleEnd = jest.fn();
+-
+-  beforeEach(() => {
+-    popperMock.mockImplementation(jest.fn());
+-  });
+-
+-  afterEach(() => {
+-    popperMock.mockReset();
+-  });
+-
+-  describe('second Checkpoint in Tour', () => {
+-    beforeEach(() => {
+-      render(
+-        <>
+-          <div id="target-element">...</div>
+-          <Checkpoint
+-            advanceButtonText="Next"
+-            body="Lorem ipsum checkpoint body"
+-            dismissButtonText="Dismiss"
+-            endButtonText="End"
+-            index={1}
+-            onAdvance={handleAdvance}
+-            onDismiss={handleDismiss}
+-            onEnd={handleEnd}
+-            target="#target-element"
+-            title="Checkpoint title"
+-            totalCheckpoints={5}
+-          />
+-        </>,
+-      );
+-    });
+-
+-    it('renders correct active breadcrumb', async () => {
+-      expect(screen.getByText('Checkpoint title')).toBeInTheDocument();
+-      const breadcrumbs = screen.getAllByTestId('checkpoint-popover_breadcrumb_', { exact: false });
+-      expect(breadcrumbs.length).toEqual(5);
+-      expect(breadcrumbs.at(0).classList.contains('checkpoint-popover_breadcrumb_inactive')).toBe(true);
+-      expect(breadcrumbs.at(1).classList.contains('checkpoint-popover_breadcrumb_active')).toBe(true);
+-      expect(breadcrumbs.at(2).classList.contains('checkpoint-popover_breadcrumb_inactive')).toBe(true);
+-      expect(breadcrumbs.at(3).classList.contains('checkpoint-popover_breadcrumb_inactive')).toBe(true);
+-      expect(breadcrumbs.at(4).classList.contains('checkpoint-popover_breadcrumb_inactive')).toBe(true);
+-    });
+-
+-    it('only renders advance and dismiss buttons (i.e. does not render end button)', () => {
+-      expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+-      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+-    });
+-
+-    it('dismiss button onClick calls handleDismiss', () => {
+-      const dismissButton = screen.getByRole('button', { name: 'Dismiss' });
+-      fireEvent.click(dismissButton);
+-      expect(handleDismiss).toHaveBeenCalledTimes(1);
+-    });
+-
+-    it('advance button onClick calls handleAdvance', () => {
+-      const advanceButton = screen.getByRole('button', { name: 'Next' });
+-      fireEvent.click(advanceButton);
+-      expect(handleAdvance).toHaveBeenCalledTimes(1);
+-    });
+-  });
+-
+-  describe('last Checkpoint in Tour', () => {
+-    beforeEach(() => {
+-      render(
+-        <>
+-          <div id="#last-element" />
+-          <Checkpoint
+-            advanceButtonText="Next"
+-            body="Lorem ipsum checkpoint body"
+-            dismissButtonText="Dismiss"
+-            endButtonText="End"
+-            index={4}
+-            onAdvance={handleAdvance}
+-            onDismiss={handleDismiss}
+-            onEnd={handleEnd}
+-            target="#last-element"
+-            title="Checkpoint title"
+-            totalCheckpoints={5}
+-          />
+-        </>,
+-      );
+-    });
+-
+-    it('only renders end button (i.e. neither advance nor dismiss buttons)', () => {
+-      expect(screen.getByRole('button', { name: 'End' })).toBeInTheDocument();
+-    });
+-
+-    it('end button onClick calls handleEnd', () => {
+-      const endButton = screen.getByRole('button', { name: 'End' });
+-      fireEvent.click(endButton);
+-      expect(handleEnd).toHaveBeenCalledTimes(1);
+-    });
+-  });
+-
+-  describe('only one Checkpoint in Tour', () => {
+-    beforeEach(() => {
+-      render(
+-        <>
+-          <div id="#target-element" />
+-          <Checkpoint
+-            advanceButtonText="Next"
+-            body="Lorem ipsum checkpoint body"
+-            dismissButtonText="Dismiss"
+-            endButtonText="End"
+-            index={0}
+-            onAdvance={handleAdvance}
+-            onDismiss={handleDismiss}
+-            onEnd={handleEnd}
+-            target="#target-element"
+-            title="Checkpoint title"
+-            totalCheckpoints={1}
+-          />
+-        </>,
+-      );
+-    });
+-
+-    it('only renders end button (i.e. neither advance nor dismiss buttons)', () => {
+-      expect(screen.getByRole('button', { name: 'End' })).toBeInTheDocument();
+-    });
+-
+-    it('does not render breadcrumbs', () => {
+-      const breadcrumbs = screen.queryAllByTestId('checkpoint-popover_breadcrumb_', { exact: false });
+-      expect(breadcrumbs.length).toEqual(0);
+-    });
+-  });
+-});
+diff --git a/src/tour/tests/Tour.test.jsx b/src/tour/tests/Tour.test.jsx
+deleted file mode 100644
+index 9b717bc..0000000
+--- a/src/tour/tests/Tour.test.jsx
++++ /dev/null
+@@ -1,426 +0,0 @@
+-/**
+- * @jest-environment jsdom
+- */
+-import Enzyme from 'enzyme';
+-import React from 'react';
+-import Adapter from '@wojtekmaj/enzyme-adapter-react-17';
+-import { fireEvent, render, screen } from '@testing-library/react';
+-import * as popper from '@popperjs/core';
+-
+-import Tour from '../Tour';
+-
+-Enzyme.configure({ adapter: new Adapter() }); // This can be removed once the component is ported over to Paragon
+-
+-const popperMock = jest.spyOn(popper, 'createPopper');
+-
+-describe('Tour', () => {
+-  const targets = (
+-    <>
+-      <div id="target-1">...</div>
+-      <div id="target-2">...</div>
+-      <div id="target-3">...</div>
+-    </>
+-  );
+-  const handleDismiss = jest.fn();
+-  const handleEnd = jest.fn();
+-  const customOnDismiss = jest.fn();
+-
+-  const disabledTourData = {
+-    advanceButtonText: 'Next',
+-    dismissButtonText: 'Dismiss',
+-    enabled: false,
+-    endButtonText: 'Okay',
+-    onDismiss: handleDismiss,
+-    onEnd: handleEnd,
+-    tourId: 'disabledTour',
+-    checkpoints: [
+-      {
+-        body: 'Lorem ipsum body',
+-        target: '#target-1',
+-        title: 'Disabled tour',
+-      },
+-    ],
+-  };
+-
+-  const tourData = {
+-    advanceButtonText: 'Next',
+-    dismissButtonText: 'Dismiss',
+-    enabled: true,
+-    endButtonText: 'Okay',
+-    onDismiss: handleDismiss,
+-    onEnd: handleEnd,
+-    tourId: 'enabledTour',
+-    checkpoints: [
+-      {
+-        body: 'Lorem ipsum body',
+-        target: '#target-1',
+-        title: 'Checkpoint 1',
+-      },
+-      {
+-        body: 'Lorem ipsum body',
+-        target: '#target-2',
+-        title: 'Checkpoint 2',
+-      },
+-      {
+-        body: 'Lorem ipsum body',
+-        target: '#target-3',
+-        title: 'Checkpoint 3',
+-        onDismiss: customOnDismiss,
+-        advanceButtonText: 'Override advance',
+-        dismissButtonText: 'Override dismiss',
+-
+-      },
+-      {
+-        target: '#target-3',
+-        title: 'Checkpoint 4',
+-        endButtonText: 'Override end',
+-      },
+-    ],
+-  };
+-
+-  beforeEach(() => {
+-    popperMock.mockImplementation(jest.fn());
+-  });
+-
+-  afterEach(() => {
+-    popperMock.mockReset();
+-  });
+-
+-  describe('multiple enabled tours', () => {
+-    it('renders first enabled tour', () => {
+-      const secondEnabledTourData = {
+-        advanceButtonText: 'Next',
+-        dismissButtonText: 'Dismiss',
+-        enabled: true,
+-        endButtonText: 'Okay',
+-        onDismiss: handleDismiss,
+-        onEnd: handleEnd,
+-        tourId: 'secondEnabledTour',
+-        checkpoints: [
+-          {
+-            body: 'Lorem ipsum body',
+-            target: '#target-1',
+-            title: 'Second enabled tour',
+-          },
+-        ],
+-      };
+-
+-      render(
+-        <>
+-          <Tour
+-            tours={[disabledTourData, tourData, secondEnabledTourData]}
+-          />
+-          {targets}
+-        </>,
+-      );
+-
+-      expect(screen.getByText('Checkpoint 1')).toBeInTheDocument();
+-      expect(screen.queryByText('Second enabled tour')).not.toBeInTheDocument();
+-    });
+-  });
+-
+-  describe('enabled tour', () => {
+-    describe('with default settings', () => {
+-      it('renders checkpoint with correct title, body, and breadcrumbs', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[tourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-
+-        expect(screen.getByRole('dialog', { name: 'Checkpoint 1' })).toBeInTheDocument();
+-        expect(screen.getByText('Checkpoint 1')).toBeInTheDocument();
+-        expect(screen.getByTestId('checkpoint-popover_breadcrumb_active')).toBeInTheDocument();
+-      });
+-
+-      it('onClick of advance button advances to next checkpoint', async () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[tourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-
+-        // Verify the first Checkpoint has rendered
+-        expect(screen.getByRole('heading', { name: 'Checkpoint 1' })).toBeInTheDocument();
+-
+-        // Click the advance button
+-        const advanceButton = screen.getByRole('button', { name: 'Next' });
+-        fireEvent.click(advanceButton);
+-
+-        // Verify the second Checkpoint has rendered
+-        expect(screen.getByRole('heading', { name: 'Checkpoint 2' })).toBeInTheDocument();
+-      });
+-
+-      it('onClick of dismiss button disables tour', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[tourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-
+-        // Verify a Checkpoint has rendered
+-        expect(screen.getByRole('dialog', { name: 'Checkpoint 1' })).toBeInTheDocument();
+-
+-        // Click the dismiss button
+-        const dismissButton = screen.getByRole('button', { name: 'Dismiss' });
+-        expect(dismissButton).toBeInTheDocument();
+-        fireEvent.click(dismissButton);
+-
+-        // Verify no Checkpoints have rendered
+-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+-      });
+-
+-      it('onClick of end button disables tour', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[tourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-
+-        // Verify a Checkpoint has rendered
+-        expect(screen.getByRole('dialog', { name: 'Checkpoint 1' })).toBeInTheDocument();
+-
+-        // Advance the Tour to the last Checkpoint
+-        const advanceButton1 = screen.getByRole('button', { name: 'Next' });
+-        fireEvent.click(advanceButton1);
+-        const advanceButton2 = screen.getByRole('button', { name: 'Next' });
+-        fireEvent.click(advanceButton2);
+-        const advanceButton3 = screen.getByRole('button', { name: 'Override advance' });
+-        fireEvent.click(advanceButton3);
+-
+-        // Click the end button
+-        const endButton = screen.getByRole('button', { name: 'Override end' });
+-        fireEvent.click(endButton);
+-
+-        // Verify no Checkpoints have rendered
+-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+-      });
+-
+-      it('onClick of escape key disables tour', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[tourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-
+-        // Verify a Checkpoint has rendered
+-        expect(screen.getByRole('dialog', { name: 'Checkpoint 1' })).toBeInTheDocument();
+-
+-        // Click Escape key
+-        fireEvent.keyDown(screen.getByRole('dialog'), {
+-          key: 'Escape',
+-          code: 'Escape',
+-          keyCode: 27,
+-          charCode: 27,
+-        });
+-
+-        // Verify no Checkpoints have been rendered
+-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+-      });
+-    });
+-
+-    describe('with Checkpoint override settings', () => {
+-      const overrideTourData = {
+-        advanceButtonText: 'Next',
+-        dismissButtonText: 'Dismiss',
+-        enabled: true,
+-        endButtonText: 'Okay',
+-        onDismiss: handleDismiss,
+-        onEnd: handleEnd,
+-        tourId: 'enabledTour',
+-        startingIndex: 2,
+-        checkpoints: [
+-          {
+-            body: 'Lorem ipsum body',
+-            target: '#target-1',
+-            title: 'Checkpoint 1',
+-          },
+-          {
+-            body: 'Lorem ipsum body',
+-            target: '#target-2',
+-            title: 'Checkpoint 2',
+-          },
+-          {
+-            body: 'Lorem ipsum body',
+-            target: '#target-3',
+-            title: 'Checkpoint 3',
+-            onDismiss: customOnDismiss,
+-            advanceButtonText: 'Override advance',
+-            dismissButtonText: 'Override dismiss',
+-
+-          },
+-          {
+-            target: '#target-3',
+-            title: 'Checkpoint 4',
+-            endButtonText: 'Override end',
+-          },
+-        ],
+-      };
+-      it('renders correct checkpoint on index override', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[overrideTourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-        expect(screen.getByRole('dialog', { name: 'Checkpoint 3' })).toBeInTheDocument();
+-        expect(screen.getByRole('heading', { name: 'Checkpoint 3' })).toBeInTheDocument();
+-      });
+-
+-      it('applies override for advanceButtonText', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[overrideTourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-        expect(screen.getByRole('button', { name: 'Override advance' })).toBeInTheDocument();
+-      });
+-
+-      it('applies override for dismissButtonText', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[overrideTourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-        expect(screen.getByRole('button', { name: 'Override dismiss' })).toBeInTheDocument();
+-      });
+-
+-      it('applies override for endButtonText', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[overrideTourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-        const advanceButton = screen.getByRole('button', { name: 'Override advance' });
+-        fireEvent.click(advanceButton);
+-        expect(screen.getByRole('button', { name: 'Override end' })).toBeInTheDocument();
+-      });
+-
+-      it('calls customHandleDismiss onClick of dismiss button', () => {
+-        render(
+-          <>
+-            <Tour
+-              tours={[overrideTourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-        const dismissButton = screen.getByRole('button', { name: 'Override dismiss' });
+-        fireEvent.click(dismissButton);
+-
+-        expect(customOnDismiss).toHaveBeenCalledTimes(1);
+-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+-      });
+-    });
+-
+-    describe('with invalid Checkpoint', () => {
+-      it('does not render', () => {
+-        const badTourData = {
+-          advanceButtonText: 'Next',
+-          dismissButtonText: 'Dismiss',
+-          enabled: true,
+-          endButtonText: 'Okay',
+-          onDismiss: handleDismiss,
+-          onEnd: handleEnd,
+-          tourId: 'badTour',
+-          checkpoints: [
+-            {
+-              body: 'Lorem ipsum body',
+-              target: 'bad-target-data',
+-              title: 'Checkpoint 1',
+-            },
+-          ],
+-        };
+-
+-        render(
+-          <>
+-            <Tour
+-              tours={[badTourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-
+-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+-      });
+-
+-      it('advances to next valid Checkpoint', () => {
+-        const badTourData = {
+-          advanceButtonText: 'Next',
+-          dismissButtonText: 'Dismiss',
+-          enabled: true,
+-          endButtonText: 'Okay',
+-          onDismiss: handleDismiss,
+-          onEnd: handleEnd,
+-          tourId: 'badTour',
+-          checkpoints: [
+-            {
+-              body: 'Lorem ipsum body',
+-              target: 'bad-target-data',
+-              title: 'Checkpoint 1',
+-            },
+-            {
+-              body: 'Lorem ipsum body',
+-              target: '#target-1',
+-              title: 'Checkpoint 2',
+-            },
+-          ],
+-        };
+-
+-        render(
+-          <>
+-            <Tour
+-              tours={[badTourData]}
+-            />
+-            {targets}
+-          </>,
+-        );
+-
+-        expect(screen.queryByRole('dialog', { name: 'Checkpoint 1' })).not.toBeInTheDocument();
+-        expect(screen.getByRole('dialog', { name: 'Checkpoint 2' })).toBeInTheDocument();
+-        expect(screen.getByRole('heading', { name: 'Checkpoint 2' })).toBeInTheDocument();
+-      });
+-    });
+-  });
+-
+-  describe('disabled tour', () => {
+-    it('does not render', () => {
+-      render(
+-        <>
+-          <Tour
+-            tours={[disabledTourData]}
+-          />
+-          {targets}
+-        </>,
+-      );
+-
+-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+-    });
+-  });
+-});
+-- 
+2.34.1
+

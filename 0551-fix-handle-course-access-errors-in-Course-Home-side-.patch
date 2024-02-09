@@ -1,0 +1,705 @@
+From c667e29492a8ccc7ad98cbdd86413cb5ce92e3cd Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 26 Jul 2021 16:33:59 -0400
+Subject: [PATCH 0551/1021] fix: handle course access errors in Course Home
+ side of things too (#558)
+
+The courseware was properly reading the access errors and
+redirecting the user as appropriate (like to the dashboard or
+whatever).
+
+This requires a backend change to push the error along.
+---
+ .../courseHomeMetadata.factory.js             |  9 +++
+ .../data/__snapshots__/redux.test.js.snap     | 27 +++++++
+ src/course-home/data/slice.js                 | 16 ++--
+ src/course-home/data/thunks.js                |  5 +-
+ src/course-home/dates-tab/DatesTab.test.jsx   | 74 +++++++++++++++----
+ src/courseware/CoursewareContainer.jsx        | 49 +-----------
+ src/courseware/CoursewareContainer.test.jsx   | 29 ++++++--
+ .../CoursewareRedirectLandingPage.jsx         |  6 ++
+ .../__factories__/courseMetadata.factory.js   |  2 +-
+ .../__factories__/sequenceMetadata.factory.js |  2 +-
+ src/courseware/data/api.js                    |  2 +-
+ src/courseware/data/redux.test.js             | 10 +--
+ src/courseware/data/thunks.js                 |  2 +-
+ .../AccessDeniedRedirect.jsx                  | 67 +++++++++++++++++
+ src/shared/access-denied-redirect/index.js    |  3 +
+ src/tab-page/TabPage.jsx                      | 23 +++++-
+ 16 files changed, 242 insertions(+), 84 deletions(-)
+ create mode 100644 src/shared/access-denied-redirect/AccessDeniedRedirect.jsx
+ create mode 100644 src/shared/access-denied-redirect/index.js
+
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 00a2b3c..43539ca 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -10,4 +10,13 @@ Factory.define('courseHomeMetadata')
+     is_self_paced: false,
+     is_enrolled: false,
+     can_load_courseware: false,
++    course_access: {
++      additional_context_user_message: null,
++      developer_message: null,
++      error_code: null,
++      has_access: true,
++      user_fragment: null,
++      user_message: null,
++    },
++    start: '2013-02-05T05:00:00Z',
+   });
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 467ae8e..e1ff273 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -22,6 +22,14 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "canLoadCourseware": false,
++        "courseAccess": Object {
++          "additionalContextUserMessage": null,
++          "developerMessage": null,
++          "errorCode": null,
++          "hasAccess": true,
++          "userFragment": null,
++          "userMessage": null,
++        },
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "isEnrolled": false,
+         "isSelfPaced": false,
+@@ -29,6 +37,7 @@ Object {
+         "number": "DemoX",
+         "org": "edX",
+         "originalUserIsStaff": false,
++        "start": "2013-02-05T05:00:00Z",
+         "tabs": Array [
+           Object {
+             "slug": "outline",
+@@ -318,6 +327,14 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "canLoadCourseware": false,
++        "courseAccess": Object {
++          "additionalContextUserMessage": null,
++          "developerMessage": null,
++          "errorCode": null,
++          "hasAccess": true,
++          "userFragment": null,
++          "userMessage": null,
++        },
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "isEnrolled": false,
+         "isSelfPaced": false,
+@@ -325,6 +342,7 @@ Object {
+         "number": "DemoX",
+         "org": "edX",
+         "originalUserIsStaff": false,
++        "start": "2013-02-05T05:00:00Z",
+         "tabs": Array [
+           Object {
+             "slug": "outline",
+@@ -497,6 +515,14 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "canLoadCourseware": false,
++        "courseAccess": Object {
++          "additionalContextUserMessage": null,
++          "developerMessage": null,
++          "errorCode": null,
++          "hasAccess": true,
++          "userFragment": null,
++          "userMessage": null,
++        },
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "isEnrolled": false,
+         "isSelfPaced": false,
+@@ -504,6 +530,7 @@ Object {
+         "number": "DemoX",
+         "org": "edX",
+         "originalUserIsStaff": false,
++        "start": "2013-02-05T05:00:00Z",
+         "tabs": Array [
+           Object {
+             "slug": "outline",
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index adb2097..b195b42 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -4,6 +4,7 @@ import { createSlice } from '@reduxjs/toolkit';
+ export const LOADING = 'loading';
+ export const LOADED = 'loaded';
+ export const FAILED = 'failed';
++export const DENIED = 'denied';
+ 
+ const slice = createSlice({
+   name: 'course-home',
+@@ -15,6 +16,14 @@ const slice = createSlice({
+     toastHeader: '',
+   },
+   reducers: {
++    fetchTabDenied: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.courseStatus = DENIED;
++    },
++    fetchTabFailure: (state, { payload }) => {
++      state.courseId = payload.courseId;
++      state.courseStatus = FAILED;
++    },
+     fetchTabRequest: (state, { payload }) => {
+       state.courseId = payload.courseId;
+       state.courseStatus = LOADING;
+@@ -24,10 +33,6 @@ const slice = createSlice({
+       state.targetUserId = payload.targetUserId;
+       state.courseStatus = LOADED;
+     },
+-    fetchTabFailure: (state, { payload }) => {
+-      state.courseId = payload.courseId;
+-      state.courseStatus = FAILED;
+-    },
+     setCallToActionToast: (state, { payload }) => {
+       const {
+         header,
+@@ -42,9 +47,10 @@ const slice = createSlice({
+ });
+ 
+ export const {
++  fetchTabDenied,
++  fetchTabFailure,
+   fetchTabRequest,
+   fetchTabSuccess,
+-  fetchTabFailure,
+   setCallToActionToast,
+ } = slice.actions;
+ 
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index f95a705..7923ea0 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -17,6 +17,7 @@ import {
+ } from '../../generic/model-store';
+ 
+ import {
++  fetchTabDenied,
+   fetchTabFailure,
+   fetchTabRequest,
+   fetchTabSuccess,
+@@ -61,7 +62,9 @@ export function fetchTab(courseId, tab, getTabData, targetUserId) {
+         logError(tabDataResult.reason);
+       }
+ 
+-      if (fetchedCourseHomeCourseMetadata && fetchedTabData) {
++      if (fetchedCourseHomeCourseMetadata && !courseHomeCourseMetadataResult.value.courseAccess.hasAccess) {
++        dispatch(fetchTabDenied({ courseId }));
++      } else if (fetchedCourseHomeCourseMetadata && fetchedTabData) {
+         dispatch(fetchTabSuccess({ courseId, targetUserId }));
+       } else {
+         dispatch(fetchTabFailure({ courseId }));
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index aaa4070..b0e1591 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -23,19 +23,24 @@ jest.mock('@edx/frontend-platform/analytics');
+ 
+ describe('DatesTab', () => {
+   let axiosMock;
+-
+-  const store = initializeStore();
+-  const component = (
+-    <AppProvider store={store}>
+-      <UserMessagesProvider>
+-        <Route path="/course/:courseId/dates">
+-          <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
+-            <DatesTab />
+-          </TabContainer>
+-        </Route>
+-      </UserMessagesProvider>
+-    </AppProvider>
+-  );
++  let store;
++  let component;
++
++  beforeEach(() => {
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    store = initializeStore();
++    component = (
++      <AppProvider store={store}>
++        <UserMessagesProvider>
++          <Route path="/course/:courseId/dates">
++            <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
++              <DatesTab />
++            </TabContainer>
++          </Route>
++        </UserMessagesProvider>
++      </AppProvider>
++    );
++  });
+ 
+   const datesTabData = Factory.build('datesTabData');
+   let courseMetadata = Factory.build('courseHomeMetadata');
+@@ -74,7 +79,6 @@ describe('DatesTab', () => {
+ 
+   describe('when receiving a full set of dates data', () => {
+     beforeEach(() => {
+-      axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+       axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+       axiosMock.onGet(datesUrl).reply(200, datesTabData);
+       history.push(`/course/${courseId}/dates`); // so tab can pull course id from url
+@@ -142,7 +146,6 @@ describe('DatesTab', () => {
+ 
+   describe('Suggested schedule messaging', () => {
+     beforeEach(() => {
+-      axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+       setMetadata({ is_self_paced: true, is_enrolled: true });
+       history.push(`/course/${courseId}/dates`);
+     });
+@@ -295,4 +298,45 @@ describe('DatesTab', () => {
+       });
+     });
+   });
++
++  describe('when receiving an access denied error', () => {
++    // These tests could go into any particular tab, as they all go through the same flow. But dates tab works.
++
++    async function renderDenied(errorCode) {
++      setMetadata({
++        course_access: {
++          has_access: false,
++          error_code: errorCode,
++          additional_context_user_message: 'uhoh oh no', // only used by audit_expired
++        },
++      });
++      render(component);
++      await waitForElementToBeRemoved(screen.getByRole('status'));
++    }
++
++    beforeEach(() => {
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
++      history.push(`/course/${courseId}/dates`); // so tab can pull course id from url
++    });
++
++    it('redirects to course survey for a survey_required error code', async () => {
++      await renderDenied('survey_required');
++      expect(global.location.href).toEqual(`http://localhost/redirect/survey/${courseMetadata.id}`);
++    });
++
++    it('redirects to dashboard for an unfulfilled_milestones error code', async () => {
++      await renderDenied('unfulfilled_milestones');
++      expect(global.location.href).toEqual('http://localhost/redirect/dashboard');
++    });
++
++    it('redirects to the dashboard with an attached access_response_error for an audit_expired error code', async () => {
++      await renderDenied('audit_expired');
++      expect(global.location.href).toEqual('http://localhost/redirect/dashboard?access_response_error=uhoh%20oh%20no');
++    });
++
++    it('redirects to the dashboard with a notlive start date for a course_not_started error code', async () => {
++      await renderDenied('course_not_started');
++      expect(global.location.href).toEqual('http://localhost/redirect/dashboard?notlive=2/5/2013'); // date from factory
++    });
++  });
+ });
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index e8376fe..3d82cfd 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -2,8 +2,6 @@ import React, { Component } from 'react';
+ import PropTypes from 'prop-types';
+ import { connect } from 'react-redux';
+ import { history } from '@edx/frontend-platform';
+-import { getLocale } from '@edx/frontend-platform/i18n';
+-import { Redirect } from 'react-router';
+ import { createSelector } from '@reduxjs/toolkit';
+ import { defaultMemoize as memoize } from 'reselect';
+ 
+@@ -245,42 +243,6 @@ class CoursewareContainer extends Component {
+     }
+   }
+ 
+-  renderDenied() {
+-    const {
+-      course,
+-      courseId,
+-      match: {
+-        params: {
+-          unitId: routeUnitId,
+-        },
+-      },
+-    } = this.props;
+-    let url = `/redirect/course-home/${courseId}`;
+-    switch (course.canLoadCourseware.errorCode) {
+-      case 'audit_expired':
+-        url = `/redirect/dashboard?access_response_error=${course.canLoadCourseware.additionalContextUserMessage}`;
+-        break;
+-      case 'course_not_started':
+-        // eslint-disable-next-line no-case-declarations
+-        const startDate = (new Intl.DateTimeFormat(getLocale())).format(new Date(course.start));
+-        url = `/redirect/dashboard?notlive=${startDate}`;
+-        break;
+-      case 'survey_required': // TODO: Redirect to the course survey
+-      case 'unfulfilled_milestones':
+-        url = '/redirect/dashboard';
+-        break;
+-      case 'microfrontend_disabled':
+-        url = `/redirect/courseware/${courseId}/unit/${routeUnitId}`;
+-        break;
+-      case 'authentication_required':
+-      case 'enrollment_required':
+-      default:
+-    }
+-    return (
+-      <Redirect to={url} />
+-    );
+-  }
+-
+   render() {
+     const {
+       courseStatus,
+@@ -293,10 +255,6 @@ class CoursewareContainer extends Component {
+       },
+     } = this.props;
+ 
+-    if (courseStatus === 'denied') {
+-      return this.renderDenied();
+-    }
+-
+     return (
+       <TabPage
+         activeTabSlug="courseware"
+@@ -338,10 +296,9 @@ const sectionShape = PropTypes.shape({
+ });
+ 
+ const courseShape = PropTypes.shape({
+-  canLoadCourseware: PropTypes.shape({
+-    errorCode: PropTypes.string,
+-    additionalContextUserMessage: PropTypes.string,
+-  }).isRequired,
++  celebrations: PropTypes.shape({
++    firstSection: PropTypes.bool,
++  }),
+ });
+ 
+ CoursewareContainer.propTypes = {
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 09e3cc0..e598969 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -427,31 +427,46 @@ describe('CoursewareContainer', () => {
+     });
+   });
+ 
+-  describe('when receiving a can_load_courseware error_code', () => {
++  describe('when receiving a course_access error_code', () => {
+     function setUpWithDeniedStatus(errorCode) {
+       const courseMetadata = Factory.build('courseMetadata', {
+-        can_load_courseware: {
++        course_access: {
+           has_access: false,
+           error_code: errorCode,
+           additional_context_user_message: 'uhoh oh no', // only used by audit_expired
+         },
+       });
+       const courseId = courseMetadata.id;
+-      const { courseBlocks } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
++
++      const { courseBlocks, sequenceBlocks, unitBlocks } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
+       setUpMockRequests({ courseBlocks, courseMetadata });
+-      history.push(`/course/${courseId}`);
+-      return courseMetadata;
++      history.push(`/course/${courseId}/${sequenceBlocks[0].id}/${unitBlocks[0].id}`);
++      return { courseMetadata, unitBlocks };
+     }
+ 
+     it('should go to course home for an enrollment_required error code', async () => {
+-      const courseMetadata = setUpWithDeniedStatus('enrollment_required');
++      const { courseMetadata } = setUpWithDeniedStatus('enrollment_required');
+       await loadContainer();
+ 
+       expect(global.location.href).toEqual(`http://localhost/redirect/course-home/${courseMetadata.id}`);
+     });
+ 
++    it('should go to course survey for a survey_required error code', async () => {
++      const { courseMetadata } = setUpWithDeniedStatus('survey_required');
++      await loadContainer();
++
++      expect(global.location.href).toEqual(`http://localhost/redirect/survey/${courseMetadata.id}`);
++    });
++
++    it('should go to legacy courseware for a microfrontend_disabled error code', async () => {
++      const { courseMetadata, unitBlocks } = setUpWithDeniedStatus('microfrontend_disabled');
++      await loadContainer();
++
++      expect(global.location.href).toEqual(`http://localhost/redirect/courseware/${courseMetadata.id}/unit/${unitBlocks[0].id}`);
++    });
++
+     it('should go to course home for an authentication_required error code', async () => {
+-      const courseMetadata = setUpWithDeniedStatus('authentication_required');
++      const { courseMetadata } = setUpWithDeniedStatus('authentication_required');
+       await loadContainer();
+ 
+       expect(global.location.href).toEqual(`http://localhost/redirect/course-home/${courseMetadata.id}`);
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index 246a540..f63ce4a 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -31,6 +31,12 @@ export default () => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/course/`);
+           }}
+         />
++        <PageRoute
++          path={`${path}/survey/:courseId`}
++          render={({ match }) => {
++            global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/survey`);
++          }}
++        />
+         <PageRoute
+           path={`${path}/dashboard`}
+           render={({ location }) => {
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 2f13687..7b84c58 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -34,7 +34,7 @@ Factory.define('courseMetadata')
+     },
+     show_calculator: false,
+     license: 'all-rights-reserved',
+-    can_load_courseware: {
++    course_access: {
+       has_access: true,
+       user_fragment: null,
+       developer_message: null,
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index ce8173e..3ec46b8 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -68,7 +68,7 @@ Factory.define('sequenceMetadata')
+  */
+ export default function buildSimpleCourseAndSequenceMetadata(options = {}) {
+   const courseMetadata = options.courseMetadata || Factory.build('courseMetadata', {
+-    can_load_courseware: {
++    course_access: {
+       has_access: false,
+     },
+   });
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 495d3cd..792fb40 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -160,7 +160,7 @@ function normalizeMetadata(metadata) {
+     start: data.start,
+     enrollmentMode: data.enrollment.mode,
+     isEnrolled: data.enrollment.is_active,
+-    canLoadCourseware: camelCaseObject(data.can_load_courseware),
++    courseAccess: camelCaseObject(data.course_access),
+     canViewLegacyCourseware: data.can_view_legacy_courseware,
+     originalUserIsStaff: data.original_user_is_staff,
+     isStaff: data.is_staff,
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index c577766..d3bea90 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -68,7 +68,7 @@ describe('Data layer integration tests', () => {
+ 
+     it('Should fetch, normalize, and save metadata, but with denied status', async () => {
+       const forbiddenCourseMetadata = Factory.build('courseMetadata', {
+-        can_load_courseware: {
++        course_access: {
+           has_access: false,
+         },
+       });
+@@ -89,7 +89,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.courseStatus).toEqual('denied');
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[forbiddenCourseMetadata.id].canLoadCourseware).not.toBeUndefined();
++      expect(state.models.coursewareMeta[forbiddenCourseMetadata.id].courseAccess).not.toBeUndefined();
+     });
+ 
+     it('Should fetch, normalize, and save metadata', async () => {
+@@ -107,7 +107,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].canLoadCourseware).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].courseAccess).not.toBeUndefined();
+     });
+ 
+     it('Should fetch, normalize, and save metadata; filtering has no effect', async () => {
+@@ -127,7 +127,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].canLoadCourseware).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].courseAccess).not.toBeUndefined();
+       expect(state.models.sequences.length === 1);
+       Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 1));
+     });
+@@ -149,7 +149,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].canLoadCourseware).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].courseAccess).not.toBeUndefined();
+       expect(state.models.sequences === null);
+       Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 0));
+     });
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 74e3a58..55767d3 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -117,7 +117,7 @@ export function fetchCourse(courseId) {
+       }
+ 
+       if (fetchedMetadata) {
+-        if (courseMetadataResult.value.canLoadCourseware.hasAccess && fetchedBlocks) {
++        if (courseMetadataResult.value.courseAccess.hasAccess && fetchedBlocks) {
+           // User has access
+           dispatch(fetchCourseSuccess({ courseId }));
+           return;
+diff --git a/src/shared/access-denied-redirect/AccessDeniedRedirect.jsx b/src/shared/access-denied-redirect/AccessDeniedRedirect.jsx
+new file mode 100644
+index 0000000..02e05d0
+--- /dev/null
++++ b/src/shared/access-denied-redirect/AccessDeniedRedirect.jsx
+@@ -0,0 +1,67 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { getLocale } from '@edx/frontend-platform/i18n';
++import { Redirect } from 'react-router';
++import { useModel } from '../../generic/model-store';
++
++// This component inspects an access denied error and redirects to a /redirect/... path, which then renders a nice
++// little message while the browser loads the next page.
++// This is basically a frontend version of check_course_access_with_redirect in the backend.
++
++function AccessDeniedRedirect(props) {
++  const {
++    courseId,
++    metadataModel,
++    unitId,
++  } = props;
++
++  const {
++    courseAccess,
++    start,
++  } = useModel(metadataModel, courseId);
++
++  let url = `/redirect/course-home/${courseId}`;
++  switch (courseAccess.errorCode) {
++    case 'audit_expired':
++      url = `/redirect/dashboard?access_response_error=${courseAccess.additionalContextUserMessage}`;
++      break;
++    case 'course_not_started':
++      // eslint-disable-next-line no-case-declarations
++      const startDate = (new Intl.DateTimeFormat(getLocale())).format(new Date(start));
++      url = `/redirect/dashboard?notlive=${startDate}`;
++      break;
++    case 'survey_required':
++      url = `/redirect/survey/${courseId}`;
++      break;
++    case 'unfulfilled_milestones':
++      url = '/redirect/dashboard';
++      break;
++    case 'microfrontend_disabled':
++      // This code path is only used by the courseware right now. The course home tabs each have their own check for
++      // this in the tab-specific API calls. In those cases, the API will return an http status code if the MFE version
++      // of those tabs are disabled, rather than an access error like this. We could try to unify these approaches, but
++      // hopefully the legacy code isn't around long enough for that to be worth it.
++      if (unitId) {
++        url = `/redirect/courseware/${courseId}/unit/${unitId}`;
++      }
++      break;
++    case 'authentication_required':
++    case 'enrollment_required':
++    default:
++  }
++  return (
++    <Redirect to={url} />
++  );
++}
++
++AccessDeniedRedirect.defaultProps = {
++  unitId: null,
++};
++
++AccessDeniedRedirect.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  metadataModel: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
++};
++
++export default AccessDeniedRedirect;
+diff --git a/src/shared/access-denied-redirect/index.js b/src/shared/access-denied-redirect/index.js
+new file mode 100644
+index 0000000..cc0d1e0
+--- /dev/null
++++ b/src/shared/access-denied-redirect/index.js
+@@ -0,0 +1,3 @@
++import AccessDeniedRedirect from './AccessDeniedRedirect';
++
++export default AccessDeniedRedirect;
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index 9eda696..87438dd 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
+ 
+ import { Toast } from '@edx/paragon';
+ import { Header } from '../course-header';
++import AccessDeniedRedirect from '../shared/access-denied-redirect';
+ import PageLoading from '../generic/PageLoading';
+ 
+ import genericMessages from '../generic/messages';
+@@ -14,7 +15,10 @@ import { setCallToActionToast } from '../course-home/data/slice';
+ 
+ function TabPage({
+   intl,
++  courseId,
+   courseStatus,
++  metadataModel,
++  unitId,
+   ...passthroughProps
+ }) {
+   const {
+@@ -49,11 +53,21 @@ function TabPage({
+         >
+           {toastHeader}
+         </Toast>
+-        <LoadedTabPage {...passthroughProps} />
++        <LoadedTabPage courseId={courseId} metadataModel={metadataModel} unitId={unitId} {...passthroughProps} />
+       </>
+     );
+   }
+ 
++  if (courseStatus === 'denied') {
++    return (
++      <AccessDeniedRedirect
++        courseId={courseId}
++        metadataModel={metadataModel}
++        unitId={unitId}
++      />
++    );
++  }
++
+   // courseStatus 'failed' and any other unexpected course status.
+   return (
+     <>
+@@ -65,9 +79,16 @@ function TabPage({
+   );
+ }
+ 
++TabPage.defaultProps = {
++  unitId: null,
++};
++
+ TabPage.propTypes = {
+   intl: intlShape.isRequired,
++  courseId: PropTypes.string.isRequired,
+   courseStatus: PropTypes.string.isRequired,
++  metadataModel: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
+ };
+ 
+ export default injectIntl(TabPage);
+-- 
+2.34.1
+

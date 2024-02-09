@@ -1,0 +1,230 @@
+From 6f0a69b8385fca538f964eb6c260ca6d18d307ef Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Tue, 2 Nov 2021 09:22:43 -0600
+Subject: [PATCH 0719/1021] fix: update goal styling (#721)
+
+---
+ src/course-home/outline-tab/DateSummary.jsx   |   2 +-
+ .../outline-tab/widgets/FlagButton.jsx        |   8 +-
+ .../outline-tab/widgets/FlagButton.scss       |   2 +-
+ .../widgets/StartOrResumeCourseCard.jsx       |   6 +-
+ .../widgets/WeeklyLearningGoalCard.jsx        | 114 +++++++++---------
+ .../outline-tab/widgets/WelcomeMessage.jsx    |   1 +
+ 6 files changed, 65 insertions(+), 68 deletions(-)
+
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index 05eae4b..490721d 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -40,7 +40,7 @@ export default function DateSummary({
+   };
+ 
+   return (
+-    <li className="container p-0 mb-3 small text-dark-500">
++    <li className="p-0 mb-3 small text-dark-500">
+       <div className="row">
+         <FontAwesomeIcon icon={faCalendarAlt} className="ml-3 mt-1 mr-1" fixedWidth />
+         <div className="ml-1 font-weight-bold">
+diff --git a/src/course-home/outline-tab/widgets/FlagButton.jsx b/src/course-home/outline-tab/widgets/FlagButton.jsx
+index 8401fab..1c7a285 100644
+--- a/src/course-home/outline-tab/widgets/FlagButton.jsx
++++ b/src/course-home/outline-tab/widgets/FlagButton.jsx
+@@ -12,20 +12,20 @@ function FlagButton({
+   return (
+     <button
+       type="button"
+-      className={classnames('flag-button m-1.5 pt-3 pb-md-3 pb-xl-0',
++      className={classnames('flag-button row w-100 align-content-between m-1.5 py-3.5',
+         isSelected ? 'flag-button-selected' : '')}
+       aria-checked={isSelected}
+       role="radio"
+       onClick={() => handleSelect()}
+       data-testid={`weekly-learning-goal-input-${title}`}
+     >
+-      <div className="row justify-content-center pb-1 w-100 m-0">
++      <div className="row w-100 m-0 justify-content-center pb-1">
+         {buttonIcon}
+       </div>
+-      <div className={classnames('text-center small text-gray-700 pb-1', isSelected ? 'font-weight-bold' : '')}>
++      <div className={classnames('row w-100 m-0 justify-content-center small text-gray-700 pb-1', isSelected ? 'font-weight-bold' : '')}>
+         {title}
+       </div>
+-      <div className={classnames('text-center micro text-gray-500 pb-2', isSelected ? 'font-weight-bold' : '')}>
++      <div className={classnames('row w-100 m-0 justify-content-center micro text-gray-500', isSelected ? 'font-weight-bold' : '')}>
+         {text}
+       </div>
+     </button>
+diff --git a/src/course-home/outline-tab/widgets/FlagButton.scss b/src/course-home/outline-tab/widgets/FlagButton.scss
+index f6335c9..31a408b 100644
+--- a/src/course-home/outline-tab/widgets/FlagButton.scss
++++ b/src/course-home/outline-tab/widgets/FlagButton.scss
+@@ -5,7 +5,7 @@
+ .flag-button {
+   background-color: $white;
+   border: 1px solid $light-400;
+-  border-radius:.2rem;
++  border-radius: .2rem;
+   box-shadow: 0 0 0 2px $light-400;
+ 
+   &:hover {
+diff --git a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+index 14b3f76..963ddb3 100644
+--- a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
++++ b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+@@ -38,10 +38,12 @@ function StartOrResumeCourseCard({ intl }) {
+   };
+ 
+   return (
+-    <Card className="mb-3" data-testid="start-resume-card">
++    <Card className="mb-3 shadow-sm border-0" data-testid="start-resume-card">
+       <Card.Body>
+         <div className="row w-100 m-0 justify-content-between align-items-center">
+-          <h2 className="h3 m-md-0">{hasVisitedCourse ? intl.formatMessage(messages.resumeBlurb) : intl.formatMessage(messages.startBlurb)}</h2>
++          <div className="col-12 col-md-7 p-0 mb-3 mb-md-0">
++            <h2 className="h3 m-0">{hasVisitedCourse ? intl.formatMessage(messages.resumeBlurb) : intl.formatMessage(messages.startBlurb)}</h2>
++          </div>
+           <div className="col-12 col-md-auto p-0">
+             <Button
+               variant="brand"
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index 051816f..a5ec039 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -47,68 +47,62 @@ function WeeklyLearningGoalCard({
+   }
+ 
+   return (
+-    <div className="row w-100 m-0 p-0">
+-      <Card
+-        className="mb-3 shadow border-0"
+-        data-testid="weekly-learning-goal-card"
+-      >
+-        <Card.Body className="p-3.5">
+-          <Card.Title>
+-            <h2 className="h4 m-0 text-primary-500">{intl.formatMessage(messages.setWeeklyGoal)}</h2>
+-          </Card.Title>
+-          <Card.Text
+-            className="text-gray-700"
+-              // id="learning_goal_choices_label"
++    <Card
++      className="row w-100 m-0 mb-3 shadow-sm border-0"
++      data-testid="weekly-learning-goal-card"
++    >
++      <Card.Body className="p-3 p-lg-3.5">
++        <h2 className="h4 mb-1 text-primary-500">{intl.formatMessage(messages.setWeeklyGoal)}</h2>
++        <Card.Text
++          className="text-gray-700 small mb-2.5"
++        >
++          {intl.formatMessage(messages.setWeeklyGoalDetail)}
++        </Card.Text>
++        <div
++          className="flag-button-container m-0 p-0"
++        >
++          <LearningGoalButton
++            level="casual"
++            currentGoal={daysPerWeekGoal}
++            handleSelect={handleSelect}
++          />
++          <LearningGoalButton
++            level="regular"
++            currentGoal={daysPerWeekGoal}
++            handleSelect={handleSelect}
++          />
++          <LearningGoalButton
++            level="intense"
++            currentGoal={daysPerWeekGoal}
++            handleSelect={handleSelect}
++          />
++        </div>
++        <div className="d-flex pt-3">
++          <Form.Switch
++            checked={isGetReminderSelected}
++            onChange={(event) => handleSubscribeToReminders(event)}
++            disabled={!daysPerWeekGoal}
+           >
+-            {intl.formatMessage(messages.setWeeklyGoalDetail)}
+-          </Card.Text>
+-          <div
+-            className="flag-button-container m-0 p-0"
+-          >
+-            <LearningGoalButton
+-              level="casual"
+-              currentGoal={daysPerWeekGoal}
+-              handleSelect={handleSelect}
+-            />
+-            <LearningGoalButton
+-              level="regular"
+-              currentGoal={daysPerWeekGoal}
+-              handleSelect={handleSelect}
+-            />
+-            <LearningGoalButton
+-              level="intense"
+-              currentGoal={daysPerWeekGoal}
+-              handleSelect={handleSelect}
+-            />
+-          </div>
+-          <div className="pt-3 pb-1">
+-            <Form.Switch
+-              checked={isGetReminderSelected}
+-              onChange={(event) => handleSubscribeToReminders(event)}
+-              disabled={!daysPerWeekGoal}
+-            >
+-              {intl.formatMessage(messages.setGoalReminder)}
+-            </Form.Switch>
+-          </div>
+-        </Card.Body>
+-        {isGetReminderSelected && (
+-          <Card.Footer className="border-0 px-2.5 bg-light-200 ">
+-            <div className="row w-100 m-0 small align-center">
+-              <div className="d-flex align-items-center pr-1">
+-                <Icon
+-                  className="text-primary-500"
+-                  src={Email}
+-                />
+-              </div>
+-              <div className="col">
+-                {intl.formatMessage(messages.goalReminderDetail)}
+-              </div>
++            <small>{intl.formatMessage(messages.setGoalReminder)}</small>
++          </Form.Switch>
++        </div>
++      </Card.Body>
++      {isGetReminderSelected && (
++        <Card.Footer className="border-0 px-2.5 bg-light-200">
++          <div className="row w-100 m-0 small align-center">
++            <div className="d-flex align-items-center pr-1">
++              <Icon
++                className="text-primary-500"
++                src={Email}
++              />
+             </div>
+-          </Card.Footer>
+-        )}
+-      </Card>
+-
+-    </div>
++            <div className="col">
++              {intl.formatMessage(messages.goalReminderDetail)}
++            </div>
++          </div>
++        </Card.Footer>
++      )}
++    </Card>
+   );
+ }
+ 
+diff --git a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+index 4cd9051..fcc7c15 100644
+--- a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
++++ b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+@@ -37,6 +37,7 @@ function WelcomeMessage({ courseId, intl }) {
+         setDisplay(false);
+         dispatch(dismissWelcomeMessage(courseId));
+       }}
++      className="shadow-sm border-0"
+       actions={messageCanBeShortened ? [
+         <Button
+           onClick={() => setShowShortMessage(!showShortMessage)}
+-- 
+2.34.1
+

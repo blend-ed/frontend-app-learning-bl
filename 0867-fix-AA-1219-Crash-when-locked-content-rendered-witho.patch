@@ -1,0 +1,35 @@
+From f7219b4f5d401a281e31502704bd658b3973a4db Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 22 Mar 2022 17:35:45 -0400
+Subject: [PATCH 0867/1021] fix: [AA-1219] Crash when locked content rendered
+ without unit ID (#878)
+
+Allows SequenceNavigation to complete rendering even if unitId is not provided.
+---
+ .../sequence/sequence-navigation/UnitButton.jsx       | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx b/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
+index e3863d4..ed55e1a 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
+@@ -69,8 +69,13 @@ UnitButton.defaultProps = {
+   showCompletion: true,
+ };
+ 
+-const mapStateToProps = (state, props) => ({
+-  ...state.models.units[props.unitId],
+-});
++const mapStateToProps = (state, props) => {
++  if (props.unitId) {
++    return {
++      ...state.models.units[props.unitId],
++    };
++  }
++  return {};
++};
+ 
+ export default connect(mapStateToProps)(UnitButton);
+-- 
+2.34.1
+

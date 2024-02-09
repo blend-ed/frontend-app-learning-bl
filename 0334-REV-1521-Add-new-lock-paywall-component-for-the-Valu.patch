@@ -1,0 +1,446 @@
+From e4060b748163d767b0f9f81ee0ead23f13fabff5 Mon Sep 17 00:00:00 2001
+From: JJ <34042537+jhan217@users.noreply.github.com>
+Date: Fri, 11 Dec 2020 11:31:07 -0500
+Subject: [PATCH 0334/1021] [REV-1521] Add new lock paywall component for the
+ Value Prop experiment (#293)
+
+Add a new lock paywall component to be shown as part of the Purchase squad's Value Prop Optimizely experiment.
+---
+ src/courseware/course/sequence/Unit.jsx       |  15 +-
+ .../lock-paywall-value-prop/LockPaywall.jsx   | 235 ++++++++++++++++++
+ .../lock-paywall-value-prop/LockPaywall.scss  |  69 +++++
+ .../LockPaywall.test.jsx                      |  40 +++
+ .../sequence/lock-paywall-value-prop/index.js |   2 +
+ .../sequence/lock-paywall/LockPaywall.jsx     |   2 +-
+ 6 files changed, 359 insertions(+), 4 deletions(-)
+ create mode 100644 src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
+ create mode 100644 src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.scss
+ create mode 100644 src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
+ create mode 100644 src/courseware/course/sequence/lock-paywall-value-prop/index.js
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 17bce39..7a2e785 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -18,6 +18,7 @@ import { processEvent } from '../../../course-home/data/thunks';
+ import { fetchCourse } from '../../data/thunks';
+ 
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
++const LockPaywallValuePropExperiment = React.lazy(() => import('./lock-paywall-value-prop'));
+ 
+ /**
+  * We discovered an error in Firefox where - upon iframe load - React would cease to call any
+@@ -66,6 +67,14 @@ function Unit({
+   const [iframeHeight, setIframeHeight] = useState(0);
+   const [hasLoaded, setHasLoaded] = useState(false);
+   const [modalOptions, setModalOptions] = useState({ open: false });
++  const [rev1512ValuePropExperimentLock, setRev1512ValuePropExperimentLock] = useState(
++    window.rev1512ValuePropExperimentLock,
++  );
++  /* TODO: The code block below + code referencing it should be deleted after REV1512 value prop experiment */
++  window.rev1512ToggleValuePropPaywallLock = () => {
++    window.rev1512ValuePropExperimentLock = !rev1512ValuePropExperimentLock;
++    setRev1512ValuePropExperimentLock(!rev1512ValuePropExperimentLock);
++  };
+ 
+   const unit = useModel('units', id);
+   const course = useModel('courses', courseId);
+@@ -125,9 +134,9 @@ function Unit({
+             />
+           )}
+         >
+-          <LockPaywall
+-            courseId={courseId}
+-          />
++          {(rev1512ValuePropExperimentLock)
++            ? <LockPaywallValuePropExperiment courseId={courseId} />
++            : <LockPaywall courseId={courseId} />}
+         </Suspense>
+       )}
+       {!hasLoaded && (
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
+new file mode 100644
+index 0000000..19893d9
+--- /dev/null
++++ b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
+@@ -0,0 +1,235 @@
++/* TODO: This file should be deleted after REV1512 value prop experiment */
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faLock } from '@fortawesome/free-solid-svg-icons';
++import { faCheckCircle } from '@fortawesome/free-regular-svg-icons';
++import {
++  injectIntl, getLocale,
++} from '@edx/frontend-platform/i18n';
++import { Button } from '@edx/paragon';
++import classNames from 'classnames';
++
++import VerifiedCert from '../../../../generic/assets/edX_verified_certificate.png';
++import { useModel } from '../../../../generic/model-store';
++import './LockPaywall.scss';
++
++function LockPaywall({
++  courseId,
++}) {
++  const course = useModel('courses', courseId);
++  const {
++    verifiedMode,
++  } = course;
++  if (!verifiedMode) {
++    return null;
++  }
++  const {
++    currencySymbol,
++    price,
++    upgradeUrl,
++  } = verifiedMode;
++
++  const isSpanish = getLocale() === 'es-419';
++
++  let upgradeButtonText;
++
++  if (document.querySelector('.price.discount') !== null) {
++    let discountPrice = document.querySelector('.price.discount').textContent;
++    if (discountPrice !== null) {
++      discountPrice = discountPrice.replace(/[^0-9.]/g, '');
++    }
++
++    if (isSpanish) {
++      upgradeButtonText = (
++        <>
++          <span className="font-weight-bold" style={{ paddingRight: '5px' }}>
++            Cómpralo por {currencySymbol}{discountPrice}
++          </span>
++          <span style={{ textDecoration: 'line-through' }}>
++            ({currencySymbol}{price})
++          </span>
++        </>
++      );
++    } else {
++      upgradeButtonText = (
++        <>
++          <span className="font-weight-bold" style={{ paddingRight: '5px' }}>
++            Upgrade for {currencySymbol}{discountPrice}
++          </span>
++          <span style={{ textDecoration: 'line-through' }}>
++            ({currencySymbol}{price})
++          </span>
++        </>
++      );
++    }
++  } else if (isSpanish) {
++    upgradeButtonText = (
++      <>
++        <span className="font-weight-bold" style={{ paddingRight: '5px' }}>
++          Cómpralo por {currencySymbol}{price}
++        </span>
++      </>
++    );
++  } else {
++    upgradeButtonText = (
++      <>
++        <span className="font-weight-bold" style={{ paddingRight: '5px' }}>
++          Upgrade for {currencySymbol}{price}
++        </span>
++      </>
++    );
++  }
++
++  const circleCheckIcon = (
++    <FontAwesomeIcon
++      icon={faCheckCircle}
++      className="float-left mt-1"
++      fixedWidth
++      aria-hidden="true"
++      title="icon"
++      style={{ marginRight: '15px' }}
++    />
++  );
++  const verifiedCertificateLink = (
++    <b>
++      <a
++        className="text-gray-700 value-prop-verified-certificate-link"
++        style={{ textDecoration: 'underline' }}
++        href="https://www.edx.org/verified-certificate"
++      >
++        { (isSpanish) ? 'certificado verificado' : 'verified certificate' }
++      </a>
++    </b>
++  );
++
++  const userAgent = typeof window.navigator === 'undefined' ? '' : navigator.userAgent;
++  const isMobile = Boolean(
++    userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i),
++  );
++
++  return (
++    <div className="border border-gray d-flex justify-content-between mt-2 p-3 value-prop-lock-paywall-banner">
++      <div className={classNames({ 'is-mobile': isMobile })}>
++        <div className="font-weight-bold top-banner-text-header">
++          <FontAwesomeIcon icon={faLock} className="text-black mr-2 ml-1 lock-icon" style={{ fontSize: '1rem' }} />
++          <span>
++            {
++              isSpanish
++                ? 'Las tareas calificadas están bloqueadas'
++                : 'Graded assignments are locked'
++            }
++          </span>
++        </div>
++        <div className="font-weight top-banner-text">
++          {
++            isSpanish
++              ? 'Cámbiate a la opción verificada para obtener acceso a funciones bloqueadas como esta y aprovechar al máximo tu curso.'
++              : 'Upgrade to gain access to locked features like this one and get the most out of your course.'
++          }
++        </div>
++
++        <div className={classNames('mb-0', { 'd-flex': !isMobile })}>
++          <div className="certificate-image-banner-container">
++            <img
++              alt="Example Certificate"
++              src={VerifiedCert}
++              className="border-0 certificate-image-banner"
++            />
++          </div>
++          <div style={{ float: 'left', paddingLeft: '18px', paddingBottom: '24px' }}>
++            <div style={{ paddingBottom: '10px' }}>
++              {
++                isSpanish
++                  ? 'Cuando te cambias a la opción verificada, tú:'
++                  : 'When you upgrade, you:'
++              }
++            </div>
++
++            <div className="list-item-row">
++              <div className="check-circle-icon-wrapper">{circleCheckIcon}</div>
++              <div className="list-item-wrapper">
++                <span>
++                  {
++                      isSpanish
++                        ? <>Obtén un {verifiedCertificateLink} de finalización para compartirlo en tu currículum</>
++                        : <>Earn a {verifiedCertificateLink} of completion to showcase on your resume</>
++                    }
++                </span>
++              </div>
++            </div>
++
++            <div className="list-item-row">
++              <div className="check-circle-icon-wrapper">{circleCheckIcon}</div>
++              <div className="list-item-wrapper">
++                {
++                  isSpanish
++                    ? 'Desbloquea el acceso a todas las actividades del curso, incluidas las '
++                    : 'Unlock access to all course activities, including '
++                }
++                <span className="font-weight-bold">
++                  {
++                    isSpanish
++                      ? 'tareas calificadas'
++                      : 'graded assignments'
++                  }
++                </span>
++              </div>
++            </div>
++
++            <div className="list-item-row">
++              <div className="check-circle-icon-wrapper">{circleCheckIcon}</div>
++              <div className="list-item-wrapper">
++                <span className="font-weight-bold">
++                  {
++                    isSpanish
++                      ? 'Acceso completo'
++                      : 'Full access'
++                  }
++                </span>
++                {
++                  isSpanish
++                    ? ' al contenido y los materiales del curso, incluso después de que finalice el curso'
++                    : ' to course content and materials, even after the course ends'
++                }
++              </div>
++            </div>
++
++            <div className="list-item-row">
++              <div className="check-circle-icon-wrapper">{circleCheckIcon}</div>
++              <div className="list-item-wrapper">
++                {
++                  isSpanish
++                    ? 'Apoya nuestra '
++                    : 'Support our '
++                }
++                <span className="font-weight-bold">
++                  {
++                    isSpanish
++                      ? 'misión sin fines de lucro'
++                      : 'non-profit mission'
++                  }
++                </span>
++                {
++                  isSpanish
++                    ? ' en edX'
++                    : ' at edX'
++                }
++              </div>
++            </div>
++          </div>
++        </div>
++
++        <div className="value-prop-upgrade-button-container">
++          <Button variant="primary" href={upgradeUrl} className="value-prop-lock-paywall-upgrade-link">
++            {upgradeButtonText}
++          </Button>
++        </div>
++      </div>
++    </div>
++  );
++}
++LockPaywall.propTypes = {
++  courseId: PropTypes.string.isRequired,
++};
++export default injectIntl(LockPaywall);
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.scss b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.scss
+new file mode 100644
+index 0000000..336914b
+--- /dev/null
++++ b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.scss
+@@ -0,0 +1,69 @@
++/* TODO: This file should be deleted after REV1512 value prop experiment */
++.value-prop-lock-paywall-banner {
++    background-color: #f8f9fa;
++
++    .list-item-row {
++        display: flex;
++        margin-left: -7px;
++    }
++    .certificate-image-banner {
++        width: 166px;
++        height: 119px;
++        margin-top: 3px;
++    }
++    .certificate-image-banner-container {
++        display: inline-block;
++        float: left;
++        padding-left: 20px;
++        flex-shrink: 0;
++    }
++    .top-banner-text {
++        margin-bottom: 16px;
++        padding-left: 20px;
++    }
++    .top-banner-text-header {
++        padding-left: 20px;
++    }
++    .value-prop-upgrade-button-container {
++        padding-left: 20px;
++    }
++    .is-mobile {
++        padding-top: 10px;
++
++        .certificate-image-banner-container {
++            text-align: center;
++            display: block;
++            float: none;
++            padding-left: 0px;
++        }
++        .certificate-image-banner {
++            width: 180px;
++            height: 128px;
++            margin-top: 3px;
++            margin-bottom: 5px;
++        }
++        .top-banner-text-header {
++            margin-left:36px;
++            position: relative;
++            padding-left: 10px;
++        }
++        .top-banner-text {
++            margin-left:36px;
++            margin-bottom: 4px;
++            position: relative;
++            padding-left: 10px;
++        }
++        .lock-icon {
++            position: absolute;
++            left: -28px;
++            top: 4px;
++        }
++        .value-prop-upgrade-button-container {
++            text-align: center;
++            padding-bottom: 20px;
++            padding-top: 20px;
++            padding-left: 0px;
++        }
++    }
++}
++
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
+new file mode 100644
+index 0000000..2666f96
+--- /dev/null
++++ b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
+@@ -0,0 +1,40 @@
++/* TODO: This file should be deleted after REV1512 value prop experiment */
++import React from 'react';
++import { Factory } from 'rosie';
++import { initializeTestStore, render, screen } from '../../../../setupTest';
++import LockPaywall from './LockPaywall';
++
++describe('Lock Paywall', () => {
++  let store;
++  const mockData = {};
++
++  beforeAll(async () => {
++    store = await initializeTestStore();
++    const { courseware } = store.getState();
++    mockData.courseId = courseware.courseId;
++  });
++
++  it('displays message along with lock icon', () => {
++    const { container } = render(<LockPaywall {...mockData} />);
++
++    const lockIcon = container.querySelector('svg');
++    expect(lockIcon).toHaveClass('fa-lock');
++    expect(lockIcon.parentElement).toHaveTextContent('Graded assignments are locked');
++  });
++
++  it('displays unlock link with price', () => {
++    const { currencySymbol, price, upgradeUrl } = store.getState().models.courses[mockData.courseId].verifiedMode;
++    render(<LockPaywall {...mockData} />);
++
++    const upgradeLink = screen.getByRole('link', { name: `Upgrade for ${currencySymbol}${price}` });
++    expect(upgradeLink).toHaveAttribute('href', `${upgradeUrl}`);
++  });
++
++  it('does not display anything if course does not have verified mode', async () => {
++    const courseMetadata = Factory.build('courseMetadata', { verified_mode: null });
++    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
++    const { container } = render(<LockPaywall {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++
++    expect(container).toBeEmptyDOMElement();
++  });
++});
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/index.js b/src/courseware/course/sequence/lock-paywall-value-prop/index.js
+new file mode 100644
+index 0000000..5fd1242
+--- /dev/null
++++ b/src/courseware/course/sequence/lock-paywall-value-prop/index.js
+@@ -0,0 +1,2 @@
++/* TODO: This file + folder should be deleted after REV1512 value prop experiment */
++export { default } from './LockPaywall';
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index 212a100..68175d5 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -35,7 +35,7 @@ function LockPaywall({
+         <p className="mb-0">
+           <span>{intl.formatMessage(messages['learn.lockPaywall.content'])}</span>
+           &nbsp;
+-          <a href={upgradeUrl}>
++          <a className="lock_paywall_upgrade_link" href={upgradeUrl}>
+             {intl.formatMessage(messages['learn.lockPaywall.upgrade.link'], {
+               currencySymbol,
+               price,
+-- 
+2.34.1
+

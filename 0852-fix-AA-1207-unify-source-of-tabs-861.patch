@@ -1,0 +1,711 @@
+From 72d18dc4f9ea141e5db7ae9b269133e553a97875 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Thu, 10 Mar 2022 13:29:30 -0500
+Subject: [PATCH 0852/1021] fix: [AA-1207] unify source of tabs (#861)
+
+Courseware and courseHome both provide tabs to the mfe.
+This PR unifies the calls so that tab descriptions are only fetched from courseHome metadata
+
+Remove jest-chain dependencies to make test errors more usable.
+---
+ package-lock.json                             |  6 --
+ package.json                                  |  1 -
+ .../courseHomeMetadata.factory.js             | 91 ++++++++++++++++++-
+ src/course-home/data/api.js                   | 17 +++-
+ .../data/pact-tests/lmsPact.test.jsx          |  2 +-
+ src/course-home/data/thunks.js                |  2 +-
+ .../widgets/StartOrResumeCourseCard.jsx       |  2 +-
+ src/course-tabs/CourseTabsNavigation.test.jsx | 10 +-
+ .../notes-visibility/NotesVisibility.test.jsx | 25 ++---
+ .../course/course-exit/CourseExit.test.jsx    | 30 +++---
+ .../course/course-exit/CourseInProgress.jsx   |  3 +-
+ .../course/course-exit/CourseNonPassing.jsx   |  3 +-
+ .../course-exit/CourseRecommendations.jsx     |  6 +-
+ .../hidden-after-due/HiddenAfterDue.jsx       |  2 +-
+ .../notifications/NotificationTray.test.jsx   |  4 +
+ src/courseware/data/api.js                    | 12 ---
+ .../data/pact-tests/lmsPact.test.jsx          | 10 --
+ src/courseware/data/thunks.js                 |  2 +-
+ src/generic/tabs/Tabs.jsx                     |  2 +-
+ src/setupTest.js                              |  1 -
+ .../courseMetadataBase.factory.js             | 70 +-------------
+ src/tab-page/TabContainer.test.jsx            | 15 ++-
+ 22 files changed, 156 insertions(+), 160 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index bcce38f..7e5ddbb 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -15447,12 +15447,6 @@
+         }
+       }
+     },
+-    "jest-chain": {
+-      "version": "1.1.5",
+-      "resolved": "https://registry.npmjs.org/jest-chain/-/jest-chain-1.1.5.tgz",
+-      "integrity": "sha512-bTx51vQP/6/XVDrMtz0WmT3wZoXvj5QAAnw1to+o6pvtjcwTIVuB6uR5URRXH/9rHf1WuM1UgsfVTWhTC/QAzw==",
+-      "dev": true
+-    },
+     "jest-changed-files": {
+       "version": "26.6.2",
+       "resolved": "https://registry.npmjs.org/jest-changed-files/-/jest-changed-files-26.6.2.tgz",
+diff --git a/package.json b/package.json
+index 0479b93..fba10c0 100644
+--- a/package.json
++++ b/package.json
+@@ -74,7 +74,6 @@
+     "es-check": "6.2.1",
+     "husky": "7.0.4",
+     "jest": "27.5.1",
+-    "jest-chain": "1.1.5",
+     "rosie": "2.1.0"
+   }
+ }
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 05007b7..b7d6ffc 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -1,5 +1,4 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+-
+ import courseMetadataBase from '../../../shared/data/__factories__/courseMetadataBase.factory';
+ 
+ Factory.define('courseHomeMetadata')
+@@ -22,4 +21,92 @@ Factory.define('courseHomeMetadata')
+     start: '2013-02-05T05:00:00Z',
+     user_timezone: 'UTC',
+     username: 'MockUser',
+-  });
++  })
++  .attr(
++    'tabs', ['id', 'host'], (id, host) => [
++      Factory.build(
++        'tab',
++        {
++          title: 'Course',
++          priority: 0,
++          slug: 'courseware',
++          type: 'courseware',
++        },
++        {
++          courseId: id,
++          host,
++          path: 'course/',
++        },
++      ),
++      Factory.build(
++        'tab',
++        {
++          title: 'Discussion',
++          priority: 1,
++          slug: 'discussion',
++          type: 'discussion',
++        },
++        {
++          courseId: id,
++          host,
++          path: 'discussion/forum/',
++        },
++      ),
++      Factory.build(
++        'tab',
++        {
++          title: 'Wiki',
++          priority: 2,
++          slug: 'wiki',
++          type: 'wiki',
++        },
++        {
++          courseId: id,
++          host,
++          path: 'course_wiki',
++        },
++      ),
++      Factory.build(
++        'tab',
++        {
++          title: 'Progress',
++          priority: 3,
++          slug: 'progress',
++          type: 'progress',
++        },
++        {
++          courseId: id,
++          host,
++          path: 'progress',
++        },
++      ),
++      Factory.build(
++        'tab',
++        {
++          title: 'Instructor',
++          priority: 4,
++          slug: 'instructor',
++          type: 'instructor',
++        },
++        {
++          courseId: id,
++          host,
++          path: 'instructor',
++        },
++      ),
++      Factory.build(
++        'tab',
++        {
++          title: 'Dates',
++          priority: 5,
++          slug: 'dates',
++          type: 'dates',
++        },
++        {
++          courseId: id,
++          host,
++          path: 'dates',
++        },
++      ),
++    ],
++  );
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index f2133ac..c60d41c 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -90,14 +90,21 @@ function normalizeAssignmentPolicies(assignmentPolicies, sectionScores) {
+   });
+ }
+ 
+-function normalizeCourseHomeCourseMetadata(metadata) {
++/**
++ * Tweak the metadata for consistency
++ * @param metadata the data to normalize
++ * @param rootSlug either 'courseware' or 'outline' depending on the context
++ * @returns {Object} The normalized metadata
++ */
++function normalizeCourseHomeCourseMetadata(metadata, rootSlug) {
+   const data = camelCaseObject(metadata);
+   return {
+     ...data,
+     tabs: data.tabs.map(tab => ({
+-      // The API uses "courseware" as a slug for both courseware and the outline tab. We switch it to "outline" here for
++      // The API uses "courseware" as a slug for both courseware and the outline tab.
++      // If needed, we switch it to "outline" here for
+       // use within the MFE to differentiate between course home and courseware.
+-      slug: tab.tabId === 'courseware' ? 'outline' : tab.tabId,
++      slug: tab.tabId === 'courseware' ? rootSlug : tab.tabId,
+       title: tab.title,
+       url: tab.url,
+     })),
+@@ -182,11 +189,11 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+   return models;
+ }
+ 
+-export async function getCourseHomeCourseMetadata(courseId) {
++export async function getCourseHomeCourseMetadata(courseId, rootSlug) {
+   let url = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   url = appendBrowserTimezoneToUrl(url);
+   const { data } = await getAuthenticatedHttpClient().get(url);
+-  return normalizeCourseHomeCourseMetadata(data);
++  return normalizeCourseHomeCourseMetadata(data, rootSlug);
+ }
+ 
+ // For debugging purposes, you might like to see a fully loaded dates tab.
+diff --git a/src/course-home/data/pact-tests/lmsPact.test.jsx b/src/course-home/data/pact-tests/lmsPact.test.jsx
+index 205c920..7ac2154 100644
+--- a/src/course-home/data/pact-tests/lmsPact.test.jsx
++++ b/src/course-home/data/pact-tests/lmsPact.test.jsx
+@@ -139,7 +139,7 @@ describe('Course Home Service', () => {
+         title: 'Demonstration Course',
+         username: 'edx',
+       };
+-      const response = await getCourseHomeCourseMetadata(courseId);
++      const response = await getCourseHomeCourseMetadata(courseId, 'outline');
+       expect(response).toBeTruthy();
+       expect(response).toEqual(normalizedTabData);
+     });
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index a321a34..e1ca82a 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -33,7 +33,7 @@ export function fetchTab(courseId, tab, getTabData, targetUserId) {
+   return async (dispatch) => {
+     dispatch(fetchTabRequest({ courseId }));
+     Promise.allSettled([
+-      getCourseHomeCourseMetadata(courseId),
++      getCourseHomeCourseMetadata(courseId, 'outline'),
+       getTabData(courseId, targetUserId),
+     ]).then(([courseHomeCourseMetadataResult, tabDataResult]) => {
+       const fetchedCourseHomeCourseMetadata = courseHomeCourseMetadataResult.status === 'fulfilled';
+diff --git a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+index 38b945f..a668cff 100644
+--- a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
++++ b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+@@ -56,7 +56,7 @@ function StartOrResumeCourseCard({ intl }) {
+         )}
+       />
+       {/* Footer is needed for internal vertical spacing to work out. If you can remove, be my guest */}
+-      <Card.Footer />
++      <Card.Footer><></></Card.Footer>
+     </Card>
+   );
+ }
+diff --git a/src/course-tabs/CourseTabsNavigation.test.jsx b/src/course-tabs/CourseTabsNavigation.test.jsx
+index cd6d24a..ae3eb9a 100644
+--- a/src/course-tabs/CourseTabsNavigation.test.jsx
++++ b/src/course-tabs/CourseTabsNavigation.test.jsx
+@@ -23,12 +23,10 @@ describe('Course Tabs Navigation', () => {
+     };
+     render(<CourseTabsNavigation {...mockData} />);
+ 
+-    expect(screen.getByRole('link', { name: tabs[0].title }))
+-      .toHaveAttribute('href', tabs[0].url)
+-      .toHaveClass('active');
++    expect(screen.getByRole('link', { name: tabs[0].title })).toHaveAttribute('href', tabs[0].url);
++    expect(screen.getByRole('link', { name: tabs[0].title })).toHaveClass('active');
+ 
+-    expect(screen.getByRole('link', { name: tabs[1].title }))
+-      .toHaveAttribute('href', tabs[1].url)
+-      .not.toHaveClass('active');
++    expect(screen.getByRole('link', { name: tabs[1].title })).toHaveAttribute('href', tabs[1].url);
++    expect(screen.getByRole('link', { name: tabs[1].title })).not.toHaveClass('active');
+   });
+ });
+diff --git a/src/courseware/course/content-tools/notes-visibility/NotesVisibility.test.jsx b/src/courseware/course/content-tools/notes-visibility/NotesVisibility.test.jsx
+index 762ad3e..6e576d4 100644
+--- a/src/courseware/course/content-tools/notes-visibility/NotesVisibility.test.jsx
++++ b/src/courseware/course/content-tools/notes-visibility/NotesVisibility.test.jsx
+@@ -49,12 +49,10 @@ describe('Notes Visibility', () => {
+     render(<NotesVisibility {...mockData} />);
+ 
+     const button = screen.getByRole('switch', { name: 'Show Notes' });
+-    expect(button)
+-      .not.toBeChecked()
+-      .toHaveClass('text-success');
+-    expect(button.querySelector('svg'))
+-      .toHaveClass('fa-pencil-alt')
+-      .toHaveAttribute('aria-hidden', 'true');
++    expect(button).not.toBeChecked();
++    expect(button).toHaveClass('text-success');
++    expect(button.querySelector('svg')).toHaveClass('fa-pencil-alt');
++    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+   });
+ 
+   it('shows notes', () => {
+@@ -63,12 +61,10 @@ describe('Notes Visibility', () => {
+     render(<NotesVisibility {...testData} />);
+ 
+     const button = screen.getByRole('switch', { name: 'Hide Notes' });
+-    expect(button)
+-      .toBeChecked()
+-      .toHaveClass('text-secondary');
+-    expect(button.querySelector('svg'))
+-      .toHaveClass('fa-pencil-alt')
+-      .toHaveAttribute('aria-hidden', 'true');
++    expect(button).toBeChecked();
++    expect(button).toHaveClass('text-secondary');
++    expect(button.querySelector('svg')).toHaveClass('fa-pencil-alt');
++    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+   });
+ 
+   it('handles click', async () => {
+@@ -84,9 +80,8 @@ describe('Notes Visibility', () => {
+ 
+     fireEvent.click(screen.getByRole('switch', { name: 'Show Notes' }));
+     await waitFor(() => expect(mockFn).toHaveBeenCalled());
+-    expect(mockFn)
+-      .toHaveBeenCalledTimes(1)
+-      .toHaveBeenCalledWith('tools.toggleNotes');
++    expect(mockFn).toHaveBeenCalledTimes(1);
++    expect(mockFn).toHaveBeenCalledWith('tools.toggleNotes');
+ 
+     expect(axiosMock.history.put).toHaveLength(1);
+     expect(axiosMock.history.put[0].url).toEqual(visibilityUrl);
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index ac44c0d..2511756 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -24,32 +24,36 @@ jest.mock('@edx/frontend-platform/analytics');
+ describe('Course Exit Pages', () => {
+   let axiosMock;
+   let store;
+-  const defaultMetadata = Factory.build('courseMetadata', {
++  const coursewareMetadata = Factory.build('courseMetadata', {
+     user_has_passing_grade: true,
+     end: '2014-02-05T05:00:00Z',
+   });
+-  const { courseBlocks: defaultCourseBlocks } = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name);
++  const courseId = coursewareMetadata.id;
++  const courseHomeMetadata = Factory.build('courseHomeMetadata');
++  const { courseBlocks: defaultCourseBlocks } = buildSimpleCourseBlocks(courseId, coursewareMetadata.name);
+ 
+-  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${defaultMetadata.id}`;
+-  courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
++  let coursewareMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
++  coursewareMetadataUrl = appendBrowserTimezoneToUrl(coursewareMetadataUrl);
++  const courseHomeMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`);
+   const discoveryRecommendationsUrl = new RegExp(`${getConfig().DISCOVERY_API_BASE_URL}/api/v1/course_recommendations/*`);
+   const enrollmentsUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment*`);
+   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+ 
+   function setMetadata(attributes) {
+-    const courseMetadata = { ...defaultMetadata, ...attributes };
+-    axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++    const courseMetadata = { ...coursewareMetadata, ...attributes };
++    axiosMock.onGet(coursewareMetadataUrl).reply(200, courseMetadata);
+   }
+ 
+   async function fetchAndRender(component) {
+-    await executeThunk(fetchCourse(defaultMetadata.id), store.dispatch);
++    await executeThunk(fetchCourse(courseId), store.dispatch);
+     render(component, { store });
+   }
+ 
+   beforeEach(() => {
+     store = initializeStore();
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+-    axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
++    axiosMock.onGet(coursewareMetadataUrl).reply(200, coursewareMetadata);
++    axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+     axiosMock.onGet(discoveryRecommendationsUrl).reply(200,
+       Factory.build('courseRecommendations', {}, { numRecs: 2 }));
+     axiosMock.onGet(enrollmentsUrl).reply(200, []);
+@@ -94,7 +98,7 @@ describe('Course Exit Pages', () => {
+         },
+       });
+       await fetchAndRender(<CourseExit />);
+-      expect(global.location.href).toEqual(`http://localhost/course/${defaultMetadata.id}`);
++      expect(global.location.href).toEqual(`http://localhost/course/${courseId}`);
+     });
+   });
+ 
+@@ -160,7 +164,7 @@ describe('Course Exit Pages', () => {
+     it('Displays verify identity link', async () => {
+       setMetadata({
+         certificate_data: { cert_status: 'unverified' },
+-        verify_identity_url: `${getConfig().LMS_BASE_URL}/verify_student/verify-now/${defaultMetadata.id}/`,
++        verify_identity_url: `${getConfig().LMS_BASE_URL}/verify_student/verify-now/${courseId}/`,
+       });
+       await fetchAndRender(<CourseCelebration />);
+       expect(screen.getByRole('link', { name: 'Verify ID now' })).toBeInTheDocument();
+@@ -171,7 +175,7 @@ describe('Course Exit Pages', () => {
+       setMetadata({
+         certificate_data: { cert_status: 'unverified' },
+         verification_status: 'pending',
+-        verify_identity_url: `${getConfig().LMS_BASE_URL}/verify_student/verify-now/${defaultMetadata.id}/`,
++        verify_identity_url: `${getConfig().LMS_BASE_URL}/verify_student/verify-now/${courseId}/`,
+       });
+       await fetchAndRender(<CourseCelebration />);
+       expect(screen.getByText('Your ID verification is pending and your certificate will be available once approved.')).toBeInTheDocument();
+@@ -367,7 +371,7 @@ describe('Course Exit Pages', () => {
+   describe('Course in progress experience', () => {
+     it('Displays link to dates tab', async () => {
+       setMetadata({ user_has_passing_grade: false });
+-      const { courseBlocks } = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name,
++      const { courseBlocks } = buildSimpleCourseBlocks(courseId, coursewareMetadata.name,
+         { hasScheduledContent: true });
+       axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
+ 
+@@ -394,7 +398,7 @@ describe('Course Exit Pages', () => {
+     const url = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
+     await waitFor(() => {
+       expect(axiosMock.history.post[0].url).toMatch(url);
+-      expect(axiosMock.history.post[0].data).toMatch(`{"course_id":"${defaultMetadata.id}","subscribed_to_reminders":false}`);
++      expect(axiosMock.history.post[0].data).toMatch(`{"course_id":"${courseId}","subscribed_to_reminders":false}`);
+     });
+   });
+ });
+diff --git a/src/courseware/course/course-exit/CourseInProgress.jsx b/src/courseware/course/course-exit/CourseInProgress.jsx
+index a575d3a..9a87b91 100644
+--- a/src/courseware/course/course-exit/CourseInProgress.jsx
++++ b/src/courseware/course/course-exit/CourseInProgress.jsx
+@@ -16,7 +16,8 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseInProgress({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org, tabs, title } = useModel('coursewareMeta', courseId);
++  const { org, title } = useModel('coursewareMeta', courseId);
++  const { tabs } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get dates tab link for 'view course schedule' button
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index 3c5046f..a8874bc 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -16,7 +16,8 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseNonPassing({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org, tabs, title } = useModel('coursewareMeta', courseId);
++  const { org, title } = useModel('coursewareMeta', courseId);
++  const { tabs } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get progress tab link for 'view grades' button
+diff --git a/src/courseware/course/course-exit/CourseRecommendations.jsx b/src/courseware/course/course-exit/CourseRecommendations.jsx
+index 8d0f92a..19b578c 100644
+--- a/src/courseware/course/course-exit/CourseRecommendations.jsx
++++ b/src/courseware/course/course-exit/CourseRecommendations.jsx
+@@ -11,7 +11,7 @@ import {
+ } from '@edx/paragon';
+ import PropTypes from 'prop-types';
+ import truncate from 'truncate-html';
+-import { useModel } from '../../../generic/model-store/hooks';
++import { useModel } from '../../../generic/model-store';
+ import fetchCourseRecommendations from './data/thunks';
+ import { FAILED, LOADED, LOADING } from './data/slice';
+ import CatalogSuggestion from './CatalogSuggestion';
+@@ -106,8 +106,8 @@ function CourseCard({
+           <Card.ImageCap src={image.src} />
+           <Card.Header title={truncate(title, 70, { reserveLastWord: -1 })} subtitle={subtitle} size="sm" />
+           {/* Section is needed for internal vertical spacing to work out. If you can remove, be my guest */}
+-          <Card.Section />
+-          <Card.Footer textElement={intl.formatMessage(messages.recommendationsCourseFooter)} />
++          <Card.Section> <></> </Card.Section>
++          <Card.Footer textElement={intl.formatMessage(messages.recommendationsCourseFooter)}><></></Card.Footer>
+         </Card>
+       </Hyperlink>
+     </div>
+diff --git a/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx b/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
+index 6b770b3..01f50b5 100644
+--- a/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
++++ b/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
+@@ -9,7 +9,7 @@ import { useModel } from '../../../../generic/model-store';
+ import messages from './messages';
+ 
+ function HiddenAfterDue({ courseId, intl }) {
+-  const { tabs } = useModel('coursewareMeta', courseId);
++  const { tabs } = useModel('courseHomeMeta', courseId);
+ 
+   const progressTab = tabs.find(tab => tab.slug === 'progress');
+   const progressLink = progressTab && progressTab.url && (
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+index f60bbb1..6be69b6 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+@@ -28,6 +28,9 @@ describe('NotificationTray', () => {
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${defaultMetadata.id}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
++  const courseHomeMetadata = Factory.build('courseHomeMetadata');
++  const courseHomeMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`);
++
+   function setMetadata(attributes, options) {
+     const courseMetadata = Factory.build('courseMetadata', attributes, options);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+@@ -43,6 +46,7 @@ describe('NotificationTray', () => {
+     store = initializeStore();
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
++    axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+   });
+ 
+   it('renders notification tray and close tray button', async () => {
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 74afa00..ae2f5e1 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -84,17 +84,6 @@ export async function getLearningSequencesOutline(courseId) {
+   return normalizeLearningSequencesData(data);
+ }
+ 
+-function normalizeTabUrls(id, tabs) {
+-  // If api doesn't return the mfe base url, change tab url to point back to LMS
+-  return tabs.map((tab) => {
+-    let { url } = tab;
+-    if (url[0] === '/') {
+-      url = `${getConfig().LMS_BASE_URL}${tab.url}`;
+-    }
+-    return { ...tab, url };
+-  });
+-}
+-
+ function normalizeMetadata(metadata) {
+   const requestTime = Date.now();
+   const responseTime = requestTime;
+@@ -120,7 +109,6 @@ function normalizeMetadata(metadata) {
+     isStaff: data.is_staff,
+     license: data.license,
+     verifiedMode: camelCaseObject(data.verified_mode),
+-    tabs: normalizeTabUrls(data.id, camelCaseObject(data.tabs)),
+     userTimezone: data.user_timezone,
+     showCalculator: data.show_calculator,
+     notes: camelCaseObject(data.notes),
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index 16f23b3..d18f335 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -243,9 +243,6 @@ describe('Courseware Service', () => {
+               generate: '2013-02-05T05:00:00Z',
+               matcher: dateRegex,
+             }),
+-            tabs: eachLike({
+-              title: 'Course', slug: 'courseware', priority: 0, type: 'courseware', url: `${getConfig().BASE_URL}/course/course-v1:edX+DemoX+Demo_Course/home`,
+-            }),
+             user_timezone: null,
+             verified_mode: like({
+               access_expiration_date: term({
+@@ -329,13 +326,6 @@ describe('Courseware Service', () => {
+           sku: '8CF08E5',
+           upgradeUrl: `${getConfig().ECOMMERCE_BASE_URL}/basket/add/?sku=8CF08E5`,
+         },
+-        tabs: [{
+-          title: 'Course',
+-          slug: 'courseware',
+-          priority: 0,
+-          type: 'courseware',
+-          url: `${getConfig().BASE_URL}/course/course-v1:edX+DemoX+Demo_Course/home`,
+-        }],
+         userTimezone: null,
+         showCalculator: false,
+         notes: { enabled: false, visible: true },
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 153487d..d57095b 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -29,7 +29,7 @@ export function fetchCourse(courseId) {
+     Promise.allSettled([
+       getCourseMetadata(courseId),
+       getLearningSequencesOutline(courseId),
+-      getCourseHomeCourseMetadata(courseId),
++      getCourseHomeCourseMetadata(courseId, 'courseware'),
+     ]).then(([
+       courseMetadataResult,
+       learningSequencesOutlineResult,
+diff --git a/src/generic/tabs/Tabs.jsx b/src/generic/tabs/Tabs.jsx
+index 474bbb9..028023b 100644
+--- a/src/generic/tabs/Tabs.jsx
++++ b/src/generic/tabs/Tabs.jsx
+@@ -37,7 +37,7 @@ export default function Tabs({ children, className, ...attrs }) {
+         key="overflow"
+       >
+         <Dropdown className="h-100">
+-          <Dropdown.Toggle variant="link" className="nav-link h-100">
++          <Dropdown.Toggle variant="link" className="nav-link h-100" id="learn.course.tabs.navigation.overflow.menu">
+             <FormattedMessage
+               id="learn.course.tabs.navigation.overflow.menu"
+               description="The title of the overflow menu for course tabs"
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 3825507..07a2d49 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -2,7 +2,6 @@ import 'core-js/stable';
+ import 'regenerator-runtime/runtime';
+ import '@testing-library/jest-dom';
+ import '@testing-library/jest-dom/extend-expect';
+-import 'jest-chain';
+ import './courseware/data/__factories__';
+ import './course-home/data/__factories__';
+ import { getConfig, mergeConfig } from '@edx/frontend-platform';
+diff --git a/src/shared/data/__factories__/courseMetadataBase.factory.js b/src/shared/data/__factories__/courseMetadataBase.factory.js
+index b379dee..ea888bd 100644
+--- a/src/shared/data/__factories__/courseMetadataBase.factory.js
++++ b/src/shared/data/__factories__/courseMetadataBase.factory.js
+@@ -17,72 +17,4 @@ export default new Factory()
+       price: 10,
+       currency_symbol: '$',
+     },
+-  })
+-  .attr(
+-    'tabs', ['id', 'host'], (id, host) => {
+-      const tabs = [
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Course',
+-            priority: 0,
+-            slug: 'courseware',
+-            type: 'courseware',
+-          },
+-          { courseId: id, host, path: 'course/' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Discussion',
+-            priority: 1,
+-            slug: 'discussion',
+-            type: 'discussion',
+-          },
+-          { courseId: id, host, path: 'discussion/forum/' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Wiki',
+-            priority: 2,
+-            slug: 'wiki',
+-            type: 'wiki',
+-          },
+-          { courseId: id, host, path: 'course_wiki' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Progress',
+-            priority: 3,
+-            slug: 'progress',
+-            type: 'progress',
+-          },
+-          { courseId: id, host, path: 'progress' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Instructor',
+-            priority: 4,
+-            slug: 'instructor',
+-            type: 'instructor',
+-          },
+-          { courseId: id, host, path: 'instructor' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Dates',
+-            priority: 5,
+-            slug: 'dates',
+-            type: 'dates',
+-          },
+-          { courseId: id, host, path: 'dates' },
+-        ),
+-      ];
+-
+-      return tabs;
+-    },
+-  );
++  });
+diff --git a/src/tab-page/TabContainer.test.jsx b/src/tab-page/TabContainer.test.jsx
+index 2f2bfd0..3479d15 100644
+--- a/src/tab-page/TabContainer.test.jsx
++++ b/src/tab-page/TabContainer.test.jsx
+@@ -38,12 +38,10 @@ describe('Tab Container', () => {
+       </Route>,
+     );
+ 
+-    expect(mockFetch)
+-      .toHaveBeenCalledTimes(1)
+-      .toHaveBeenCalledWith(courseId);
+-    expect(mockDispatch)
+-      .toHaveBeenCalledTimes(1)
+-      .toHaveBeenCalledWith(courseId);
++    expect(mockFetch).toHaveBeenCalledTimes(1);
++    expect(mockFetch).toHaveBeenCalledWith(courseId);
++    expect(mockDispatch).toHaveBeenCalledTimes(1);
++    expect(mockDispatch).toHaveBeenCalledWith(courseId);
+     expect(screen.getByTestId('TabPage')).toBeInTheDocument();
+   });
+ 
+@@ -67,9 +65,8 @@ describe('Tab Container', () => {
+       />,
+     );
+ 
+-    expect(mockFetch)
+-      .toHaveBeenCalledTimes(1)
+-      .toHaveBeenCalledWith(courseId, targetUserId);
++    expect(mockFetch).toHaveBeenCalledTimes(1);
++    expect(mockFetch).toHaveBeenCalledWith(courseId, targetUserId);
+     expect(screen.getByTestId('TabPage')).toBeInTheDocument();
+   });
+ });
+-- 
+2.34.1
+

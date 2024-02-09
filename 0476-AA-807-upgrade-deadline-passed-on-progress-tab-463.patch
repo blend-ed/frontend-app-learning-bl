@@ -1,0 +1,134 @@
+From 9d07f26f13405e863ca819567eb961961ffcd7fb Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 26 May 2021 12:01:12 -0400
+Subject: [PATCH 0476/1021] AA-807: upgrade deadline passed on progress tab
+ (#463)
+
+---
+ .../progress-tab/ProgressTab.test.jsx         | 26 ++++++++++++++++++-
+ .../certificate-status/CertificateStatus.jsx  |  2 ++
+ .../grades/course-grade/CourseGradeHeader.jsx | 13 +++++-----
+ .../progress-tab/grades/messages.js           | 10 ++++---
+ 4 files changed, 41 insertions(+), 10 deletions(-)
+
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 4284f25..a10dbc7 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -162,17 +162,41 @@ describe('Progress Tab', () => {
+       expect(screen.getByText('F: <80%'));
+     });
+ 
+-    it('renders locked feature preview when user has locked content', async () => {
++    it('renders locked feature preview with upgrade button when user has locked content', async () => {
+       setTabData({
+         completion_summary: {
+           complete_count: 1,
+           incomplete_count: 1,
+           locked_count: 1,
+         },
++        verified_mode: {
++          access_expiration_date: '2050-01-01T12:00:00',
++          currency: 'USD',
++          currency_symbol: '$',
++          price: 149,
++          sku: 'ABCD1234',
++          upgrade_url: 'edx.org/upgrade',
++        },
+       });
+       await fetchAndRender();
+       expect(screen.getByText('locked feature')).toBeInTheDocument();
++      expect(screen.getByText('Unlock to view grades and work towards a certificate.')).toBeInTheDocument();
++      expect(screen.getAllByRole('link', 'Unlock now')).toHaveLength(3);
+     });
++
++    it('renders locked feature preview with no upgrade button when user has locked content but cannot upgrade', async () => {
++      setTabData({
++        completion_summary: {
++          complete_count: 1,
++          incomplete_count: 1,
++          locked_count: 1,
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('locked feature')).toBeInTheDocument();
++      expect(screen.getByText('The deadline to upgrade in this course has passed.')).toBeInTheDocument();
++    });
++
+     it('does not render locked feature preview when user does not have locked content', async () => {
+       await fetchAndRender();
+       expect(screen.queryByText('locked feature')).not.toBeInTheDocument();
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index 23555e2..f89c3cb 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -134,6 +134,8 @@ function CertificateStatus({ intl }) {
+           body = intl.formatMessage(messages[`${certCase}Body`]);
+           buttonLocation = verifiedMode.upgradeUrl;
+           buttonText = intl.formatMessage(messages[`${certCase}Button`]);
++        } else {
++          certCase = null; // Do not render the certificate component if the upgrade deadline has passed
+         }
+         break;
+ 
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+index d064e3a..d0ef033 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+@@ -17,7 +17,7 @@ function CourseGradeHeader({ intl }) {
+   } = useModel('progress', courseId);
+   return (
+     <div className="row w-100 m-0 p-4 rounded-top bg-primary-500 text-white">
+-      <div className="col-12 col-md-9 p-0">
++      <div className={`col-12 ${verifiedMode ? 'col-md-9' : ''} p-0`}>
+         <div className="row w-100 m-0 p-0">
+           <div className="col-1 p-0">
+             <Icon src={Locked} />
+@@ -31,17 +31,18 @@ function CourseGradeHeader({ intl }) {
+         </div>
+         <div className="row w-100 m-0 p-0 justify-content-end">
+           <div className="col-11 px-2 p-sm-0 small">
+-            {intl.formatMessage(messages.courseGradePreviewBody)}
++            {verifiedMode ? intl.formatMessage(messages.courseGradePreviewUnlockCertificateBody)
++              : intl.formatMessage(messages.courseGradePreviewUpgradeDeadlinePassedBody)}
+           </div>
+         </div>
+       </div>
+-      <div className="col-12 col-md-3 mt-3 mt-md-0 p-0 align-self-center text-right">
+-        {verifiedMode && (
++      {verifiedMode && (
++        <div className="col-12 col-md-3 mt-3 mt-md-0 p-0 align-self-center text-right">
+           <Button variant="brand" size="sm" href={verifiedMode.upgradeUrl}>
+             {intl.formatMessage(messages.courseGradePreviewUpgradeButton)}
+           </Button>
+-        )}
+-      </div>
++        </div>
++      )}
+     </div>
+   );
+ }
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 867efb6..3fb2443 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -37,9 +37,13 @@ const messages = defineMessages({
+     id: 'progress.courseGrade.preview.header.ariaHidden',
+     defaultMessage: 'Preview of a ',
+   },
+-  courseGradePreviewBody: {
+-    id: 'progress.courseGrade.preview.body',
+-    defaultMessage: 'Unlock to view grades and work towards a certificate',
++  courseGradePreviewUnlockCertificateBody: {
++    id: 'progress.courseGrade.preview.body.unlockCertificate',
++    defaultMessage: 'Unlock to view grades and work towards a certificate.',
++  },
++  courseGradePreviewUpgradeDeadlinePassedBody: {
++    id: 'progress.courseGrade.preview.body.upgradeDeadlinePassed',
++    defaultMessage: 'The deadline to upgrade in this course has passed.',
+   },
+   courseGradePreviewUpgradeButton: {
+     id: 'progress.courseGrade.preview.button.upgrade',
+-- 
+2.34.1
+

@@ -1,0 +1,79 @@
+From d408986682973e02526cc8b75ba72fd2472a7fda Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Thu, 23 Jul 2020 16:52:44 +0200
+Subject: [PATCH 0198/1021] [TNL-7268] Fix tests after rebase
+
+---
+ src/courseware/course/sequence/Sequence.test.jsx   | 14 +++++++++-----
+ .../SequenceNavigation.test.jsx                    |  4 ++--
+ .../data/__factories__/sequenceMetadata.factory.js |  5 ++---
+ 3 files changed, 13 insertions(+), 10 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 5c6108d..966525b 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -53,10 +53,14 @@ describe('Sequence', () => {
+     };
+     const sequenceMetadata = [Factory.build(
+       'sequenceMetadata',
+-      { courseId: courseMetadata.id, gated_content: gatedContent },
+-      { unitBlocks, sequenceBlock: sequenceBlock[0] },
++      { gated_content: gatedContent },
++      { courseId: courseMetadata.id, unitBlocks, sequenceBlock: sequenceBlock[0] },
+     )];
+-    const testStore = await initializeTestStore({ unitBlocks, sequenceBlock, sequenceMetadata }, false);
++    const testStore = await initializeTestStore(
++      {
++        courseMetadata, unitBlocks, sequenceBlock, sequenceMetadata,
++      }, false,
++    );
+     const { container } = render(
+       <Sequence {...mockData} {...{ sequenceId: sequenceBlock[0].id }} />,
+       { store: testStore },
+@@ -261,8 +265,8 @@ describe('Sequence', () => {
+       )];
+       const testSequenceMetadata = testSequenceBlock.map(block => Factory.build(
+         'sequenceMetadata',
+-        { courseId: courseMetadata.id },
+-        { unitBlocks: block.children.length ? unitBlocks : [], sequenceBlock: block },
++        {},
++        { courseId: courseMetadata.id, unitBlocks: block.children.length ? unitBlocks : [], sequenceBlock: block },
+       ));
+       const innerTestStore = await initializeTestStore({
+         courseMetadata, unitBlocks, sequenceBlock: testSequenceBlock, sequenceMetadata: testSequenceMetadata,
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index 4ca50da..885f9e1 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -52,8 +52,8 @@ describe('Sequence Navigation', () => {
+     )];
+     const sequenceMetadata = [Factory.build(
+       'sequenceMetadata',
+-      { courseId: courseMetadata.id, gated_content: { gated: true } },
+-      { unitBlocks, sequenceBlock: sequenceBlock[0] },
++      { gated_content: { gated: true } },
++      { courseId: courseMetadata.id, unitBlocks, sequenceBlock: sequenceBlock[0] },
+     )];
+     const testStore = await initializeTestStore({ unitBlocks, sequenceBlock, sequenceMetadata }, false);
+     const testData = {
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index 0ed1571..c53962d 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -76,10 +76,9 @@ export default function buildSimpleCourseAndSequenceMetadata(options = {}) {
+   const { unitBlocks, sequenceBlock } = simpleCourseBlocks;
+   const sequenceMetadata = options.sequenceMetadata || sequenceBlock.map(block => Factory.build(
+     'sequenceMetadata',
+-    { courseId },
++    {},
+     {
+-      unitBlocks,
+-      sequenceBlock: block,
++      courseId, unitBlocks, sequenceBlock: block,
+     },
+   ));
+   return {
+-- 
+2.34.1
+

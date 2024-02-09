@@ -1,0 +1,26 @@
+From c2414ce1bacd26eca7e4c1956f59debbcfcc3127 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 19 Oct 2021 15:30:04 -0400
+Subject: [PATCH 0699/1021] fix: [AA-906] WeeklyLearningGoals (#694)
+
+Fix incorrect message for returning students
+---
+ src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+index 3269741..14b3f76 100644
+--- a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
++++ b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+@@ -41,7 +41,7 @@ function StartOrResumeCourseCard({ intl }) {
+     <Card className="mb-3" data-testid="start-resume-card">
+       <Card.Body>
+         <div className="row w-100 m-0 justify-content-between align-items-center">
+-          <h2 className="h3 m-md-0">{intl.formatMessage(messages.startBlurb)}</h2>
++          <h2 className="h3 m-md-0">{hasVisitedCourse ? intl.formatMessage(messages.resumeBlurb) : intl.formatMessage(messages.startBlurb)}</h2>
+           <div className="col-12 col-md-auto p-0">
+             <Button
+               variant="brand"
+-- 
+2.34.1
+

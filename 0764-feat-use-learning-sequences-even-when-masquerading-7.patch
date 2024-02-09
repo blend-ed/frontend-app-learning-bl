@@ -1,0 +1,46 @@
+From 1044d2afc6a3aa66c9fbfff4b3d2af0ffce05ce2 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 20 Dec 2021 13:19:38 -0500
+Subject: [PATCH 0764/1021] feat: use learning sequences even when masquerading
+ (#774)
+
+The backend recently grew support for it, so we can use it
+directly instead of falling back to course blocks in that case.
+
+AA-1151
+---
+ src/courseware/data/thunks.js | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 210954c..2a09862 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -37,13 +37,11 @@ import {
+  *
+  * @param {*} learningSequencesModels  Normalized model from normalizeLearningSequencesData
+  * @param {*} courseBlocksModels       Normalized model from normalizeBlocks
+- * @param {bool} isMasquerading        Is Masquerading being used?
+  */
+-function mergeLearningSequencesWithCourseBlocks(learningSequencesModels, courseBlocksModels, isMasquerading) {
++function mergeLearningSequencesWithCourseBlocks(learningSequencesModels, courseBlocksModels) {
+   // If there's no Learning Sequences API data yet (not active for this course),
+-  // send back the course blocks model as-is. Likewise, Learning Sequences
+-  // doesn't currently handle masquerading properly for content groups.
+-  if (isMasquerading || learningSequencesModels === null) {
++  // send back the course blocks model as-is.
++  if (learningSequencesModels === null) {
+     return courseBlocksModels;
+   }
+   const mergedModels = {
+@@ -151,7 +149,6 @@ export function fetchCourse(courseId) {
+         } = mergeLearningSequencesWithCourseBlocks(
+           learningSequencesOutlineResult.value,
+           courseBlocksResult.value,
+-          courseMetadataResult.value.isMasquerading,
+         );
+ 
+         // This updates the course with a sectionIds array from the blocks data.
+-- 
+2.34.1
+

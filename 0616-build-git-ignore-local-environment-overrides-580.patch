@@ -1,0 +1,27 @@
+From 0d015be97e4f453a562fb33e7dcc30f378cc47db Mon Sep 17 00:00:00 2001
+From: Robert Raposa <rraposa@edx.org>
+Date: Fri, 20 Aug 2021 09:13:35 -0400
+Subject: [PATCH 0616/1021] build: git ignore local environment overrides
+ (#580)
+
+Git ignore for .env.private to enable local environment
+overrides as detailed by frontend-build. See:
+https://github.com/edx/frontend-build#override-default-envdevelopment-environment-variables-with-envprivate
+---
+ .gitignore | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index 6aeb527..cc6aec9 100755
+--- a/.gitignore
++++ b/.gitignore
+@@ -20,3 +20,6 @@ logs
+ 
+ # Local package dependencies
+ module.config.js
++
++# Local environment overrides
++.env.private
+-- 
+2.34.1
+

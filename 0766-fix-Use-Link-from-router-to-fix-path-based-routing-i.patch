@@ -1,0 +1,95 @@
+From de49e8b2717023f12a29a08dda77bd4a66c5bb69 Mon Sep 17 00:00:00 2001
+From: Arslan <arslan.ashraf@arbisoft.com>
+Date: Fri, 17 Dec 2021 18:53:25 +0500
+Subject: [PATCH 0766/1021] fix: Use Link from router to fix path based routing
+ issue
+
+---
+ src/courseware/course/CourseBreadcrumbs.jsx      | 14 +++++++++-----
+ src/courseware/course/CourseBreadcrumbs.test.jsx | 15 +++++++++------
+ 2 files changed, 18 insertions(+), 11 deletions(-)
+
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index b7b41e7..4621f5c 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faHome } from '@fortawesome/free-solid-svg-icons';
+ import { useSelector } from 'react-redux';
+ import { SelectMenu } from '@edx/paragon';
++import { Link } from 'react-router-dom';
+ import { useModel, useModels } from '../../generic/model-store';
+ /** [MM-P2P] Experiment */
+ import { MMP2PFlyoverTrigger } from '../../experiments/mm-p2p';
+@@ -30,9 +31,12 @@ function CourseBreadcrumb({
+       >
+         { getConfig().ENABLE_JUMPNAV !== 'true' || content.length < 2 || !isStaff
+           ? (
+-            <a className="text-primary-500" href={`/course/${courseId}/${defaultContent.id}`}>
++            <Link
++              className="text-primary-500"
++              to={`/course/${courseId}/${defaultContent.id}`}
++            >
+               {defaultContent.label}
+-            </a>
++            </Link>
+           )
+           : (
+             <SelectMenu isLink defaultMessage={defaultContent.label}>
+@@ -125,9 +129,9 @@ export default function CourseBreadcrumbs({
+     <nav aria-label="breadcrumb" className="my-4 d-inline-block col-sm-10">
+       <ol className="list-unstyled d-flex  flex-nowrap align-items-center m-0">
+         <li className="list-unstyled col-auto m-0 p-0">
+-          <a
+-            href={`/course/${courseId}/home`}
++          <Link
+             className="flex-shrink-0 text-primary"
++            to={`/course/${courseId}/home`}
+           >
+             <FontAwesomeIcon icon={faHome} className="mr-2" />
+             <FormattedMessage
+@@ -135,7 +139,7 @@ export default function CourseBreadcrumbs({
+               description="The course home link in breadcrumbs nav"
+               defaultMessage="Course"
+             />
+-          </a>
++          </Link>
+         </li>
+         {links.map(content => (
+           <CourseBreadcrumb
+diff --git a/src/courseware/course/CourseBreadcrumbs.test.jsx b/src/courseware/course/CourseBreadcrumbs.test.jsx
+index ae5111b..d441271 100644
+--- a/src/courseware/course/CourseBreadcrumbs.test.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.test.jsx
+@@ -2,6 +2,7 @@ import React from 'react';
+ import { screen, render } from '@testing-library/react';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { getConfig } from '@edx/frontend-platform';
++import { BrowserRouter } from 'react-router-dom';
+ import { useModel, useModels } from '../../generic/model-store';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ 
+@@ -105,12 +106,14 @@ describe('CourseBreadcrumbs', () => {
+     ],
+   ]);
+   render(
+-    <CourseBreadcrumbs
+-      courseId="course-v1:edX+DemoX+Demo_Course"
+-      sectionId="block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations"
+-      sequenceId="block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions"
+-      isStaff
+-    />,
++    <BrowserRouter>
++      <CourseBreadcrumbs
++        courseId="course-v1:edX+DemoX+Demo_Course"
++        sectionId="block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations"
++        sequenceId="block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions"
++        isStaff
++      />
++    </BrowserRouter>,
+   );
+   it('renders course breadcrumbs as expected', async () => {
+     expect(screen.queryAllByRole('link')).toHaveLength(1);
+-- 
+2.34.1
+

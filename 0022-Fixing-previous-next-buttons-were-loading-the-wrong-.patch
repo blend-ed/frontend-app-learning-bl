@@ -1,0 +1,38 @@
+From 04754e583223b8cf23444b361366ad0d98fcc042 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 10 Jan 2020 12:51:46 -0500
+Subject: [PATCH 0022/1021] Fixing previous/next buttons - were loading the
+ wrong subsection.
+
+---
+ src/learning-sequence/sub-section/SubSectionNavigation.jsx | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/src/learning-sequence/sub-section/SubSectionNavigation.jsx b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+index bed8024..3aa03fc 100644
+--- a/src/learning-sequence/sub-section/SubSectionNavigation.jsx
++++ b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+@@ -33,18 +33,17 @@ function UnitIcon({ type }) {
+ 
+ export default function SubSectionNavigation() {
+   const { courseId } = useContext(CourseStructureContext);
+-  const subSection = useCurrentSubSection();
+   const previousUnit = usePreviousUnit();
+   const nextUnit = useNextUnit();
+ 
+   const handlePreviousClick = useCallback(() => {
+     if (previousUnit) {
+-      history.push(`/course/${courseId}/${subSection.id}/${previousUnit.id}`);
++      history.push(`/course/${courseId}/${previousUnit.parentId}/${previousUnit.id}`);
+     }
+   });
+   const handleNextClick = useCallback(() => {
+     if (nextUnit) {
+-      history.push(`/course/${courseId}/${subSection.id}/${nextUnit.id}`);
++      history.push(`/course/${courseId}/${nextUnit.parentId}/${nextUnit.id}`);
+     }
+   });
+ 
+-- 
+2.34.1
+

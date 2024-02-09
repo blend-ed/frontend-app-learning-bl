@@ -1,0 +1,2357 @@
+From f004d0ab3c11ec8a88c39ca2ecdabee4d05d0151 Mon Sep 17 00:00:00 2001
+From: Kshitij Sobti <kshitij@sobti.in>
+Date: Mon, 7 Mar 2022 19:26:05 +0530
+Subject: [PATCH 0835/1021] feat: Sidebar refactor and add support for
+ discussions sidebar. (#762)
+
+squash!: remove unnecessary styling and migrate to bootstrap and other review feedback
+---
+ .env                                          |   1 +
+ .env.development                              |   1 +
+ .env.test                                     |   1 +
+ src/courseware/CoursewareContainer.test.jsx   |   3 +
+ src/courseware/course/Course.jsx              |  65 ++--------
+ src/courseware/course/Course.test.jsx         |  14 +--
+ src/courseware/course/NotificationIcon.scss   |  15 ---
+ src/courseware/course/NotificationTray.jsx    |  96 ---------------
+ src/courseware/course/NotificationTray.scss   |  67 -----------
+ src/courseware/course/NotificationTrigger.jsx |  51 --------
+ .../course/NotificationTrigger.scss           |  24 ----
+ src/courseware/course/sequence/Sequence.jsx   |  53 +--------
+ .../course/sequence/Sequence.test.jsx         |  26 ++--
+ .../course/sequence/SequenceContent.jsx       |   3 -
+ src/courseware/course/sequence/Unit.jsx       |  83 ++++++-------
+ .../sequence/lock-paywall/LockPaywall.jsx     |   6 +-
+ src/courseware/course/sidebar/Sidebar.jsx     |  18 +++
+ .../course/sidebar/SidebarContext.js          |   5 +
+ .../course/sidebar/SidebarContextProvider.jsx |  72 +++++++++++
+ .../course/sidebar/SidebarTriggers.jsx        |  32 +++++
+ .../course/sidebar/common/SidebarBase.jsx     | 102 ++++++++++++++++
+ .../course/sidebar/common/TriggerBase.jsx     |  30 +++++
+ .../discussions/DiscussionsSidebar.jsx        |  50 ++++++++
+ .../discussions/DiscussionsTrigger.jsx        |  50 ++++++++
+ .../discussions/DiscussionsTrigger.test.jsx   |  70 +++++++++++
+ .../sidebar/sidebars/discussions/index.js     |   2 +
+ .../sidebar/sidebars/discussions/messages.js  |  16 +++
+ .../course/sidebar/sidebars/index.js          |  20 ++++
+ .../notifications}/NotificationIcon.jsx       |  29 +++--
+ .../notifications/NotificationIcon.scss       |   4 +
+ .../notifications/NotificationTray.jsx        |  72 +++++++++++
+ .../notifications}/NotificationTray.test.jsx  | 112 ++++++++++++------
+ .../notifications/NotificationTrigger.jsx     |  71 +++++++++++
+ .../NotificationTrigger.test.jsx              |  78 ++++++------
+ .../sidebar/sidebars/notifications/index.js   |   2 +
+ .../__factories__/discussionTopics.factory.js |  23 ++++
+ src/courseware/data/__factories__/index.js    |   1 +
+ src/courseware/data/api.js                    |  17 ++-
+ src/courseware/data/thunks.js                 |  36 ++++--
+ src/generic/hooks.js                          |  21 ++++
+ src/generic/model-store/slice.js              |  35 +++---
+ .../UpgradeNotification.test.jsx              |   2 +-
+ src/index.jsx                                 |   1 +
+ src/index.scss                                |   4 +-
+ src/product-tours/ProductTours.test.jsx       |   2 +
+ src/setupTest.js                              |   3 +
+ 46 files changed, 953 insertions(+), 536 deletions(-)
+ delete mode 100644 src/courseware/course/NotificationIcon.scss
+ delete mode 100644 src/courseware/course/NotificationTray.jsx
+ delete mode 100644 src/courseware/course/NotificationTray.scss
+ delete mode 100644 src/courseware/course/NotificationTrigger.jsx
+ delete mode 100644 src/courseware/course/NotificationTrigger.scss
+ create mode 100644 src/courseware/course/sidebar/Sidebar.jsx
+ create mode 100644 src/courseware/course/sidebar/SidebarContext.js
+ create mode 100644 src/courseware/course/sidebar/SidebarContextProvider.jsx
+ create mode 100644 src/courseware/course/sidebar/SidebarTriggers.jsx
+ create mode 100644 src/courseware/course/sidebar/common/SidebarBase.jsx
+ create mode 100644 src/courseware/course/sidebar/common/TriggerBase.jsx
+ create mode 100644 src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+ create mode 100644 src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
+ create mode 100644 src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.test.jsx
+ create mode 100644 src/courseware/course/sidebar/sidebars/discussions/index.js
+ create mode 100644 src/courseware/course/sidebar/sidebars/discussions/messages.js
+ create mode 100644 src/courseware/course/sidebar/sidebars/index.js
+ rename src/courseware/course/{ => sidebar/sidebars/notifications}/NotificationIcon.jsx (60%)
+ create mode 100644 src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.scss
+ create mode 100644 src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
+ rename src/courseware/course/{ => sidebar/sidebars/notifications}/NotificationTray.test.jsx (56%)
+ create mode 100644 src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.jsx
+ rename src/courseware/course/{ => sidebar/sidebars/notifications}/NotificationTrigger.test.jsx (74%)
+ create mode 100644 src/courseware/course/sidebar/sidebars/notifications/index.js
+ create mode 100644 src/courseware/data/__factories__/discussionTopics.factory.js
+ create mode 100644 src/generic/hooks.js
+
+diff --git a/.env b/.env
+index b29e73e..c882fde 100644
+--- a/.env
++++ b/.env
+@@ -10,6 +10,7 @@ CREDENTIALS_BASE_URL=''
+ CREDIT_HELP_LINK_URL=''
+ CSRF_TOKEN_API_PATH=''
+ DISCOVERY_API_BASE_URL=''
++DISCUSSIONS_MFE_BASE_URL=''
+ ECOMMERCE_BASE_URL=''
+ ENABLE_JUMPNAV='true'
+ ENABLE_NOTICES=''
+diff --git a/.env.development b/.env.development
+index cb04320..f191351 100644
+--- a/.env.development
++++ b/.env.development
+@@ -10,6 +10,7 @@ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CREDIT_HELP_LINK_URL='https://edx.readthedocs.io/projects/edx-guide-for-students/en/latest/SFD_credit_courses.html#keep-track-of-credit-requirements'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ DISCOVERY_API_BASE_URL='http://localhost:18381'
++DISCUSSIONS_MFE_BASE_URL='http://localhost:2002'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+ ENABLE_JUMPNAV='true'
+ ENABLE_NOTICES=''
+diff --git a/.env.test b/.env.test
+index 9860963..147c12c 100644
+--- a/.env.test
++++ b/.env.test
+@@ -10,6 +10,7 @@ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CREDIT_HELP_LINK_URL='https://edx.readthedocs.io/projects/edx-guide-for-students/en/latest/SFD_credit_courses.html#keep-track-of-credit-requirements'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ DISCOVERY_API_BASE_URL='http://localhost:18381'
++DISCUSSIONS_MFE_BASE_URL='http://localhost:2002'
+ ECOMMERCE_BASE_URL='http://localhost:18130'
+ ENABLE_JUMPNAV='true'
+ ENABLE_NOTICES=''
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 3baa127..71912ca 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -147,6 +147,9 @@ describe('CoursewareContainer', () => {
+         const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${unitBlock.id}`;
+         axiosMock.onGet(sequenceMetadataUrl).reply(422, {});
+       });
++
++    const discussionConfigUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/discussion/v1/courses/*`);
++    axiosMock.onGet(discussionConfigUrl).reply(200, { provider: 'legacy' });
+   }
+ 
+   async function loadContainer() {
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index e6d8552..56b25df 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -12,10 +12,10 @@ import Sequence from './sequence';
+ import { CelebrationModal, shouldCelebrateOnSectionLoad, WeeklyGoalCelebrationModal } from './celebration';
+ import ContentTools from './content-tools';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+-import NotificationTrigger from './NotificationTrigger';
++import SidebarProvider from './sidebar/SidebarContextProvider';
++import SidebarTriggers from './sidebar/SidebarTriggers';
+ 
+ import { useModel } from '../../generic/model-store';
+-import { getLocalStorage, setLocalStorage } from '../../data/localStorage';
+ import { getSessionStorage, setSessionStorage } from '../../data/sessionStorage';
+ 
+ /** [MM-P2P] Experiment */
+@@ -43,7 +43,6 @@ function Course({
+   const {
+     celebrations,
+     courseGoals,
+-    verifiedMode,
+   } = course;
+ 
+   // Below the tabs, above the breadcrumbs alerts (appearing in the order listed here)
+@@ -57,10 +56,10 @@ function Course({
+   const [weeklyGoalCelebrationOpen, setWeeklyGoalCelebrationOpen] = useState(
+     celebrations && !celebrations.streakLengthToCelebrate && celebrations.weeklyGoal,
+   );
++  const shouldDisplayTriggers = windowWidth >= breakpoints.small.minWidth;
+   const daysPerWeek = courseGoals?.selectedGoal?.daysPerWeek;
+ 
+   // Responsive breakpoints for showing the notification button/tray
+-  const shouldDisplayNotificationTriggerInCourse = windowWidth >= breakpoints.small.minWidth;
+   const shouldDisplayNotificationTrayOpenOnLoad = windowWidth > breakpoints.medium.minWidth;
+ 
+   // Course specific notification tray open/closed persistance by browser session
+@@ -73,45 +72,15 @@ function Course({
+     }
+   }
+ 
+-  const [notificationTrayVisible, setNotificationTray] = verifiedMode
+-    && shouldDisplayNotificationTrayOpenOnLoad && getSessionStorage(`notificationTrayStatus.${courseId}`) !== 'closed' ? useState(true) : useState(false);
+-
+-  const isNotificationTrayVisible = () => notificationTrayVisible && setNotificationTray;
+-
+-  const toggleNotificationTray = () => {
+-    if (notificationTrayVisible) { setNotificationTray(false); } else { setNotificationTray(true); }
+-    if (getSessionStorage(`notificationTrayStatus.${courseId}`) === 'open') {
+-      setSessionStorage(`notificationTrayStatus.${courseId}`, 'closed');
+-    } else {
+-      setSessionStorage(`notificationTrayStatus.${courseId}`, 'open');
+-    }
+-  };
+-
+-  if (!getLocalStorage(`notificationStatus.${courseId}`)) {
+-    setLocalStorage(`notificationStatus.${courseId}`, 'active'); // Show red dot on notificationTrigger until seen
+-  }
+-
+-  if (!getLocalStorage(`upgradeNotificationCurrentState.${courseId}`)) {
+-    setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'initialize');
+-  }
+-
+-  const [notificationStatus, setNotificationStatus] = useState(getLocalStorage(`notificationStatus.${courseId}`));
+-  const [upgradeNotificationCurrentState, setupgradeNotificationCurrentState] = useState(getLocalStorage(`upgradeNotificationCurrentState.${courseId}`));
+-
+-  const onNotificationSeen = () => {
+-    setNotificationStatus('inactive');
+-    setLocalStorage(`notificationStatus.${courseId}`, 'inactive');
+-  };
+-
+   /** [MM-P2P] Experiment */
+   const MMP2P = initCoursewareMMP2P(courseId, sequenceId, unitId);
+ 
+   return (
+-    <>
++    <SidebarProvider courseId={courseId} unitId={unitId}>
+       <Helmet>
+         <title>{`${pageTitleBreadCrumbs.join(' | ')} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+-      <div className="position-relative">
++      <div className="position-relative d-flex align-items-start">
+         <CourseBreadcrumbs
+           courseId={courseId}
+           sectionId={section ? section.id : null}
+@@ -121,17 +90,9 @@ function Course({
+           //* * [MM-P2P] Experiment */
+           mmp2p={MMP2P}
+         />
+-
+-        { shouldDisplayNotificationTriggerInCourse ? (
+-          <NotificationTrigger
+-            courseId={courseId}
+-            toggleNotificationTray={toggleNotificationTray}
+-            isNotificationTrayVisible={isNotificationTrayVisible}
+-            notificationStatus={notificationStatus}
+-            setNotificationStatus={setNotificationStatus}
+-            upgradeNotificationCurrentState={upgradeNotificationCurrentState}
+-          />
+-        ) : null}
++        {shouldDisplayTriggers && (
++          <SidebarTriggers />
++        )}
+       </div>
+ 
+       <AlertList topic="sequence" />
+@@ -142,14 +103,6 @@ function Course({
+         unitNavigationHandler={unitNavigationHandler}
+         nextSequenceHandler={nextSequenceHandler}
+         previousSequenceHandler={previousSequenceHandler}
+-        toggleNotificationTray={toggleNotificationTray}
+-        isNotificationTrayVisible={isNotificationTrayVisible}
+-        notificationTrayVisible={notificationTrayVisible}
+-        notificationStatus={notificationStatus}
+-        setNotificationStatus={setNotificationStatus}
+-        onNotificationSeen={onNotificationSeen}
+-        upgradeNotificationCurrentState={upgradeNotificationCurrentState}
+-        setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+         //* * [MM-P2P] Experiment */
+         mmp2p={MMP2P}
+       />
+@@ -167,7 +120,7 @@ function Course({
+       <ContentTools course={course} />
+       { /** [MM-P2P] Experiment */ }
+       { MMP2P.meta.modalLock && <MMP2PBlockModal options={MMP2P} /> }
+-    </>
++    </SidebarProvider>
+   );
+ }
+ 
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 77d1937..d218036 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -2,14 +2,13 @@ import React from 'react';
+ import { Factory } from 'rosie';
+ import { breakpoints } from '@edx/paragon';
+ import {
+-  loadUnit, render, screen, waitFor, getByRole, initializeTestStore, fireEvent,
++  fireEvent, getByRole, initializeTestStore, loadUnit, render, screen, waitFor,
+ } from '../../setupTest';
+-import Course from './Course';
+ import { handleNextSectionCelebration } from './celebration';
+ import * as celebrationUtils from './celebration/utils';
++import Course from './Course';
+ 
+ jest.mock('@edx/frontend-platform/analytics');
+-jest.mock('./NotificationTray', () => () => <div data-testid="NotificationTray" />);
+ 
+ const recordFirstSectionCelebration = jest.fn();
+ celebrationUtils.recordFirstSectionCelebration = recordFirstSectionCelebration;
+@@ -106,11 +105,10 @@ describe('Course', () => {
+     render(<Course {...mockData} />);
+ 
+     const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
+-
+     expect(notificationTrigger).toBeInTheDocument();
+-    expect(notificationTrigger).toHaveClass('trigger-active');
++    expect(notificationTrigger.parentNode).toHaveClass('border-primary-700');
+     fireEvent.click(notificationTrigger);
+-    expect(notificationTrigger).not.toHaveClass('trigger-active');
++    expect(notificationTrigger.parentNode).not.toHaveClass('border-primary-700');
+   });
+ 
+   it('handles click to open/close notification tray', async () => {
+@@ -118,10 +116,10 @@ describe('Course', () => {
+     render(<Course {...mockData} />);
+     expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"open"');
+     const notificationShowButton = await screen.findByRole('button', { name: /Show notification tray/i });
+-    expect(screen.queryByTestId('NotificationTray')).toBeInTheDocument();
++    expect(screen.queryByRole('region', { name: /notification tray/i })).toBeInTheDocument();
+     fireEvent.click(notificationShowButton);
+     expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"closed"');
+-    expect(screen.queryByTestId('NotificationTray')).not.toBeInTheDocument();
++    expect(screen.queryByRole('region', { name: /notification tray/i })).not.toBeInTheDocument();
+   });
+ 
+   it('handles reload persisting notification tray status', async () => {
+diff --git a/src/courseware/course/NotificationIcon.scss b/src/courseware/course/NotificationIcon.scss
+deleted file mode 100644
+index c2671cd..0000000
+--- a/src/courseware/course/NotificationIcon.scss
++++ /dev/null
+@@ -1,15 +0,0 @@
+-.icon-container {
+-    position: relative;
+-    display: flex;
+-    align-items: center;
+-    width: 2.4rem;
+-    height: 2rem;
+-}
+-
+-.notification-dot {
+-    position: absolute;
+-    top: 0.3rem;
+-    right: 0.55rem;
+-    border-radius: 50% !important;
+-    padding: 0.25rem !important;
+-}
+\ No newline at end of file
+diff --git a/src/courseware/course/NotificationTray.jsx b/src/courseware/course/NotificationTray.jsx
+deleted file mode 100644
+index 76946d7..0000000
+--- a/src/courseware/course/NotificationTray.jsx
++++ /dev/null
+@@ -1,96 +0,0 @@
+-import React, { useEffect } from 'react';
+-import { useSelector } from 'react-redux';
+-import PropTypes from 'prop-types';
+-import classNames from 'classnames';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import {
+-  breakpoints,
+-  Icon,
+-  IconButton,
+-  useWindowSize,
+-} from '@edx/paragon';
+-import { ArrowBackIos, Close } from '@edx/paragon/icons';
+-
+-import messages from './messages';
+-import { useModel } from '../../generic/model-store';
+-import UpgradeNotification from '../../generic/upgrade-notification/UpgradeNotification';
+-
+-function NotificationTray({
+-  intl, toggleNotificationTray, onNotificationSeen, upgradeNotificationCurrentState, setupgradeNotificationCurrentState,
+-}) {
+-  const {
+-    courseId,
+-  } = useSelector(state => state.courseware);
+-
+-  const course = useModel('coursewareMeta', courseId);
+-
+-  const {
+-    accessExpiration,
+-    contentTypeGatingEnabled,
+-    offer,
+-    org,
+-    timeOffsetMillis,
+-    userTimezone,
+-    verifiedMode,
+-  } = course;
+-
+-  const shouldDisplayFullScreen = useWindowSize().width < breakpoints.large.minWidth;
+-
+-  // After three seconds, update notificationSeen (to hide red dot)
+-  useEffect(() => { setTimeout(onNotificationSeen, 3000); }, []);
+-
+-  return (
+-    <section className={classNames('notification-tray-container ml-0 ml-lg-4', { 'no-notification': !verifiedMode && !shouldDisplayFullScreen })} aria-label={intl.formatMessage(messages.notificationTray)}>
+-      {shouldDisplayFullScreen ? (
+-        <div className="mobile-close-container" onClick={() => { toggleNotificationTray(); }} onKeyDown={() => { toggleNotificationTray(); }} role="button" tabIndex="0" alt={intl.formatMessage(messages.responsiveCloseNotificationTray)}>
+-          <Icon src={ArrowBackIos} />
+-          <span className="mobile-close">{intl.formatMessage(messages.responsiveCloseNotificationTray)}</span>
+-        </div>
+-      ) : null}
+-      <div>
+-        <span className="notification-tray-title">{intl.formatMessage(messages.notificationTitle)}</span>
+-        {shouldDisplayFullScreen
+-          ? null
+-          : (
+-            <div className="d-inline-flex close-btn">
+-              <IconButton src={Close} size="sm" iconAs={Icon} onClick={() => { toggleNotificationTray(); }} variant="primary" alt={intl.formatMessage(messages.closeNotificationTrigger)} />
+-            </div>
+-          )}
+-      </div>
+-      <div className="notification-tray-divider" />
+-      <div>{verifiedMode
+-        ? (
+-          <UpgradeNotification
+-            offer={offer}
+-            verifiedMode={verifiedMode}
+-            accessExpiration={accessExpiration}
+-            contentTypeGatingEnabled={contentTypeGatingEnabled}
+-            upsellPageName="in_course"
+-            userTimezone={userTimezone}
+-            shouldDisplayBorder={false}
+-            timeOffsetMillis={timeOffsetMillis}
+-            courseId={courseId}
+-            org={org}
+-            upgradeNotificationCurrentState={upgradeNotificationCurrentState}
+-            setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+-          />
+-        ) : <p className="notification-tray-content">{intl.formatMessage(messages.noNotificationsMessage)}</p>}
+-      </div>
+-    </section>
+-  );
+-}
+-
+-NotificationTray.propTypes = {
+-  intl: intlShape.isRequired,
+-  toggleNotificationTray: PropTypes.func,
+-  onNotificationSeen: PropTypes.func,
+-  upgradeNotificationCurrentState: PropTypes.string.isRequired,
+-  setupgradeNotificationCurrentState: PropTypes.func.isRequired,
+-};
+-
+-NotificationTray.defaultProps = {
+-  toggleNotificationTray: null,
+-  onNotificationSeen: null,
+-};
+-
+-export default injectIntl(NotificationTray);
+diff --git a/src/courseware/course/NotificationTray.scss b/src/courseware/course/NotificationTray.scss
+deleted file mode 100644
+index abddee9..0000000
+--- a/src/courseware/course/NotificationTray.scss
++++ /dev/null
+@@ -1,67 +0,0 @@
+-.notification-tray-container {
+-    border: 1px solid $light-400;
+-    border-radius: 4px;
+-    width: 31rem;
+-    vertical-align: top;
+-    height: 100%;
+-
+-    @media (max-width: -1 + map-get($grid-breakpoints, 'lg')) {
+-        position: fixed; 
+-        top: 0; 
+-        bottom: 0; 
+-        left: 0; 
+-        right: 0;
+-        width: 100%;
+-        background-color: white;
+-        margin: 0;
+-        border: none;
+-        border-radius: 0;
+-        z-index: 1100;
+-    }
+-}
+-
+-.no-notification {
+-    height: 15rem;
+-}
+-
+-.notification-tray-title {
+-    display: inline-block;
+-    padding: 0.625rem 0 0.625rem 1.25rem;
+-}
+-
+-.close-btn {
+-    float: right;
+-    margin-right: 0.5rem;
+-    margin-top: 0.35rem;
+-}
+-
+-.notification-tray-divider {
+-    height: 0.5rem;
+-    background: $gray-100;
+-    border-top: 1px solid $light-400;
+-    border-bottom: 1px solid $light-400;
+-}
+-
+-.notification-tray-content {
+-    padding: 1rem;
+-    font-size: 0.875rem;
+-}
+-
+-.mobile-close-container {
+-    padding-top: 0.5rem;
+-    padding-bottom: 0.75rem;
+-    border-bottom: 1px solid $light-400;
+-
+-    span {
+-        display: inline-block;
+-    }
+-    svg {
+-        top: 0.4rem;
+-        left: 0.8rem;
+-    }
+-}
+-
+-.mobile-close {
+-    font-weight: 500;
+-    margin-left: 1.2rem;
+-}
+\ No newline at end of file
+diff --git a/src/courseware/course/NotificationTrigger.jsx b/src/courseware/course/NotificationTrigger.jsx
+deleted file mode 100644
+index 8078dce..0000000
+--- a/src/courseware/course/NotificationTrigger.jsx
++++ /dev/null
+@@ -1,51 +0,0 @@
+-import React, { useEffect } from 'react';
+-import PropTypes from 'prop-types';
+-import classNames from 'classnames';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { getLocalStorage, setLocalStorage } from '../../data/localStorage';
+-
+-import NotificationIcon from './NotificationIcon';
+-import messages from './messages';
+-
+-function NotificationTrigger({
+-  courseId, intl, toggleNotificationTray, isNotificationTrayVisible, notificationStatus, setNotificationStatus,
+-  upgradeNotificationCurrentState,
+-}) {
+-  /* Re-show a red dot beside the notification trigger for each of the 7 UpgradeNotification stages
+-   The upgradeNotificationCurrentState prop will be available after UpgradeNotification mounts. Once available,
+-  compare with the last state they've seen, and if it's different then set dot back to red */
+-  function UpdateUpgradeNotificationLastSeen() {
+-    if (upgradeNotificationCurrentState) {
+-      if (getLocalStorage(`upgradeNotificationLastSeen.${courseId}`) !== upgradeNotificationCurrentState) {
+-        setNotificationStatus('active');
+-        setLocalStorage(`notificationStatus.${courseId}`, 'active');
+-        setLocalStorage(`upgradeNotificationLastSeen.${courseId}`, upgradeNotificationCurrentState);
+-      }
+-    }
+-  }
+-
+-  useEffect(() => { UpdateUpgradeNotificationLastSeen(); });
+-
+-  return (
+-    <button
+-      className={classNames('notification-trigger-btn', { 'trigger-active': isNotificationTrayVisible() })}
+-      type="button"
+-      onClick={() => { toggleNotificationTray(); }}
+-      aria-label={intl.formatMessage(messages.openNotificationTrigger)}
+-    >
+-      <NotificationIcon status={notificationStatus} notificationColor="bg-danger-500" />
+-    </button>
+-  );
+-}
+-
+-NotificationTrigger.propTypes = {
+-  courseId: PropTypes.string.isRequired,
+-  intl: intlShape.isRequired,
+-  toggleNotificationTray: PropTypes.func.isRequired,
+-  notificationStatus: PropTypes.string.isRequired,
+-  setNotificationStatus: PropTypes.func.isRequired,
+-  isNotificationTrayVisible: PropTypes.func.isRequired,
+-  upgradeNotificationCurrentState: PropTypes.string.isRequired,
+-};
+-
+-export default injectIntl(NotificationTrigger);
+diff --git a/src/courseware/course/NotificationTrigger.scss b/src/courseware/course/NotificationTrigger.scss
+deleted file mode 100644
+index a3267a0..0000000
+--- a/src/courseware/course/NotificationTrigger.scss
++++ /dev/null
+@@ -1,24 +0,0 @@
+-.notification-trigger-btn {
+-    border: 1px solid $light-400;
+-    background: none;
+-    margin-top: 1rem;
+-
+-    position: absolute;
+-    right: 0;
+-
+-    @media (max-width: -1 + map-get($grid-breakpoints, 'sm')) {
+-        border: none;
+-        margin: 0.3rem 1.25rem 0 0.25rem;
+-        top: 0.1rem;
+-        right: -3rem;
+-    }
+-}
+-
+-.trigger-active::after {
+-    content: '';
+-    position: absolute;
+-    border-bottom: 2px solid $primary-700;
+-    right: 0;
+-    left: 0;
+-    bottom: -1px;
+-}
+\ No newline at end of file
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index b5b1b7e..cc3baad 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -19,12 +19,12 @@ import { UserMessagesContext, ALERT_TYPES } from '../../../generic/user-messages
+ import { useModel } from '../../../generic/model-store';
+ 
+ import CourseLicense from '../course-license';
++import Sidebar from '../sidebar/Sidebar';
++import SidebarTriggers from '../sidebar/SidebarTriggers';
+ import messages from './messages';
+ import HiddenAfterDue from './hidden-after-due';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import SequenceContent from './SequenceContent';
+-import NotificationTray from '../NotificationTray';
+-import NotificationTrigger from '../NotificationTrigger';
+ 
+ /** [MM-P2P] Experiment */
+ import { isMobile } from '../../../experiments/mm-p2p/utils';
+@@ -38,14 +38,6 @@ function Sequence({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   intl,
+-  toggleNotificationTray,
+-  notificationTrayVisible,
+-  isNotificationTrayVisible,
+-  notificationStatus,
+-  setNotificationStatus,
+-  onNotificationSeen,
+-  upgradeNotificationCurrentState,
+-  setupgradeNotificationCurrentState,
+   mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+@@ -159,8 +151,8 @@ function Sequence({
+   };
+ 
+   const defaultContent = (
+-    <div className="sequence-container" style={{ display: 'inline-flex', flexDirection: 'row' }}>
+-      <div className={classNames('sequence', { 'position-relative': shouldDisplayNotificationTriggerInSequence })} style={{ width: '100%' }}>
++    <div className="sequence-container d-inline-flex flex-row">
++      <div className={classNames('sequence w-100', { 'position-relative': shouldDisplayNotificationTriggerInSequence })}>
+         <SequenceNavigation
+           sequenceId={sequenceId}
+           unitId={unitId}
+@@ -183,17 +175,7 @@ function Sequence({
+           }}
+           goToCourseExitPage={() => goToCourseExitPage()}
+         />
+-
+-        {shouldDisplayNotificationTriggerInSequence ? (
+-          <NotificationTrigger
+-            courseId={courseId}
+-            toggleNotificationTray={toggleNotificationTray}
+-            isNotificationTrayVisible={isNotificationTrayVisible}
+-            notificationStatus={notificationStatus}
+-            setNotificationStatus={setNotificationStatus}
+-            upgradeNotificationCurrentState={upgradeNotificationCurrentState}
+-          />
+-        ) : null}
++        {shouldDisplayNotificationTriggerInSequence && <SidebarTriggers />}
+ 
+         <div className="unit-container flex-grow-1">
+           <SequenceContent
+@@ -202,7 +184,6 @@ function Sequence({
+             sequenceId={sequenceId}
+             unitId={unitId}
+             unitLoadedHandler={handleUnitLoaded}
+-            notificationTrayVisible={notificationTrayVisible}
+             /** [MM-P2P] Experiment */
+             mmp2p={mmp2p}
+           />
+@@ -223,16 +204,7 @@ function Sequence({
+           )}
+         </div>
+       </div>
+-      {notificationTrayVisible ? (
+-        <NotificationTray
+-          toggleNotificationTray={toggleNotificationTray}
+-          notificationTrayVisible={notificationTrayVisible}
+-          notificationStatus={notificationStatus}
+-          onNotificationSeen={onNotificationSeen}
+-          upgradeNotificationCurrentState={upgradeNotificationCurrentState}
+-          setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+-        />
+-      ) : null }
++      <Sidebar />
+ 
+       {/** [MM-P2P] Experiment */}
+       {(mmp2p.state.isEnabled && mmp2p.flyover.isVisible) && (
+@@ -277,14 +249,6 @@ Sequence.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   intl: intlShape.isRequired,
+-  toggleNotificationTray: PropTypes.func,
+-  notificationTrayVisible: PropTypes.bool,
+-  isNotificationTrayVisible: PropTypes.func,
+-  notificationStatus: PropTypes.string.isRequired,
+-  setNotificationStatus: PropTypes.func.isRequired,
+-  onNotificationSeen: PropTypes.func,
+-  upgradeNotificationCurrentState: PropTypes.string.isRequired,
+-  setupgradeNotificationCurrentState: PropTypes.func.isRequired,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+@@ -303,11 +267,6 @@ Sequence.propTypes = {
+ Sequence.defaultProps = {
+   sequenceId: null,
+   unitId: null,
+-  toggleNotificationTray: null,
+-  notificationTrayVisible: null,
+-  isNotificationTrayVisible: null,
+-  onNotificationSeen: null,
+-
+   /** [MM-P2P] Experiment */
+   mmp2p: {
+     flyover: { isVisible: false },
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 611e7fd..0836c2c 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -5,6 +5,7 @@ import { breakpoints } from '@edx/paragon';
+ import {
+   loadUnit, render, screen, fireEvent, waitFor, initializeTestStore,
+ } from '../../../setupTest';
++import SidebarContext from '../sidebar/SidebarContext';
+ import Sequence from './Sequence';
+ import { fetchSequenceFailure } from '../../data/slice';
+ 
+@@ -386,22 +387,25 @@ describe('Sequence', () => {
+ 
+   describe('notification feature', () => {
+     it('renders notification tray in sequence', async () => {
+-      const testData = {
+-        ...mockData,
+-        notificationTrayVisible: true,
+-      };
+-      render(<Sequence {...testData} />);
++      render(
++        <SidebarContext.Provider
++          value={{ courseId: mockData.courseId, currentSidebar: 'NOTIFICATIONS', toggleSidebar: () => null }}
++        >
++          <Sequence {...mockData} />
++        </SidebarContext.Provider>,
++      );
+       expect(await screen.findByText('Notifications')).toBeInTheDocument();
+     });
+ 
+     it('handles click on notification tray close button', async () => {
+       const toggleNotificationTray = jest.fn();
+-      const testData = {
+-        ...mockData,
+-        toggleNotificationTray,
+-        notificationTrayVisible: true,
+-      };
+-      render(<Sequence {...testData} />);
++      render(
++        <SidebarContext.Provider
++          value={{ courseId: mockData.courseId, currentSidebar: 'NOTIFICATIONS', toggleSidebar: toggleNotificationTray }}
++        >
++          <Sequence {...mockData} />
++        </SidebarContext.Provider>,
++      );
+       const notificationCloseIconButton = await screen.findByRole('button', { name: /Close notification tray/i });
+       fireEvent.click(notificationCloseIconButton);
+       expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index 110dd0c..d6eff20 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -16,7 +16,6 @@ function SequenceContent({
+   sequenceId,
+   unitId,
+   unitLoadedHandler,
+-  notificationTrayVisible,
+   /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
+@@ -62,7 +61,6 @@ function SequenceContent({
+       key={unitId}
+       id={unitId}
+       onLoaded={unitLoadedHandler}
+-      notificationTrayVisible={notificationTrayVisible}
+       /** [MM-P2P] Experiment */
+       mmp2p={mmp2p}
+     />
+@@ -75,7 +73,6 @@ SequenceContent.propTypes = {
+   sequenceId: PropTypes.string.isRequired,
+   unitId: PropTypes.string,
+   unitLoadedHandler: PropTypes.func.isRequired,
+-  notificationTrayVisible: PropTypes.bool.isRequired,
+   intl: intlShape.isRequired,
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 7ceb4ae..7da7a81 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -1,25 +1,21 @@
+-import React, {
+-  Suspense,
+-  useContext,
+-  useEffect,
+-  useRef,
+-  useState,
+-  useLayoutEffect,
+-} from 'react';
+-import { useDispatch } from 'react-redux';
+-import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { AppContext, ErrorPage } from '@edx/frontend-platform/react';
+ import { Modal } from '@edx/paragon';
+-import messages from './messages';
+-import BookmarkButton from '../bookmark/BookmarkButton';
+-import { useModel } from '../../../generic/model-store';
+-import PageLoading from '../../../generic/PageLoading';
++import PropTypes from 'prop-types';
++import React, {
++  Suspense, useCallback, useContext, useEffect, useLayoutEffect, useState,
++} from 'react';
++import { useDispatch } from 'react-redux';
+ import { processEvent } from '../../../course-home/data/thunks';
+-import { fetchCourse } from '../../data';
+ /** [MM-P2P] Experiment */
+ import { MMP2PLockPaywall } from '../../../experiments/mm-p2p';
++import { useEventListener } from '../../../generic/hooks';
++import { useModel } from '../../../generic/model-store';
++import PageLoading from '../../../generic/PageLoading';
++import { fetchCourse } from '../../data';
++import BookmarkButton from '../bookmark/BookmarkButton';
++import messages from './messages';
+ 
+ const HonorCode = React.lazy(() => import('./honor-code'));
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
+@@ -85,7 +81,6 @@ function Unit({
+   onLoaded,
+   id,
+   intl,
+-  notificationTrayVisible,
+   /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
+@@ -121,40 +116,31 @@ function Unit({
+     }
+   }, [userNeedsIntegritySignature]);
+ 
+-  // We use this ref so that we can hold a reference to the currently active event listener.
+-  const messageEventListenerRef = useRef(null);
+-  useEffect(() => {
+-    sendUrlHashToFrame(document.getElementById('unit-iframe'));
+-    function receiveMessage(event) {
+-      const { type, payload } = event.data;
+-      if (type === 'plugin.resize') {
+-        setIframeHeight(payload.height);
+-        if (!hasLoaded && iframeHeight === 0 && payload.height > 0) {
+-          setHasLoaded(true);
+-          if (onLoaded) {
+-            onLoaded();
+-          }
++  const receiveMessage = useCallback(({ data }) => {
++    const {
++      type,
++      payload,
++    } = data;
++    if (type === 'plugin.resize') {
++      setIframeHeight(payload.height);
++      if (!hasLoaded && iframeHeight === 0 && payload.height > 0) {
++        setHasLoaded(true);
++        if (onLoaded) {
++          onLoaded();
+         }
+-      } else if (type === 'plugin.modal') {
+-        payload.open = true;
+-        setModalOptions(payload);
+-      } else if (event.data.offset) {
+-        // We listen for this message from LMS to know when the page needs to
+-        // be scrolled to another location on the page.
+-        window.scrollTo(0, event.data.offset + document.getElementById('unit-iframe').offsetTop);
+       }
++    } else if (type === 'plugin.modal') {
++      payload.open = true;
++      setModalOptions(payload);
++    } else if (data.offset) {
++      // We listen for this message from LMS to know when the page needs to
++      // be scrolled to another location on the page.
++      window.scrollTo(0, data.offset + document.getElementById('unit-iframe').offsetTop);
+     }
+-    // If we currently have an event listener, remove it.
+-    if (messageEventListenerRef.current !== null) {
+-      global.removeEventListener('message', messageEventListenerRef.current);
+-      messageEventListenerRef.current = null;
+-    }
+-    // Now add our new receiveMessage handler as the event listener.
+-    global.addEventListener('message', receiveMessage);
+-    // And then save it to our ref for next time.
+-    messageEventListenerRef.current = receiveMessage;
+-    // When the component finally unmounts, use the ref to remove the correct handler.
+-    return () => global.removeEventListener('message', messageEventListenerRef.current);
++  }, [id, setIframeHeight, hasLoaded, iframeHeight, setHasLoaded, onLoaded]);
++  useEventListener('message', receiveMessage);
++  useEffect(() => {
++    sendUrlHashToFrame(document.getElementById('unit-iframe'));
+   }, [id, setIframeHeight, hasLoaded, iframeHeight, setHasLoaded, onLoaded]);
+ 
+   return (
+@@ -174,7 +160,7 @@ function Unit({
+             />
+           )}
+         >
+-          <LockPaywall courseId={courseId} notificationTrayVisible={notificationTrayVisible} />
++          <LockPaywall courseId={courseId} />
+         </Suspense>
+       )}
+       { /** [MM-P2P] Experiment */ }
+@@ -266,7 +252,6 @@ Unit.propTypes = {
+   id: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
+   onLoaded: PropTypes.func,
+-  notificationTrayVisible: PropTypes.bool.isRequired,
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+     state: PropTypes.shape({
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index 7a452c3..37aacd2 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -1,10 +1,11 @@
+-import React from 'react';
++import React, { useContext } from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Alert, breakpoints, useWindowSize } from '@edx/paragon';
+ import { Locked } from '@edx/paragon/icons';
++import SidebarContext from '../../sidebar/SidebarContext';
+ import messages from './messages';
+ import certificateLocked from '../../../../generic/assets/edX_locked_certificate.png';
+ import { useModel } from '../../../../generic/model-store';
+@@ -19,8 +20,8 @@ import {
+ function LockPaywall({
+   intl,
+   courseId,
+-  notificationTrayVisible,
+ }) {
++  const { notificationTrayVisible } = useContext(SidebarContext);
+   const course = useModel('coursewareMeta', courseId);
+   const {
+     offer,
+@@ -115,6 +116,5 @@ function LockPaywall({
+ LockPaywall.propTypes = {
+   intl: intlShape.isRequired,
+   courseId: PropTypes.string.isRequired,
+-  notificationTrayVisible: PropTypes.bool.isRequired,
+ };
+ export default injectIntl(LockPaywall);
+diff --git a/src/courseware/course/sidebar/Sidebar.jsx b/src/courseware/course/sidebar/Sidebar.jsx
+new file mode 100644
+index 0000000..efec70a
+--- /dev/null
++++ b/src/courseware/course/sidebar/Sidebar.jsx
+@@ -0,0 +1,18 @@
++import React, { useContext } from 'react';
++import SidebarContext from './SidebarContext';
++import { SIDEBARS } from './sidebars';
++
++function Sidebar() {
++  const {
++    currentSidebar,
++  } = useContext(SidebarContext);
++  if (!currentSidebar) {
++    return null;
++  }
++  const CurrentSidebar = SIDEBARS[currentSidebar].Sidebar;
++  return (
++    <CurrentSidebar />
++  );
++}
++
++export default Sidebar;
+diff --git a/src/courseware/course/sidebar/SidebarContext.js b/src/courseware/course/sidebar/SidebarContext.js
+new file mode 100644
+index 0000000..023b868
+--- /dev/null
++++ b/src/courseware/course/sidebar/SidebarContext.js
+@@ -0,0 +1,5 @@
++import React from 'react';
++
++const SidebarContext = React.createContext({});
++
++export default SidebarContext;
+diff --git a/src/courseware/course/sidebar/SidebarContextProvider.jsx b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+new file mode 100644
+index 0000000..1e6c93a
+--- /dev/null
++++ b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+@@ -0,0 +1,72 @@
++import { breakpoints, useWindowSize } from '@edx/paragon';
++import PropTypes from 'prop-types';
++import React, { useEffect, useState } from 'react';
++
++import { getLocalStorage, setLocalStorage } from '../../../data/localStorage';
++import { getSessionStorage } from '../../../data/sessionStorage';
++import { useModel } from '../../../generic/model-store';
++import SidebarContext from './SidebarContext';
++import { SIDEBARS } from './sidebars';
++
++export default function SidebarProvider({
++  courseId,
++  unitId,
++  children,
++}) {
++  const { verifiedMode } = useModel('coursewareMeta', courseId);
++  const shouldDisplayFullScreen = useWindowSize().width < breakpoints.large.minWidth;
++  const shouldDisplaySidebarOpen = useWindowSize().width > breakpoints.medium.minWidth;
++  const showNotificationsOnLoad = getSessionStorage(`notificationTrayStatus.${courseId}`) !== 'closed';
++  const initialSidebar = (verifiedMode && shouldDisplaySidebarOpen && showNotificationsOnLoad)
++    ? SIDEBARS.NOTIFICATIONS.ID
++    : null;
++  const [currentSidebar, setCurrentSidebar] = useState(initialSidebar);
++  const [notificationStatus, setNotificationStatus] = useState(getLocalStorage(`notificationStatus.${courseId}`));
++  const [upgradeNotificationCurrentState, setUpgradeNotificationCurrentState] = useState(getLocalStorage(`upgradeNotificationCurrentState.${courseId}`));
++
++  useEffect(() => {
++    // As a one-off set initial sidebar if the verified mode data has just loaded
++    if (verifiedMode && currentSidebar === null && initialSidebar) {
++      setCurrentSidebar(initialSidebar);
++    }
++  }, [initialSidebar, verifiedMode]);
++
++  const onNotificationSeen = () => {
++    setNotificationStatus('inactive');
++    setLocalStorage(`notificationStatus.${courseId}`, 'inactive');
++  };
++
++  const toggleSidebar = (sidebarId) => {
++    // Switch to new sidebar or hide the current sidebar
++    setCurrentSidebar(sidebarId === currentSidebar ? null : sidebarId);
++  };
++
++  return (
++    <SidebarContext.Provider value={{
++      toggleSidebar,
++      onNotificationSeen,
++      setNotificationStatus,
++      currentSidebar,
++      notificationStatus,
++      upgradeNotificationCurrentState,
++      setUpgradeNotificationCurrentState,
++      shouldDisplaySidebarOpen,
++      shouldDisplayFullScreen,
++      courseId,
++      unitId,
++    }}
++    >
++      {children}
++    </SidebarContext.Provider>
++  );
++}
++
++SidebarProvider.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  unitId: PropTypes.string.isRequired,
++  children: PropTypes.node,
++};
++
++SidebarProvider.defaultProps = {
++  children: null,
++};
+diff --git a/src/courseware/course/sidebar/SidebarTriggers.jsx b/src/courseware/course/sidebar/SidebarTriggers.jsx
+new file mode 100644
+index 0000000..b578f41
+--- /dev/null
++++ b/src/courseware/course/sidebar/SidebarTriggers.jsx
+@@ -0,0 +1,32 @@
++import classNames from 'classnames';
++import React, { useContext } from 'react';
++import SidebarContext from './SidebarContext';
++import { SIDEBAR_ORDER, SIDEBARS } from './sidebars';
++
++function SidebarTriggers() {
++  const {
++    toggleSidebar,
++    currentSidebar,
++  } = useContext(SidebarContext);
++  return (
++    <div className="d-flex ml-auto">
++      {SIDEBAR_ORDER.map((sidebarId) => {
++        const { Trigger } = SIDEBARS[sidebarId];
++        const isActive = sidebarId === currentSidebar;
++        return (
++          <div
++            className={classNames('mt-3', { 'border-primary-700': isActive })}
++            style={{ borderBottom: isActive ? '2px solid' : null }}
++            key={sidebarId}
++          >
++            <Trigger onClick={() => toggleSidebar(sidebarId)} key={sidebarId} />
++          </div>
++        );
++      })}
++    </div>
++  );
++}
++
++SidebarTriggers.propTypes = {};
++
++export default SidebarTriggers;
+diff --git a/src/courseware/course/sidebar/common/SidebarBase.jsx b/src/courseware/course/sidebar/common/SidebarBase.jsx
+new file mode 100644
+index 0000000..41454b6
+--- /dev/null
++++ b/src/courseware/course/sidebar/common/SidebarBase.jsx
+@@ -0,0 +1,102 @@
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Icon, IconButton } from '@edx/paragon';
++import { ArrowBackIos, Close } from '@edx/paragon/icons';
++import classNames from 'classnames';
++import PropTypes from 'prop-types';
++import React, { useCallback, useContext } from 'react';
++import { useEventListener } from '../../../../generic/hooks';
++import messages from '../../messages';
++import SidebarContext from '../SidebarContext';
++
++function SidebarBase({
++  intl,
++  title,
++  ariaLabel,
++  sidebarId,
++  className,
++  children,
++  showTitleBar,
++  width,
++}) {
++  const {
++    toggleSidebar,
++    shouldDisplayFullScreen,
++    currentSidebar,
++  } = useContext(SidebarContext);
++
++  const receiveMessage = useCallback(({ data }) => {
++    const { type } = data;
++    if (type === 'learning.events.sidebar.close') {
++      toggleSidebar(null);
++    }
++  }, [sidebarId, toggleSidebar]);
++
++  useEventListener('message', receiveMessage);
++
++  return currentSidebar === sidebarId && (
++    <section
++      className={classNames('ml-0 ml-lg-4 border border-light-400 rounded-sm h-auto align-top', {
++        'bg-white m-0 border-0 fixed-top vh-100 rounded-0': shouldDisplayFullScreen,
++      }, className)}
++      style={{ width: shouldDisplayFullScreen ? '100%' : width }}
++      aria-label={ariaLabel}
++    >
++      {shouldDisplayFullScreen ? (
++        <div
++          className="pt-2 pb-2.5 border-bottom border-light-400 d-flex align-items-center ml-2"
++          onClick={() => toggleSidebar(null)}
++          onKeyDown={() => toggleSidebar(null)}
++          role="button"
++          tabIndex="0"
++          alt={intl.formatMessage(messages.responsiveCloseNotificationTray)}
++        >
++          <Icon src={ArrowBackIos} />
++          <span className="font-weight-bold m-2 d-inline-block">
++            {intl.formatMessage(messages.responsiveCloseNotificationTray)}
++          </span>
++        </div>
++      ) : null}
++      {showTitleBar && (
++        <>
++          <div className="d-flex align-items-center">
++            <span className="p-2.5 d-inline-block">{title}</span>
++            {shouldDisplayFullScreen
++              ? null
++              : (
++                <div className="d-inline-flex mr-2 mt-1.5 ml-auto">
++                  <IconButton
++                    src={Close}
++                    size="sm"
++                    iconAs={Icon}
++                    onClick={() => toggleSidebar(null)}
++                    variant="primary"
++                    alt={intl.formatMessage(messages.closeNotificationTrigger)}
++                  />
++                </div>
++              )}
++          </div>
++          <div className="py-1 bg-gray-100 border-top border-bottom border-light-400" />
++        </>
++      )}
++      {children}
++    </section>
++  );
++}
++
++SidebarBase.propTypes = {
++  intl: intlShape.isRequired,
++  title: PropTypes.string.isRequired,
++  ariaLabel: PropTypes.string.isRequired,
++  sidebarId: PropTypes.string.isRequired,
++  className: PropTypes.string.isRequired,
++  children: PropTypes.element.isRequired,
++  showTitleBar: PropTypes.bool,
++  width: PropTypes.string,
++};
++
++SidebarBase.defaultProps = {
++  width: '31rem',
++  showTitleBar: true,
++};
++
++export default injectIntl(SidebarBase);
+diff --git a/src/courseware/course/sidebar/common/TriggerBase.jsx b/src/courseware/course/sidebar/common/TriggerBase.jsx
+new file mode 100644
+index 0000000..bf1e9b6
+--- /dev/null
++++ b/src/courseware/course/sidebar/common/TriggerBase.jsx
+@@ -0,0 +1,30 @@
++import { injectIntl } from '@edx/frontend-platform/i18n';
++import PropTypes from 'prop-types';
++import React from 'react';
++
++function SidebarTriggerBase({
++  onClick,
++  ariaLabel,
++  children,
++}) {
++  return (
++    <button
++      className="border border-light-400 bg-transparent align-items-center align-content-center d-flex"
++      type="button"
++      onClick={onClick}
++      aria-label={ariaLabel}
++    >
++      <div className="icon-container d-flex position-relative align-items-center">
++        {children}
++      </div>
++    </button>
++  );
++}
++
++SidebarTriggerBase.propTypes = {
++  onClick: PropTypes.func.isRequired,
++  ariaLabel: PropTypes.string.isRequired,
++  children: PropTypes.element.isRequired,
++};
++
++export default injectIntl(SidebarTriggerBase);
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+new file mode 100644
+index 0000000..f781e80
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -0,0 +1,50 @@
++import { ensureConfig, getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import React, { useContext } from 'react';
++import { useModel } from '../../../../../generic/model-store';
++import SidebarBase from '../../common/SidebarBase';
++import SidebarContext from '../../SidebarContext';
++import { ID } from './DiscussionsTrigger';
++
++import messages from './messages';
++
++ensureConfig(['DISCUSSIONS_MFE_BASE_URL']);
++
++function DiscussionsSidebar({ intl }) {
++  const {
++    unitId,
++    courseId,
++  } = useContext(SidebarContext);
++  const topic = useModel('discussionTopics', unitId);
++  if (!topic) {
++    return null;
++  }
++  const discussionsUrl = `${getConfig().DISCUSSIONS_MFE_BASE_URL}/${courseId}/topics/${topic.id}`;
++  return (
++    <SidebarBase
++      title={intl.formatMessage(messages.discussionsTitle)}
++      ariaLabel={intl.formatMessage(messages.discussionsTitle)}
++      sidebarId={ID}
++      width="50rem"
++      showTitleBar={false}
++    >
++      <iframe
++        src={`${discussionsUrl}?inContext`}
++        className="d-flex w-100 border-0"
++        // Need to set minHeight so there is enough space for the add post UI
++        // TODO: Use postMessage API to dynamically update iframe size.
++        style={{ minHeight: '60rem' }}
++        title={intl.formatMessage(messages.discussionsTitle)}
++      />
++    </SidebarBase>
++  );
++}
++
++DiscussionsSidebar.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++DiscussionsSidebar.Trigger = DiscussionsSidebar;
++DiscussionsSidebar.ID = ID;
++
++export default injectIntl(DiscussionsSidebar);
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
+new file mode 100644
+index 0000000..15cc0a8
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
+@@ -0,0 +1,50 @@
++import { ensureConfig, getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Icon } from '@edx/paragon';
++import { QuestionAnswer } from '@edx/paragon/icons';
++import PropTypes from 'prop-types';
++import React, { useContext, useEffect } from 'react';
++import { useDispatch } from 'react-redux';
++import { useModel } from '../../../../../generic/model-store';
++import { getCourseDiscussionTopics } from '../../../../data/thunks';
++import SidebarTriggerBase from '../../common/TriggerBase';
++import SidebarContext from '../../SidebarContext';
++import messages from './messages';
++
++ensureConfig(['DISCUSSIONS_MFE_BASE_URL']);
++export const ID = 'DISCUSSIONS';
++
++function DiscussionsTrigger({
++  intl,
++  onClick,
++}) {
++  const {
++    unitId,
++    courseId,
++  } = useContext(SidebarContext);
++  const dispatch = useDispatch();
++  const topic = useModel('discussionTopics', unitId);
++  const baseUrl = getConfig().DISCUSSIONS_MFE_BASE_URL;
++
++  useEffect(() => {
++    // Only fetch the topic data if the MFE is configured.
++    if (baseUrl) {
++      dispatch(getCourseDiscussionTopics(courseId));
++    }
++  }, [courseId, baseUrl]);
++  if (!topic.id) {
++    return null;
++  }
++  return (
++    <SidebarTriggerBase onClick={onClick} ariaLabel={intl.formatMessage(messages.openDiscussionsTrigger)}>
++      <Icon src={QuestionAnswer} className="m-0 m-auto" />
++    </SidebarTriggerBase>
++  );
++}
++
++DiscussionsTrigger.propTypes = {
++  intl: intlShape.isRequired,
++  onClick: PropTypes.func.isRequired,
++};
++
++export default injectIntl(DiscussionsTrigger);
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.test.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.test.jsx
+new file mode 100644
+index 0000000..18d4677
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.test.jsx
+@@ -0,0 +1,70 @@
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import MockAdapter from 'axios-mock-adapter';
++import React from 'react';
++import {
++  fireEvent, initializeMockApp, initializeTestStore, render, screen,
++} from '../../../../../setupTest';
++import { buildTopicsFromUnits } from '../../../../data/__factories__/discussionTopics.factory';
++import SidebarContext from '../../SidebarContext';
++import DiscussionsTrigger from './DiscussionsTrigger';
++
++initializeMockApp();
++
++describe('Discussions Trigger', () => {
++  let axiosMock;
++  let mockData;
++  let courseId;
++  let unitId;
++
++  beforeEach(async () => {
++    const store = await initializeTestStore({
++      excludeFetchCourse: false,
++      excludeFetchSequence: false,
++    });
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    const state = store.getState();
++    courseId = state.courseware.courseId;
++    [unitId] = Object.keys(state.models.units);
++
++    mockData = {
++      courseId,
++      unitId,
++    };
++
++    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/discussion/v1/courses/${courseId}`).reply(
++      200,
++      {
++        provider: 'openedx',
++      },
++    );
++    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/discussion/v2/course_topics/${courseId}`)
++      .reply(200, buildTopicsFromUnits(state.models.units));
++  });
++
++  function renderWithProvider(testData = {}, onClick = () => null) {
++    const { container } = render(
++      <SidebarContext.Provider value={{ ...mockData, ...testData }}>
++        <DiscussionsTrigger onClick={onClick} />
++      </SidebarContext.Provider>,
++    );
++    return container;
++  }
++
++  it('shows up and handles onClick even if unit has discussion associated with it', async () => {
++    const clickTrigger = jest.fn();
++    renderWithProvider({}, clickTrigger);
++
++    const notificationTrigger = await screen.findByRole('button', { name: /Show discussions tray/i });
++    expect(notificationTrigger).toBeInTheDocument();
++    fireEvent.click(notificationTrigger);
++    expect(clickTrigger).toHaveBeenCalledTimes(1);
++  });
++
++  it('doesn\'t show up if unit has no discussion associated with it', async () => {
++    const clickTrigger = jest.fn();
++    renderWithProvider({ unitId: 'has-no-discussion' }, clickTrigger);
++
++    expect(await screen.queryByRole('button', { name: /Show discussions tray/i })).not.toBeInTheDocument();
++  });
++});
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/index.js b/src/courseware/course/sidebar/sidebars/discussions/index.js
+new file mode 100644
+index 0000000..39a8ce6
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/discussions/index.js
+@@ -0,0 +1,2 @@
++export { default as Sidebar } from './DiscussionsSidebar';
++export { default as Trigger, ID } from './DiscussionsTrigger';
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/messages.js b/src/courseware/course/sidebar/sidebars/discussions/messages.js
+new file mode 100644
+index 0000000..0af89ae
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/discussions/messages.js
+@@ -0,0 +1,16 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  discussionsTitle: {
++    id: 'discussions.sidebar.title',
++    defaultMessage: 'Discussions',
++    description: 'Title text for a forum where users are able to discuss course topics',
++  },
++  openDiscussionsTrigger: {
++    id: 'discussions.sidebar.open.button',
++    defaultMessage: 'Show discussions tray',
++    description: 'Alt text for a button that opens the discussions feature',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/course/sidebar/sidebars/index.js b/src/courseware/course/sidebar/sidebars/index.js
+new file mode 100644
+index 0000000..9128fd0
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/index.js
+@@ -0,0 +1,20 @@
++import * as notifications from './notifications';
++import * as discusssions from './discussions';
++
++export const SIDEBARS = {
++  [notifications.ID]: {
++    ID: notifications.ID,
++    Sidebar: notifications.Sidebar,
++    Trigger: notifications.Trigger,
++  },
++  [discusssions.ID]: {
++    ID: discusssions.ID,
++    Sidebar: discusssions.Sidebar,
++    Trigger: discusssions.Trigger,
++  },
++};
++
++export const SIDEBAR_ORDER = [
++  discusssions.ID,
++  notifications.ID,
++];
+diff --git a/src/courseware/course/NotificationIcon.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.jsx
+similarity index 60%
+rename from src/courseware/course/NotificationIcon.jsx
+rename to src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.jsx
+index ae8c08c..d8ea403 100644
+--- a/src/courseware/course/NotificationIcon.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.jsx
+@@ -1,20 +1,33 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import classNames from 'classnames';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Icon } from '@edx/paragon';
+ import { WatchOutline } from '@edx/paragon/icons';
++import classNames from 'classnames';
++import PropTypes from 'prop-types';
++import React from 'react';
+ 
+-import messages from './messages';
++import messages from '../../../messages';
+ 
+-function NotificationIcon({ intl, status, notificationColor }) {
++function NotificationIcon({
++  intl,
++  status,
++  notificationColor,
++}) {
+   return (
+-    <div className="icon-container">
++    <>
+       <Icon src={WatchOutline} className="m-0 m-auto" alt={intl.formatMessage(messages.openNotificationTrigger)} />
+       {status === 'active'
+-        ? <span className={classNames(notificationColor, 'notification-dot')} data-testid="notification-dot" />
++        ? (
++          <span
++            className={classNames(notificationColor, 'rounded-circle p-1 position-absolute')}
++            data-testid="notification-dot"
++            style={{
++              top: '0.3rem',
++              right: '0.55rem',
++            }}
++          />
++        )
+         : null}
+-    </div>
++    </>
+   );
+ }
+ 
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.scss b/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.scss
+new file mode 100644
+index 0000000..099800e
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.scss
+@@ -0,0 +1,4 @@
++.icon-container {
++    width: 2.4rem;
++    height: 2rem;
++}
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
+new file mode 100644
+index 0000000..eda7bc8
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
+@@ -0,0 +1,72 @@
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import classNames from 'classnames';
++import React, { useContext, useEffect } from 'react';
++import { useModel } from '../../../../../generic/model-store';
++import UpgradeNotification from '../../../../../generic/upgrade-notification/UpgradeNotification';
++
++import messages from '../../../messages';
++import SidebarBase from '../../common/SidebarBase';
++import SidebarContext from '../../SidebarContext';
++import NotificationTrigger, { ID } from './NotificationTrigger';
++
++function NotificationTray({ intl }) {
++  const {
++    courseId,
++    onNotificationSeen,
++    shouldDisplayFullScreen,
++    upgradeNotificationCurrentState,
++    setUpgradeNotificationCurrentState,
++  } = useContext(SidebarContext);
++  const course = useModel('coursewareMeta', courseId);
++
++  const {
++    accessExpiration,
++    contentTypeGatingEnabled,
++    offer,
++    org,
++    timeOffsetMillis,
++    userTimezone,
++    verifiedMode,
++  } = course;
++  // After three seconds, update notificationSeen (to hide red dot)
++  useEffect(() => { setTimeout(onNotificationSeen, 3000); }, []);
++
++  return (
++    <SidebarBase
++      title={intl.formatMessage(messages.notificationTitle)}
++      ariaLabel={intl.formatMessage(messages.notificationTray)}
++      sidebarId={ID}
++      className={classNames({ 'h-100': !verifiedMode && !shouldDisplayFullScreen })}
++    >
++      <div>{verifiedMode
++        ? (
++          <UpgradeNotification
++            offer={offer}
++            verifiedMode={verifiedMode}
++            accessExpiration={accessExpiration}
++            contentTypeGatingEnabled={contentTypeGatingEnabled}
++            upsellPageName="in_course"
++            userTimezone={userTimezone}
++            shouldDisplayBorder={false}
++            timeOffsetMillis={timeOffsetMillis}
++            courseId={courseId}
++            org={org}
++            upgradeNotificationCurrentState={upgradeNotificationCurrentState}
++            setupgradeNotificationCurrentState={setUpgradeNotificationCurrentState}
++          />
++        ) : (
++          <p className="p-3 small">{intl.formatMessage(messages.noNotificationsMessage)}</p>
++        )}
++      </div>
++    </SidebarBase>
++  );
++}
++
++NotificationTray.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++NotificationTray.Trigger = NotificationTrigger;
++NotificationTray.ID = ID;
++
++export default injectIntl(NotificationTray);
+diff --git a/src/courseware/course/NotificationTray.test.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+similarity index 56%
+rename from src/courseware/course/NotificationTray.test.jsx
+rename to src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+index ccb51e7..05a1c1d 100644
+--- a/src/courseware/course/NotificationTray.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+@@ -1,27 +1,30 @@
+-import React from 'react';
+-import { Factory } from 'rosie';
+-import MockAdapter from 'axios-mock-adapter';
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import { breakpoints } from '@edx/paragon';
+ 
+-import { fetchCourse } from '../data';
++import MockAdapter from 'axios-mock-adapter';
++import React from 'react';
++import { Factory } from 'rosie';
+ import {
+-  render, initializeMockApp, screen, fireEvent, waitFor,
+-} from '../../setupTest';
+-import initializeStore from '../../store';
+-import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
++  fireEvent, initializeMockApp, render, screen, waitFor,
++} from '../../../../../setupTest';
++import initializeStore from '../../../../../store';
++import { appendBrowserTimezoneToUrl, executeThunk } from '../../../../../utils';
++
++import { fetchCourse } from '../../../../data';
++import SidebarContext from '../../SidebarContext';
++import { ID } from './index';
+ import NotificationTray from './NotificationTray';
+ 
+ initializeMockApp();
+ jest.mock('@edx/frontend-platform/analytics');
+ 
+ describe('NotificationTray', () => {
+-  let mockData;
+   let axiosMock;
+   let store;
+ 
+   const defaultMetadata = Factory.build('courseMetadata');
++  const courseId = defaultMetadata.id;
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${defaultMetadata.id}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
+@@ -40,59 +43,96 @@ describe('NotificationTray', () => {
+     store = initializeStore();
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
+-    mockData = {
+-      toggleNotificationTray: () => {},
+-    };
+   });
+ 
+   it('renders notification tray and close tray button', async () => {
+     global.innerWidth = breakpoints.extraLarge.minWidth;
+     const toggleNotificationTray = jest.fn();
+-    const testData = {
+-      ...mockData,
+-      toggleNotificationTray,
+-    };
+-    await fetchAndRender(<NotificationTray {...testData} />);
+-
+-    expect(screen.getByText('Notifications')).toBeInTheDocument();
++    await fetchAndRender(
++      <SidebarContext.Provider value={{
++        currentSidebar: ID,
++        courseId,
++        toggleSidebar: toggleNotificationTray,
++        shouldDisplayFullScreen: false,
++      }}
++      >
++        <NotificationTray />
++      </SidebarContext.Provider>,
++    );
++    expect(screen.getByText('Notifications'))
++      .toBeInTheDocument();
+     const notificationCloseIconButton = screen.getByRole('button', { name: /Close notification tray/i });
+-    expect(notificationCloseIconButton).toBeInTheDocument();
+-    expect(notificationCloseIconButton).toHaveClass('btn-icon-primary');
++    expect(notificationCloseIconButton)
++      .toBeInTheDocument();
++    expect(notificationCloseIconButton)
++      .toHaveClass('btn-icon-primary');
+     fireEvent.click(notificationCloseIconButton);
+-    expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
++    expect(toggleNotificationTray)
++      .toHaveBeenCalledTimes(1);
+ 
+     // should not render responsive "Back to course" to close the tray
+-    expect(screen.queryByText('Back to course')).not.toBeInTheDocument();
++    expect(screen.queryByText('Back to course'))
++      .not
++      .toBeInTheDocument();
+   });
+ 
+   it('renders upgrade card', async () => {
+-    await fetchAndRender(<NotificationTray />);
++    await fetchAndRender(
++      <SidebarContext.Provider value={{
++        currentSidebar: ID,
++        courseId,
++      }}
++      >
++        <NotificationTray />
++      </SidebarContext.Provider>,
++    );
+     const UpgradeNotification = document.querySelector('.upgrade-notification');
+ 
+-    expect(UpgradeNotification).toBeInTheDocument();
+-    expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+-    expect(screen.queryByText('You have no new notifications at this time.')).not.toBeInTheDocument();
++    expect(UpgradeNotification)
++      .toBeInTheDocument();
++    expect(screen.getByRole('link', { name: 'Upgrade for $149' }))
++      .toBeInTheDocument();
++    expect(screen.queryByText('You have no new notifications at this time.'))
++      .not
++      .toBeInTheDocument();
+   });
+ 
+   it('renders no notifications message if no verified mode', async () => {
+     setMetadata({ verified_mode: null });
+-    await fetchAndRender(<NotificationTray />);
+-    expect(screen.queryByText('You have no new notifications at this time.')).toBeInTheDocument();
++    await fetchAndRender(
++      <SidebarContext.Provider value={{
++        currentSidebar: ID,
++        courseId,
++      }}
++      >
++        <NotificationTray />
++      </SidebarContext.Provider>,
++    );
++    expect(screen.queryByText('You have no new notifications at this time.'))
++      .toBeInTheDocument();
+   });
+ 
+   it('renders notification tray with full screen "Back to course" at responsive view', async () => {
+     global.innerWidth = breakpoints.medium.maxWidth;
+     const toggleNotificationTray = jest.fn();
+-    const testData = {
+-      ...mockData,
+-      toggleNotificationTray,
+-    };
+-    await fetchAndRender(<NotificationTray {...testData} />);
++    await fetchAndRender(
++      <SidebarContext.Provider value={{
++        currentSidebar: ID,
++        courseId,
++        shouldDisplayFullScreen: true,
++        toggleSidebar: toggleNotificationTray,
++      }}
++      >
++        <NotificationTray />
++      </SidebarContext.Provider>,
++    );
+ 
+     const responsiveCloseButton = screen.getByRole('button', { name: 'Back to course' });
+-    await waitFor(() => expect(responsiveCloseButton).toBeInTheDocument());
++    await waitFor(() => expect(responsiveCloseButton)
++      .toBeInTheDocument());
+ 
+     fireEvent.click(responsiveCloseButton);
+-    expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
++    expect(toggleNotificationTray)
++      .toHaveBeenCalledTimes(1);
+   });
+ });
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.jsx
+new file mode 100644
+index 0000000..73c667b
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.jsx
+@@ -0,0 +1,71 @@
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import PropTypes from 'prop-types';
++import React, { useContext, useEffect } from 'react';
++import { getLocalStorage, setLocalStorage } from '../../../../../data/localStorage';
++import { getSessionStorage, setSessionStorage } from '../../../../../data/sessionStorage';
++import messages from '../../../messages';
++import SidebarTriggerBase from '../../common/TriggerBase';
++import SidebarContext from '../../SidebarContext';
++
++import NotificationIcon from './NotificationIcon';
++
++export const ID = 'NOTIFICATIONS';
++
++function NotificationTrigger({
++  intl,
++  onClick,
++}) {
++  const {
++    courseId,
++    notificationStatus,
++    setNotificationStatus,
++    upgradeNotificationCurrentState,
++  } = useContext(SidebarContext);
++
++  /* Re-show a red dot beside the notification trigger for each of the 7 UpgradeNotification stages
++   The upgradeNotificationCurrentState prop will be available after UpgradeNotification mounts. Once available,
++  compare with the last state they've seen, and if it's different then set dot back to red */
++  function UpdateUpgradeNotificationLastSeen() {
++    if (upgradeNotificationCurrentState) {
++      if (getLocalStorage(`upgradeNotificationLastSeen.${courseId}`) !== upgradeNotificationCurrentState) {
++        setNotificationStatus('active');
++        setLocalStorage(`notificationStatus.${courseId}`, 'active');
++        setLocalStorage(`upgradeNotificationLastSeen.${courseId}`, upgradeNotificationCurrentState);
++      }
++    }
++  }
++
++  if (!getLocalStorage(`notificationStatus.${courseId}`)) {
++    setLocalStorage(`notificationStatus.${courseId}`, 'active'); // Show red dot on notificationTrigger until seen
++  }
++
++  if (!getLocalStorage(`upgradeNotificationCurrentState.${courseId}`)) {
++    setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'initialize');
++  }
++
++  useEffect(() => {
++    UpdateUpgradeNotificationLastSeen();
++  });
++
++  const handleClick = () => {
++    if (getSessionStorage(`notificationTrayStatus.${courseId}`) === 'open') {
++      setSessionStorage(`notificationTrayStatus.${courseId}`, 'closed');
++    } else {
++      setSessionStorage(`notificationTrayStatus.${courseId}`, 'open');
++    }
++    onClick();
++  };
++
++  return (
++    <SidebarTriggerBase onClick={handleClick} ariaLabel={intl.formatMessage(messages.openNotificationTrigger)}>
++      <NotificationIcon status={notificationStatus} notificationColor="bg-danger-500" />
++    </SidebarTriggerBase>
++  );
++}
++
++NotificationTrigger.propTypes = {
++  intl: intlShape.isRequired,
++  onClick: PropTypes.func.isRequired,
++};
++
++export default injectIntl(NotificationTrigger);
+diff --git a/src/courseware/course/NotificationTrigger.test.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
+similarity index 74%
+rename from src/courseware/course/NotificationTrigger.test.jsx
+rename to src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
+index f700b6e..41a284c 100644
+--- a/src/courseware/course/NotificationTrigger.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
+@@ -1,8 +1,9 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
+ import {
+-  render, initializeTestStore, screen, fireEvent,
+-} from '../../setupTest';
++  fireEvent, initializeTestStore, render, screen,
++} from '../../../../../setupTest';
++import SidebarContext from '../../SidebarContext';
+ import NotificationTrigger from './NotificationTrigger';
+ 
+ describe('Notification Trigger', () => {
+@@ -12,7 +13,11 @@ describe('Notification Trigger', () => {
+   const courseMetadata = Factory.build('courseMetadata');
+ 
+   beforeEach(async () => {
+-    await initializeTestStore({ courseMetadata, excludeFetchCourse: true, excludeFetchSequence: true });
++    await initializeTestStore({
++      courseMetadata,
++      excludeFetchCourse: true,
++      excludeFetchSequence: true,
++    });
+     mockData = {
+       courseId: courseMetadata.id,
+       toggleNotificationTray: () => {},
+@@ -31,13 +36,23 @@ describe('Notification Trigger', () => {
+     setItemSpy.mockRestore();
+   });
+ 
++  function renderWithProvider(data, onClick = () => {
++  }) {
++    const { container } = render(
++      <SidebarContext.Provider value={{ ...mockData, ...data }}>
++        <NotificationTrigger onClick={onClick} />
++      </SidebarContext.Provider>,
++    );
++    return container;
++  }
++
+   it('handles onClick event toggling the notification tray', async () => {
+     const toggleNotificationTray = jest.fn();
+     const testData = {
+       ...mockData,
+       toggleNotificationTray,
+     };
+-    render(<NotificationTrigger {...testData} />);
++    renderWithProvider(testData, toggleNotificationTray);
+ 
+     const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
+     expect(notificationTrigger).toBeInTheDocument();
+@@ -46,7 +61,7 @@ describe('Notification Trigger', () => {
+   });
+ 
+   it('renders notification trigger icon with red dot when notificationStatus is active', async () => {
+-    const { container } = render(<NotificationTrigger {...mockData} notificationStatus="active" />);
++    const container = renderWithProvider({ notificationStatus: 'active' });
+     expect(container).toBeInTheDocument();
+     const buttonIcon = container.querySelectorAll('svg');
+     expect(buttonIcon).toHaveLength(1);
+@@ -54,44 +69,44 @@ describe('Notification Trigger', () => {
+   });
+ 
+   it('renders notification trigger icon WITHOUT red dot 3 seconds later', async () => {
+-    const { container } = render(<NotificationTrigger {...mockData} notificationStatus="active" />);
++    const container = renderWithProvider({ notificationStatus: 'active' });
+     expect(container).toBeInTheDocument();
+     expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
+     jest.useFakeTimers();
+     setTimeout(() => {
+-      expect(localStorage.setItem).toHaveBeenCalledTimes(2);
++      expect(localStorage.setItem).toHaveBeenCalledTimes(5);
+       expect(screen.queryByRole('notification-dot')).not.toBeInTheDocument();
+     }, 3000);
+     jest.runAllTimers();
+   });
+ 
+   it('renders notification trigger icon WITHOUT red dot within the same phase', async () => {
+-    const { container } = render(
+-      <NotificationTrigger
+-        {...mockData}
+-        upgradeNotificationCurrentState="sameState"
+-        upgradeNotificationLastSeen="sameState"
+-      />,
+-    );
+-    expect(container).toBeInTheDocument();
+-    expect(localStorage.getItem).toHaveBeenCalledWith(`upgradeNotificationLastSeen.${mockData.courseId}`);
+-    expect(localStorage.getItem(`upgradeNotificationLastSeen.${mockData.courseId}`)).toBe('"sameState"');
++    const container = renderWithProvider({
++      upgradeNotificationLastSeen: 'sameState',
++      upgradeNotificationCurrentState: 'sameState',
++    });
++    expect(container)
++      .toBeInTheDocument();
++    expect(localStorage.getItem)
++      .toHaveBeenCalledWith(`upgradeNotificationLastSeen.${mockData.courseId}`);
++    expect(localStorage.getItem(`upgradeNotificationLastSeen.${mockData.courseId}`))
++      .toBe('"sameState"');
+     const buttonIcon = container.querySelectorAll('svg');
+-    expect(buttonIcon).toHaveLength(1);
+-    expect(screen.queryByRole('notification-dot')).not.toBeInTheDocument();
++    expect(buttonIcon)
++      .toHaveLength(1);
++    expect(screen.queryByRole('notification-dot'))
++      .not
++      .toBeInTheDocument();
+   });
+ 
+   // Rendering NotificationTrigger has the effect of calling UpdateUpgradeNotificationLastSeen(),
+   // if upgradeNotificationLastSeen is different than upgradeNotificationCurrentState
+   // it should update localStorage accordingly
+   it('makes the right updates when rendering a new phase from an UpgradeNotification change (before -> after)', async () => {
+-    const { container } = render(
+-      <NotificationTrigger
+-        {...mockData}
+-        upgradeNotificationLastSeen="before"
+-        upgradeNotificationCurrentState="after"
+-      />,
+-    );
++    const container = renderWithProvider({
++      upgradeNotificationLastSeen: 'before',
++      upgradeNotificationCurrentState: 'after',
++    });
+     expect(container).toBeInTheDocument();
+ 
+     // verify localStorage get/set are called with correct arguments
+@@ -110,13 +125,10 @@ describe('Notification Trigger', () => {
+     localStorage.setItem(`upgradeNotificationLastSeen.${courseMetadataSecondCourse.id}`, '"accessDateView"');
+     localStorage.setItem(`notificationStatus.${courseMetadataSecondCourse.id}`, '"inactive"');
+ 
+-    const { container } = render(
+-      <NotificationTrigger
+-        {...mockData}
+-        upgradeNotificationLastSeen="before"
+-        upgradeNotificationCurrentState="after"
+-      />,
+-    );
++    const container = renderWithProvider({
++      upgradeNotificationLastSeen: 'before',
++      upgradeNotificationCurrentState: 'after',
++    });
+     expect(container).toBeInTheDocument();
+     // Verify localStorage was updated for the original course
+     expect(localStorage.getItem(`upgradeNotificationLastSeen.${mockData.courseId}`)).toBe('"after"');
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/index.js b/src/courseware/course/sidebar/sidebars/notifications/index.js
+new file mode 100644
+index 0000000..dd80fe3
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/notifications/index.js
+@@ -0,0 +1,2 @@
++export { default as Sidebar } from './NotificationTray';
++export { default as Trigger, ID } from './NotificationTrigger';
+diff --git a/src/courseware/data/__factories__/discussionTopics.factory.js b/src/courseware/data/__factories__/discussionTopics.factory.js
+new file mode 100644
+index 0000000..1aeb2b1
+--- /dev/null
++++ b/src/courseware/data/__factories__/discussionTopics.factory.js
+@@ -0,0 +1,23 @@
++/* eslint-disable import/prefer-default-export */
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('discussionTopic')
++  .option('topicPrefix', null, '')
++  .option('courseId', null, 'course-v1:edX+DemoX+Demo_Course')
++  .sequence('id', ['topicPrefix'], (idx, topicPrefix) => `${topicPrefix}topic-${idx}`)
++  .sequence('name', ['topicPrefix'], (idx, topicPrefix) => `${topicPrefix}topic ${idx}`)
++  .sequence(
++    'usage_key',
++    ['id', 'courseId'],
++    (idx, id, courseId) => `block-v1:${courseId.replace('course-v1:', '')}+type@vertical+block@${id}`,
++  )
++  .attr('enabled_in_context', null, true)
++  .attr('thread_counts', [], {
++    discussion: 0,
++    question: 0,
++  });
++
++// Given a pre-build units state, build topics from it.
++export function buildTopicsFromUnits(units) {
++  return Object.values(units).map(unit => Factory.build('discussionTopic', { usage_key: unit.id }));
++}
+diff --git a/src/courseware/data/__factories__/index.js b/src/courseware/data/__factories__/index.js
+index f7d2b0f..cec0381 100644
+--- a/src/courseware/data/__factories__/index.js
++++ b/src/courseware/data/__factories__/index.js
+@@ -2,3 +2,4 @@ import './courseMetadata.factory';
+ import './sequenceMetadata.factory';
+ import './courseRecommendations.factory';
+ import './learningSequencesOutline.factory';
++import './discussionTopics.factory';
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 0623dc0..74afa00 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -1,4 +1,4 @@
+-import { getConfig, camelCaseObject } from '@edx/frontend-platform';
++import { camelCaseObject, getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { getTimeOffsetMillis } from '../../course-home/data/api';
+ import { appendBrowserTimezoneToUrl } from '../../utils';
+@@ -71,7 +71,7 @@ export async function getSequenceForUnitDeprecated(courseId, unitId) {
+   url.searchParams.append('course_id', courseId);
+   url.searchParams.append('username', authenticatedUser ? authenticatedUser.username : '');
+   url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children');
++  url.searchParams.append('requested_fields', 'children,discussions_url');
+ 
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+   const parent = Object.values(data.blocks).find(block => block.type === 'sequential' && block.children.includes(unitId));
+@@ -227,8 +227,21 @@ export async function postIntegritySignature(courseId) {
+   );
+   return camelCaseObject(data);
+ }
++
+ export async function sendActivationEmail() {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/send_account_activation_email`);
+   const { data } = await getAuthenticatedHttpClient().post(url.href, {});
+   return data;
+ }
++
++export async function getCourseDiscussionConfig(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/discussion/v1/courses/${courseId}`;
++  const { data } = await getAuthenticatedHttpClient().get(url);
++  return data;
++}
++
++export async function getCourseTopics(courseId) {
++  const { data } = await getAuthenticatedHttpClient()
++    .get(`${getConfig().LMS_BASE_URL}/api/discussion/v2/course_topics/${courseId}`);
++  return camelCaseObject(data);
++}
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index af52f38..153487d 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -1,24 +1,26 @@
+ import { logError, logInfo } from '@edx/frontend-platform/logging';
++import { getCourseHomeCourseMetadata } from '../../course-home/data/api';
++import {
++  addModel, addModelsMap, updateModel, updateModels, updateModelsMap,
++} from '../../generic/model-store';
+ import {
+   getBlockCompletion,
++  getCourseDiscussionConfig,
+   getCourseMetadata,
++  getCourseTopics,
+   getLearningSequencesOutline,
+   getSequenceMetadata,
+   postIntegritySignature,
+   postSequencePosition,
+ } from './api';
+-import { getCourseHomeCourseMetadata } from '../../course-home/data/api';
+-import {
+-  updateModel, addModel, updateModelsMap, addModelsMap, updateModels,
+-} from '../../generic/model-store';
+ import {
++  fetchCourseDenied,
++  fetchCourseFailure,
+   fetchCourseRequest,
+   fetchCourseSuccess,
+-  fetchCourseFailure,
+-  fetchCourseDenied,
++  fetchSequenceFailure,
+   fetchSequenceRequest,
+   fetchSequenceSuccess,
+-  fetchSequenceFailure,
+ } from './slice';
+ 
+ export function fetchCourse(courseId) {
+@@ -231,3 +233,23 @@ export function saveIntegritySignature(courseId, isMasquerading) {
+     }
+   };
+ }
++
++export function getCourseDiscussionTopics(courseId) {
++  return async (dispatch) => {
++    try {
++      const config = await getCourseDiscussionConfig(courseId);
++      // Only load topics for the openedx provider, the legacy provider uses
++      // the xblock
++      if (config.provider === 'openedx') {
++        const topics = await getCourseTopics(courseId);
++        dispatch(updateModels({
++          modelType: 'discussionTopics',
++          models: topics,
++          idField: 'usageKey',
++        }));
++      }
++    } catch (error) {
++      logError(error);
++    }
++  };
++}
+diff --git a/src/generic/hooks.js b/src/generic/hooks.js
+new file mode 100644
+index 0000000..cce0b53
+--- /dev/null
++++ b/src/generic/hooks.js
+@@ -0,0 +1,21 @@
++/* eslint-disable import/prefer-default-export */
++
++import { useEffect, useRef } from 'react';
++
++export function useEventListener(type, handler) {
++  // We use this ref so that we can hold a reference to the currently active event listener.
++  const eventListenerRef = useRef(null);
++  useEffect(() => {
++    // If we currently have an event listener, remove it.
++    if (eventListenerRef.current !== null) {
++      global.removeEventListener(type, eventListenerRef.current);
++      eventListenerRef.current = null;
++    }
++    // Now add our new handler as the event listener.
++    global.addEventListener(type, handler);
++    // And then save it to our ref for next time.
++    eventListenerRef.current = handler;
++    // When the component finally unmounts, use the ref to remove the correct handler.
++    return () => global.removeEventListener(type, eventListenerRef.current);
++  }, [type, handler]);
++}
+diff --git a/src/generic/model-store/slice.js b/src/generic/model-store/slice.js
+index 0bf587f..bc6dda3 100644
+--- a/src/generic/model-store/slice.js
++++ b/src/generic/model-store/slice.js
+@@ -1,19 +1,22 @@
+ /* eslint-disable no-param-reassign */
+ import { createSlice } from '@reduxjs/toolkit';
+ 
+-function add(state, modelType, model) {
+-  const { id } = model;
++function add(state, modelType, model, idField) {
++  idField = idField ?? 'id';
++  const id = model[idField];
+   if (state[modelType] === undefined) {
+     state[modelType] = {};
+   }
+   state[modelType][id] = model;
+ }
+ 
+-function update(state, modelType, model) {
++function update(state, modelType, model, idField) {
++  idField = idField ?? 'id';
++  const id = model[idField];
+   if (state[modelType] === undefined) {
+     state[modelType] = {};
+   }
+-  state[modelType][model.id] = { ...state[modelType][model.id], ...model };
++  state[modelType][id] = { ...state[modelType][id], ...model };
+ }
+ 
+ function remove(state, modelType, id) {
+@@ -29,28 +32,28 @@ const slice = createSlice({
+   initialState: {},
+   reducers: {
+     addModel: (state, { payload }) => {
+-      const { modelType, model } = payload;
+-      add(state, modelType, model);
++      const { modelType, model, idField } = payload;
++      add(state, modelType, model, idField);
+     },
+     addModels: (state, { payload }) => {
+-      const { modelType, models } = payload;
+-      models.forEach(model => add(state, modelType, model));
++      const { modelType, models, idField } = payload;
++      models.forEach(model => add(state, modelType, model, idField));
+     },
+     addModelsMap: (state, { payload }) => {
+-      const { modelType, modelsMap } = payload;
+-      Object.values(modelsMap).forEach(model => add(state, modelType, model));
++      const { modelType, modelsMap, idField } = payload;
++      Object.values(modelsMap).forEach(model => add(state, modelType, model, idField));
+     },
+     updateModel: (state, { payload }) => {
+-      const { modelType, model } = payload;
+-      update(state, modelType, model);
++      const { modelType, model, idField } = payload;
++      update(state, modelType, model, idField);
+     },
+     updateModels: (state, { payload }) => {
+-      const { modelType, models } = payload;
+-      models.forEach(model => update(state, modelType, model));
++      const { modelType, models, idField } = payload;
++      models.forEach(model => update(state, modelType, model, idField));
+     },
+     updateModelsMap: (state, { payload }) => {
+-      const { modelType, modelsMap } = payload;
+-      Object.values(modelsMap).forEach(model => update(state, modelType, model));
++      const { modelType, modelsMap, idField } = payload;
++      Object.values(modelsMap).forEach(model => update(state, modelType, model, idField));
+     },
+     removeModel: (state, { payload }) => {
+       const { modelType, id } = payload;
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.test.jsx b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+index b4510a2..6e82126 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.test.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+@@ -126,7 +126,7 @@ describe('Upgrade Notification', () => {
+     });
+     expect(screen.getByRole('heading', { name: 'Course Access Expiration' })).toBeInTheDocument();
+     expect(screen.getByText('12 hours left')).toBeInTheDocument();
+-    expect(screen.getByText(/You will lose all access to this course.*?on/s).textContent).toMatch('You will lose all access to this course, including any progress, on April 13.');
++    expect(screen.getByText(/You will lose all access to this course.*?on/s)).toHaveTextContent('You will lose all access to this course, including any progress, on April 13.');
+     expect(screen.getByText(/Upgrading your course enables you/s).textContent).toMatch('Upgrading your course enables you to pursue a verified certificate and unlocks numerous features. Learn more about the benefits of upgrading.');
+     expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+   });
+diff --git a/src/index.jsx b/src/index.jsx
+index f625e20..85f8368 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -98,6 +98,7 @@ initialize({
+         CONTACT_URL: process.env.CONTACT_URL || null,
+         CREDENTIALS_BASE_URL: process.env.CREDENTIALS_BASE_URL || null,
+         CREDIT_HELP_LINK_URL: process.env.CREDIT_HELP_LINK_URL || null,
++        DISCUSSIONS_MFE_BASE_URL: process.env.DISCUSSIONS_MFE_BASE_URL || null,
+         ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
+         ENABLE_JUMPNAV: process.env.ENABLE_JUMPNAV || null,
+         ENABLE_NOTICES: process.env.ENABLE_NOTICES || null,
+diff --git a/src/index.scss b/src/index.scss
+index 6145a90..9c16a12 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -363,9 +363,7 @@
+ 
+ // Import component-specific sass files
+ @import "courseware/course/celebration/CelebrationModal.scss";
+-@import "courseware/course/NotificationTray.scss";
+-@import "courseware/course/NotificationTrigger.scss";
+-@import "courseware/course/NotificationIcon.scss";
++@import "courseware/course/sidebar/sidebars/notifications/NotificationIcon.scss";
+ @import "courseware/course/sequence/lock-paywall/LockPaywall.scss";
+ @import "shared/streak-celebration/StreakCelebrationModal.scss";
+ @import "courseware/course/content-tools/calculator/calculator.scss";
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+index 24ec467..1fa09f2 100644
+--- a/src/product-tours/ProductTours.test.jsx
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -283,6 +283,8 @@ describe('Courseware Tour', () => {
+ 
+       const blockUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/*`);
+       axiosMock.onPost(blockUrlRegExp).reply(200, { complete: true });
++      const discussionConfigUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/discussion/v1/courses/*`);
++      axiosMock.onGet(discussionConfigUrl).reply(200, { provider: 'legacy' });
+ 
+       history.push(`/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[0].id}`);
+     });
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 30697cc..3825507 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -55,6 +55,7 @@ export const authenticatedUser = {
+ export function initializeMockApp() {
+   mergeConfig({
+     CONTACT_URL: process.env.CONTACT_URL || null,
++    DISCUSSIONS_MFE_BASE_URL: process.env.DISCUSSIONS_MFE_BASE_URL || null,
+     INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
+     STUDIO_BASE_URL: process.env.STUDIO_BASE_URL || null,
+     TWITTER_URL: process.env.TWITTER_URL || null,
+@@ -135,11 +136,13 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
+ 
+   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+   let courseHomeMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseMetadata.id}`;
++  const discussionConfigUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/discussion/v1/courses/*`);
+   courseHomeMetadataUrl = appendBrowserTimezoneToUrl(courseHomeMetadataUrl);
+ 
+   axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+   axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
++  axiosMock.onGet(discussionConfigUrl).reply(200, { provider: 'legacy' });
+   sequenceMetadata.forEach(metadata => {
+     const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${metadata.item_id}`;
+     axiosMock.onGet(sequenceMetadataUrl).reply(200, metadata);
+-- 
+2.34.1
+

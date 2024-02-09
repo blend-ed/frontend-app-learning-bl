@@ -1,0 +1,845 @@
+From a8d01c423df8d584f329eeb88f477a323931a59c Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Tue, 2 Jun 2020 14:15:12 -0400
+Subject: [PATCH 0136/1021] Miscellaneous small refactorings (#74)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Normalizing “courseInfo” back into “course”
+
+Splitting it out denormalizes the data and introduces potential data inconsistencies.
+
+* Name component JSX files with the name of the component.
+
+* Normalizing some module exports/naming.
+
+* Moving alerts into a sub-directory.
+
+* DRYing up alert hook creation into reusable useAlert hook.
+
+* Adding some comments about ‘courses’ hydration.
+---
+ src/access-expiration-alert/hooks.js          | 28 ----------
+ .../AccessExpirationAlert.jsx                 | 10 ++--
+ src/alerts/access-expiration-alert/hooks.js   | 15 ++++++
+ .../access-expiration-alert/index.js          |  0
+ .../enrollment-alert/EnrollmentAlert.jsx      |  2 +-
+ .../enrollment-alert/StaffEnrollmentAlert.jsx |  2 +-
+ src/{ => alerts}/enrollment-alert/data/api.js |  0
+ src/alerts/enrollment-alert/hooks.js          | 40 ++++++++++++++
+ src/{ => alerts}/enrollment-alert/index.js    |  0
+ src/{ => alerts}/enrollment-alert/messages.js |  0
+ .../logistration-alert/LogistrationAlert.jsx  |  2 +-
+ src/alerts/logistration-alert/hooks.js        | 17 ++++++
+ src/{ => alerts}/logistration-alert/index.js  |  0
+ .../logistration-alert/messages.js            |  0
+ src/{ => alerts}/offer-alert/OfferAlert.jsx   | 10 ++--
+ src/alerts/offer-alert/hooks.js               | 15 ++++++
+ src/{ => alerts}/offer-alert/index.js         |  0
+ src/course-home/CourseHome.jsx                |  4 +-
+ src/courseware/course/Course.jsx              | 16 +++---
+ .../{tools => content-tools}/ContentTools.jsx |  4 +-
+ .../calculator/Calculator.jsx}                |  0
+ .../calculator/calculator.scss                |  0
+ .../course/content-tools/calculator/index.js  |  3 ++
+ .../calculator/messages.js                    |  0
+ .../contentTools.scss}                        |  0
+ src/courseware/course/content-tools/index.js  |  3 ++
+ .../notes-visibility}/NotesVisibility.jsx     |  5 +-
+ .../content-tools/notes-visibility/index.js   |  3 ++
+ .../notes-visibility}/messages.js             |  0
+ .../course-sock/{index.jsx => CourseSock.jsx} |  0
+ src/courseware/course/course-sock/index.js    |  3 ++
+ src/courseware/course/tools/data/api.js       |  6 ---
+ src/data/thunks.js                            | 28 +++-------
+ src/enrollment-alert/hooks.js                 | 54 -------------------
+ src/logistration-alert/hooks.js               | 28 ----------
+ src/offer-alert/hooks.js                      | 28 ----------
+ src/tab-page/LoadedTabPage.jsx                |  4 +-
+ src/tab-page/TabPage.jsx                      |  2 +-
+ src/user-messages/AlertList.jsx               |  2 +-
+ src/user-messages/UserMessagesProvider.jsx    |  4 +-
+ src/user-messages/hooks.js                    | 26 +++++++++
+ src/user-messages/index.js                    |  1 +
+ 42 files changed, 171 insertions(+), 194 deletions(-)
+ delete mode 100644 src/access-expiration-alert/hooks.js
+ rename src/{ => alerts}/access-expiration-alert/AccessExpirationAlert.jsx (60%)
+ create mode 100644 src/alerts/access-expiration-alert/hooks.js
+ rename src/{ => alerts}/access-expiration-alert/index.js (100%)
+ rename src/{ => alerts}/enrollment-alert/EnrollmentAlert.jsx (96%)
+ rename src/{ => alerts}/enrollment-alert/StaffEnrollmentAlert.jsx (96%)
+ rename src/{ => alerts}/enrollment-alert/data/api.js (100%)
+ create mode 100644 src/alerts/enrollment-alert/hooks.js
+ rename src/{ => alerts}/enrollment-alert/index.js (100%)
+ rename src/{ => alerts}/enrollment-alert/messages.js (100%)
+ rename src/{ => alerts}/logistration-alert/LogistrationAlert.jsx (96%)
+ create mode 100644 src/alerts/logistration-alert/hooks.js
+ rename src/{ => alerts}/logistration-alert/index.js (100%)
+ rename src/{ => alerts}/logistration-alert/messages.js (100%)
+ rename src/{ => alerts}/offer-alert/OfferAlert.jsx (59%)
+ create mode 100644 src/alerts/offer-alert/hooks.js
+ rename src/{ => alerts}/offer-alert/index.js (100%)
+ rename src/courseware/course/{tools => content-tools}/ContentTools.jsx (89%)
+ rename src/courseware/course/{tools/calculator/index.jsx => content-tools/calculator/Calculator.jsx} (100%)
+ rename src/courseware/course/{tools => content-tools}/calculator/calculator.scss (100%)
+ create mode 100644 src/courseware/course/content-tools/calculator/index.js
+ rename src/courseware/course/{tools => content-tools}/calculator/messages.js (100%)
+ rename src/courseware/course/{tools/tools.scss => content-tools/contentTools.scss} (100%)
+ create mode 100644 src/courseware/course/content-tools/index.js
+ rename src/courseware/course/{tools/notes => content-tools/notes-visibility}/NotesVisibility.jsx (91%)
+ create mode 100644 src/courseware/course/content-tools/notes-visibility/index.js
+ rename src/courseware/course/{tools/notes => content-tools/notes-visibility}/messages.js (100%)
+ rename src/courseware/course/course-sock/{index.jsx => CourseSock.jsx} (100%)
+ create mode 100644 src/courseware/course/course-sock/index.js
+ delete mode 100644 src/courseware/course/tools/data/api.js
+ delete mode 100644 src/enrollment-alert/hooks.js
+ delete mode 100644 src/logistration-alert/hooks.js
+ delete mode 100644 src/offer-alert/hooks.js
+ create mode 100644 src/user-messages/hooks.js
+
+diff --git a/src/access-expiration-alert/hooks.js b/src/access-expiration-alert/hooks.js
+deleted file mode 100644
+index 62887be..0000000
+--- a/src/access-expiration-alert/hooks.js
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/* eslint-disable import/prefer-default-export */
+-import { useContext, useState, useEffect } from 'react';
+-import { UserMessagesContext } from '../user-messages';
+-import { useModel } from '../model-store';
+-
+-export function useAccessExpirationAlert(courseId) {
+-  const course = useModel('courses', courseId);
+-  const { add, remove } = useContext(UserMessagesContext);
+-  const [alertId, setAlertId] = useState(null);
+-  const rawHtml = (course && course.courseExpiredMessage) || null;
+-  useEffect(() => {
+-    if (rawHtml && alertId === null) {
+-      setAlertId(add({
+-        code: 'clientAccessExpirationAlert',
+-        topic: 'course',
+-        rawHtml,
+-      }));
+-    } else if (!rawHtml && alertId !== null) {
+-      remove(alertId);
+-      setAlertId(null);
+-    }
+-    return () => {
+-      if (alertId !== null) {
+-        remove(alertId);
+-      }
+-    };
+-  }, [alertId, courseId, rawHtml]);
+-}
+diff --git a/src/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+similarity index 60%
+rename from src/access-expiration-alert/AccessExpirationAlert.jsx
+rename to src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index adbd3e6..bac2859 100644
+--- a/src/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -1,12 +1,12 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { Alert } from '../user-messages';
++import { Alert } from '../../user-messages';
+ 
+-function AccessExpirationAlert(props) {
++function AccessExpirationAlert({ payload }) {
+   const {
+     rawHtml,
+-  } = props;
++  } = payload;
+   return rawHtml && (
+     <Alert type="info">
+       <div dangerouslySetInnerHTML={{ __html: rawHtml }} />
+@@ -15,7 +15,9 @@ function AccessExpirationAlert(props) {
+ }
+ 
+ AccessExpirationAlert.propTypes = {
+-  rawHtml: PropTypes.string.isRequired,
++  payload: PropTypes.shape({
++    rawHtml: PropTypes.string.isRequired,
++  }).isRequired,
+ };
+ 
+ export default AccessExpirationAlert;
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+new file mode 100644
+index 0000000..22fc418
+--- /dev/null
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -0,0 +1,15 @@
++/* eslint-disable import/prefer-default-export */
++import { useModel } from '../../model-store';
++import { useAlert } from '../../user-messages';
++
++export function useAccessExpirationAlert(courseId) {
++  const course = useModel('courses', courseId);
++  const rawHtml = (course && course.courseExpiredMessage) || null;
++  const isVisible = !!rawHtml; // If it exists, show it.
++
++  useAlert(isVisible, {
++    code: 'clientAccessExpirationAlert',
++    topic: 'course',
++    payload: { rawHtml },
++  });
++}
+diff --git a/src/access-expiration-alert/index.js b/src/alerts/access-expiration-alert/index.js
+similarity index 100%
+rename from src/access-expiration-alert/index.js
+rename to src/alerts/access-expiration-alert/index.js
+diff --git a/src/enrollment-alert/EnrollmentAlert.jsx b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+similarity index 96%
+rename from src/enrollment-alert/EnrollmentAlert.jsx
+rename to src/alerts/enrollment-alert/EnrollmentAlert.jsx
+index a684ca4..67e0fe7 100644
+--- a/src/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+@@ -5,7 +5,7 @@ import { Button } from '@edx/paragon';
+ 
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+-import { Alert } from '../user-messages';
++import { Alert } from '../../user-messages';
+ 
+ import messages from './messages';
+ import { useEnrollClickHandler } from './hooks';
+diff --git a/src/enrollment-alert/StaffEnrollmentAlert.jsx b/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
+similarity index 96%
+rename from src/enrollment-alert/StaffEnrollmentAlert.jsx
+rename to src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
+index c5fd849..c9e9db9 100644
+--- a/src/enrollment-alert/StaffEnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
+@@ -5,7 +5,7 @@ import { Button } from '@edx/paragon';
+ 
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+-import { Alert } from '../user-messages';
++import { Alert } from '../../user-messages';
+ 
+ import messages from './messages';
+ import { useEnrollClickHandler } from './hooks';
+diff --git a/src/enrollment-alert/data/api.js b/src/alerts/enrollment-alert/data/api.js
+similarity index 100%
+rename from src/enrollment-alert/data/api.js
+rename to src/alerts/enrollment-alert/data/api.js
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+new file mode 100644
+index 0000000..d0b5b51
+--- /dev/null
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -0,0 +1,40 @@
++/* eslint-disable import/prefer-default-export */
++import {
++  useContext, useState, useCallback,
++} from 'react';
++import { UserMessagesContext, ALERT_TYPES, useAlert } from '../../user-messages';
++import { useModel } from '../../model-store';
++import { postCourseEnrollment } from './data/api';
++
++
++export function useEnrollmentAlert(courseId) {
++  const course = useModel('courses', courseId);
++  const code = course.isStaff ? 'clientStaffEnrollmentAlert' : 'clientEnrollmentAlert';
++  const isVisible = course && course.isEnrolled !== undefined && !course.isEnrolled;
++
++  useAlert(isVisible, {
++    code,
++    topic: 'course',
++  });
++}
++
++export function useEnrollClickHandler(courseId, successText) {
++  const [loading, setLoading] = useState(false);
++  const { addFlash } = useContext(UserMessagesContext);
++  const enrollClickHandler = useCallback(() => {
++    setLoading(true);
++    postCourseEnrollment(courseId).then(() => {
++      addFlash({
++        dismissible: true,
++        flash: true,
++        text: successText,
++        type: ALERT_TYPES.SUCCESS,
++        topic: 'course',
++      });
++      setLoading(false);
++      global.location.reload();
++    });
++  }, [courseId]);
++
++  return { enrollClickHandler, loading };
++}
+diff --git a/src/enrollment-alert/index.js b/src/alerts/enrollment-alert/index.js
+similarity index 100%
+rename from src/enrollment-alert/index.js
+rename to src/alerts/enrollment-alert/index.js
+diff --git a/src/enrollment-alert/messages.js b/src/alerts/enrollment-alert/messages.js
+similarity index 100%
+rename from src/enrollment-alert/messages.js
+rename to src/alerts/enrollment-alert/messages.js
+diff --git a/src/logistration-alert/LogistrationAlert.jsx b/src/alerts/logistration-alert/LogistrationAlert.jsx
+similarity index 96%
+rename from src/logistration-alert/LogistrationAlert.jsx
+rename to src/alerts/logistration-alert/LogistrationAlert.jsx
+index e1efaf9..72825c0 100644
+--- a/src/logistration-alert/LogistrationAlert.jsx
++++ b/src/alerts/logistration-alert/LogistrationAlert.jsx
+@@ -3,7 +3,7 @@ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
+ 
+-import { Alert } from '../user-messages';
++import { Alert } from '../../user-messages';
+ import messages from './messages';
+ 
+ function LogistrationAlert({ intl }) {
+diff --git a/src/alerts/logistration-alert/hooks.js b/src/alerts/logistration-alert/hooks.js
+new file mode 100644
+index 0000000..5557ab2
+--- /dev/null
++++ b/src/alerts/logistration-alert/hooks.js
+@@ -0,0 +1,17 @@
++/* eslint-disable import/prefer-default-export */
++import { useContext } from 'react';
++import { AppContext } from '@edx/frontend-platform/react';
++import { ALERT_TYPES, useAlert } from '../../user-messages';
++
++
++export function useLogistrationAlert() {
++  const { authenticatedUser } = useContext(AppContext);
++  const isVisible = authenticatedUser === null;
++
++  useAlert(isVisible, {
++    code: 'clientLogistrationAlert',
++    topic: 'course',
++    dismissible: false,
++    type: ALERT_TYPES.ERROR,
++  });
++}
+diff --git a/src/logistration-alert/index.js b/src/alerts/logistration-alert/index.js
+similarity index 100%
+rename from src/logistration-alert/index.js
+rename to src/alerts/logistration-alert/index.js
+diff --git a/src/logistration-alert/messages.js b/src/alerts/logistration-alert/messages.js
+similarity index 100%
+rename from src/logistration-alert/messages.js
+rename to src/alerts/logistration-alert/messages.js
+diff --git a/src/offer-alert/OfferAlert.jsx b/src/alerts/offer-alert/OfferAlert.jsx
+similarity index 59%
+rename from src/offer-alert/OfferAlert.jsx
+rename to src/alerts/offer-alert/OfferAlert.jsx
+index 719b3f6..714035b 100644
+--- a/src/offer-alert/OfferAlert.jsx
++++ b/src/alerts/offer-alert/OfferAlert.jsx
+@@ -1,12 +1,12 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { Alert } from '../user-messages';
++import { Alert } from '../../user-messages';
+ 
+-function OfferAlert(props) {
++function OfferAlert({ payload }) {
+   const {
+     rawHtml,
+-  } = props;
++  } = payload;
+   return rawHtml && (
+     <Alert type="info">
+       <div dangerouslySetInnerHTML={{ __html: rawHtml }} />
+@@ -15,7 +15,9 @@ function OfferAlert(props) {
+ }
+ 
+ OfferAlert.propTypes = {
+-  rawHtml: PropTypes.string.isRequired,
++  payload: PropTypes.shape({
++    rawHtml: PropTypes.string.isRequired,
++  }).isRequired,
+ };
+ 
+ export default OfferAlert;
+diff --git a/src/alerts/offer-alert/hooks.js b/src/alerts/offer-alert/hooks.js
+new file mode 100644
+index 0000000..4866ee6
+--- /dev/null
++++ b/src/alerts/offer-alert/hooks.js
+@@ -0,0 +1,15 @@
++/* eslint-disable import/prefer-default-export */
++import { useModel } from '../../model-store';
++import { useAlert } from '../../user-messages';
++
++export function useOfferAlert(courseId) {
++  const course = useModel('courses', courseId);
++  const rawHtml = (course && course.offerHtml) || null;
++  const isVisible = !!rawHtml; // if it exists, show it.
++
++  useAlert(isVisible, {
++    code: 'clientOfferAlert',
++    topic: 'course',
++    payload: { rawHtml },
++  });
++}
+diff --git a/src/offer-alert/index.js b/src/alerts/offer-alert/index.js
+similarity index 100%
+rename from src/offer-alert/index.js
+rename to src/alerts/offer-alert/index.js
+diff --git a/src/course-home/CourseHome.jsx b/src/course-home/CourseHome.jsx
+index c26351c..ce981c1 100644
+--- a/src/course-home/CourseHome.jsx
++++ b/src/course-home/CourseHome.jsx
+@@ -13,8 +13,8 @@ import { useModel } from '../model-store';
+ // This is because React.lazy() requires that we import() from a file with a Component as its
+ // default export.
+ // See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
+-const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../enrollment-alert'));
+-const LogistrationAlert = React.lazy(() => import('../logistration-alert'));
++const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../alerts/enrollment-alert'));
++const LogistrationAlert = React.lazy(() => import('../alerts/logistration-alert'));
+ 
+ export default function CourseHome() {
+   const {
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index fd4bbd8..ffc7a8b 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -2,25 +2,25 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import { AlertList } from '../../user-messages';
+-import { useAccessExpirationAlert } from '../../access-expiration-alert';
+-import { useOfferAlert } from '../../offer-alert';
++import { useAccessExpirationAlert } from '../../alerts/access-expiration-alert';
++import { useOfferAlert } from '../../alerts/offer-alert';
+ 
+ import Sequence from './sequence';
+ 
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import CourseSock from './course-sock';
+-import ContentTools from './tools/ContentTools';
++import ContentTools from './content-tools';
+ import { useModel } from '../../model-store';
+ 
+ // Note that we import from the component files themselves in the enrollment-alert package.
+ // This is because Reacy.lazy() requires that we import() from a file with a Component as it's
+ // default export.
+ // See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
+-const AccessExpirationAlert = React.lazy(() => import('../../access-expiration-alert/AccessExpirationAlert'));
+-const EnrollmentAlert = React.lazy(() => import('../../enrollment-alert/EnrollmentAlert'));
+-const StaffEnrollmentAlert = React.lazy(() => import('../../enrollment-alert/StaffEnrollmentAlert'));
+-const LogistrationAlert = React.lazy(() => import('../../logistration-alert'));
+-const OfferAlert = React.lazy(() => import('../../offer-alert/OfferAlert'));
++const AccessExpirationAlert = React.lazy(() => import('../../alerts/access-expiration-alert/AccessExpirationAlert'));
++const EnrollmentAlert = React.lazy(() => import('../../alerts/enrollment-alert/EnrollmentAlert'));
++const StaffEnrollmentAlert = React.lazy(() => import('../../alerts/enrollment-alert/StaffEnrollmentAlert'));
++const LogistrationAlert = React.lazy(() => import('../../alerts/logistration-alert'));
++const OfferAlert = React.lazy(() => import('../../alerts/offer-alert/OfferAlert'));
+ 
+ function Course({
+   courseId,
+diff --git a/src/courseware/course/tools/ContentTools.jsx b/src/courseware/course/content-tools/ContentTools.jsx
+similarity index 89%
+rename from src/courseware/course/tools/ContentTools.jsx
+rename to src/courseware/course/content-tools/ContentTools.jsx
+index 0baaffc..2ea2676 100644
+--- a/src/courseware/course/tools/ContentTools.jsx
++++ b/src/courseware/course/content-tools/ContentTools.jsx
+@@ -2,8 +2,8 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import Calculator from './calculator';
+-import NotesVisibility from './notes/NotesVisibility';
+-import './tools.scss';
++import NotesVisibility from './notes-visibility';
++import './contentTools.scss';
+ 
+ export default function ContentTools({
+   course,
+diff --git a/src/courseware/course/tools/calculator/index.jsx b/src/courseware/course/content-tools/calculator/Calculator.jsx
+similarity index 100%
+rename from src/courseware/course/tools/calculator/index.jsx
+rename to src/courseware/course/content-tools/calculator/Calculator.jsx
+diff --git a/src/courseware/course/tools/calculator/calculator.scss b/src/courseware/course/content-tools/calculator/calculator.scss
+similarity index 100%
+rename from src/courseware/course/tools/calculator/calculator.scss
+rename to src/courseware/course/content-tools/calculator/calculator.scss
+diff --git a/src/courseware/course/content-tools/calculator/index.js b/src/courseware/course/content-tools/calculator/index.js
+new file mode 100644
+index 0000000..4b49f2e
+--- /dev/null
++++ b/src/courseware/course/content-tools/calculator/index.js
+@@ -0,0 +1,3 @@
++import Calculator from './Calculator';
++
++export default Calculator;
+diff --git a/src/courseware/course/tools/calculator/messages.js b/src/courseware/course/content-tools/calculator/messages.js
+similarity index 100%
+rename from src/courseware/course/tools/calculator/messages.js
+rename to src/courseware/course/content-tools/calculator/messages.js
+diff --git a/src/courseware/course/tools/tools.scss b/src/courseware/course/content-tools/contentTools.scss
+similarity index 100%
+rename from src/courseware/course/tools/tools.scss
+rename to src/courseware/course/content-tools/contentTools.scss
+diff --git a/src/courseware/course/content-tools/index.js b/src/courseware/course/content-tools/index.js
+new file mode 100644
+index 0000000..6d423f6
+--- /dev/null
++++ b/src/courseware/course/content-tools/index.js
+@@ -0,0 +1,3 @@
++import ContentTools from './ContentTools';
++
++export default ContentTools;
+diff --git a/src/courseware/course/tools/notes/NotesVisibility.jsx b/src/courseware/course/content-tools/notes-visibility/NotesVisibility.jsx
+similarity index 91%
+rename from src/courseware/course/tools/notes/NotesVisibility.jsx
+rename to src/courseware/course/content-tools/notes-visibility/NotesVisibility.jsx
+index f47e7c7..a241ef2 100644
+--- a/src/courseware/course/tools/notes/NotesVisibility.jsx
++++ b/src/courseware/course/content-tools/notes-visibility/NotesVisibility.jsx
+@@ -8,9 +8,12 @@ import {
+ } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faPencilAlt } from '@fortawesome/free-solid-svg-icons';
+-import toggleNotes from '../data/api';
+ import messages from './messages';
+ 
++function toggleNotes() {
++  const iframe = document.getElementById('unit-iframe');
++  iframe.contentWindow.postMessage('tools.toggleNotes', getConfig().LMS_BASE_URL);
++}
+ 
+ class NotesVisibility extends Component {
+   constructor(props) {
+diff --git a/src/courseware/course/content-tools/notes-visibility/index.js b/src/courseware/course/content-tools/notes-visibility/index.js
+new file mode 100644
+index 0000000..19497c8
+--- /dev/null
++++ b/src/courseware/course/content-tools/notes-visibility/index.js
+@@ -0,0 +1,3 @@
++import NotesVisibility from './NotesVisibility';
++
++export default NotesVisibility;
+diff --git a/src/courseware/course/tools/notes/messages.js b/src/courseware/course/content-tools/notes-visibility/messages.js
+similarity index 100%
+rename from src/courseware/course/tools/notes/messages.js
+rename to src/courseware/course/content-tools/notes-visibility/messages.js
+diff --git a/src/courseware/course/course-sock/index.jsx b/src/courseware/course/course-sock/CourseSock.jsx
+similarity index 100%
+rename from src/courseware/course/course-sock/index.jsx
+rename to src/courseware/course/course-sock/CourseSock.jsx
+diff --git a/src/courseware/course/course-sock/index.js b/src/courseware/course/course-sock/index.js
+new file mode 100644
+index 0000000..91968df
+--- /dev/null
++++ b/src/courseware/course/course-sock/index.js
+@@ -0,0 +1,3 @@
++import CourseSock from './CourseSock';
++
++export default CourseSock;
+diff --git a/src/courseware/course/tools/data/api.js b/src/courseware/course/tools/data/api.js
+deleted file mode 100644
+index 5084a7a..0000000
+--- a/src/courseware/course/tools/data/api.js
++++ /dev/null
+@@ -1,6 +0,0 @@
+-import { getConfig } from '@edx/frontend-platform';
+-
+-export default function toggleNotes() {
+-  const iframe = document.getElementById('unit-iframe');
+-  iframe.contentWindow.postMessage('tools.toggleNotes', getConfig().LMS_BASE_URL);
+-}
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index 604d4cb..c2aa3e2 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -35,17 +35,6 @@ export function fetchCourse(courseId) {
+           modelType: 'courses',
+           model: courseMetadataResult.value,
+         }));
+-        dispatch(addModel({
+-          modelType: 'courseInfo',
+-          model: {
+-            id: courseMetadataResult.value.id,
+-            isStaff: courseMetadataResult.value.isStaff,
+-            number: courseMetadataResult.value.number,
+-            org: courseMetadataResult.value.org,
+-            tabs: courseMetadataResult.value.tabs,
+-            title: courseMetadataResult.value.title,
+-          },
+-        }));
+       }
+ 
+       if (courseBlocksResult.status === 'fulfilled') {
+@@ -53,6 +42,7 @@ export function fetchCourse(courseId) {
+           courses, sections, sequences, units,
+         } = courseBlocksResult.value;
+ 
++        // This updates the course with a sectionIds array from the blocks data.
+         dispatch(updateModelsMap({
+           modelType: 'courses',
+           modelsMap: courses,
+@@ -124,16 +114,14 @@ export function fetchTab(courseId, tab, version) {
+       const fetchedTabData = tabDataResult.status === 'fulfilled';
+ 
+       if (fetchedMetadata) {
++        /*
++         * NOTE: The "courses" models created by this thunk do not include an array of sectionIds.
++         * If that data is required for some use case, then fetchTab will need to call
++         * getCourseBlocks as well.  See fetchCourse above.
++         */
+         dispatch(addModel({
+-          modelType: 'courseInfo',
+-          model: {
+-            id: courseMetadataResult.value.id,
+-            isStaff: courseMetadataResult.value.isStaff,
+-            number: courseMetadataResult.value.number,
+-            org: courseMetadataResult.value.org,
+-            tabs: courseMetadataResult.value.tabs,
+-            title: courseMetadataResult.value.title,
+-          },
++          modelType: 'courses',
++          model: courseMetadataResult.value,
+         }));
+       } else {
+         logError(courseMetadataResult.reason);
+diff --git a/src/enrollment-alert/hooks.js b/src/enrollment-alert/hooks.js
+deleted file mode 100644
+index a6be779..0000000
+--- a/src/enrollment-alert/hooks.js
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/* eslint-disable import/prefer-default-export */
+-import {
+-  useContext, useState, useEffect, useCallback,
+-} from 'react';
+-import { UserMessagesContext, ALERT_TYPES } from '../user-messages';
+-import { useModel } from '../model-store';
+-import { postCourseEnrollment } from './data/api';
+-
+-export function useEnrollmentAlert(courseId) {
+-  const course = useModel('courses', courseId);
+-  const { add, remove } = useContext(UserMessagesContext);
+-  const [alertId, setAlertId] = useState(null);
+-  const isEnrolled = course && course.isEnrolled;
+-  useEffect(() => {
+-    if (course && course.isEnrolled !== undefined) {
+-      if (!course.isEnrolled && alertId === null) {
+-        const code = course.isStaff ? 'clientStaffEnrollmentAlert' : 'clientEnrollmentAlert';
+-        setAlertId(add({
+-          code,
+-          topic: 'course',
+-        }));
+-      } else if (course.isEnrolled && alertId !== null) {
+-        remove(alertId);
+-        setAlertId(null);
+-      }
+-    }
+-    return () => {
+-      if (alertId !== null) {
+-        remove(alertId);
+-      }
+-    };
+-  }, [course, isEnrolled]);
+-}
+-
+-export function useEnrollClickHandler(courseId, successText) {
+-  const [loading, setLoading] = useState(false);
+-  const { addFlash } = useContext(UserMessagesContext);
+-  const enrollClickHandler = useCallback(() => {
+-    setLoading(true);
+-    postCourseEnrollment(courseId).then(() => {
+-      addFlash({
+-        dismissible: true,
+-        flash: true,
+-        text: successText,
+-        type: ALERT_TYPES.SUCCESS,
+-        topic: 'course',
+-      });
+-      setLoading(false);
+-      global.location.reload();
+-    });
+-  }, [courseId]);
+-
+-  return { enrollClickHandler, loading };
+-}
+diff --git a/src/logistration-alert/hooks.js b/src/logistration-alert/hooks.js
+deleted file mode 100644
+index f0f4adc..0000000
+--- a/src/logistration-alert/hooks.js
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/* eslint-disable import/prefer-default-export */
+-import { useContext, useState, useEffect } from 'react';
+-import { AppContext } from '@edx/frontend-platform/react';
+-import { UserMessagesContext, ALERT_TYPES } from '../user-messages';
+-
+-export function useLogistrationAlert() {
+-  const { authenticatedUser } = useContext(AppContext);
+-  const { add, remove } = useContext(UserMessagesContext);
+-  const [alertId, setAlertId] = useState(null);
+-  useEffect(() => {
+-    if (authenticatedUser === null && alertId === null) {
+-      setAlertId(add({
+-        code: 'clientLogistrationAlert',
+-        dismissible: false,
+-        type: ALERT_TYPES.ERROR,
+-        topic: 'course',
+-      }));
+-    } else if (authenticatedUser !== null && alertId !== null) {
+-      remove(alertId);
+-      setAlertId(null);
+-    }
+-    return () => {
+-      if (alertId !== null) {
+-        remove(alertId);
+-      }
+-    };
+-  }, [authenticatedUser]);
+-}
+diff --git a/src/offer-alert/hooks.js b/src/offer-alert/hooks.js
+deleted file mode 100644
+index d6048db..0000000
+--- a/src/offer-alert/hooks.js
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/* eslint-disable import/prefer-default-export */
+-import { useContext, useState, useEffect } from 'react';
+-import { UserMessagesContext } from '../user-messages';
+-import { useModel } from '../model-store';
+-
+-export function useOfferAlert(courseId) {
+-  const course = useModel('courses', courseId);
+-  const { add, remove } = useContext(UserMessagesContext);
+-  const [alertId, setAlertId] = useState(null);
+-  const rawHtml = (course && course.offerHtml) || null;
+-  useEffect(() => {
+-    if (rawHtml && alertId === null) {
+-      setAlertId(add({
+-        code: 'clientOfferAlert',
+-        topic: 'course',
+-        rawHtml,
+-      }));
+-    } else if (!rawHtml && alertId !== null) {
+-      remove(alertId);
+-      setAlertId(null);
+-    }
+-    return () => {
+-      if (alertId !== null) {
+-        remove(alertId);
+-      }
+-    };
+-  }, [alertId, courseId, rawHtml]);
+-}
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 4690945..8e538b4 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
+ 
+ import { Header, CourseTabsNavigation } from '../course-header';
+ import { useModel } from '../model-store';
+-import { useEnrollmentAlert } from '../enrollment-alert';
++import { useEnrollmentAlert } from '../alerts/enrollment-alert';
+ import InstructorToolbar from '../courseware/course/InstructorToolbar';
+ 
+ function LoadedTabPage({
+@@ -20,7 +20,7 @@ function LoadedTabPage({
+     org,
+     tabs,
+     title,
+-  } = useModel('courseInfo', courseId);
++  } = useModel('courses', courseId);
+ 
+   return (
+     <>
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index d35fc35..1989697 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -3,7 +3,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useSelector } from 'react-redux';
+ 
+ import { Header } from '../course-header';
+-import { useLogistrationAlert } from '../logistration-alert';
++import { useLogistrationAlert } from '../alerts/logistration-alert';
+ import PageLoading from '../PageLoading';
+ 
+ import messages from './messages';
+diff --git a/src/user-messages/AlertList.jsx b/src/user-messages/AlertList.jsx
+index 0db4ece..6fdb662 100644
+--- a/src/user-messages/AlertList.jsx
++++ b/src/user-messages/AlertList.jsx
+@@ -28,7 +28,7 @@ export default function AlertList({
+               type={message.type}
+               dismissible={message.dismissible}
+               onDismiss={() => remove(message.id)}
+-              rawHtml={message.rawHtml}
++              payload={message.payload}
+               {...customProps}
+             >
+               {message.text}
+diff --git a/src/user-messages/UserMessagesProvider.jsx b/src/user-messages/UserMessagesProvider.jsx
+index f227170..3777ddd 100644
+--- a/src/user-messages/UserMessagesProvider.jsx
++++ b/src/user-messages/UserMessagesProvider.jsx
+@@ -82,11 +82,11 @@ export default function UserMessagesProvider({ children }) {
+ 
+   function add(message) {
+     const {
+-      code, dismissible, text, type, topic, ...others
++      code, dismissible, text, type, topic, payload, ...others
+     } = message;
+     const id = refId.current;
+     setMessages(currentMessages => [...currentMessages, {
+-      code, dismissible, text, type, topic, ...others, id,
++      code, dismissible, text, type, topic, payload, ...others, id,
+     }]);
+     refId.current += 1;
+     setNextId(refId.current);
+diff --git a/src/user-messages/hooks.js b/src/user-messages/hooks.js
+new file mode 100644
+index 0000000..4e0aa40
+--- /dev/null
++++ b/src/user-messages/hooks.js
+@@ -0,0 +1,26 @@
++/* eslint-disable import/prefer-default-export */
++import { useContext, useState, useEffect } from 'react';
++import UserMessagesContext from './UserMessagesContext';
++
++export function useAlert(isVisible, {
++  code, text, topic, type, payload, dismissible,
++}) {
++  const { add, remove } = useContext(UserMessagesContext);
++  const [alertId, setAlertId] = useState(null);
++
++  useEffect(() => {
++    if (isVisible && alertId === null) {
++      setAlertId(add({
++        code, text, topic, type, payload, dismissible,
++      }));
++    } else if (!isVisible && alertId !== null) {
++      remove(alertId);
++      setAlertId(null);
++    }
++    return () => {
++      if (alertId !== null) {
++        remove(alertId);
++      }
++    };
++  }, [alertId, isVisible, code, text, topic, type, dismissible, payload]);
++}
+diff --git a/src/user-messages/index.js b/src/user-messages/index.js
+index b7d8dfd..9cfd27d 100644
+--- a/src/user-messages/index.js
++++ b/src/user-messages/index.js
+@@ -2,3 +2,4 @@ export { default as UserMessagesProvider, ALERT_TYPES } from './UserMessagesProv
+ export { default as UserMessagesContext } from './UserMessagesContext';
+ export { default as AlertList } from './AlertList';
+ export { default as Alert } from './Alert';
++export { useAlert } from './hooks';
+-- 
+2.34.1
+

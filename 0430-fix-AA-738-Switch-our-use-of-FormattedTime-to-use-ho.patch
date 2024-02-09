@@ -1,0 +1,62 @@
+From 34dbcb7ea61eafc725939671e850c557857c5157 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Wed, 21 Apr 2021 12:15:13 -0700
+Subject: [PATCH 0430/1021] fix: AA-738: Switch our use of FormattedTime to use
+ hourCycle (#418)
+
+We had a bug reported where learners were seeing a due date like
+March 24, 24:59 instead of March 25, 00:59. This is a bug that only
+shows up in Chrome. The hour12 flag overrides the hourCycle flag so
+we are just going to swap the two. h23 means a 24 hour format ranging
+from 0-23 (there also exists a h24 option which goes from 1-24).
+
+See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat
+for any additional details on the options.
+---
+ src/course-home/outline-tab/SequenceLink.jsx                    | 2 +-
+ .../outline-tab/alerts/course-end-alert/CourseEndAlert.jsx      | 2 +-
+ .../outline-tab/alerts/course-start-alert/CourseStartAlert.jsx  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index 863ef7a..96c1c6d 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -96,7 +96,7 @@ function SequenceLink({
+                       day="numeric"
+                       month="short"
+                       year="numeric"
+-                      hour12={false}
++                      hourCycle="h23"
+                       timeZoneName="short"
+                       value={due}
+                       {...timezoneFormatArgs}
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+index 858ff49..b329823 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+@@ -37,7 +37,7 @@ function CourseEndAlert({ payload }) {
+         day="numeric"
+         month="short"
+         year="numeric"
+-        hour12={false}
++        hourCycle="h23"
+         timeZoneName="short"
+         value={endDate}
+         {...timezoneFormatArgs}
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+index 8b69d66..873ac5b 100644
+--- a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+@@ -42,7 +42,7 @@ function CourseStartAlert({ payload }) {
+                 day="numeric"
+                 month="short"
+                 year="numeric"
+-                hour12={false}
++                hourCycle="h23"
+                 timeZoneName="short"
+                 value={startDate}
+                 {...timezoneFormatArgs}
+-- 
+2.34.1
+

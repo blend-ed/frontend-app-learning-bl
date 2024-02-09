@@ -1,0 +1,25 @@
+From 4c09d49532c8d30ec9a332f22568c749ccf9e2ee Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 28 Feb 2020 13:54:35 -0500
+Subject: [PATCH 0060/1021] Adding userHasAccess to redux so we can use it in
+ our components.
+
+---
+ src/data/course-meta/slice.js | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/data/course-meta/slice.js b/src/data/course-meta/slice.js
+index 79b138b..43213b1 100644
+--- a/src/data/course-meta/slice.js
++++ b/src/data/course-meta/slice.js
+@@ -16,6 +16,7 @@ const courseMetaSlice = createSlice({
+       number: payload.number,
+       org: payload.org,
+       tabs: payload.tabs,
++      userHasAccess: payload.userHasAccess,
+     }),
+     fetchCourseMetadataFailure: (draftState) => {
+       draftState.fetchState = 'failed';
+-- 
+2.34.1
+

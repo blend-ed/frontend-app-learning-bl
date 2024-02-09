@@ -1,0 +1,114 @@
+From 47fd6bfe18b705507dadd43d8ae3adbb16e67aa2 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 25 Jan 2021 11:11:14 -0500
+Subject: [PATCH 0373/1021] AA-512: underline links within iframes (#347)
+
+---
+ .../outline-tab/LmsHtmlFragment.css           | 11 +++++++
+ .../outline-tab/LmsHtmlFragment.jsx           | 29 +++++++++++++------
+ .../outline-tab/widgets/CourseHandouts.jsx    |  1 +
+ .../outline-tab/widgets/WelcomeMessage.jsx    |  2 ++
+ 4 files changed, 34 insertions(+), 9 deletions(-)
+ create mode 100644 src/course-home/outline-tab/LmsHtmlFragment.css
+
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.css b/src/course-home/outline-tab/LmsHtmlFragment.css
+new file mode 100644
+index 0000000..9f3869d
+--- /dev/null
++++ b/src/course-home/outline-tab/LmsHtmlFragment.css
+@@ -0,0 +1,11 @@
++body a {
++    color: #00688D;
++}
++
++body.inline-link a {
++    text-decoration: underline;
++}
++
++body.small {
++    font-size: 0.875rem;
++}
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.jsx b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+index 5496ce3..77625f3 100644
+--- a/src/course-home/outline-tab/LmsHtmlFragment.jsx
++++ b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+@@ -3,16 +3,22 @@ import PropTypes from 'prop-types';
+ 
+ import { getConfig } from '@edx/frontend-platform';
+ 
+-export default function LmsHtmlFragment({ html, title, ...rest }) {
++export default function LmsHtmlFragment({
++  className,
++  html,
++  title,
++  ...rest
++}) {
+   const wholePage = `
+-<html>
+-  <head>
+-    <base href="${getConfig().LMS_BASE_URL}" target="_parent">
+-    <link rel="stylesheet" href="/static/css/bootstrap/lms-main.css">
+-  </head>
+-  <body>${html}</body>
+-</html>
+-`;
++    <html>
++      <head>
++        <base href="${getConfig().LMS_BASE_URL}" target="_parent">
++        <link rel="stylesheet" href="/static/css/bootstrap/lms-main.css">
++        <link rel="stylesheet" type="text/css" href="${getConfig().BASE_URL}/src/course-home/outline-tab/LmsHtmlFragment.css">
++      </head>
++      <body class="${className}">${html}</body>
++    </html>
++  `;
+ 
+   const iframe = useRef(null);
+   function handleLoad() {
+@@ -33,7 +39,12 @@ export default function LmsHtmlFragment({ html, title, ...rest }) {
+   );
+ }
+ 
++LmsHtmlFragment.defaultProps = {
++  className: '',
++};
++
+ LmsHtmlFragment.propTypes = {
++  className: PropTypes.string,
+   html: PropTypes.string.isRequired,
+   title: PropTypes.string.isRequired,
+ };
+diff --git a/src/course-home/outline-tab/widgets/CourseHandouts.jsx b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+index f952bc1..6364d53 100644
+--- a/src/course-home/outline-tab/widgets/CourseHandouts.jsx
++++ b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+@@ -20,6 +20,7 @@ function CourseHandouts({ courseId, intl }) {
+     <section className="mb-4">
+       <h2 className="h4">{intl.formatMessage(messages.handouts)}</h2>
+       <LmsHtmlFragment
++        className="small"
+         html={handoutsHtml}
+         title={intl.formatMessage(messages.handouts)}
+       />
+diff --git a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+index e5cd19c..6600393 100644
+--- a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
++++ b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+@@ -55,6 +55,7 @@ function WelcomeMessage({ courseId, intl }) {
+         <TransitionReplace className="mb-3" enterDuration={200} exitDuration={200}>
+           {showShortMessage ? (
+             <LmsHtmlFragment
++              className="inline-link"
+               data-testid="short-welcome-message-iframe"
+               key="short-html"
+               html={shortWelcomeMessageHtml}
+@@ -62,6 +63,7 @@ function WelcomeMessage({ courseId, intl }) {
+             />
+           ) : (
+             <LmsHtmlFragment
++              className="inline-link"
+               data-testid="long-welcome-message-iframe"
+               key="full-html"
+               html={welcomeMessageHtml}
+-- 
+2.34.1
+

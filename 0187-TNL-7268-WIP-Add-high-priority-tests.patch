@@ -1,0 +1,2048 @@
+From ec7f532bc943db1caf4d618ae9c3ace95d9de8e5 Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Fri, 26 Jun 2020 04:23:08 +0200
+Subject: [PATCH 0187/1021] [TNL-7268] WIP: Add high priority tests
+
+---
+ jest.config.js                                |   2 +-
+ .../course/sequence/SequenceContent.test.jsx  |  94 ++++
+ .../SequenceContent.test.jsx.snap             | 271 +++++++++++
+ .../SequenceNavigation.test.jsx               | 142 ++++++
+ .../SequenceNavigationDropdown.test.jsx       |  79 ++++
+ .../SequenceNavigationTabs.test.jsx           |  57 +++
+ .../sequence-navigation/UnitButton.test.jsx   |  77 ++++
+ .../sequence-navigation/UnitIcon.test.jsx     |  27 ++
+ .../UnitNavigation.test.jsx                   | 109 +++++
+ .../SequenceNavigation.test.jsx.snap          | 244 ++++++++++
+ .../SequenceNavigationDropdown.test.jsx.snap  |  26 ++
+ .../SequenceNavigationTabs.test.jsx.snap      | 436 ++++++++++++++++++
+ .../__snapshots__/UnitButton.test.jsx.snap    | 143 ++++++
+ .../__snapshots__/UnitIcon.test.jsx.snap      |  61 +++
+ .../UnitNavigation.test.jsx.snap              |  36 ++
+ src/setupTest.js                              |   1 +
+ .../@fortawesome/react-fontawesome.js         |  32 ++
+ src/test/test-utils.js                        |  49 ++
+ 18 files changed, 1885 insertions(+), 1 deletion(-)
+ create mode 100644 src/courseware/course/sequence/SequenceContent.test.jsx
+ create mode 100644 src/courseware/course/sequence/__snapshots__/SequenceContent.test.jsx.snap
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigation.test.jsx.snap
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationDropdown.test.jsx.snap
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationTabs.test.jsx.snap
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitButton.test.jsx.snap
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitNavigation.test.jsx.snap
+ create mode 100644 src/test/__mocks__/@fortawesome/react-fontawesome.js
+ create mode 100644 src/test/test-utils.js
+
+diff --git a/jest.config.js b/jest.config.js
+index 7c936b4..dc38c06 100644
+--- a/jest.config.js
++++ b/jest.config.js
+@@ -1,7 +1,7 @@
+ const { createConfig } = require('@edx/frontend-build');
+ 
+ module.exports = createConfig('jest', {
+-  setupFiles: [
++  setupFilesAfterEnv: [
+     '<rootDir>/src/setupTest.js',
+   ],
+   coveragePathIgnorePatterns: [
+diff --git a/src/courseware/course/sequence/SequenceContent.test.jsx b/src/courseware/course/sequence/SequenceContent.test.jsx
+new file mode 100644
+index 0000000..f0bbf2e
+--- /dev/null
++++ b/src/courseware/course/sequence/SequenceContent.test.jsx
+@@ -0,0 +1,94 @@
++import React from 'react';
++import { render, screen } from '../../../test/test-utils';
++import SequenceContent from './SequenceContent';
++
++describe('Sequence Content', () => {
++  window.scrollTo = jest.fn();
++  // HACK: Mock the MutationObserver as it's breaking async testing.
++  //  According to StackOverflow it should be fixed in `jest-environment-jsdom` v16,
++  //  but upgrading `jest` to v26 didn't fix this problem.
++  //  ref: https://stackoverflow.com/questions/61036156/react-typescript-testing-typeerror-mutationobserver-is-not-a-constructor
++  global.MutationObserver = class {
++    // eslint-disable-next-line no-unused-vars,no-useless-constructor,no-empty-function
++    constructor(callback) {}
++
++    disconnect() {}
++
++    // eslint-disable-next-line no-unused-vars
++    observe(element, initObject) {}
++  };
++
++  const testUnits = [...Array(10).keys()].map(i => String(i + 1));
++  const initialState = {
++    courseware: {
++      sequenceStatus: 'loaded',
++      courseStatus: 'loaded',
++      courseId: '1',
++    },
++    models: {
++      courses: {
++        1: {
++          sectionIds: ['1'],
++        },
++      },
++      sections: {
++        1: {
++          sequenceIds: ['1', '2'],
++        },
++      },
++      sequences: {
++        1: {
++          unitIds: testUnits,
++          showCompletion: true,
++          title: 'test-sequence',
++          gatedContent: {
++            prereqId: '1',
++            gatedSectionName: 'test-gated-section',
++          },
++        },
++      },
++      units: testUnits.reduce(
++        (acc, unitId) => Object.assign(acc, {
++          [unitId]: {
++            id: unitId,
++            contentType: 'other',
++            title: unitId,
++          },
++        }),
++        {},
++      ),
++    },
++  };
++
++  const mockData = {
++    gated: false,
++    courseId: '1',
++    sequenceId: '1',
++    unitId: '1',
++    unitLoadedHandler: () => {},
++    intl: {},
++  };
++
++  it('displays loading message', () => {
++    const { asFragment } = render(<SequenceContent {...mockData} />, { initialState });
++    expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('displays messages for the locked content', async () => {
++    const { asFragment } = render(<SequenceContent {...mockData} gated />, { initialState });
++    expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
++    expect(asFragment()).toMatchSnapshot();
++
++    expect(await screen.findByText(/content locked/i)).toBeInTheDocument();
++    expect(screen.getByText('test-sequence')).toBeInTheDocument();
++    expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('displays message for no content', () => {
++    const { asFragment } = render(<SequenceContent {...mockData} unitId={null} />, { initialState });
++    expect(screen.getByText('There is no content here.')).toBeInTheDocument();
++    expect(asFragment()).toMatchSnapshot();
++  });
++});
+diff --git a/src/courseware/course/sequence/__snapshots__/SequenceContent.test.jsx.snap b/src/courseware/course/sequence/__snapshots__/SequenceContent.test.jsx.snap
+new file mode 100644
+index 0000000..a3d7a4b
+--- /dev/null
++++ b/src/courseware/course/sequence/__snapshots__/SequenceContent.test.jsx.snap
+@@ -0,0 +1,271 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Sequence Content displays loading message 1`] = `
++<DocumentFragment>
++  <div
++    class="unit"
++  >
++    <h2
++      class="mb-0 h4"
++    >
++      1
++    </h2>
++    <button
++      aria-disabled="false"
++      aria-live="assertive"
++      class="btn pgn__stateful-btn pgn__stateful-btn-state-default btn-link px-1 ml-n1 btn-sm"
++      type="button"
++    >
++      <span
++        class="d-flex align-items-center justify-content-center"
++      >
++        <span
++          class="pgn__stateful-btn-icon"
++        >
++          <img
++            alt="fa-bookmark"
++            class="fa-bookmark"
++            data-testid="icon"
++          />
++        </span>
++        <span>
++          Bookmark this page
++        </span>
++      </span>
++    </button>
++    <div>
++      <div
++        class="d-flex justify-content-center align-items-center flex-column"
++        style="height: 50vh;"
++      >
++        <div
++          class="spinner-border text-primary"
++          role="status"
++        >
++          <span
++            class="sr-only"
++          >
++            Loading learning sequence...
++          </span>
++        </div>
++      </div>
++    </div>
++    <div
++      class="unit-iframe-wrapper"
++    >
++      <iframe
++        allowfullscreen=""
++        height="0"
++        id="unit-iframe"
++        referrerpolicy="origin"
++        scrolling="no"
++        src="http://localhost:18000/xblock/1?show_title=0&show_bookmark_button=0"
++        title="1"
++      />
++    </div>
++  </div>
++</DocumentFragment>
++`;
++
++exports[`Sequence Content displays message for no content 1`] = `
++<DocumentFragment>
++  <div>
++    There is no content here.
++  </div>
++</DocumentFragment>
++`;
++
++exports[`Sequence Content displays messages for the locked content 1`] = `
++<DocumentFragment>
++  <div>
++    <div
++      class="d-flex justify-content-center align-items-center flex-column"
++      style="height: 50vh;"
++    >
++      <div
++        class="spinner-border text-primary"
++        role="status"
++      >
++        <span
++          class="sr-only"
++        >
++          Loading locked content messaging...
++        </span>
++      </div>
++    </div>
++  </div>
++</DocumentFragment>
++`;
++
++exports[`Sequence Content displays messages for the locked content 2`] = `
++<DocumentFragment>
++  <h3>
++    <img
++      alt="fa-lock"
++      class="fa-lock"
++      data-testid="icon"
++    />
++     test-sequence
++  </h3>
++  <h4>
++    Content Locked
++  </h4>
++  <p>
++    You must complete the prerequisite: 'test-gated-section' to access this content.
++  </p>
++  <p>
++    <button
++      class="btn btn-primary"
++      type="button"
++    >
++      Go To Prerequisite Section
++    </button>
++  </p>
++</DocumentFragment>
++`;
++
++exports[`Unit Navigation displays loading message 1`] = `
++<DocumentFragment>
++  <div
++    class="unit"
++  >
++    <h2
++      class="mb-0 h4"
++    >
++      1
++    </h2>
++    <button
++      aria-disabled="false"
++      aria-live="assertive"
++      class="btn pgn__stateful-btn pgn__stateful-btn-state-default btn-link px-1 ml-n1 btn-sm"
++      type="button"
++    >
++      <span
++        class="d-flex align-items-center justify-content-center"
++      >
++        <span
++          class="pgn__stateful-btn-icon"
++        >
++          <img
++            alt="fa-bookmark"
++            class="fa-bookmark"
++            data-testid="icon"
++          />
++        </span>
++        <span>
++          Bookmark this page
++        </span>
++      </span>
++    </button>
++    <div>
++      <div
++        class="d-flex justify-content-center align-items-center flex-column"
++        style="height: 50vh;"
++      >
++        <div
++          class="spinner-border text-primary"
++          role="status"
++        >
++          <span
++            class="sr-only"
++          >
++            Loading learning sequence...
++          </span>
++        </div>
++      </div>
++    </div>
++    <div
++      class="unit-iframe-wrapper"
++    >
++      <iframe
++        allowfullscreen=""
++        height="0"
++        id="unit-iframe"
++        referrerpolicy="origin"
++        scrolling="no"
++        src="http://localhost:18000/xblock/1?show_title=0&show_bookmark_button=0"
++        title="1"
++      />
++    </div>
++  </div>
++</DocumentFragment>
++`;
++
++exports[`Unit Navigation displays message for no content 1`] = `
++<DocumentFragment>
++  <div>
++    There is no content here.
++  </div>
++</DocumentFragment>
++`;
++
++exports[`Unit Navigation displays message for the locked content 1`] = `
++<DocumentFragment>
++  <div>
++    <div
++      class="d-flex justify-content-center align-items-center flex-column"
++      style="height: 50vh;"
++    >
++      <div
++        class="spinner-border text-primary"
++        role="status"
++      >
++        <span
++          class="sr-only"
++        >
++          Loading locked content messaging...
++        </span>
++      </div>
++    </div>
++  </div>
++</DocumentFragment>
++`;
++
++exports[`Unit Navigation displays messages for the locked content 1`] = `
++<DocumentFragment>
++  <div>
++    <div
++      class="d-flex justify-content-center align-items-center flex-column"
++      style="height: 50vh;"
++    >
++      <div
++        class="spinner-border text-primary"
++        role="status"
++      >
++        <span
++          class="sr-only"
++        >
++          Loading locked content messaging...
++        </span>
++      </div>
++    </div>
++  </div>
++</DocumentFragment>
++`;
++
++exports[`Unit Navigation displays messages for the locked content 2`] = `
++<DocumentFragment>
++  <h3>
++    <img
++      alt="fa-lock"
++      class="fa-lock"
++      data-testid="icon"
++    />
++     test-sequence
++  </h3>
++  <h4>
++    Content Locked
++  </h4>
++  <p>
++    You must complete the prerequisite: 'test-gated-section' to access this content.
++  </p>
++  <p>
++    <button
++      class="btn btn-primary"
++      type="button"
++    >
++      Go To Prerequisite Section
++    </button>
++  </p>
++</DocumentFragment>
++`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+new file mode 100644
+index 0000000..d78b324
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -0,0 +1,142 @@
++import React from 'react';
++// eslint-disable-next-line import/no-extraneous-dependencies
++import { cloneDeep } from 'lodash';
++import { fireEvent } from '@testing-library/dom';
++import { render, screen } from '../../../../test/test-utils';
++import SequenceNavigation from './SequenceNavigation';
++import useIndexOfLastVisibleChild from '../../../../tabs/useIndexOfLastVisibleChild';
++
++// Mock the hook to avoid relying on its implementation and mocking `getBoundingClientRect`.
++jest.mock('../../../../tabs/useIndexOfLastVisibleChild');
++useIndexOfLastVisibleChild.mockReturnValue([0, null, null]);
++
++describe('Sequence Navigation', () => {
++  const testUnits = [...Array(10).keys()].map(i => String(i + 1));
++  const initialState = {
++    courseware: {
++      sequenceStatus: 'loaded',
++      courseStatus: 'loaded',
++      courseId: '1',
++    },
++    models: {
++      courses: {
++        1: {
++          sectionIds: ['1'],
++        },
++      },
++      sections: {
++        1: {
++          sequenceIds: ['1', '2'],
++        },
++      },
++      sequences: {
++        1: {
++          unitIds: testUnits,
++          showCompletion: true,
++        },
++        2: {
++          unitIds: testUnits,
++          showCompletion: true,
++        },
++      },
++      units: testUnits.reduce(
++        (acc, unitId) => Object.assign(acc, {
++          [unitId]: {
++            contentType: 'other',
++            title: unitId,
++          },
++        }),
++        {},
++      ),
++    },
++  };
++
++  const mockData = {
++    previousSequenceHandler: () => {},
++    onNavigate: () => {},
++    nextSequenceHandler: () => {},
++    sequenceId: '1',
++    unitId: '3',
++  };
++
++  it('is empty while loading', () => {
++    // Clone initialState.
++    const testState = cloneDeep(initialState);
++    testState.courseware.sequenceStatus = 'loading';
++
++    const { asFragment } = render(
++      <SequenceNavigation {...mockData} />,
++      { initialState: testState },
++    );
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('renders empty div without unitId', () => {
++    const { asFragment } = render(<SequenceNavigation {...mockData} unitId={undefined} />, { initialState });
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('renders locked button for gated content', () => {
++    // TODO: Not sure if this is working as expected, because the `contentType="lock"` will be overridden by the value
++    //  from Redux. To make this provide a `fa-icon` lock we could introduce something like `overriddenContentType`.
++    const testState = cloneDeep(initialState);
++    testState.models.sequences['1'].gatedContent = { gated: true };
++
++    const { asFragment } = render(
++      <SequenceNavigation {...mockData} />,
++      { initialState: testState },
++    );
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('renders correctly', () => {
++    const { asFragment } = render(<SequenceNavigation {...mockData} />, { initialState });
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('has both navigation buttons enabled for a non-corner unit of the sequence', () => {
++    render(<SequenceNavigation
++      {...mockData}
++    />, { initialState });
++
++    screen.getAllByRole('button', { name: /previous|next/i }).forEach(button => {
++      expect(button).toBeEnabled();
++    });
++  });
++
++  it('has the "Previous" button disabled for the first unit of the sequence', () => {
++    render(<SequenceNavigation
++      {...mockData}
++      unitId="1"
++    />, { initialState });
++
++    expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
++    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled();
++  });
++
++  it('has the "Next" button disabled for the last unit of the sequence', () => {
++    render(<SequenceNavigation
++      {...mockData}
++      sequenceId="2"
++      unitId={testUnits.length.toString()}
++    />, { initialState });
++
++    expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
++    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
++  });
++
++  it('handles "Previous" and "Next" click', () => {
++    const previousSequenceHandler = jest.fn();
++    const nextSequenceHandler = jest.fn();
++    render(<SequenceNavigation
++      {...mockData}
++      {...{ previousSequenceHandler, nextSequenceHandler }}
++    />, { initialState });
++
++    fireEvent.click(screen.getByRole('button', { name: /previous/i }));
++    expect(previousSequenceHandler).toHaveBeenCalledTimes(1);
++
++    fireEvent.click(screen.getByRole('button', { name: /next/i }));
++    expect(nextSequenceHandler).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+new file mode 100644
+index 0000000..0b6a0a1
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+@@ -0,0 +1,79 @@
++import React from 'react';
++import { fireEvent } from '@testing-library/dom';
++import SequenceNavigationDropdown from './SequenceNavigationDropdown';
++import { render, screen } from '../../../../test/test-utils';
++
++describe('Sequence Navigation Dropdown', () => {
++  const testUnits = ['1', '2', '3'];
++
++  const initialState = {
++    models: {
++      units: testUnits.reduce(
++        (acc, unitId) => Object.assign(acc, {
++          [unitId]: {
++            contentType: 'other',
++            title: unitId,
++          },
++        }),
++        {},
++      ),
++    },
++  };
++
++  const mockData = {
++    unitId: '1',
++    onNavigate: () => {},
++    showCompletion: false,
++    unitIds: testUnits,
++  };
++
++  it('renders correctly without units', () => {
++    const { asFragment } = render(<SequenceNavigationDropdown
++      {...mockData}
++      unitIds={[]}
++    />);
++
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  testUnits.forEach(unitId => {
++    it(`displays proper text for unit ${unitId} on mobile`, () => {
++      render(<SequenceNavigationDropdown
++        {...mockData}
++        unitId={unitId}
++      />, { initialState });
++
++      expect(screen.getByRole('button')).toHaveTextContent(`${unitId} of ${testUnits.length}`);
++    });
++  });
++
++  testUnits.forEach(unitId => {
++    it(`marks unit ${unitId} as active`, () => {
++      render(<SequenceNavigationDropdown
++        {...mockData}
++        unitId={unitId}
++      />, { initialState });
++
++      // Only the current unit should be marked as active.
++      screen.getAllByText(/^\d$/).forEach(element => {
++        if (element.textContent === unitId) {
++          expect(element.parentElement).toHaveClass('active');
++        } else {
++          expect(element.parentElement).not.toHaveClass('active');
++        }
++      });
++    });
++  });
++
++  it('handles the clicks', () => {
++    const onNavigate = jest.fn();
++
++    render(<SequenceNavigationDropdown
++      {...mockData}
++      onNavigate={onNavigate}
++    />, { initialState });
++
++    screen.getAllByText(/^\d$/).forEach(element => fireEvent.click(element));
++    expect(onNavigate).toHaveBeenCalledTimes(testUnits.length);
++  });
++});
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+new file mode 100644
+index 0000000..aea3003
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+@@ -0,0 +1,57 @@
++import React from 'react';
++import { render, screen } from '../../../../test/test-utils';
++import SequenceNavigationTabs from './SequenceNavigationTabs';
++import useIndexOfLastVisibleChild from '../../../../tabs/useIndexOfLastVisibleChild';
++
++// Mock the hook to avoid relying on its implementation and mocking `getBoundingClientRect`.
++jest.mock('../../../../tabs/useIndexOfLastVisibleChild');
++
++describe('Sequence Navigation Tabs', () => {
++  const testUnits = [...Array(10).keys()].map(i => String(i + 1));
++
++  const initialState = {
++    models: {
++      units: testUnits.reduce(
++        (acc, unitId) => Object.assign(acc, {
++          [unitId]: {
++            contentType: 'other',
++            title: unitId,
++          },
++        }),
++        {},
++      ),
++    },
++  };
++
++  const mockData = {
++    unitId: '1',
++    onNavigate: () => {
++    },
++    showCompletion: false,
++    unitIds: testUnits,
++  };
++
++  it('renders correctly without dropdown', () => {
++    useIndexOfLastVisibleChild.mockReturnValue([0, null, null]);
++    const { asFragment } = render(<SequenceNavigationTabs {...mockData} />, { initialState });
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('renders correctly with dropdown', () => {
++    useIndexOfLastVisibleChild.mockReturnValue([-1, null, null]);
++    const { asFragment } = render(<SequenceNavigationTabs {...mockData} />, { initialState });
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('renders unit buttons', () => {
++    useIndexOfLastVisibleChild.mockReturnValue([0, null, null]);
++    render(<SequenceNavigationTabs {...mockData} />, { initialState });
++    expect(screen.getAllByRole('button').length).toEqual(testUnits.length);
++  });
++
++  it('renders unit buttons and dropdown button', () => {
++    useIndexOfLastVisibleChild.mockReturnValue([-1, null, null]);
++    render(<SequenceNavigationTabs {...mockData} />, { initialState });
++    expect(screen.getAllByRole('button').length).toEqual(testUnits.length + 1);
++  });
++});
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+new file mode 100644
+index 0000000..6851db5
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+@@ -0,0 +1,77 @@
++import React from 'react';
++import { fireEvent } from '@testing-library/dom';
++import { render, screen } from '../../../../test/test-utils';
++import UnitButton from './UnitButton';
++
++describe('Unit Button', () => {
++  const initialState = {
++    models: {
++      units: {
++        other: {
++          contentType: 'other',
++          title: 'other-unit',
++        },
++        problem: {
++          contentType: 'problem',
++          title: 'problem-unit',
++          complete: true,
++          bookmarked: true,
++        },
++      },
++    },
++  };
++
++  const mockData = {
++    unitId: 'other',
++    onClick: () => {},
++  };
++
++  it('hides title by default', () => {
++    const { asFragment } = render(<UnitButton {...mockData} />, { initialState });
++    expect(screen.getByTestId('icon')).toBeEmptyDOMElement();
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('shows title', () => {
++    const { asFragment } = render(<UnitButton {...mockData} showTitle />, { initialState });
++    expect(screen.getByRole('button')).toHaveTextContent('other-unit');
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('does not show completion for non-completed unit', () => {
++    const { asFragment } = render(<UnitButton {...mockData} />, { initialState });
++    expect(screen.queryByAltText('fa-check')).toBeNull();
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('shows completion for completed unit', () => {
++    const { asFragment } = render(<UnitButton {...mockData} unitId="problem" />, { initialState });
++    expect(screen.getByAltText('fa-check')).toBeInTheDocument();
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('hides completion', () => {
++    const { asFragment } = render(<UnitButton {...mockData} unitId="problem" showCompletion={false} />, { initialState });
++    expect(screen.queryByAltText('fa-check')).toBeNull();
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('does not show bookmark', () => {
++    const { asFragment } = render(<UnitButton {...mockData} />, { initialState });
++    expect(screen.queryByAltText('fa-bookmark')).toBeNull();
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('shows bookmark', () => {
++    const { asFragment } = render(<UnitButton {...mockData} unitId="problem" />, { initialState });
++    expect(screen.getByAltText('fa-bookmark')).toBeInTheDocument();
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('handles the click', () => {
++    const onClick = jest.fn();
++    render(<UnitButton {...mockData} onClick={onClick} />, { initialState });
++    fireEvent.click(screen.getByRole('button'));
++    expect(onClick).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+new file mode 100644
+index 0000000..51f942c
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+@@ -0,0 +1,27 @@
++import React from 'react';
++import { render, screen } from '../../../../test/test-utils';
++import UnitIcon from './UnitIcon';
++
++describe('Unit Icon', () => {
++  const types = {
++    video: 'fa-film',
++    other: 'fa-book',
++    vertical: 'fa-tasks',
++    problem: 'fa-edit',
++    lock: 'fa-lock',
++    undefined: 'fa-book',
++  };
++
++  Object.entries(types).forEach(([key, value]) => {
++    it(`renders correct icon for ${key} unit`, () => {
++      // Suppress warning for undefined prop type.
++      if (key === 'undefined') {
++        jest.spyOn(console, 'error').mockImplementation(() => {});
++      }
++
++      const { asFragment } = render(<UnitIcon type={key} />);
++      expect(screen.getByAltText(value)).toBeInTheDocument();
++      expect(asFragment()).toMatchSnapshot();
++    });
++  });
++});
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+new file mode 100644
+index 0000000..7c8c038
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+@@ -0,0 +1,109 @@
++import React from 'react';
++import { fireEvent } from '@testing-library/dom';
++import { render, screen } from '../../../../test/test-utils';
++import UnitNavigation from './UnitNavigation';
++
++describe('Unit Navigation', () => {
++  const testUnits = [...Array(10).keys()].map(i => String(i + 1));
++  const initialState = {
++    courseware: {
++      sequenceStatus: 'loaded',
++      courseStatus: 'loaded',
++      courseId: '1',
++    },
++    models: {
++      courses: {
++        1: {
++          sectionIds: ['1'],
++        },
++      },
++      sections: {
++        1: {
++          sequenceIds: ['1', '2'],
++        },
++      },
++      sequences: {
++        1: {
++          unitIds: testUnits,
++          showCompletion: true,
++        },
++        2: {
++          unitIds: testUnits,
++          showCompletion: true,
++        },
++      },
++      units: testUnits.reduce(
++        (acc, unitId) => Object.assign(acc, {
++          [unitId]: {
++            contentType: 'other',
++            title: unitId,
++          },
++        }),
++        {},
++      ),
++    },
++  };
++  const mockData = {
++    sequenceId: '1',
++    unitId: '2',
++    onClickPrevious: () => {},
++    onClickNext: () => {},
++  };
++
++  it('renders correctly without units', () => {
++    const { asFragment } = render(<UnitNavigation
++      {...mockData}
++      sequenceId=""
++      unitId=""
++      onClickPrevious={() => {}}
++      onClickNext={() => {}}
++    />);
++
++    expect(asFragment()).toMatchSnapshot();
++  });
++
++  it('handles the clicks', () => {
++    const onClickPrevious = jest.fn();
++    const onClickNext = jest.fn();
++
++    render(<UnitNavigation
++      {...mockData}
++      sequenceId=""
++      unitId=""
++      onClickPrevious={onClickPrevious}
++      onClickNext={onClickNext}
++    />);
++
++    fireEvent.click(screen.getByRole('button', { name: /previous/i }));
++    expect(onClickPrevious).toHaveBeenCalledTimes(1);
++
++    fireEvent.click(screen.getByRole('button', { name: /next/i }));
++    expect(onClickNext).toHaveBeenCalledTimes(1);
++  });
++
++  it('should have the navigation buttons enabled for the non-corner unit in the sequence', () => {
++    render(<UnitNavigation {...mockData} />, { initialState });
++    screen.getAllByRole('button').forEach(button => {
++      expect(button).toBeEnabled();
++    });
++  });
++
++  it('should have the "Previous" button disabled for the first unit in the sequence', () => {
++    render(<UnitNavigation {...mockData} unitId="1" />, { initialState });
++    expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
++    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled();
++  });
++
++  it('should display "learn.end.of.course" message instead of the "Next" button for the last unit in the sequence', () => {
++    render(
++      <UnitNavigation
++        {...mockData}
++        sequenceId="2"
++        unitId={testUnits.length.toString()}
++      />, { initialState },
++    );
++    expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
++    expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument();
++    expect(screen.getByText("You've reached the end of this course!")).toBeInTheDocument();
++  });
++});
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigation.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigation.test.jsx.snap
+new file mode 100644
+index 0000000..aa4cc9c
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigation.test.jsx.snap
+@@ -0,0 +1,244 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Sequence Navigation is empty while loading 1`] = `<DocumentFragment />`;
++
++exports[`Sequence Navigation renders correctly 1`] = `
++<DocumentFragment>
++  <nav
++    class="sequence-navigation"
++  >
++    <button
++      class="btn previous-btn"
++      type="button"
++    >
++      <img
++        alt="fa-chevron-left"
++        class="fa-chevron-left"
++        data-testid="icon"
++      />
++      <span>
++        Previous
++      </span>
++    </button>
++    <div
++      style="flex-basis: 100%; min-width: 0;"
++    >
++      <div
++        class="sequence-navigation-tabs-container"
++      >
++        <div
++          class="sequence-navigation-tabs d-flex flex-grow-1"
++        >
++          <button
++            class="btn"
++            title="1"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn"
++            title="2"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn active"
++            title="3"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn"
++            title="4"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn"
++            title="5"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn"
++            title="6"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn"
++            title="7"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn"
++            title="8"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn"
++            title="9"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++          <button
++            class="btn"
++            title="10"
++            type="button"
++          >
++            <img
++              alt="fa-book"
++              class="fa-book"
++              data-testid="icon"
++            />
++          </button>
++        </div>
++      </div>
++    </div>
++    <button
++      class="btn next-btn"
++      type="button"
++    >
++      <span>
++        Next
++      </span>
++      <img
++        alt="fa-chevron-right"
++        class="fa-chevron-right"
++        data-testid="icon"
++      />
++    </button>
++  </nav>
++</DocumentFragment>
++`;
++
++exports[`Sequence Navigation renders empty div without unitId 1`] = `
++<DocumentFragment>
++  <nav
++    class="sequence-navigation"
++  >
++    <button
++      class="btn previous-btn"
++      type="button"
++    >
++      <img
++        alt="fa-chevron-left"
++        class="fa-chevron-left"
++        data-testid="icon"
++      />
++      <span>
++        Previous
++      </span>
++    </button>
++    <div
++      style="flex-basis: 100%; min-width: 0; border-bottom: 1px solid #EAEAEA;"
++    />
++    <button
++      class="btn next-btn"
++      type="button"
++    >
++      <span>
++        Next
++      </span>
++      <img
++        alt="fa-chevron-right"
++        class="fa-chevron-right"
++        data-testid="icon"
++      />
++    </button>
++  </nav>
++</DocumentFragment>
++`;
++
++exports[`Sequence Navigation renders locked button for gated content 1`] = `
++<DocumentFragment>
++  <nav
++    class="sequence-navigation"
++  >
++    <button
++      class="btn previous-btn"
++      type="button"
++    >
++      <img
++        alt="fa-chevron-left"
++        class="fa-chevron-left"
++        data-testid="icon"
++      />
++      <span>
++        Previous
++      </span>
++    </button>
++    <button
++      class="btn active"
++      title="3"
++      type="button"
++    >
++      <img
++        alt="fa-book"
++        class="fa-book"
++        data-testid="icon"
++      />
++    </button>
++    <button
++      class="btn next-btn"
++      type="button"
++    >
++      <span>
++        Next
++      </span>
++      <img
++        alt="fa-chevron-right"
++        class="fa-chevron-right"
++        data-testid="icon"
++      />
++    </button>
++  </nav>
++</DocumentFragment>
++`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationDropdown.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationDropdown.test.jsx.snap
+new file mode 100644
+index 0000000..1204f27
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationDropdown.test.jsx.snap
+@@ -0,0 +1,26 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Sequence Navigation Dropdown renders correctly without units 1`] = `
++<DocumentFragment>
++  <div
++    class="dropdown sequence-navigation-dropdown"
++  >
++    <button
++      aria-expanded="false"
++      aria-haspopup="true"
++      class="dropdown-toggle btn dropdown-button font-weight-normal w-100 border-right-0"
++      id="pgn__dropdown-trigger-0"
++    >
++      <span>
++        0 of 0
++      </span>
++    </button>
++    <div
++      aria-hidden="true"
++      aria-labelledby="pgn__dropdown-trigger-0"
++      class="dropdown-menu w-100"
++      role="menu"
++    />
++  </div>
++</DocumentFragment>
++`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationTabs.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationTabs.test.jsx.snap
+new file mode 100644
+index 0000000..65de0dc
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/__snapshots__/SequenceNavigationTabs.test.jsx.snap
+@@ -0,0 +1,436 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Sequence Navigation Tabs renders correctly with dropdown 1`] = `
++<DocumentFragment>
++  <div
++    style="flex-basis: 100%; min-width: 0;"
++  >
++    <div
++      class="sequence-navigation-tabs-container"
++    >
++      <div
++        class="sequence-navigation-tabs d-flex flex-grow-1"
++      >
++        <button
++          class="btn active"
++          title="1"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="2"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="3"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="4"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="5"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="6"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="7"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="8"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="9"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="10"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++      </div>
++    </div>
++    <div
++      class="dropdown sequence-navigation-dropdown"
++    >
++      <button
++        aria-expanded="false"
++        aria-haspopup="true"
++        class="dropdown-toggle btn dropdown-button font-weight-normal w-100 border-right-0"
++        id="pgn__dropdown-trigger-0"
++      >
++        <span>
++          1 of 10
++        </span>
++      </button>
++      <div
++        aria-hidden="true"
++        aria-labelledby="pgn__dropdown-trigger-0"
++        class="dropdown-menu w-100"
++        role="menu"
++      >
++        <button
++          class="btn active w-100"
++          title="1"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            1
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="2"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            2
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="3"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            3
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="4"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            4
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="5"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            5
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="6"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            6
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="7"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            7
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="8"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            8
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="9"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            9
++          </span>
++        </button>
++        <button
++          class="btn w-100"
++          title="10"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++          <span
++            class="unit-title"
++          >
++            10
++          </span>
++        </button>
++      </div>
++    </div>
++  </div>
++</DocumentFragment>
++`;
++
++exports[`Sequence Navigation Tabs renders correctly without dropdown 1`] = `
++<DocumentFragment>
++  <div
++    style="flex-basis: 100%; min-width: 0;"
++  >
++    <div
++      class="sequence-navigation-tabs-container"
++    >
++      <div
++        class="sequence-navigation-tabs d-flex flex-grow-1"
++      >
++        <button
++          class="btn active"
++          title="1"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="2"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="3"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="4"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="5"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="6"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="7"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="8"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="9"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++        <button
++          class="btn"
++          title="10"
++          type="button"
++        >
++          <img
++            alt="fa-book"
++            class="fa-book"
++            data-testid="icon"
++          />
++        </button>
++      </div>
++    </div>
++  </div>
++</DocumentFragment>
++`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitButton.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitButton.test.jsx.snap
+new file mode 100644
+index 0000000..eb1efa6
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitButton.test.jsx.snap
+@@ -0,0 +1,143 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Unit Button does not show bookmark 1`] = `
++<DocumentFragment>
++  <button
++    class="btn"
++    title="other-unit"
++    type="button"
++  >
++    <img
++      alt="fa-book"
++      class="fa-book"
++      data-testid="icon"
++    />
++  </button>
++</DocumentFragment>
++`;
++
++exports[`Unit Button does not show completion for non-completed unit 1`] = `
++<DocumentFragment>
++  <button
++    class="btn"
++    title="other-unit"
++    type="button"
++  >
++    <img
++      alt="fa-book"
++      class="fa-book"
++      data-testid="icon"
++    />
++  </button>
++</DocumentFragment>
++`;
++
++exports[`Unit Button hides completion 1`] = `
++<DocumentFragment>
++  <button
++    class="btn"
++    title="problem-unit"
++    type="button"
++  >
++    <img
++      alt="fa-edit"
++      class="fa-edit"
++      data-testid="icon"
++    />
++    <img
++      alt="fa-bookmark"
++      class="fa-bookmark"
++      data-testid="icon"
++    />
++  </button>
++</DocumentFragment>
++`;
++
++exports[`Unit Button hides title by default 1`] = `
++<DocumentFragment>
++  <button
++    class="btn"
++    title="other-unit"
++    type="button"
++  >
++    <img
++      alt="fa-book"
++      class="fa-book"
++      data-testid="icon"
++    />
++  </button>
++</DocumentFragment>
++`;
++
++exports[`Unit Button shows bookmark 1`] = `
++<DocumentFragment>
++  <button
++    class="btn complete"
++    title="problem-unit"
++    type="button"
++  >
++    <img
++      alt="fa-edit"
++      class="fa-edit"
++      data-testid="icon"
++    />
++    <img
++      alt="fa-check"
++      class="fa-check"
++      data-testid="icon"
++    />
++    <img
++      alt="fa-bookmark"
++      class="fa-bookmark"
++      data-testid="icon"
++    />
++  </button>
++</DocumentFragment>
++`;
++
++exports[`Unit Button shows completion for completed unit 1`] = `
++<DocumentFragment>
++  <button
++    class="btn complete"
++    title="problem-unit"
++    type="button"
++  >
++    <img
++      alt="fa-edit"
++      class="fa-edit"
++      data-testid="icon"
++    />
++    <img
++      alt="fa-check"
++      class="fa-check"
++      data-testid="icon"
++    />
++    <img
++      alt="fa-bookmark"
++      class="fa-bookmark"
++      data-testid="icon"
++    />
++  </button>
++</DocumentFragment>
++`;
++
++exports[`Unit Button shows title 1`] = `
++<DocumentFragment>
++  <button
++    class="btn"
++    title="other-unit"
++    type="button"
++  >
++    <img
++      alt="fa-book"
++      class="fa-book"
++      data-testid="icon"
++    />
++    <span
++      class="unit-title"
++    >
++      other-unit
++    </span>
++  </button>
++</DocumentFragment>
++`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
+new file mode 100644
+index 0000000..31ed98b
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
+@@ -0,0 +1,61 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Unit Icon renders correct icon for lock unit 1`] = `
++<DocumentFragment>
++  <img
++    alt="fa-lock"
++    class="fa-lock"
++    data-testid="icon"
++  />
++</DocumentFragment>
++`;
++
++exports[`Unit Icon renders correct icon for other unit 1`] = `
++<DocumentFragment>
++  <img
++    alt="fa-book"
++    class="fa-book"
++    data-testid="icon"
++  />
++</DocumentFragment>
++`;
++
++exports[`Unit Icon renders correct icon for problem unit 1`] = `
++<DocumentFragment>
++  <img
++    alt="fa-edit"
++    class="fa-edit"
++    data-testid="icon"
++  />
++</DocumentFragment>
++`;
++
++exports[`Unit Icon renders correct icon for undefined unit 1`] = `
++<DocumentFragment>
++  <img
++    alt="fa-book"
++    class="fa-book"
++    data-testid="icon"
++  />
++</DocumentFragment>
++`;
++
++exports[`Unit Icon renders correct icon for vertical unit 1`] = `
++<DocumentFragment>
++  <img
++    alt="fa-tasks"
++    class="fa-tasks"
++    data-testid="icon"
++  />
++</DocumentFragment>
++`;
++
++exports[`Unit Icon renders correct icon for video unit 1`] = `
++<DocumentFragment>
++  <img
++    alt="fa-film"
++    class="fa-film"
++    data-testid="icon"
++  />
++</DocumentFragment>
++`;
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitNavigation.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitNavigation.test.jsx.snap
+new file mode 100644
+index 0000000..c15047d
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitNavigation.test.jsx.snap
+@@ -0,0 +1,36 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Unit Navigation renders correctly without units 1`] = `
++<DocumentFragment>
++  <div
++    class="unit-navigation d-flex"
++  >
++    <button
++      class="btn btn-outline-secondary previous-button mr-2"
++      type="button"
++    >
++      <img
++        alt="fa-chevron-left"
++        class="fa-chevron-left"
++        data-testid="icon"
++      />
++      <span>
++        Previous
++      </span>
++    </button>
++    <button
++      class="btn btn-outline-primary next-button"
++      type="button"
++    >
++      <span>
++        Next
++      </span>
++      <img
++        alt="fa-chevron-right"
++        class="fa-chevron-right"
++        data-testid="icon"
++      />
++    </button>
++  </div>
++</DocumentFragment>
++`;
+diff --git a/src/setupTest.js b/src/setupTest.js
+index c0dadbd..76f28b4 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -1,5 +1,6 @@
+ import 'core-js/stable';
+ import 'regenerator-runtime/runtime';
++import '@testing-library/jest-dom';
+ import { getConfig, mergeConfig } from '@edx/frontend-platform';
+ import { configure as configureI18n } from '@edx/frontend-platform/i18n';
+ import { configure as configureLogging } from '@edx/frontend-platform/logging';
+diff --git a/src/test/__mocks__/@fortawesome/react-fontawesome.js b/src/test/__mocks__/@fortawesome/react-fontawesome.js
+new file mode 100644
+index 0000000..f574d7b
+--- /dev/null
++++ b/src/test/__mocks__/@fortawesome/react-fontawesome.js
+@@ -0,0 +1,32 @@
++/**
++ * Mocks `@fortawesome/react-fontawesome.js` to return a simple <img> element containing `data-testid` attribute.
++ * This way we can check whether the icon matches without relying on its internal implementation
++ * and avoid storing its <svg> content in the snapshot tests.
++ */
++import React from 'react';
++import PropTypes from 'prop-types';
++
++// eslint-disable-next-line no-use-before-define
++FontAwesomeIcon.propTypes = {
++  icon: PropTypes.oneOfType([
++    PropTypes.string,
++    PropTypes.shape({
++      icon: PropTypes.arrayOf(PropTypes.any),
++    }),
++  ]).isRequired,
++};
++
++// eslint-disable-next-line import/prefer-default-export
++export function FontAwesomeIcon(props) {
++  const { icon } = props;
++
++  let iconName;
++  if (typeof icon === 'string') {
++    iconName = icon;
++  } else {
++    iconName = `fa-${icon.iconName}`;
++  }
++
++  // eslint-disable-next-line react/jsx-filename-extension
++  return <img data-testid="icon" className={iconName} alt={iconName} />;
++}
+diff --git a/src/test/test-utils.js b/src/test/test-utils.js
+new file mode 100644
+index 0000000..d156767
+--- /dev/null
++++ b/src/test/test-utils.js
+@@ -0,0 +1,49 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++// eslint-disable-next-line import/no-extraneous-dependencies
++import { render as rtlRender, screen } from '@testing-library/react';
++import { Provider } from 'react-redux';
++import { configureStore } from '@reduxjs/toolkit';
++import { IntlProvider } from '@edx/frontend-platform/node_modules/react-intl';
++import { reducer as modelsReducer } from '../model-store';
++import { reducer as coursewareReducer } from '../data';
++
++
++function render(
++  ui,
++  {
++    initialState = {},
++    store = configureStore({
++      reducer: {
++        models: modelsReducer,
++        courseware: coursewareReducer,
++      },
++      preloadedState: initialState,
++    }),
++    ...renderOptions
++  } = {},
++) {
++  function Wrapper({ children }) {
++    return (
++      // eslint-disable-next-line react/jsx-filename-extension
++      <IntlProvider locale="en">
++        <Provider store={store}>
++          {children}
++        </Provider>
++      </IntlProvider>
++    );
++  }
++
++  Wrapper.propTypes = {
++    children: PropTypes.node.isRequired,
++  };
++
++  return rtlRender(ui, { wrapper: Wrapper, ...renderOptions });
++}
++
++// re-export everything
++// eslint-disable-next-line import/no-extraneous-dependencies
++export * from '@testing-library/react';
++
++// override `render` method; export `screen` too to suppress errors
++export { render, screen };
+-- 
+2.34.1
+

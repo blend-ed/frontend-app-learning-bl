@@ -1,0 +1,52 @@
+From 6a402c50eafa7c75d6b5ddff75f7c44e3524cfe0 Mon Sep 17 00:00:00 2001
+From: Kristin Aoki <42981026+KristinAoki@users.noreply.github.com>
+Date: Wed, 9 Jun 2021 13:18:46 -0400
+Subject: [PATCH 0490/1021] fix: Scroll page when html anchor tag clicked
+
+This PR adds a listener check to messages. Previously the anchor tags that were set to scroll on the page to another element would open the link outside of the iframe and redirect the parent page. As a result, users would have to have to click the back arrow to navigate back to the course and continue the unit. Now when the listener receives an object with offset in the event.data, the page will scroll to the location provided by offset. The offset is only received when a user clicks on an anchor tag in the unit iframe that focuses on another element on the page. This change will impact the Learner.
+
+Jira issue: TNL-8312
+---
+ src/courseware/course/sequence/Unit.jsx      |  4 ++++
+ src/courseware/course/sequence/Unit.test.jsx | 10 ++++++++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 4cc96fc..1e80ff7 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -118,6 +118,10 @@ function Unit({
+       } else if (type === 'plugin.modal') {
+         payload.open = true;
+         setModalOptions(payload);
++      } else if (event.data.offset) {
++        // We listen for this message from LMS to know when the page needs to
++        // be scroll to another location on the page.
++        window.scrollTo(0, event.data.offset);
+       }
+     }
+     // If we currently have an event listener, remove it.
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index c92b393..02ba79a 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -103,6 +103,16 @@ describe('Unit', () => {
+     expect(onLoaded).toHaveBeenCalledTimes(1);
+   });
+ 
++  it('scrolls page on MessagaeEvent when receiving offset', async () => {
++    // Set message to constain offset data.
++    const testMessageWithOffset = { offset: 1500 };
++    render(<Unit {...mockData} />);
++    window.postMessage(testMessageWithOffset, '*');
++
++    await expect(waitFor(() => expect(window.scrollTo()).toHaveBeenCalled()));
++    expect(window.scrollY === testMessageWithOffset.offset);
++  });
++
+   it('ignores MessageEvent with unhandled type', async () => {
+     // Clone message and set different type.
+     const testMessageWithUnhandledType = { ...messageEvent, type: 'wrong type' };
+-- 
+2.34.1
+

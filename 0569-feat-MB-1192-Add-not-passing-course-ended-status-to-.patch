@@ -1,0 +1,277 @@
+From d12e93d80a5c2124c361f8e954ab720d1b244886 Mon Sep 17 00:00:00 2001
+From: Thomas Tracy <contact@tjtracy.com>
+Date: Mon, 2 Aug 2021 10:10:08 -0400
+Subject: [PATCH 0569/1021] [feat] MB-1192: Add not passing, course ended
+ status to certificate status alert (#548)
+
+[feat] Add not passing, course ended status to certificate status alert on the outline tab
+---
+ .../data/__snapshots__/redux.test.js.snap     |  2 ++
+ src/course-home/data/api.js                   |  4 +++
+ .../outline-tab/OutlineTab.test.jsx           | 34 +++++++++++++++++++
+ .../CertificateStatusAlert.jsx                | 29 ++++++++++++++++
+ .../alerts/certificate-status-alert/hooks.js  | 34 +++++++++++++++++--
+ .../certificate-status-alert/messages.js      |  8 +++++
+ 6 files changed, 108 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 504c866..e5aa549 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -461,6 +461,7 @@ Object {
+           "canEnroll": true,
+           "extraText": "Contact the administrator.",
+         },
++        "enrollmentMode": undefined,
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "hasEnded": undefined,
+         "hasScheduledContent": null,
+@@ -471,6 +472,7 @@ Object {
+           "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+Test+Block@12345abcde",
+         },
+         "timeOffsetMillis": 0,
++        "userHasPassingGrade": undefined,
+         "verifiedMode": Object {
+           "accessExpirationDate": "2050-01-01T12:00:00",
+           "currency": "USD",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 9791171..ef008ea 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -343,12 +343,14 @@ export async function getOutlineTabData(courseId) {
+   const datesBannerInfo = camelCaseObject(data.dates_banner_info);
+   const datesWidget = camelCaseObject(data.dates_widget);
+   const enrollAlert = camelCaseObject(data.enroll_alert);
++  const enrollmentMode = data.enrollment_mode;
+   const handoutsHtml = data.handouts_html;
+   const hasScheduledContent = data.has_scheduled_content;
+   const hasEnded = data.has_ended;
+   const offer = camelCaseObject(data.offer);
+   const resumeCourse = camelCaseObject(data.resume_course);
+   const timeOffsetMillis = getTimeOffsetMillis(headers && headers.date, requestTime, responseTime);
++  const userHasPassingGrade = data.user_has_passing_grade;
+   const verifiedMode = camelCaseObject(data.verified_mode);
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+@@ -362,12 +364,14 @@ export async function getOutlineTabData(courseId) {
+     datesBannerInfo,
+     datesWidget,
+     enrollAlert,
++    enrollmentMode,
+     handoutsHtml,
+     hasScheduledContent,
+     hasEnded,
+     offer,
+     resumeCourse,
+     timeOffsetMillis, // This should move to a global time correction reference
++    userHasPassingGrade,
+     verifiedMode,
+     welcomeMessageHtml,
+   };
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 040f3ce..400e55d 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -693,6 +693,40 @@ describe('Outline Tab', () => {
+         await fetchAndRender();
+         expect(screen.queryByText('Verify your identity to earn a certificate!')).toBeInTheDocument();
+       });
++      it('renders non passing grade', async () => {
++        const now = new Date();
++        const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
++        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
++        setMetadata({ is_enrolled: true });
++        setTabData({
++          cert_data: {},
++          user_has_passing_grade: false,
++          has_ended: true,
++          enrollment_mode: 'verified',
++        }, {
++          date_blocks: [
++            {
++              date_type: 'course-end-date',
++              date: yesterday.toISOString(),
++              title: 'End',
++            },
++            {
++              date_type: 'certificate-available-date',
++              date: tomorrow.toISOString(),
++              title: 'Cert Available',
++            },
++            {
++              date_type: 'verification-deadline-date',
++              date: tomorrow.toISOString(),
++              link_text: 'Verify',
++              title: 'Verification Upgrade Deadline',
++            },
++          ],
++        });
++        await fetchAndRender();
++        screen.getAllByText('You are not eligible for a certificate');
++        expect(screen.queryByText('You are not eligible for a certificate')).toBeInTheDocument();
++      });
+       it('tracks request cert button', async () => {
+         sendTrackEvent.mockClear();
+         const now = new Date();
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+index c92497b..becf78a 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+@@ -36,6 +36,8 @@ function CertificateStatusAlert({ intl, payload }) {
+     isWebCert,
+     userTimezone,
+     org,
++    notPassingCourseEnded,
++    tabs,
+   } = payload;
+ 
+   // eslint-disable-next-line react/prop-types
+@@ -118,6 +120,24 @@ function CertificateStatusAlert({ intl, payload }) {
+     return alertProps;
+   };
+ 
++  const renderNotPassingCourseEnded = () => {
++    const progressTab = tabs.find(tab => tab.slug === 'progress');
++    const progressLink = progressTab && progressTab.url;
++
++    const alertProps = {
++      header: intl.formatMessage(certMessages.certStatusNotPassingHeader),
++      buttonMessage: intl.formatMessage(certMessages.certStatusNotPassingButton),
++      body: intl.formatMessage(certStatusMessages.notPassingBody),
++      buttonVisible: true,
++      buttonLink: progressLink,
++      buttonAction: () => {
++        sendAlertClickTracking('edx.ui.lms.course_outline.certificate_alert_view_grades_button.clicked');
++      },
++    };
++
++    return alertProps;
++  };
++
+   let alertProps = {};
+   switch (certStatus) {
+     case CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE:
+@@ -129,6 +149,9 @@ function CertificateStatusAlert({ intl, payload }) {
+       alertProps = renderNotIDVerifiedStatus();
+       break;
+     default:
++      if (notPassingCourseEnded) {
++        alertProps = renderNotPassingCourseEnded();
++      }
+       break;
+   }
+ 
+@@ -184,6 +207,12 @@ CertificateStatusAlert.propTypes = {
+     isWebCert: PropTypes.bool,
+     userTimezone: PropTypes.string,
+     org: PropTypes.string,
++    notPassingCourseEnded: PropTypes.bool,
++    tabs: PropTypes.arrayOf(PropTypes.shape({
++      tab_id: PropTypes.string,
++      title: PropTypes.string,
++      url: PropTypes.string,
++    })),
+   }).isRequired,
+ };
+ 
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+index 8a8e62d..4564ff3 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+@@ -21,9 +21,19 @@ function verifyCertStatusType(status) {
+ }
+ 
+ function useCertificateStatusAlert(courseId) {
++  const VERIFIED_MODES = {
++    PROFESSIONAL: 'professional',
++    VERIFIED: 'verified',
++    NO_ID_PROFESSIONAL_MODE: 'no-id-professional',
++    CREDIT_MODE: 'credit',
++    MASTERS: 'masters',
++    EXECUTIVE_EDUCATION: 'executive-education',
++  };
++
+   const {
+     isEnrolled,
+     org,
++    tabs,
+   } = useModel('courseHomeMeta', courseId);
+ 
+   const {
+@@ -32,6 +42,9 @@ function useCertificateStatusAlert(courseId) {
+       userTimezone,
+     },
+     certData,
++    hasEnded,
++    userHasPassingGrade,
++    enrollmentMode,
+   } = useModel('outline', courseId);
+ 
+   const {
+@@ -42,7 +55,11 @@ function useCertificateStatusAlert(courseId) {
+   } = certData || {};
+   const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+   const isWebCert = downloadUrl === null;
+-
++  const isVerifiedEnrollmentMode = (
++    enrollmentMode !== null
++    && enrollmentMode !== undefined
++    && !!Object.values(VERIFIED_MODES).find(mode => mode === enrollmentMode)
++  );
+   let certURL = '';
+   if (certWebViewUrl) {
+     certURL = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
+@@ -52,8 +69,17 @@ function useCertificateStatusAlert(courseId) {
+   }
+   const hasAlertingCertStatus = verifyCertStatusType(certStatus);
+ 
+-  // Only show if there is a known cert status that we want provide status on.
++  // Only show if:
++  // - there is a known cert status that we want provide status on.
++  // - Or the course has ended and the learner does not have a passing grade.
+   const isVisible = isEnrolled && hasAlertingCertStatus;
++  const notPassingCourseEnded = (
++    isEnrolled
++    && isVerifiedEnrollmentMode
++    && !hasAlertingCertStatus
++    && hasEnded
++    && !userHasPassingGrade
++  );
+   const payload = {
+     certificateAvailableDate,
+     certURL,
+@@ -63,9 +89,11 @@ function useCertificateStatusAlert(courseId) {
+     userTimezone,
+     isWebCert,
+     org,
++    notPassingCourseEnded,
++    tabs,
+   };
+ 
+-  useAlert(isVisible, {
++  useAlert(isVisible || notPassingCourseEnded, {
+     code: 'clientCertificateStatusAlert',
+     payload: useMemo(() => payload, Object.values(payload).sort()),
+     topic: 'outline-course-alerts',
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js b/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+index 8dfce5f..a9756a8 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+@@ -11,6 +11,14 @@ const messages = defineMessages({
+     defaultMessage: 'Congratulations! Your certificate is ready.',
+     description: 'Header alerting the user that their certificate is ready.',
+   },
++  certStatusNotPassingHeader: {
++    id: 'cert.alert.notPassing.header',
++    defaultMessage: 'You are not eligible for a certificate',
++  },
++  certStatusNotPassingButton: {
++    id: 'cert.alert.notPassing.button',
++    defaultMessage: 'View grades',
++  },
+ });
+ 
+ export default messages;
+-- 
+2.34.1
+

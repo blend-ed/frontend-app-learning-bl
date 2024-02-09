@@ -1,0 +1,478 @@
+From 52e144d8a6ede06ba8f58cf0f5517c33015ba20e Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Thu, 9 Jan 2020 16:41:28 -0500
+Subject: [PATCH 0017/1021] Refactoring data management.  Using context now.
+
+Ripped out the subSection and unit code for the moment to refactor it to use the context - breadcrumbs is currently working with it, though.
+---
+ src/index.jsx                                 |   4 +-
+ src/learning-sequence/Breadcrumbs.jsx         |  57 ------
+ src/learning-sequence/CourseBreadcrumbs.jsx   |  54 +++++
+ .../CourseStructureContext.jsx                |   5 +
+ .../LearningSequencePage.jsx                  | 187 ++++--------------
+ src/learning-sequence/api.js                  |  13 +-
+ src/learning-sequence/hooks.js                |  39 ++++
+ 7 files changed, 141 insertions(+), 218 deletions(-)
+ delete mode 100644 src/learning-sequence/Breadcrumbs.jsx
+ create mode 100644 src/learning-sequence/CourseBreadcrumbs.jsx
+ create mode 100644 src/learning-sequence/CourseStructureContext.jsx
+ create mode 100644 src/learning-sequence/hooks.js
+
+diff --git a/src/index.jsx b/src/index.jsx
+index acf3755..50acc91 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -20,10 +20,12 @@ subscribe(APP_READY, () => {
+     <AppProvider>
+       <Header />
+       <Switch>
++        {/* Staging: course-v1:UBCx+Water201x_2+2T2015 */}
+         <Route
+           exact
+           path="/"
+-          render={() => <Link to="/course/course-v1%3AedX%2BDemoX%2BDemo_Course/0">Visit Demo Course</Link>}
++
++          render={() => <Link to="/course/course-v1%3AedX%2BDemoX%2BDemo_Course/block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction/block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0270f6de40fc">Visit Demo Course</Link>}
+         />
+         <Route path="/course/:courseId/:subSectionId/:unitId" component={LearningSequencePage} />
+         <Route path="/course/:courseId" component={LearningSequencePage} />
+diff --git a/src/learning-sequence/Breadcrumbs.jsx b/src/learning-sequence/Breadcrumbs.jsx
+deleted file mode 100644
+index 6fda826..0000000
+--- a/src/learning-sequence/Breadcrumbs.jsx
++++ /dev/null
+@@ -1,57 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
+-
+-const Breadcrumbs = ({
+-  links, activeLabel, spacer, clickHandler,
+-}) => {
+-  const linkCount = links.length;
+-
+-  return (
+-    <nav aria-label="breadcrumb">
+-      <ol className="list-inline">
+-        {links.map(({ url, label }, i) => (
+-          <React.Fragment key={`${label}-${url}`}>
+-            <li className="list-inline-item">
+-              <a href={url} {...(clickHandler && { onClick: clickHandler })}>{label}</a>
+-            </li>
+-            {(activeLabel || ((i + 1) < linkCount)) &&
+-              <li className="list-inline-item" role="presentation" aria-label="spacer">
+-                {spacer || <FontAwesomeIcon icon={faChevronRight} />}
+-              </li>
+-            }
+-          </React.Fragment>
+-        ))}
+-        {activeLabel && <li className="list-inline-item">{activeLabel}</li>}
+-      </ol>
+-    </nav>
+-  );
+-};
+-
+-Breadcrumbs.propTypes = {
+-  /** an array of objects with the properties `label` and `url` as strings. */
+-  links: PropTypes.arrayOf(PropTypes.shape({
+-    label: PropTypes.string,
+-    url: PropTypes.string,
+-  })).isRequired,
+-  /** allows to add a label that is not a link to the end of the breadcrumb.
+-   * Defaults to `undefined`.
+- */
+-  activeLabel: PropTypes.string,
+-  /** allows to add a custom element between the breadcrumb items.
+-   * Defaults to `>` rendered using the `Icon` component. */
+-  spacer: PropTypes.element,
+-  /** allows to add a custom function to be called `onClick` of a breadcrumb link.
+-   * The use case for this is for adding custom analytics to the component. */
+-  clickHandler: PropTypes.func,
+-};
+-
+-Breadcrumbs.defaultProps = {
+-  activeLabel: undefined,
+-  spacer: undefined,
+-  clickHandler: undefined,
+-};
+-
+-export default Breadcrumbs;
+diff --git a/src/learning-sequence/CourseBreadcrumbs.jsx b/src/learning-sequence/CourseBreadcrumbs.jsx
+new file mode 100644
+index 0000000..68acd1d
+--- /dev/null
++++ b/src/learning-sequence/CourseBreadcrumbs.jsx
+@@ -0,0 +1,54 @@
++import React, { useContext } from 'react';
++import PropTypes from 'prop-types';
++
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
++import { getConfig } from '@edx/frontend-platform';
++
++import CourseStructureContext from './CourseStructureContext';
++import { useBlockAncestry } from './hooks';
++
++const CourseBreadcrumbs = () => {
++  const { courseId, unitId } = useContext(CourseStructureContext);
++
++  const ancestry = useBlockAncestry(unitId);
++
++  const links = ancestry.map(ancestor => ({
++    id: ancestor.id,
++    label: ancestor.displayName,
++    url: `${getConfig().LMS_BASE_URL}/courses/${courseId}/course/#${ancestor.id}`,
++  }));
++
++  return (
++    <nav aria-label="breadcrumb">
++      <ol className="list-inline">
++        {links.map(({ id, url, label }, i) => (
++          <CourseBreadcrumb key={id} url={url} label={label} last={i === links.length - 1} />
++        ))}
++      </ol>
++    </nav>
++  );
++};
++
++export default CourseBreadcrumbs;
++
++function CourseBreadcrumb({ url, label, last }) {
++  return (
++    <React.Fragment key={`${label}-${url}`}>
++      <li className="list-inline-item">
++        {last ? label : (<a href={url}>{label}</a>)}
++      </li>
++      {!last &&
++        <li className="list-inline-item" role="presentation" aria-label="spacer">
++          <FontAwesomeIcon icon={faChevronRight} />
++        </li>
++      }
++    </React.Fragment>
++  );
++}
++
++CourseBreadcrumb.propTypes = {
++  url: PropTypes.string.isRequired,
++  label: PropTypes.string.isRequired,
++  last: PropTypes.bool.isRequired,
++};
+diff --git a/src/learning-sequence/CourseStructureContext.jsx b/src/learning-sequence/CourseStructureContext.jsx
+new file mode 100644
+index 0000000..0f3f573
+--- /dev/null
++++ b/src/learning-sequence/CourseStructureContext.jsx
+@@ -0,0 +1,5 @@
++import React from 'react';
++
++const CourseStructureContext = React.createContext({});
++
++export default CourseStructureContext;
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+index 6880891..e99b03e 100644
+--- a/src/learning-sequence/LearningSequencePage.jsx
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -1,170 +1,49 @@
+-/* eslint-disable no-plusplus */
+-import React, { Component } from 'react';
++import React, { useState, useEffect, useContext } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { getConfig, history } from '@edx/frontend-platform';
+-import { AppContext } from '@edx/frontend-platform/react';
+ 
+ import PageLoading from './PageLoading';
+ import messages from './messages';
+-import SubSectionNavigation from './SubSectionNavigation';
+-import { loadCourseSequence, findBlockAncestry, loadSubSectionMetadata } from './api';
+-import Breadcrumbs from './Breadcrumbs';
+ 
+-class LearningSequencePage extends Component {
+-  constructor(props, context) {
+-    super(props, context);
++import CourseBreadcrumbs from './CourseBreadcrumbs';
++import SubSection from './SubSection';
+ 
+-    this.state = {
+-      loading: true,
+-      blocks: {},
+-      units: {},
+-      subSectionMetadata: null,
+-      subSectionId: null,
+-      subSectionIds: [],
+-      unitId: null,
+-      courseBlockId: null,
+-    };
++import { useCourseStructure } from './hooks';
++import CourseStructureContext from './CourseStructureContext';
+ 
+-    this.iframeRef = React.createRef();
+-  }
++function LearningSequencePage({ match, intl }) {
++  const {
++    courseId,
++    subSectionId,
++    unitId,
++  } = match.params;
+ 
+-  componentDidMount() {
+-    loadCourseSequence(this.props.match.params.courseId, this.props.match.params.subSectionId, this.props.match.params.unitId, this.context.authenticatedUser.username)
+-      .then(({
+-        blocks, courseBlockId, subSectionIds, subSectionMetadata, units, unitId,
+-      }) => {
+-        this.setState({
+-          loading: false,
+-          blocks,
+-          units,
+-          subSectionMetadata,
+-          subSectionId: subSectionMetadata.itemId,
+-          subSectionIds,
+-          unitId,
+-          courseBlockId, // TODO: Currently unused, but may be necessary.
+-        });
+-      });
+-  }
++  const { blocks, loaded, courseBlockId } = useCourseStructure(courseId);
+ 
+-  componentDidUpdate(prevProps, prevState) {
+-    if (
+-      this.props.match.params.courseId !== prevProps.match.params.courseId ||
+-      this.state.subSectionId !== prevState.subSectionId ||
+-      this.state.unitId !== prevState.unitId
+-    ) {
+-      history.push(`/course/${this.props.match.params.courseId}/${this.state.subSectionId}/${this.state.unitId}`);
+-    }
+-  }
+-
+-  handlePreviousClick = () => {
+-    const index = this.state.subSectionMetadata.unitIds.indexOf(this.state.unitId);
+-    if (index > 0) {
+-      this.setState({
+-        unitId: this.state.subSectionMetadata.unitIds[index - 1],
+-      });
+-    } else {
+-      const subSectionIndex = this.state.subSectionIds.indexOf(this.state.subSectionId);
+-      if (subSectionIndex > 0) {
+-        const previousSubSectionId = this.state.subSectionIds[subSectionIndex - 1];
+-
+-        loadSubSectionMetadata(this.props.match.params.courseId, previousSubSectionId, { last: true }).then(({ subSectionMetadata, units, unitId }) => {
+-          this.setState({
+-            subSectionId: subSectionMetadata.itemId,
+-            subSectionMetadata,
+-            units,
++  return (
++    <main>
++      <div className="container-fluid">
++        <CourseStructureContext.Provider value={{
++            courseId,
++            courseBlockId,
++            subSectionId,
+             unitId,
+-          });
+-        });
+-      } else {
+-        console.log('we are at the beginning!');
+-        // TODO: We need to calculate whether we're on the first/last subSection in render so we can
+-        // disable the Next/Previous buttons.  That'll involve extracting a bit of logic from this
+-        // function and handleNextClick below and reusing it - memoized, probably - in render().
+-      }
+-    }
+-  }
+-
+-  handleNextClick = () => {
+-    const index = this.state.subSectionMetadata.unitIds.indexOf(this.state.unitId);
+-    if (index < this.state.subSectionMetadata.unitIds.length - 1) {
+-      this.setState({
+-        unitId: this.state.subSectionMetadata.unitIds[index + 1],
+-      });
+-    } else {
+-      const subSectionIndex = this.state.subSectionIds.indexOf(this.state.subSectionId);
+-      if (subSectionIndex < this.state.subSectionIds.length - 1) {
+-        const nextSubSectionId = this.state.subSectionIds[subSectionIndex + 1];
+-
+-        loadSubSectionMetadata(this.props.match.params.courseId, nextSubSectionId, { first: true })
+-          .then(({ subSectionMetadata, units, unitId }) => {
+-            this.setState({
+-              subSectionId: subSectionMetadata.itemId,
+-              subSectionMetadata,
+-              units,
+-              unitId,
+-            });
+-          });
+-      } else {
+-        console.log('we are at the end!');
+-      }
+-    }
+-  }
+-
+-  handleUnitChange = (unitId) => {
+-    this.setState({
+-      unitId,
+-    });
+-  }
+-
+-  render() {
+-    if (this.state.loading) {
+-      return (
+-        <PageLoading srMessage={this.props.intl.formatMessage(messages['learn.loading.learning.sequence'])} />
+-      );
+-    }
+-
+-    const [course, chapter, subSection] = findBlockAncestry(
+-      this.state.blocks,
+-      this.state.blocks[this.state.subSectionId],
+-    );
+-
+-    const currentUnit = this.state.units[this.state.unitId];
+-    const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${this.state.unitId}`;
+-
+-    return (
+-      <main >
+-        <div className="container-fluid">
+-          <h1>{course.displayName}</h1>
+-          <Breadcrumbs
+-            links={[
+-              { label: course.displayName, url: global.location.href },
+-              { label: chapter.displayName, url: global.location.href },
+-              { label: subSection.displayName, url: global.location.href },
+-            ]}
+-            activeLabel={currentUnit.pageTitle}
+-          />
+-          <SubSectionNavigation
+-            units={this.state.units}
+-            unitIds={this.state.subSectionMetadata.unitIds}
+-            activeUnitId={this.state.unitId}
+-            unitClickHandler={this.handleUnitChange}
+-            nextClickHandler={this.handleNextClick}
+-            previousClickHandler={this.handlePreviousClick}
+-          />
+-        </div>
+-        <iframe
+-          title="yus"
+-          ref={this.iframeRef}
+-          src={iframeUrl}
+-        />
+-      </main>
+-    );
+-  }
++            blocks,
++            loaded,
++          }}
++        >
++          {!loaded && <PageLoading
++            srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++          />}
++
++          {loaded && <CourseBreadcrumbs />}
++          {/* <SubSection /> */}
++        </CourseStructureContext.Provider>
++      </div>
++    </main>
++  );
+ }
+ 
+-LearningSequencePage.contextType = AppContext;
+-
+ export default injectIntl(LearningSequencePage);
+ 
+ LearningSequencePage.propTypes = {
+diff --git a/src/learning-sequence/api.js b/src/learning-sequence/api.js
+index 6c3e7ff..0cb57f0 100644
+--- a/src/learning-sequence/api.js
++++ b/src/learning-sequence/api.js
+@@ -25,11 +25,11 @@ export async function loadCourseSequence(courseId, subSectionId, urlUnitId, user
+   };
+ }
+ 
+-async function getCourseBlocks(courseId, username) {
++export async function getCourseBlocks(courseId, username) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+   url.searchParams.append('course_id', decodeURIComponent(courseId));
+   url.searchParams.append('username', username);
+-  url.searchParams.append('depth', 2);
++  url.searchParams.append('depth', 3);
+   url.searchParams.append('requested_fields', 'children');
+ 
+   const { data } = await getAuthenticatedHttpClient()
+@@ -67,7 +67,7 @@ async function getSubSectionMetadata(courseId, subSectionId) {
+   return data;
+ }
+ 
+-function createBlocksMap(blocksData) {
++export function createBlocksMap(blocksData) {
+   const blocks = {};
+   const blocksList = Object.values(blocksData);
+ 
+@@ -112,7 +112,7 @@ function findFirstLeafChild(blocks, entryPointId) {
+   return block;
+ }
+ 
+-function createSubSectionIdList(blocks, entryPointId, subSections = []) {
++export function createSubSectionIdList(blocks, entryPointId, subSections = []) {
+   const block = blocks[entryPointId];
+   if (block.type === 'sequential') {
+     subSections.push(block.id);
+@@ -126,10 +126,11 @@ function createSubSectionIdList(blocks, entryPointId, subSections = []) {
+   return subSections;
+ }
+ 
+-export function findBlockAncestry(blocks, block, descendents = []) {
++export function findBlockAncestry(blocks, blockId, descendents = []) {
++  const block = blocks[blockId];
+   descendents.unshift(block);
+   if (block.parentId === undefined) {
+     return descendents;
+   }
+-  return findBlockAncestry(blocks, blocks[block.parentId], descendents);
++  return findBlockAncestry(blocks, block.parentId, descendents);
+ }
+diff --git a/src/learning-sequence/hooks.js b/src/learning-sequence/hooks.js
+new file mode 100644
+index 0000000..5d24dbf
+--- /dev/null
++++ b/src/learning-sequence/hooks.js
+@@ -0,0 +1,39 @@
++import { useContext, useMemo, useState, useEffect } from 'react';
++import { AppContext } from '@edx/frontend-platform/react';
++
++import CourseStructureContext from './CourseStructureContext';
++import { findBlockAncestry, getCourseBlocks, createBlocksMap } from './api';
++
++export function useBlockAncestry(blockId) {
++  const { blocks, loaded } = useContext(CourseStructureContext);
++  return useMemo(() => {
++    if (!loaded) {
++      return [];
++    }
++    return findBlockAncestry(
++      blocks,
++      blockId,
++    );
++  }, [blocks, blockId, loaded]);
++}
++
++export function useCourseStructure(courseId) {
++  const { authenticatedUser } = useContext(AppContext);
++
++  const [blocks, setBlocks] = useState({});
++  const [loaded, setLoaded] = useState(false);
++  const [courseBlockId, setCourseBlockId] = useState();
++
++  useEffect(() => {
++    setLoaded(false);
++    getCourseBlocks(courseId, authenticatedUser.username).then((blocksData) => {
++      setBlocks(createBlocksMap(blocksData.blocks));
++      setCourseBlockId(blocksData.root);
++      setLoaded(true);
++    });
++  }, [courseId]);
++
++  return {
++    blocks, loaded, courseBlockId,
++  };
++}
+-- 
+2.34.1
+

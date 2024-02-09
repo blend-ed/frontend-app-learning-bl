@@ -1,0 +1,295 @@
+From f715fd5ed6cdb051a39f540ceff072f2cc88230c Mon Sep 17 00:00:00 2001
+From: Nick <ndalfonso@edx.org>
+Date: Thu, 23 Jul 2020 12:28:56 -0400
+Subject: [PATCH 0177/1021] AA-123 welcome message (#121)
+
+---
+ .../data/__snapshots__/redux.test.js.snap     |  1 +
+ src/course-home/data/api.js                   |  7 ++
+ src/course-home/data/redux.test.js            | 12 ++++
+ src/course-home/data/thunks.js                |  5 ++
+ src/course-home/outline-tab/OutlineTab.jsx    |  2 +
+ src/course-home/outline-tab/messages.js       | 12 ++++
+ .../outline-tab/widgets/WelcomeMessage.jsx    | 68 +++++++++++++++++++
+ src/generic/user-messages/Alert.jsx           | 20 ++++--
+ src/generic/user-messages/Alert.scss          |  4 ++
+ .../user-messages/UserMessagesProvider.jsx    |  1 +
+ 10 files changed, 128 insertions(+), 4 deletions(-)
+ create mode 100644 src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+ create mode 100644 src/generic/user-messages/Alert.scss
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 9dad7db..b0baead 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -199,6 +199,7 @@ Object {
+         "datesWidget": undefined,
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "welcomeMessageHtml": undefined,
+       },
+     },
+   },
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index c131053..8c15eb1 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -72,12 +72,14 @@ export async function getOutlineTabData(courseId) {
+   const courseTools = camelCaseObject(data.course_tools);
+   const datesWidget = camelCaseObject(data.dates_widget);
+   const handoutsHtml = data.handouts_html;
++  const welcomeMessageHtml = data.welcome_message_html;
+ 
+   return {
+     courseTools,
+     courseBlocks,
+     datesWidget,
+     handoutsHtml,
++    welcomeMessageHtml,
+   };
+ }
+ 
+@@ -85,3 +87,8 @@ export async function postCourseDeadlines(courseId) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`);
+   await getAuthenticatedHttpClient().post(url.href, { course_key: courseId });
+ }
++
++export async function postDismissWelcomeMessage(courseId) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dismiss_welcome_message`);
++  await getAuthenticatedHttpClient().post(url.href, { course_id: courseId });
++}
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index db87abf..ad226a6 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -125,4 +125,16 @@ describe('Data layer integration tests', () => {
+       expect(getTabDataMock).toHaveBeenCalledWith(courseId);
+     });
+   });
++
++  describe('Test dismissWelcomeMessage', () => {
++    it('Should dismiss welcome message', async () => {
++      const dismissUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dismiss_welcome_message`;
++      axiosMock.onPost(dismissUrl).reply(201);
++
++      await executeThunk(thunks.dismissWelcomeMessage(courseId), store.dispatch);
++
++      expect(axiosMock.history.post[0].url).toEqual(dismissUrl);
++      expect(axiosMock.history.post[0].data).toEqual(`{"course_id":"${courseId}"}`);
++    });
++  });
+ });
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index 335289d..0caf530 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -5,6 +5,7 @@ import {
+   getOutlineTabData,
+   getProgressTabData,
+   postCourseDeadlines,
++  postDismissWelcomeMessage,
+ } from './api';
+ 
+ import {
+@@ -79,3 +80,7 @@ export function resetDeadlines(courseId, getTabData) {
+     });
+   };
+ }
++
++export function dismissWelcomeMessage(courseId) {
++  return async () => postDismissWelcomeMessage(courseId);
++}
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 20d03e5..1bb2376 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -11,6 +11,7 @@ import CourseTools from './widgets/CourseTools';
+ import messages from './messages';
+ import Section from './Section';
+ import { useModel } from '../../generic/model-store';
++import WelcomeMessage from './widgets/WelcomeMessage';
+ 
+ // Note that we import from the component files themselves in the enrollment-alert package.
+ // This is because React.lazy() requires that we import() from a file with a Component as its
+@@ -61,6 +62,7 @@ function OutlineTab({ intl }) {
+       </div>
+       <div className="row">
+         <div className="col col-8">
++          <WelcomeMessage courseId={courseId} />
+           {sectionIds.map((sectionId) => (
+             <Section
+               key={sectionId}
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index a7011ad..ee0e019 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -21,6 +21,18 @@ const messages = defineMessages({
+     id: 'learning.outline.tools',
+     defaultMessage: 'Course Tools',
+   },
++  welcomeMessage: {
++    id: 'learning.outline.welcomeMessage',
++    defaultMessage: 'Welcome Message',
++  },
++  welcomeMessageShowMoreButton: {
++    id: 'learning.outline.welcomeMessageShowMoreButton',
++    defaultMessage: 'Show More',
++  },
++  welcomeMessageShowLessButton: {
++    id: 'learning.outline.welcomeMessageShowLessButton',
++    defaultMessage: 'Show Less',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+new file mode 100644
+index 0000000..c12c0d8
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+@@ -0,0 +1,68 @@
++import React, { useState } from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import { useDispatch } from 'react-redux';
++import LmsHtmlFragment from '../LmsHtmlFragment';
++import messages from '../messages';
++import { useModel } from '../../../generic/model-store';
++import { Alert } from '../../../generic/user-messages';
++import { dismissWelcomeMessage } from '../../data/thunks';
++
++function WelcomeMessage({ courseId, intl }) {
++  const {
++    welcomeMessageHtml,
++  } = useModel('outline', courseId);
++
++  if (!welcomeMessageHtml) {
++    return null;
++  }
++
++  const [display, setDisplay] = useState(true);
++
++  const shortWelcomeMessageHtml = welcomeMessageHtml.length > 200 && `${welcomeMessageHtml.substring(0, 199)}...`;
++  const [showShortMessage, setShowShortMessage] = useState(!!shortWelcomeMessageHtml);
++  const dispatch = useDispatch();
++
++  return (
++    display && (
++      <Alert
++        type="welcome"
++        dismissible
++        onDismiss={() => {
++          setDisplay(false);
++          dispatch(dismissWelcomeMessage(courseId));
++        }}
++      >
++        <div className="my-3">
++          <LmsHtmlFragment
++            html={showShortMessage ? shortWelcomeMessageHtml : welcomeMessageHtml}
++            title={intl.formatMessage(messages.welcomeMessage)}
++          />
++        </div>
++        {
++          shortWelcomeMessageHtml && (
++            <div className="d-flex justify-content-end">
++              <button
++                type="button"
++                className="btn rounded align-self-center border border-primary bg-white font-weight-bold mb-3"
++                onClick={() => setShowShortMessage(!showShortMessage)}
++              >
++                {showShortMessage ? intl.formatMessage(messages.welcomeMessageShowMoreButton)
++                  : intl.formatMessage(messages.welcomeMessageShowLessButton)}
++              </button>
++            </div>
++          )
++        }
++      </Alert>
++    )
++  );
++}
++
++WelcomeMessage.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(WelcomeMessage);
+diff --git a/src/generic/user-messages/Alert.jsx b/src/generic/user-messages/Alert.jsx
+index 2dea7c7..fa5fe33 100644
+--- a/src/generic/user-messages/Alert.jsx
++++ b/src/generic/user-messages/Alert.jsx
+@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { Button } from '@edx/paragon';
+ 
+ import { ALERT_TYPES } from './UserMessagesProvider';
++import './Alert.scss';
+ 
+ function getAlertClass(type) {
+   if (type === ALERT_TYPES.ERROR) {
+@@ -19,6 +20,9 @@ function getAlertClass(type) {
+   if (type === ALERT_TYPES.SUCCESS) {
+     return 'alert-success';
+   }
++  if (type === ALERT_TYPES.WELCOME) {
++    return 'alert-welcome alert-light';
++  }
+   return 'alert-info';
+ }
+ 
+@@ -41,9 +45,11 @@ function Alert({
+   return (
+     <div className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))}>
+       <div className="d-flex align-items-start">
+-        <div className="mr-2">
+-          <FontAwesomeIcon icon={getAlertIcon(type)} />
+-        </div>
++        {type !== ALERT_TYPES.WELCOME && (
++          <div className="mr-2">
++            <FontAwesomeIcon icon={getAlertIcon(type)} />
++          </div>
++        )}
+         <div role="alert" className="flex-grow-1">
+           {children}
+         </div>
+@@ -54,7 +60,13 @@ function Alert({
+ }
+ 
+ Alert.propTypes = {
+-  type: PropTypes.oneOf([ALERT_TYPES.ERROR, ALERT_TYPES.DANGER, ALERT_TYPES.INFO, ALERT_TYPES.SUCCESS]).isRequired,
++  type: PropTypes.oneOf([
++    ALERT_TYPES.ERROR,
++    ALERT_TYPES.DANGER,
++    ALERT_TYPES.INFO,
++    ALERT_TYPES.SUCCESS,
++    ALERT_TYPES.WELCOME,
++  ]).isRequired,
+   dismissible: PropTypes.bool,
+   children: PropTypes.node,
+   onDismiss: PropTypes.func,
+diff --git a/src/generic/user-messages/Alert.scss b/src/generic/user-messages/Alert.scss
+new file mode 100644
+index 0000000..8808693
+--- /dev/null
++++ b/src/generic/user-messages/Alert.scss
+@@ -0,0 +1,4 @@
++.alert-welcome {
++  border: #b9babe solid 1px !important;
++  border-left: #000000 solid 3px !important;
++}
+diff --git a/src/generic/user-messages/UserMessagesProvider.jsx b/src/generic/user-messages/UserMessagesProvider.jsx
+index f51b866..c504d31 100644
+--- a/src/generic/user-messages/UserMessagesProvider.jsx
++++ b/src/generic/user-messages/UserMessagesProvider.jsx
+@@ -9,6 +9,7 @@ export const ALERT_TYPES = {
+   DANGER: 'danger',
+   SUCCESS: 'success',
+   INFO: 'info',
++  WELCOME: 'welcome',
+ };
+ 
+ const FLASH_MESSAGES_LOCAL_STORAGE_KEY = 'UserMessagesProvider.flashMessages';
+-- 
+2.34.1
+

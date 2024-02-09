@@ -1,0 +1,179 @@
+From fcddc2d639370b156fc9e315e4c3792bfa1acf23 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Mon, 9 Mar 2020 12:43:02 -0400
+Subject: [PATCH 0073/1021] Log api request errors to New Relic and display
+ load error (#24)
+
+TNL-7114 Logs any failed api request to New Relic. Show error in CourseContainer instead of a spinner when a course fails to load.
+---
+ src/courseware/CourseContainer.jsx | 52 +++++++++++++++++++-----------
+ src/courseware/messages.js         |  5 +++
+ src/data/course-blocks/thunks.js   | 13 ++++++--
+ src/data/course-meta/thunks.js     |  4 ++-
+ 4 files changed, 51 insertions(+), 23 deletions(-)
+
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index cd726f5..b30ec0a 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -51,25 +51,39 @@ function CourseContainer(props) {
+ 
+   return (
+     <main className="flex-grow-1 d-flex flex-column">
+-      {ready ? (
+-        <Course
+-          courseOrg={props.metadata.org}
+-          courseNumber={props.metadata.number}
+-          courseName={props.metadata.name}
+-          courseUsageKey={courseUsageKey}
+-          courseId={courseId}
+-          isEnrolled={props.metadata.isEnrolled}
+-          sequenceId={sequenceId}
+-          unitId={unitId}
+-          models={models}
+-          tabs={props.metadata.tabs}
+-          verifiedMode={props.metadata.verifiedMode}
+-        />
+-      ) : (
+-        <PageLoading
+-          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-        />
+-      )}
++      {(() => {
++        if (ready) {
++          return (
++            <Course
++              courseOrg={props.metadata.org}
++              courseNumber={props.metadata.number}
++              courseName={props.metadata.name}
++              courseUsageKey={courseUsageKey}
++              courseId={courseId}
++              isEnrolled={props.metadata.isEnrolled}
++              sequenceId={sequenceId}
++              unitId={unitId}
++              models={models}
++              tabs={props.metadata.tabs}
++              verifiedMode={props.metadata.verifiedMode}
++            />
++          );
++        }
++
++        if (metadata.fetchState === 'failed' || models.fetchState === 'failed') {
++          return (
++            <p className="text-center py-5 mx-auto" style={{ maxWidth: '30em' }}>
++              {intl.formatMessage(messages['learn.course.load.failure'])}
++            </p>
++          );
++        }
++
++        return (
++          <PageLoading
++            srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++          />
++        );
++      })()}
+     </main>
+   );
+ }
+diff --git a/src/courseware/messages.js b/src/courseware/messages.js
+index 65564d1..2e778ee 100644
+--- a/src/courseware/messages.js
++++ b/src/courseware/messages.js
+@@ -11,6 +11,11 @@ const messages = defineMessages({
+     defaultMessage: 'Error: {error}',
+     description: 'Message when learning sequence fails to load',
+   },
++  'learn.course.load.failure': {
++    id: 'learn.course.load.failure',
++    defaultMessage: 'There was an error loading this course.',
++    description: 'Message when a course fails to load',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/data/course-blocks/thunks.js b/src/data/course-blocks/thunks.js
+index 57c8538..3616ce2 100644
+--- a/src/data/course-blocks/thunks.js
++++ b/src/data/course-blocks/thunks.js
+@@ -1,3 +1,4 @@
++import { logError } from '@edx/frontend-platform/logging';
+ import {
+   fetchCourseBlocksRequest,
+   fetchCourseBlocksSuccess,
+@@ -25,7 +26,8 @@ export function fetchCourseBlocks(courseUsageKey) {
+       const courseBlocks = await getCourseBlocks(courseUsageKey);
+       dispatch(fetchCourseBlocksSuccess(courseBlocks));
+     } catch (error) {
+-      dispatch(fetchCourseBlocksFailure(error));
++      logError(error);
++      dispatch(fetchCourseBlocksFailure(courseUsageKey));
+     }
+   };
+ }
+@@ -41,7 +43,8 @@ export function fetchSequenceMetadata(sequenceBlockId) {
+         relatedBlocksMetadata: sequenceMetadata.items,
+       }));
+     } catch (error) {
+-      dispatch(fetchBlockMetadataFailure({ blockId: sequenceBlockId }, error));
++      logError(error);
++      dispatch(fetchBlockMetadataFailure({ blockId: sequenceBlockId }));
+     }
+   };
+ }
+@@ -63,7 +66,8 @@ export function checkBlockCompletion(courseUsageKey, sequenceId, unitId) {
+         },
+       }));
+     } catch (error) {
+-      dispatch(fetchBlockMetadataFailure(commonPayload, error));
++      logError(error);
++      dispatch(fetchBlockMetadataFailure(commonPayload));
+     }
+   };
+ }
+@@ -82,6 +86,7 @@ export function saveSequencePosition(courseUsageKey, sequenceId, position) {
+       await updateSequencePosition(courseUsageKey, sequenceId, position);
+       dispatch(updateBlockSuccess(actionPayload));
+     } catch (error) {
++      logError(error);
+       dispatch(updateBlockFailure(actionPayload));
+     }
+   };
+@@ -100,6 +105,7 @@ export function addBookmark(unitId) {
+       await createBookmark(unitId);
+       dispatch(updateBlockSuccess(actionPayload));
+     } catch (error) {
++      logError(error);
+       dispatch(updateBlockFailure(actionPayload));
+     }
+   };
+@@ -118,6 +124,7 @@ export function removeBookmark(unitId) {
+       await deleteBookmark(unitId);
+       dispatch(updateBlockSuccess(actionPayload));
+     } catch (error) {
++      logError(error);
+       dispatch(updateBlockFailure(actionPayload));
+     }
+   };
+diff --git a/src/data/course-meta/thunks.js b/src/data/course-meta/thunks.js
+index 6301e4e..0259ab6 100644
+--- a/src/data/course-meta/thunks.js
++++ b/src/data/course-meta/thunks.js
+@@ -1,4 +1,5 @@
+ /* eslint-disable import/prefer-default-export */
++import { logError } from '@edx/frontend-platform/logging';
+ import {
+   fetchCourseMetadataRequest,
+   fetchCourseMetadataSuccess,
+@@ -15,7 +16,8 @@ export function fetchCourseMetadata(courseUsageKey) {
+       const courseMetadata = await getCourseMetadata(courseUsageKey);
+       dispatch(fetchCourseMetadataSuccess(courseMetadata));
+     } catch (error) {
+-      dispatch(fetchCourseMetadataFailure(error));
++      logError(error);
++      dispatch(fetchCourseMetadataFailure({ courseUsageKey }));
+     }
+   };
+ }
+-- 
+2.34.1
+

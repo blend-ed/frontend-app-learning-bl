@@ -1,0 +1,440 @@
+From cd8f3072e297db1f473ce03f14c0daf79b1f837c Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 30 Jul 2020 12:51:17 -0400
+Subject: [PATCH 0185/1021] AA-124: Refactor enrollment alerts (#126)
+
+- Place them only on the Outline page
+- Support a few cases where enrollment isn't actually allowed
+---
+ .../enrollment-alert/EnrollmentAlert.jsx      | 43 +++++++++++++++----
+ .../enrollment-alert/StaffEnrollmentAlert.jsx | 37 ----------------
+ src/alerts/enrollment-alert/hooks.js          | 20 +++++++--
+ src/alerts/enrollment-alert/index.js          |  4 +-
+ src/alerts/enrollment-alert/messages.js       |  8 ++--
+ .../logistration-alert/LogistrationAlert.jsx  |  4 +-
+ src/alerts/logistration-alert/hooks.js        |  2 +-
+ src/alerts/logistration-alert/messages.js     |  4 +-
+ .../__factories__/outlineTabData.factory.js   |  4 ++
+ .../data/__snapshots__/redux.test.js.snap     |  4 ++
+ src/course-home/data/api.js                   |  2 +
+ src/course-home/outline-tab/OutlineTab.jsx    | 13 +++---
+ src/courseware/course/Course.jsx              | 10 -----
+ src/tab-page/LoadedTabPage.jsx                |  3 --
+ src/tab-page/TabPage.jsx                      |  3 --
+ 15 files changed, 76 insertions(+), 85 deletions(-)
+ delete mode 100644 src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
+
+diff --git a/src/alerts/enrollment-alert/EnrollmentAlert.jsx b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+index b51dc6f..c9ac6e0 100644
+--- a/src/alerts/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+@@ -5,24 +5,44 @@ import { Button } from '@edx/paragon';
+ 
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+-import { Alert } from '../../generic/user-messages';
++import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ 
+ import messages from './messages';
+ import { useEnrollClickHandler } from './hooks';
+ 
+-function EnrollmentAlert({ intl, courseId }) {
++function EnrollmentAlert({ intl, payload }) {
++  const {
++    canEnroll,
++    courseId,
++    extraText,
++    isStaff,
++  } = payload;
++
+   const { enrollClickHandler, loading } = useEnrollClickHandler(
+     courseId,
+-    intl.formatMessage(messages['learning.enrollment.success']),
++    intl.formatMessage(messages.success),
++  );
++
++  let text = intl.formatMessage(messages.alert);
++  let type = ALERT_TYPES.ERROR;
++  if (isStaff) {
++    text = intl.formatMessage(messages.staffAlert);
++    type = ALERT_TYPES.INFO;
++  } else if (extraText) {
++    text = `${text} ${extraText}`;
++  }
++
++  const button = canEnroll && (
++    <Button disabled={loading} className="btn-link p-0 border-0 align-top" onClick={enrollClickHandler}>
++      {intl.formatMessage(messages.enroll)}
++    </Button>
+   );
+ 
+   return (
+-    <Alert type="error">
+-      {intl.formatMessage(messages['learning.enrollment.alert'])}
++    <Alert type={type}>
++      {text}
+       {' '}
+-      <Button disabled={loading} className="btn-link p-0 border-0 align-top" onClick={enrollClickHandler}>
+-        {intl.formatMessage(messages['learning.enrollment.enroll.now'])}
+-      </Button>
++      {button}
+       {' '}
+       {loading && <FontAwesomeIcon icon={faSpinner} spin />}
+     </Alert>
+@@ -31,7 +51,12 @@ function EnrollmentAlert({ intl, courseId }) {
+ 
+ EnrollmentAlert.propTypes = {
+   intl: intlShape.isRequired,
+-  courseId: PropTypes.string.isRequired,
++  payload: PropTypes.shape({
++    canEnroll: PropTypes.bool,
++    courseId: PropTypes.string,
++    extraText: PropTypes.string,
++    isStaff: PropTypes.bool,
++  }).isRequired,
+ };
+ 
+ export default injectIntl(EnrollmentAlert);
+diff --git a/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx b/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
+deleted file mode 100644
+index 229224b..0000000
+--- a/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
++++ /dev/null
+@@ -1,37 +0,0 @@
+-import React from 'react';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import PropTypes from 'prop-types';
+-import { Button } from '@edx/paragon';
+-
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+-import { Alert } from '../../generic/user-messages';
+-
+-import messages from './messages';
+-import { useEnrollClickHandler } from './hooks';
+-
+-function StaffEnrollmentAlert({ intl, courseId }) {
+-  const { enrollClickHandler, loading } = useEnrollClickHandler(
+-    courseId,
+-    intl.formatMessage(messages['learning.enrollment.success']),
+-  );
+-
+-  return (
+-    <Alert type="info" dismissible>
+-      {intl.formatMessage(messages['learning.staff.enrollment.alert'])}
+-      {' '}
+-      <Button disabled={loading} className="btn-link p-0 border-0 align-top" onClick={enrollClickHandler}>
+-        {intl.formatMessage(messages['learning.enrollment.enroll.now'])}
+-      </Button>
+-      {' '}
+-      {loading && <FontAwesomeIcon icon={faSpinner} spin />}
+-    </Alert>
+-  );
+-}
+-
+-StaffEnrollmentAlert.propTypes = {
+-  intl: intlShape.isRequired,
+-  courseId: PropTypes.string.isRequired,
+-};
+-
+-export default injectIntl(StaffEnrollmentAlert);
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index 58db7c3..ccc2306 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -1,20 +1,32 @@
+ /* eslint-disable import/prefer-default-export */
+-import {
++import React, {
+   useContext, useState, useCallback,
+ } from 'react';
++
+ import { UserMessagesContext, ALERT_TYPES, useAlert } from '../../generic/user-messages';
+ import { useModel } from '../../generic/model-store';
++
+ import { postCourseEnrollment } from './data/api';
+ 
++const EnrollmentAlert = React.lazy(() => import('./EnrollmentAlert'));
++
+ export function useEnrollmentAlert(courseId) {
+   const course = useModel('courses', courseId);
+-  const code = course.isStaff ? 'clientStaffEnrollmentAlert' : 'clientEnrollmentAlert';
++  const outline = useModel('outline', courseId);
+   const isVisible = course && course.isEnrolled !== undefined && !course.isEnrolled;
+ 
+   useAlert(isVisible, {
+-    code,
+-    topic: 'course',
++    code: 'clientEnrollmentAlert',
++    payload: {
++      canEnroll: outline.enrollAlert.canEnroll,
++      courseId,
++      extraText: outline.enrollAlert.extraText,
++      isStaff: course.isStaff,
++    },
++    topic: 'outline',
+   });
++
++  return EnrollmentAlert;
+ }
+ 
+ export function useEnrollClickHandler(courseId, successText) {
+diff --git a/src/alerts/enrollment-alert/index.js b/src/alerts/enrollment-alert/index.js
+index 72585cd..d7edefd 100644
+--- a/src/alerts/enrollment-alert/index.js
++++ b/src/alerts/enrollment-alert/index.js
+@@ -1,3 +1 @@
+-export { default as EnrollmentAlert } from './EnrollmentAlert';
+-export { default as StaffEnrollmentAlert } from './StaffEnrollmentAlert';
+-export { useEnrollmentAlert } from './hooks';
++export { useEnrollmentAlert as default } from './hooks';
+diff --git a/src/alerts/enrollment-alert/messages.js b/src/alerts/enrollment-alert/messages.js
+index 659d684..1d74456 100644
+--- a/src/alerts/enrollment-alert/messages.js
++++ b/src/alerts/enrollment-alert/messages.js
+@@ -1,22 +1,22 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  'learning.enrollment.alert': {
++  alert: {
+     id: 'learning.enrollment.alert',
+     defaultMessage: 'You must be enrolled in the course to see course content.',
+     description: 'Message shown to indicate that a user needs to enroll in a course prior to viewing the course content.  Shown as part of an alert, along with a link to enroll.',
+   },
+-  'learning.staff.enrollment.alert': {
++  staffAlert: {
+     id: 'learning.staff.enrollment.alert',
+     defaultMessage: 'You are viewing this course as staff, and are not enrolled.',
+     description: 'Message shown to indicate that a user is not enrolled, but is able to view a course anyway because they are staff. Shown as part of an alert, along with a link to enroll.',
+   },
+-  'learning.enrollment.enroll.now': {
++  enroll: {
+     id: 'learning.enrollment.enroll.now',
+     defaultMessage: 'Enroll Now',
+     description: 'A link prompting the user to click on it to enroll in the currently viewed course.',
+   },
+-  'learning.enrollment.success': {
++  success: {
+     id: 'learning.enrollment.success',
+     defaultMessage: "You've successfully enrolled in this course!",
+     description: 'A message telling the user that their course enrollment was successful.',
+diff --git a/src/alerts/logistration-alert/LogistrationAlert.jsx b/src/alerts/logistration-alert/LogistrationAlert.jsx
+index 579d7d0..304a8c5 100644
+--- a/src/alerts/logistration-alert/LogistrationAlert.jsx
++++ b/src/alerts/logistration-alert/LogistrationAlert.jsx
+@@ -9,7 +9,7 @@ import messages from './messages';
+ function LogistrationAlert({ intl }) {
+   const signIn = (
+     <a href={`${getLoginRedirectUrl(global.location.href)}`}>
+-      {intl.formatMessage(messages['learning.logistration.login'])}
++      {intl.formatMessage(messages.login)}
+     </a>
+   );
+ 
+@@ -17,7 +17,7 @@ function LogistrationAlert({ intl }) {
+   // This is complicated by the fact that we don't have a REGISTER_URL env variable available.
+   const register = (
+     <a href={`${getConfig().LMS_BASE_URL}/register?next=${encodeURIComponent(global.location.href)}`}>
+-      {intl.formatMessage(messages['learning.logistration.register'])}
++      {intl.formatMessage(messages.register)}
+     </a>
+   );
+ 
+diff --git a/src/alerts/logistration-alert/hooks.js b/src/alerts/logistration-alert/hooks.js
+index 3d7981f..a2370a4 100644
+--- a/src/alerts/logistration-alert/hooks.js
++++ b/src/alerts/logistration-alert/hooks.js
+@@ -9,7 +9,7 @@ export function useLogistrationAlert() {
+ 
+   useAlert(isVisible, {
+     code: 'clientLogistrationAlert',
+-    topic: 'course',
++    topic: 'outline',
+     dismissible: false,
+     type: ALERT_TYPES.ERROR,
+   });
+diff --git a/src/alerts/logistration-alert/messages.js b/src/alerts/logistration-alert/messages.js
+index b30e713..35ae74d 100644
+--- a/src/alerts/logistration-alert/messages.js
++++ b/src/alerts/logistration-alert/messages.js
+@@ -1,12 +1,12 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  'learning.logistration.login': {
++  login: {
+     id: 'learning.logistration.login',
+     defaultMessage: 'sign in',
+     description: 'Text in a link, prompting the user to log in.  Used in "learning.logistration.alert"',
+   },
+-  'learning.logistration.register': {
++  register: {
+     id: 'learning.logistration.register',
+     defaultMessage: 'register',
+     description: 'Text in a link, prompting the user to create an account.  Used in "learning.logistration.alert"',
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 9d84f68..92033ea 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -16,4 +16,8 @@ Factory.define('outlineTabData')
+       blocks: courseBlocks.blocks,
+     };
+   })
++  .attr('enroll_alert', {
++    can_enroll: true,
++    extra_text: 'Contact the administrator.',
++  })
+   .attr('handouts_html', [], () => '<ul><li>Handout 1</li></ul>');
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index b0baead..465bf40 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -197,6 +197,10 @@ Object {
+           "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/bookmarks/",
+         },
+         "datesWidget": undefined,
++        "enrollAlert": Object {
++          "canEnroll": true,
++          "extraText": "Contact the administrator.",
++        },
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "welcomeMessageHtml": undefined,
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 3670773..0132915 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -71,6 +71,7 @@ export async function getOutlineTabData(courseId) {
+   const courseBlocks = normalizeBlocks(courseId, data.course_blocks.blocks);
+   const courseTools = camelCaseObject(data.course_tools);
+   const datesWidget = camelCaseObject(data.dates_widget);
++  const enrollAlert = camelCaseObject(data.enroll_alert);
+   const handoutsHtml = data.handouts_html;
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+@@ -78,6 +79,7 @@ export async function getOutlineTabData(courseId) {
+     courseTools,
+     courseBlocks,
+     datesWidget,
++    enrollAlert,
+     handoutsHtml,
+     welcomeMessageHtml,
+   };
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 0016d10..d171e95 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -10,14 +10,11 @@ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
+ import messages from './messages';
+ import Section from './Section';
++import useEnrollmentAlert from '../../alerts/enrollment-alert';
++import { useLogistrationAlert } from '../../alerts/logistration-alert';
+ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+ 
+-// Note that we import from the component files themselves in the enrollment-alert package.
+-// This is because React.lazy() requires that we import() from a file with a Component as its
+-// default export.
+-// See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
+-const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../../alerts/enrollment-alert'));
+ const LogistrationAlert = React.lazy(() => import('../../alerts/logistration-alert'));
+ 
+ function OutlineTab({ intl }) {
+@@ -42,6 +39,9 @@ function OutlineTab({ intl }) {
+     },
+   } = useModel('outline', courseId);
+ 
++  const clientEnrollmentAlert = useEnrollmentAlert(courseId);
++  useLogistrationAlert();
++
+   const rootCourseId = Object.keys(courses)[0];
+   const { sectionIds } = courses[rootCourseId];
+ 
+@@ -51,8 +51,7 @@ function OutlineTab({ intl }) {
+         topic="outline"
+         className="mb-3"
+         customAlerts={{
+-          clientEnrollmentAlert: EnrollmentAlert,
+-          clientStaffEnrollmentAlert: StaffEnrollmentAlert,
++          clientEnrollmentAlert,
+           clientLogistrationAlert: LogistrationAlert,
+         }}
+       />
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 217cdc7..640017d 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -21,9 +21,6 @@ import { useModel } from '../../generic/model-store';
+ // default export.
+ // See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
+ const AccessExpirationAlert = React.lazy(() => import('../../alerts/access-expiration-alert/AccessExpirationAlert'));
+-const EnrollmentAlert = React.lazy(() => import('../../alerts/enrollment-alert/EnrollmentAlert'));
+-const StaffEnrollmentAlert = React.lazy(() => import('../../alerts/enrollment-alert/StaffEnrollmentAlert'));
+-const LogistrationAlert = React.lazy(() => import('../../alerts/logistration-alert'));
+ const OfferAlert = React.lazy(() => import('../../alerts/offer-alert/OfferAlert'));
+ 
+ function Course({
+@@ -66,16 +63,9 @@ function Course({
+         className="my-3"
+         topic="course"
+         customAlerts={{
+-          clientEnrollmentAlert: EnrollmentAlert,
+-          clientStaffEnrollmentAlert: StaffEnrollmentAlert,
+-          clientLogistrationAlert: LogistrationAlert,
+           clientAccessExpirationAlert: AccessExpirationAlert,
+           clientOfferAlert: OfferAlert,
+         }}
+-        // courseId is provided because EnrollmentAlert and StaffEnrollmentAlert require it.
+-        customProps={{
+-          courseId,
+-        }}
+       />
+       <CourseBreadcrumbs
+         courseId={courseId}
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 3654828..eba2e88 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
+ 
+ import { Header, CourseTabsNavigation } from '../course-header';
+ import { useModel } from '../generic/model-store';
+-import { useEnrollmentAlert } from '../alerts/enrollment-alert';
+ import InstructorToolbar from '../instructor-toolbar';
+ 
+ function LoadedTabPage({
+@@ -12,8 +11,6 @@ function LoadedTabPage({
+   courseId,
+   unitId,
+ }) {
+-  useEnrollmentAlert(courseId);
+-
+   const {
+     isStaff,
+     number,
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index b3355cc..2683a5d 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { Header } from '../course-header';
+-import { useLogistrationAlert } from '../alerts/logistration-alert';
+ import PageLoading from '../generic/PageLoading';
+ 
+ import messages from './messages';
+@@ -14,8 +13,6 @@ function TabPage({
+   courseStatus,
+   ...passthroughProps
+ }) {
+-  useLogistrationAlert();
+-
+   if (courseStatus === 'loading') {
+     return (
+       <>
+-- 
+2.34.1
+

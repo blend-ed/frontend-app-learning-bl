@@ -1,0 +1,556 @@
+From bbff8e719e9699a491344115c5c8ee81aab4c74e Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 19 Apr 2022 09:12:40 -0400
+Subject: [PATCH 0911/1021] fix: remove support for the legacy courseware pages
+
+Access to learners for these pages has been removed, so we don't
+need to keep any support for it around. Simplifies some code paths.
+---
+ .../courseHomeMetadata.factory.js             |  1 -
+ .../data/__snapshots__/redux.test.js.snap     |  4 ---
+ src/course-home/data/api.js                   |  9 +++----
+ .../data/pact-tests/lmsPact.test.jsx          |  2 --
+ .../outline-tab/OutlineTab.test.jsx           | 19 +------------
+ src/course-home/outline-tab/SequenceLink.jsx  | 12 +--------
+ src/courseware/CoursewareContainer.test.jsx   | 17 ------------
+ .../CoursewareRedirectLandingPage.jsx         |  6 -----
+ src/courseware/data/api.js                    |  2 --
+ .../data/pact-tests/lmsPact.test.jsx          |  4 ---
+ src/courseware/data/thunks.js                 |  4 +--
+ src/instructor-toolbar/InstructorToolbar.jsx  | 19 +------------
+ .../InstructorToolbar.test.jsx                | 27 -------------------
+ src/pacts/frontend-app-learning-lms.json      | 10 +------
+ src/shared/access.js                          |  8 ++----
+ .../data/__factories__/block.factory.js       |  6 ++---
+ src/tab-page/LoadedTabPage.jsx                |  2 --
+ src/tab-page/TabPage.jsx                      |  6 +----
+ 18 files changed, 14 insertions(+), 144 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 7bdf3b5..e144b6a 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -9,7 +9,6 @@ Factory.define('courseHomeMetadata')
+     is_self_paced: false,
+     is_enrolled: false,
+     is_staff: false,
+-    can_load_courseware: true,
+     can_view_certificate: true,
+     celebrations: null,
+     course_access: {
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index d387287..8fe76e5 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -21,7 +21,6 @@ Object {
+   "models": Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course": Object {
+-        "canLoadCourseware": true,
+         "canViewCertificate": true,
+         "celebrations": null,
+         "courseAccess": Object {
+@@ -340,7 +339,6 @@ Object {
+   "models": Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course": Object {
+-        "canLoadCourseware": true,
+         "canViewCertificate": true,
+         "celebrations": null,
+         "courseAccess": Object {
+@@ -447,7 +445,6 @@ Object {
+               "effortTime": 15,
+               "icon": null,
+               "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+-              "legacyWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1?experience=legacy",
+               "sectionId": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+               "showLink": true,
+               "title": "Title of Sequence",
+@@ -539,7 +536,6 @@ Object {
+   "models": Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course": Object {
+-        "canLoadCourseware": true,
+         "canViewCertificate": true,
+         "celebrations": null,
+         "courseAccess": Object {
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index e4c0d18..eac84f1 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -148,12 +148,9 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+           effortTime: block.effort_time,
+           icon: block.icon,
+           id: block.id,
+-          legacyWebUrl: block.legacy_web_url,
+-          // The presence of an legacy URL for the sequence indicates that we want this
+-          // sequence to be a clickable link in the outline (even though, if the new
+-          // courseware experience is active, we will ignore `legacyWebUrl` and build a
+-          // link to the MFE ourselves).
+-          showLink: !!block.legacy_web_url,
++          // The presence of a URL for the sequence indicates that we want this sequence to be a clickable
++          // link in the outline (even though we ignore the given url and use an internal <Link> to ourselves).
++          showLink: !!block.lms_web_url,
+           title: block.display_name,
+         };
+         break;
+diff --git a/src/course-home/data/pact-tests/lmsPact.test.jsx b/src/course-home/data/pact-tests/lmsPact.test.jsx
+index 7ac2154..2e55c6a 100644
+--- a/src/course-home/data/pact-tests/lmsPact.test.jsx
++++ b/src/course-home/data/pact-tests/lmsPact.test.jsx
+@@ -58,7 +58,6 @@ describe('Course Home Service', () => {
+               sku: '8CF08E5',
+               upgrade_url: `${getConfig().ECOMMERCE_BASE_URL}/basket/add/?sku=8CF08E5`,
+             }),
+-            can_load_courseware: boolean(true),
+             celebrations: like({
+               first_section: false,
+               streak_length_to_celebrate: null,
+@@ -106,7 +105,6 @@ describe('Course Home Service', () => {
+           sku: '8CF08E5',
+           upgradeUrl: `${getConfig().ECOMMERCE_BASE_URL}/basket/add/?sku=8CF08E5`,
+         },
+-        canLoadCourseware: true,
+         celebrations: {
+           firstSection: false,
+           streakLengthToCelebrate: null,
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 4016a3d..575f12f 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -138,25 +138,8 @@ describe('Outline Tab', () => {
+       expect(screen.getByTitle('Incomplete section')).toBeInTheDocument();
+     });
+ 
+-    it('SequenceLink displays points to legacy courseware', async () => {
++    it('SequenceLink displays link', async () => {
+       const { courseBlocks } = await buildMinimalCourseBlocks(courseId, 'Title', { resumeBlock: true });
+-      setMetadata({
+-        can_load_courseware: false,
+-      });
+-      setTabData({
+-        course_blocks: { blocks: courseBlocks.blocks },
+-      });
+-      await fetchAndRender();
+-
+-      const sequenceLink = screen.getByText('Title of Sequence');
+-      expect(sequenceLink.getAttribute('href')).toContain(`/courses/${courseId}`);
+-    });
+-
+-    it('SequenceLink displays points to courseware MFE', async () => {
+-      const { courseBlocks } = await buildMinimalCourseBlocks(courseId, 'Title', { resumeBlock: true });
+-      setMetadata({
+-        can_load_courseware: true,
+-      });
+       setTabData({
+         course_blocks: { blocks: courseBlocks.blocks },
+       });
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index b0effb5..794cdc2 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -2,7 +2,6 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { Link } from 'react-router-dom';
+-import { Hyperlink } from '@edx/paragon';
+ import {
+   FormattedMessage,
+   FormattedTime,
+@@ -28,25 +27,16 @@ function SequenceLink({
+     complete,
+     description,
+     due,
+-    legacyWebUrl,
+     showLink,
+     title,
+   } = sequence;
+   const {
+     userTimezone,
+   } = useModel('outline', courseId);
+-  const {
+-    canLoadCourseware,
+-  } = useModel('courseHomeMeta', courseId);
+ 
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+-  // canLoadCourseware is true if the Courseware MFE is enabled, false otherwise
+-  const coursewareUrl = (
+-    canLoadCourseware
+-      ? <Link to={`/course/${courseId}/${id}`}>{title}</Link>
+-      : <Hyperlink destination={legacyWebUrl}>{title}</Hyperlink>
+-  );
++  const coursewareUrl = <Link to={`/course/${courseId}/${id}`}>{title}</Link>;
+   const displayTitle = showLink ? coursewareUrl : title;
+ 
+   return (
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index aa5b99b..4ee2988 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -504,21 +504,4 @@ describe('CoursewareContainer', () => {
+       expect(global.location.href).toEqual(`http://localhost/redirect/dashboard?notlive=${startDate}`);
+     });
+   });
+-
+-  describe('redirects when canLoadCourseware is false', () => {
+-    it('should go to legacy courseware for disabled frontend', async () => {
+-      const courseMetadata = Factory.build('courseMetadata');
+-      const courseHomeMetadata = Factory.build('courseHomeMetadata', {
+-        can_load_courseware: false,
+-      });
+-      const courseId = courseMetadata.id;
+-      const { courseBlocks, sequenceBlocks, unitBlocks } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
+-      setUpMockRequests({ courseBlocks, courseMetadata, courseHomeMetadata });
+-      history.push(`/course/${courseId}/${sequenceBlocks[0].id}/${unitBlocks[0].id}`);
+-
+-      await loadContainer();
+-
+-      expect(global.location.href).toEqual(`http://localhost/redirect/courseware/${courseMetadata.id}/unit/${unitBlocks[0].id}`);
+-    });
+-  });
+ });
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index 16388f9..7cc2b9d 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -20,12 +20,6 @@ export default () => {
+       />
+ 
+       <Switch>
+-        <PageRoute
+-          path={`${path}/courseware/:courseId/unit/:unitId`}
+-          render={({ match }) => {
+-            global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/jump_to/${match.params.unitId}?experience=legacy`);
+-          }}
+-        />
+         <PageRoute
+           path={`${path}/survey/:courseId`}
+           render={({ match }) => {
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index ccbc3d6..e45aa4f 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -26,7 +26,6 @@ export function normalizeLearningSequencesData(learningSequencesData) {
+     models.sequences[seqId] = {
+       id: seqId,
+       title: sequence.title,
+-      legacyWebUrl: `${getConfig().LMS_BASE_URL}/courses/${learningSequencesData.course_key}/jump_to/${seqId}?experience=legacy`,
+     };
+   });
+ 
+@@ -106,7 +105,6 @@ function normalizeMetadata(metadata) {
+     start: data.start,
+     enrollmentMode: data.enrollment.mode,
+     isEnrolled: data.enrollment.is_active,
+-    canViewLegacyCourseware: data.can_view_legacy_courseware,
+     license: data.license,
+     userTimezone: data.user_timezone,
+     showCalculator: data.show_calculator,
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index feb5ec7..cf77a27 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -171,13 +171,11 @@ describe('Courseware Service', () => {
+             id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible',
+             title: 'Can access',
+             sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial',
+-            legacyWebUrl: `${getConfig().LMS_BASE_URL}/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@accessible?experience=legacy`,
+           },
+           'block-v1:edX+DemoX+Demo_Course+type@sequential+block@released': {
+             id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@released',
+             title: 'Released and inaccessible',
+             sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@partial',
+-            legacyWebUrl: `${getConfig().LMS_BASE_URL}/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@released?experience=legacy`,
+           },
+         },
+       };
+@@ -271,7 +269,6 @@ describe('Courseware Service', () => {
+             }),
+             show_calculator: boolean(false),
+             original_user_is_staff: boolean(true),
+-            can_view_legacy_courseware: boolean(true),
+             is_staff: boolean(true),
+             course_access: like({
+               has_access: true,
+@@ -321,7 +318,6 @@ describe('Courseware Service', () => {
+         start: '2013-02-05T05:00:00Z',
+         enrollmentMode: 'audit',
+         isEnrolled: true,
+-        canViewLegacyCourseware: true,
+         license: 'all-rights-reserved',
+         userTimezone: null,
+         showCalculator: false,
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index d57095b..ae023b5 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -95,9 +95,7 @@ export function fetchCourse(courseId) {
+         logError(courseHomeMetadataResult.reason);
+       }
+       if (fetchedMetadata && fetchedCourseHomeMetadata) {
+-        if (courseHomeMetadataResult.value.courseAccess.hasAccess
+-          && courseHomeMetadataResult.value.canLoadCourseware
+-          && fetchedOutline) {
++        if (courseHomeMetadataResult.value.courseAccess.hasAccess && fetchedOutline) {
+           // User has access
+           dispatch(fetchCourseSuccess({ courseId }));
+           return;
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 1957a05..80eb3f5 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -36,14 +36,6 @@ function getStudioUrl(courseId, unitId) {
+   return urlFull;
+ }
+ 
+-function getLegacyWebUrl(canViewLegacyCourseware, courseId, unitId) {
+-  if (!canViewLegacyCourseware || !unitId) {
+-    return undefined;
+-  }
+-
+-  return `${getConfig().LMS_BASE_URL}/courses/${courseId}/jump_to/${unitId}?experience=legacy`;
+-}
+-
+ export default function InstructorToolbar(props) {
+   // This didMount logic became necessary once we had a page that does a redirect on a quick exit.
+   // As a result, it unmounts the InstructorToolbar (which will be remounted by the new component),
+@@ -62,12 +54,10 @@ export default function InstructorToolbar(props) {
+   const {
+     courseId,
+     unitId,
+-    canViewLegacyCourseware,
+     tab,
+   } = props;
+ 
+   const urlInsights = getInsightsUrl(courseId);
+-  const urlLegacy = getLegacyWebUrl(canViewLegacyCourseware, courseId, unitId);
+   const urlStudio = getStudioUrl(courseId, unitId);
+   const [masqueradeErrorMessage, showMasqueradeError] = useState(null);
+ 
+@@ -81,17 +71,12 @@ export default function InstructorToolbar(props) {
+           <div className="align-items-center flex-grow-1 d-md-flex mx-1 my-1">
+             <MasqueradeWidget courseId={courseId} onError={showMasqueradeError} />
+           </div>
+-          {(urlLegacy || urlStudio || urlInsights) && (
++          {(urlStudio || urlInsights) && (
+             <>
+               <hr className="border-light" />
+               <span className="mr-2 mt-1 col-form-label">View course in:</span>
+             </>
+           )}
+-          {urlLegacy && (
+-            <span className="mx-1 my-1">
+-              <a className="btn btn-inverse-outline-primary" href={urlLegacy}>Legacy experience</a>
+-            </span>
+-          )}
+           {urlStudio && (
+             <span className="mx-1 my-1">
+               <a className="btn btn-inverse-outline-primary" href={urlStudio}>Studio</a>
+@@ -128,13 +113,11 @@ export default function InstructorToolbar(props) {
+ InstructorToolbar.propTypes = {
+   courseId: PropTypes.string,
+   unitId: PropTypes.string,
+-  canViewLegacyCourseware: PropTypes.bool,
+   tab: PropTypes.string,
+ };
+ 
+ InstructorToolbar.defaultProps = {
+   courseId: undefined,
+   unitId: undefined,
+-  canViewLegacyCourseware: undefined,
+   tab: '',
+ };
+diff --git a/src/instructor-toolbar/InstructorToolbar.test.jsx b/src/instructor-toolbar/InstructorToolbar.test.jsx
+index a926275..f74c751 100644
+--- a/src/instructor-toolbar/InstructorToolbar.test.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.test.jsx
+@@ -34,7 +34,6 @@ describe('Instructor Toolbar', () => {
+     mockData = {
+       courseId: courseware.courseId,
+       unitId: Object.values(models.units)[0].id,
+-      canViewLegacyCourseware: true,
+     };
+     axiosMock.reset();
+     axiosMock.onGet(masqueradeUrl).reply(200, { success: true });
+@@ -63,32 +62,6 @@ describe('Instructor Toolbar', () => {
+     getConfig.mockImplementation(() => config);
+     render(<InstructorToolbar {...mockData} />);
+ 
+-    const linksContainer = screen.getByText('View course in:').parentElement;
+-    ['Legacy experience', 'Studio', 'Insights'].forEach(service => {
+-      expect(getByText(linksContainer, service).getAttribute('href')).toMatch(/http.*/);
+-    });
+-  });
+-
+-  it('displays links to view course in available services - false legacy courseware flag', () => {
+-    const config = { ...originalConfig };
+-    config.INSIGHTS_BASE_URL = 'http://localhost:18100';
+-    getConfig.mockImplementation(() => config);
+-    mockData.canViewLegacyCourseware = false;
+-    render(<InstructorToolbar {...mockData} />);
+-
+-    const linksContainer = screen.getByText('View course in:').parentElement;
+-    ['Studio', 'Insights'].forEach(service => {
+-      expect(getByText(linksContainer, service).getAttribute('href')).toMatch(/http.*/);
+-    });
+-  });
+-
+-  it('displays links to view course in available services - empty unit', () => {
+-    const config = { ...originalConfig };
+-    config.INSIGHTS_BASE_URL = 'http://localhost:18100';
+-    getConfig.mockImplementation(() => config);
+-    mockData.unitId = undefined;
+-    render(<InstructorToolbar {...mockData} />);
+-
+     const linksContainer = screen.getByText('View course in:').parentElement;
+     ['Studio', 'Insights'].forEach(service => {
+       expect(getByText(linksContainer, service).getAttribute('href')).toMatch(/http.*/);
+diff --git a/src/pacts/frontend-app-learning-lms.json b/src/pacts/frontend-app-learning-lms.json
+index c1f4af7..76880a7 100644
+--- a/src/pacts/frontend-app-learning-lms.json
++++ b/src/pacts/frontend-app-learning-lms.json
+@@ -27,7 +27,6 @@
+             "sku": "8CF08E5",
+             "upgrade_url": "http://localhost:18130/basket/add/?sku=8CF08E5"
+           },
+-          "can_load_courseware": true,
+           "celebrations": {
+             "first_section": false,
+             "streak_length_to_celebrate": null,
+@@ -66,9 +65,6 @@
+           "$.body.verified_mode": {
+             "match": "type"
+           },
+-          "$.body.can_load_courseware": {
+-            "match": "type"
+-          },
+           "$.body.celebrations": {
+             "match": "type"
+           },
+@@ -280,7 +276,6 @@
+           },
+           "show_calculator": false,
+           "original_user_is_staff": true,
+-          "can_view_legacy_courseware": true,
+           "is_staff": true,
+           "course_access": {
+             "has_access": true,
+@@ -414,9 +409,6 @@
+           "$.body.original_user_is_staff": {
+             "match": "type"
+           },
+-          "$.body.can_view_legacy_courseware": {
+-            "match": "type"
+-          },
+           "$.body.is_staff": {
+             "match": "type"
+           },
+@@ -759,4 +751,4 @@
+       "version": "2.0.0"
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/shared/access.js b/src/shared/access.js
+index 773aa2e..4ac2840 100644
+--- a/src/shared/access.js
++++ b/src/shared/access.js
+@@ -4,7 +4,7 @@ import { getLocale } from '@edx/frontend-platform/i18n';
+ // This function inspects an access denied error and provides a redirect url (looks like a /redirect/... path),
+ // which then renders a nice little message while the browser loads the next page.
+ // This is basically a frontend version of check_course_access_with_redirect in the backend.
+-export function getAccessDeniedRedirectUrl(courseId, activeTabSlug, canLoadCourseware, courseAccess, start, unitId) {
++export function getAccessDeniedRedirectUrl(courseId, activeTabSlug, courseAccess, start) {
+   let url = null;
+   switch (courseAccess.errorCode) {
+     case 'audit_expired':
+@@ -24,11 +24,7 @@ export function getAccessDeniedRedirectUrl(courseId, activeTabSlug, canLoadCours
+     case 'authentication_required':
+     case 'enrollment_required':
+     default:
+-      // if the learner has access to the course, but it is not enabled in the mfe, there is no
+-      // error message, canLoadCourseware will be false.
+-      if (activeTabSlug === 'courseware' && canLoadCourseware === false && unitId) {
+-        url = `/redirect/courseware/${courseId}/unit/${unitId}`;
+-      } else if (activeTabSlug !== 'outline') {
++      if (activeTabSlug !== 'outline') {
+         url = `/course/${courseId}/home`;
+       }
+   }
+diff --git a/src/shared/data/__factories__/block.factory.js b/src/shared/data/__factories__/block.factory.js
+index f037c02..0bda473 100644
+--- a/src/shared/data/__factories__/block.factory.js
++++ b/src/shared/data/__factories__/block.factory.js
+@@ -47,13 +47,13 @@ Factory.define('block')
+     },
+   )
+   .attr(
+-    'legacy_web_url',
+-    ['legacy_web_url', 'host', 'courseId', 'id'],
++    'lms_web_url',
++    ['lms_web_url', 'host', 'courseId', 'id'],
+     (url, host, courseId, id) => {
+       if (url) {
+         return url;
+       }
+ 
+-      return `${host}/courses/${courseId}/jump_to/${id}?experience=legacy`;
++      return `${host}/courses/${courseId}/jump_to/${id}`;
+     },
+   );
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 44e85db..db31ca6 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -24,7 +24,6 @@ function LoadedTabPage({
+ }) {
+   const {
+     celebrations,
+-    canViewLegacyCourseware,
+     org,
+     originalUserIsStaff,
+     tabs,
+@@ -58,7 +57,6 @@ function LoadedTabPage({
+         <InstructorToolbar
+           courseId={courseId}
+           unitId={unitId}
+-          canViewLegacyCourseware={canViewLegacyCourseware}
+           tab={activeTabSlug}
+         />
+       )}
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index 1fb59c1..24f1dd2 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -23,7 +23,6 @@ function TabPage({ intl, ...props }) {
+     courseId,
+     courseStatus,
+     metadataModel,
+-    unitId,
+   } = props;
+   const {
+     toastBodyLink,
+@@ -32,7 +31,6 @@ function TabPage({ intl, ...props }) {
+   } = useSelector(state => state.courseHome);
+   const dispatch = useDispatch();
+   const {
+-    canLoadCourseware,
+     courseAccess,
+     number,
+     org,
+@@ -53,9 +51,7 @@ function TabPage({ intl, ...props }) {
+   }
+ 
+   if (courseStatus === 'denied') {
+-    const redirectUrl = getAccessDeniedRedirectUrl(
+-      courseId, activeTabSlug, canLoadCourseware, courseAccess, start, unitId,
+-    );
++    const redirectUrl = getAccessDeniedRedirectUrl(courseId, activeTabSlug, courseAccess, start);
+     if (redirectUrl) {
+       return (<Redirect to={redirectUrl} />);
+     }
+-- 
+2.34.1
+

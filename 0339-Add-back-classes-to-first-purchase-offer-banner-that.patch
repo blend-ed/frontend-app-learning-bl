@@ -1,0 +1,36 @@
+From 79f5c7fcf49abdfe6bd2b9a2ba6e79fc1f9d4326 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Tue, 15 Dec 2020 14:59:56 -0500
+Subject: [PATCH 0339/1021] Add back classes to first purchase offer banner
+ that are used in the REV-1512 optimizely test (#309)
+
+---
+ src/alerts/offer-alert/OfferAlert.jsx | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/alerts/offer-alert/OfferAlert.jsx b/src/alerts/offer-alert/OfferAlert.jsx
+index 376ae29..89644ef 100644
+--- a/src/alerts/offer-alert/OfferAlert.jsx
++++ b/src/alerts/offer-alert/OfferAlert.jsx
+@@ -34,14 +34,16 @@ function OfferAlert({ intl, payload }) {
+         {intl.formatMessage(messages.srPrices, { discountedPrice, originalPrice })}
+       </span>
+       <span aria-hidden="true">
+-        {discountedPrice} <del>{originalPrice}</del>
++        {/* the price discount and price original classes can be removed post REV-1512 experiment */}
++        <span className="price discount">{discountedPrice}</span> <del className="price original">{originalPrice}</del>
+       </span>
+     </>
+   );
+ 
+   return (
+     <Alert type={ALERT_TYPES.INFO}>
+-      <span className="font-weight-bold">
++      {/* the first-purchase-offer-banner class can be removed post REV-1512 experiment */}
++      <span className="font-weight-bold first-purchase-offer-banner">
+         <FormattedMessage
+           id="learning.offer.header"
+           defaultMessage="Upgrade by {date} and save {percentage}% [{fullPricing}]"
+-- 
+2.34.1
+

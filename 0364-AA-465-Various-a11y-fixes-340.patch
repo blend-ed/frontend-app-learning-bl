@@ -1,0 +1,615 @@
+From 958c13ca93f0184fe2ba9ce10be01874a22b770a Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Thu, 7 Jan 2021 12:11:28 -0500
+Subject: [PATCH 0364/1021] AA-465: Various a11y fixes (#340)
+
+---
+ src/course-header/Header.jsx                  |   8 +-
+ src/course-header/messages.js                 |   5 +
+ .../courseHomeMetadata.factory.js             |  10 ++
+ .../data/__snapshots__/redux.test.js.snap     |  10 ++
+ src/course-home/outline-tab/DateSummary.jsx   |   4 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |  20 ++--
+ .../outline-tab/OutlineTab.test.jsx           |   4 +-
+ src/course-home/outline-tab/Section.jsx       | 104 ++++++++++--------
+ src/course-home/outline-tab/SequenceLink.jsx  | 104 +++++++++---------
+ src/course-home/outline-tab/messages.js       |   6 +-
+ .../outline-tab/widgets/CourseDates.jsx       |  16 +--
+ .../outline-tab/widgets/CourseGoalCard.jsx    |   2 +-
+ .../outline-tab/widgets/CourseTools.jsx       |  18 +--
+ .../__factories__/courseBlocks.factory.js     |   1 +
+ src/tab-page/LoadedTabPage.jsx                |  10 +-
+ src/tab-page/LoadedTabPage.test.jsx           |   2 +-
+ 16 files changed, 189 insertions(+), 135 deletions(-)
+
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index bd77469..b77702c 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -2,10 +2,12 @@ import React, { useContext } from 'react';
+ import PropTypes from 'prop-types';
+ import { useEnterpriseConfig } from '@edx/frontend-enterprise';
+ import { getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { AppContext } from '@edx/frontend-platform/react';
+ 
+ import AnonymousUserMenu from './AnonymousUserMenu';
+ import AuthenticatedUserDropdown from './AuthenticatedUserDropdown';
++import messages from './messages';
+ 
+ function LinkedLogo({
+   href,
+@@ -27,7 +29,7 @@ LinkedLogo.propTypes = {
+ };
+ 
+ function Header({
+-  courseOrg, courseNumber, courseTitle,
++  courseOrg, courseNumber, courseTitle, intl,
+ }) {
+   const { authenticatedUser } = useContext(AppContext);
+ 
+@@ -58,6 +60,7 @@ function Header({
+ 
+   return (
+     <header className="course-header">
++      <a className="sr-only sr-only-focusable" href="#main-content">{intl.formatMessage(messages.skipNavLink)}</a>
+       <div className="container-fluid py-2 d-flex align-items-center">
+         {headerLogo}
+         <div className="flex-grow-1 course-title-lockup" style={{ lineHeight: 1 }}>
+@@ -82,6 +85,7 @@ Header.propTypes = {
+   courseOrg: PropTypes.string,
+   courseNumber: PropTypes.string,
+   courseTitle: PropTypes.string,
++  intl: intlShape.isRequired,
+ };
+ 
+ Header.defaultProps = {
+@@ -90,4 +94,4 @@ Header.defaultProps = {
+   courseTitle: null,
+ };
+ 
+-export default Header;
++export default injectIntl(Header);
+diff --git a/src/course-header/messages.js b/src/course-header/messages.js
+index 07d5de9..e35d61a 100644
+--- a/src/course-header/messages.js
++++ b/src/course-header/messages.js
+@@ -31,6 +31,11 @@ const messages = defineMessages({
+     defaultMessage: 'Order History',
+     description: 'The text for the user menu Order History navigation link.',
+   },
++  skipNavLink: {
++    id: 'header.navigation.skipNavLink',
++    defaultMessage: 'Skip to main content.',
++    description: 'A link used by screen readers to allow users to skip to the main content of the page.',
++  },
+   signOut: {
+     id: 'header.menu.signOut.label',
+     defaultMessage: 'Sign Out',
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 67d2ab1..4db203d 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -67,6 +67,16 @@ Factory.define('courseHomeMetadata')
+           },
+           { courseId, path: 'instructor' },
+         ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Dates',
++            priority: 5,
++            slug: 'dates',
++            type: 'dates',
++          },
++          { courseId, path: 'dates' },
++        ),
+       ];
+ 
+       return tabs.map(
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index d2463b0..403b2a3 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -52,6 +52,11 @@ Object {
+             "title": "Instructor",
+             "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
+           },
++          Object {
++            "slug": "dates",
++            "title": "Dates",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/dates",
++          },
+         ],
+         "title": "Demonstration Course",
+       },
+@@ -333,6 +338,11 @@ Object {
+             "title": "Instructor",
+             "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
+           },
++          Object {
++            "slug": "dates",
++            "title": "Dates",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/dates",
++          },
+         ],
+         "title": "Demonstration Course",
+       },
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index a0d3648..63be855 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -13,7 +13,7 @@ export default function DateSummary({
+   const linkedTitle = dateBlock.link && isLearnerAssignment(dateBlock);
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+   return (
+-    <section className="container p-0 mb-3">
++    <li className="container p-0 mb-3">
+       <div className="row">
+         <FontAwesomeIcon icon={faCalendarAlt} className="ml-3 mt-1 mr-1" fixedWidth />
+         <div className="ml-1 font-weight-bold">
+@@ -39,7 +39,7 @@ export default function DateSummary({
+         {!linkedTitle && dateBlock.link
+           && <a href={dateBlock.link} className="description-link">{dateBlock.linkText}</a>}
+       </div>
+-    </section>
++    </li>
+   );
+ }
+ 
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 58ce676..4fe9f15 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -146,15 +146,17 @@ function OutlineTab({ intl }) {
+                   </Button>
+                 </div>
+               </div>
+-              {courses[rootCourseId].sectionIds.map((sectionId) => (
+-                <Section
+-                  key={sectionId}
+-                  courseId={courseId}
+-                  defaultOpen={sections[sectionId].resumeBlock}
+-                  expand={expandAll}
+-                  section={sections[sectionId]}
+-                />
+-              ))}
++              <ol className="list-unstyled">
++                {courses[rootCourseId].sectionIds.map((sectionId) => (
++                  <Section
++                    key={sectionId}
++                    courseId={courseId}
++                    defaultOpen={sections[sectionId].resumeBlock}
++                    expand={expandAll}
++                    section={sections[sectionId]}
++                  />
++                ))}
++              </ol>
+             </>
+           )}
+         </div>
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index f50727b..7fe863e 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -71,7 +71,7 @@ describe('Outline Tab', () => {
+         },
+       });
+       await fetchAndRender();
+-      expect(screen.getByRole('link', { name: 'Resume Course' })).toBeInTheDocument();
++      expect(screen.getByRole('link', { name: 'Resume course' })).toBeInTheDocument();
+     });
+ 
+     it('expands section that contains resume block', async () => {
+@@ -87,7 +87,7 @@ describe('Outline Tab', () => {
+     it('handles expand/collapse all button click', async () => {
+       await fetchAndRender();
+       // Button renders as "Expand All"
+-      const expandButton = screen.getByRole('button', { name: 'Expand All' });
++      const expandButton = screen.getByRole('button', { name: 'Expand all' });
+       expect(expandButton).toBeInTheDocument();
+ 
+       // Section initially renders collapsed
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index ea931a4..e815286 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -39,23 +39,27 @@ function Section({
+   }, []);
+ 
+   const sectionTitle = (
+-    <div>
+-      {complete ? (
+-        <FontAwesomeIcon
+-          icon={fasCheckCircle}
+-          className="float-left mt-1 text-success"
+-          aria-hidden="true"
+-          title={intl.formatMessage(messages.completedSection)}
+-        />
+-      ) : (
+-        <FontAwesomeIcon
+-          icon={farCheckCircle}
+-          className="float-left mt-1 text-gray-200"
+-          aria-hidden="true"
+-          title={intl.formatMessage(messages.incompleteSection)}
+-        />
+-      )}
+-      <div className="ml-3 pl-3 font-weight-bold">
++    <div className="row w-100 m-0">
++      <div className="col-auto p-0">
++        {complete ? (
++          <FontAwesomeIcon
++            icon={fasCheckCircle}
++            fixedWidth
++            className="float-left mt-1 text-success"
++            aria-hidden="true"
++            title={intl.formatMessage(messages.completedSection)}
++          />
++        ) : (
++          <FontAwesomeIcon
++            icon={farCheckCircle}
++            fixedWidth
++            className="float-left mt-1 text-gray-200"
++            aria-hidden="true"
++            title={intl.formatMessage(messages.incompleteSection)}
++          />
++        )}
++      </div>
++      <div className="col-10 ml-2 p-0 font-weight-bold">
+         {title}
+         <span className="sr-only">
+           , {intl.formatMessage(complete ? messages.completedSection : messages.incompleteSection)}
+@@ -65,37 +69,41 @@ function Section({
+   );
+ 
+   return (
+-    <Collapsible
+-      className="mb-2"
+-      styling="card-lg"
+-      title={sectionTitle}
+-      open={open}
+-      onToggle={() => { setOpen(!open); }}
+-      iconWhenClosed={(
+-        <IconButton
+-          alt={intl.formatMessage(messages.openSection)}
+-          icon={faPlus}
+-          onClick={() => { setOpen(true); }}
+-        />
+-      )}
+-      iconWhenOpen={(
+-        <IconButton
+-          alt={intl.formatMessage(genericMessages.close)}
+-          icon={faMinus}
+-          onClick={() => { setOpen(false); }}
+-        />
+-      )}
+-    >
+-      {sequenceIds.map((sequenceId, index) => (
+-        <SequenceLink
+-          key={sequenceId}
+-          id={sequenceId}
+-          courseId={courseId}
+-          sequence={sequences[sequenceId]}
+-          first={index === 0}
+-        />
+-      ))}
+-    </Collapsible>
++    <li>
++      <Collapsible
++        className="mb-2"
++        styling="card-lg"
++        title={sectionTitle}
++        open={open}
++        onToggle={() => { setOpen(!open); }}
++        iconWhenClosed={(
++          <IconButton
++            alt={intl.formatMessage(messages.openSection)}
++            icon={faPlus}
++            onClick={() => { setOpen(true); }}
++          />
++        )}
++        iconWhenOpen={(
++          <IconButton
++            alt={intl.formatMessage(genericMessages.close)}
++            icon={faMinus}
++            onClick={() => { setOpen(false); }}
++          />
++        )}
++      >
++        <ol className="list-unstyled">
++          {sequenceIds.map((sequenceId, index) => (
++            <SequenceLink
++              key={sequenceId}
++              id={sequenceId}
++              courseId={courseId}
++              sequence={sequences[sequenceId]}
++              first={index === 0}
++            />
++          ))}
++        </ol>
++      </Collapsible>
++    </li>
+   );
+ }
+ 
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index b10ce9c..5a66c02 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -40,59 +40,61 @@ function SequenceLink({
+   const displayTitle = showLink ? <Link to={`/course/${courseId}/${id}`}>{title}</Link> : title;
+ 
+   return (
+-    <div className={classNames('', { 'mt-2 pt-2 border-top border-light': !first })}>
+-      <div className="row w-100 m-0">
+-        <div className="col-auto p-0">
+-          {complete ? (
+-            <FontAwesomeIcon
+-              icon={fasCheckCircle}
+-              fixedWidth
+-              className="float-left text-success mt-1"
+-              aria-hidden="true"
+-              title={intl.formatMessage(messages.completedAssignment)}
+-            />
+-          ) : (
+-            <FontAwesomeIcon
+-              icon={farCheckCircle}
+-              fixedWidth
+-              className="float-left text-gray-200 mt-1"
+-              aria-hidden="true"
+-              title={intl.formatMessage(messages.incompleteAssignment)}
+-            />
+-          )}
++    <li>
++      <div className={classNames('', { 'mt-2 pt-2 border-top border-light': !first })}>
++        <div className="row w-100 m-0">
++          <div className="col-auto p-0">
++            {complete ? (
++              <FontAwesomeIcon
++                icon={fasCheckCircle}
++                fixedWidth
++                className="float-left text-success mt-1"
++                aria-hidden="true"
++                title={intl.formatMessage(messages.completedAssignment)}
++              />
++            ) : (
++              <FontAwesomeIcon
++                icon={farCheckCircle}
++                fixedWidth
++                className="float-left text-gray-200 mt-1"
++                aria-hidden="true"
++                title={intl.formatMessage(messages.incompleteAssignment)}
++              />
++            )}
++          </div>
++          <div className="col-10 p-0 ml-2 text-break">{displayTitle}</div>
++          <span className="sr-only">
++            , {intl.formatMessage(complete ? messages.completedAssignment : messages.incompleteAssignment)}
++          </span>
+         </div>
+-        <div className="col-10 p-0 ml-2 pl-1 text-break">{displayTitle}</div>
+-        <span className="sr-only">
+-          , {intl.formatMessage(complete ? messages.completedAssignment : messages.incompleteAssignment)}
+-        </span>
++        {due && (
++          <div className="row w-100 m-0 ml-3 pl-3">
++            <small className="text-body">
++              <FormattedMessage
++                id="learning.outline.sequence-due"
++                defaultMessage="{description} due {assignmentDue}"
++                description="Used below an assignment title"
++                values={{
++                  assignmentDue: (
++                    <FormattedTime
++                      key={`${id}-due`}
++                      day="numeric"
++                      month="short"
++                      year="numeric"
++                      hour12={false}
++                      timeZoneName="short"
++                      value={due}
++                      {...timezoneFormatArgs}
++                    />
++                  ),
++                  description: description || '',
++                }}
++              />
++            </small>
++          </div>
++        )}
+       </div>
+-      {due && (
+-        <div className="row w-100 m-0 ml-3 pl-3">
+-          <small className="text-body">
+-            <FormattedMessage
+-              id="learning.outline.sequence-due"
+-              defaultMessage="{description} due {assignmentDue}"
+-              description="Used below an assignment title"
+-              values={{
+-                assignmentDue: (
+-                  <FormattedTime
+-                    key={`${id}-due`}
+-                    day="numeric"
+-                    month="short"
+-                    year="numeric"
+-                    hour12={false}
+-                    timeZoneName="short"
+-                    value={due}
+-                    {...timezoneFormatArgs}
+-                  />
+-                ),
+-                description: description || '',
+-              }}
+-            />
+-          </small>
+-        </div>
+-      )}
+-    </div>
++    </li>
+   );
+ }
+ 
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index 581f6af..f0c839a 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -7,7 +7,7 @@ const messages = defineMessages({
+   },
+   collapseAll: {
+     id: 'learning.outline.collapseAll',
+-    defaultMessage: 'Collapse All',
++    defaultMessage: 'Collapse all',
+     description: 'Label for button to close all of the collapsible sections',
+   },
+   completedAssignment: {
+@@ -31,7 +31,7 @@ const messages = defineMessages({
+   },
+   expandAll: {
+     id: 'learning.outline.expandAll',
+-    defaultMessage: 'Expand All',
++    defaultMessage: 'Expand all',
+     description: 'Label for button to open all of the collapsible sections',
+   },
+   goal: {
+@@ -68,7 +68,7 @@ const messages = defineMessages({
+   },
+   resume: {
+     id: 'learning.outline.resume',
+-    defaultMessage: 'Resume Course',
++    defaultMessage: 'Resume course',
+   },
+   setGoal: {
+     id: 'learning.outline.setGoal',
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index 0bf1d8d..1ed45cc 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -23,13 +23,15 @@ function CourseDates({ courseId, intl }) {
+   return (
+     <section className="mb-4">
+       <h2 className="h6">{intl.formatMessage(messages.dates)}</h2>
+-      {courseDateBlocks.map((courseDateBlock) => (
+-        <DateSummary
+-          key={courseDateBlock.title + courseDateBlock.date}
+-          dateBlock={courseDateBlock}
+-          userTimezone={userTimezone}
+-        />
+-      ))}
++      <ol className="list-unstyled">
++        {courseDateBlocks.map((courseDateBlock) => (
++          <DateSummary
++            key={courseDateBlock.title + courseDateBlock.date}
++            dateBlock={courseDateBlock}
++            userTimezone={userTimezone}
++          />
++        ))}
++      </ol>
+       <a className="font-weight-bold ml-4 pl-1" href={datesTabLink}>
+         {intl.formatMessage(messages.allDates)}
+       </a>
+diff --git a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx b/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+index 64ae8cb..8324005 100644
+--- a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+@@ -38,7 +38,7 @@ function CourseGoalCard({
+       <Card.Body>
+         <div className="row w-100 m-0 justify-content-between align-items-center">
+           <div className="col col-8 p-0">
+-            <Card.Title className="h6 m-0">{intl.formatMessage(messages.welcomeTo)} {title}</Card.Title>
++            <Card.Title role="heading" aria-level="2" className="h6 m-0">{intl.formatMessage(messages.welcomeTo)} {title}</Card.Title>
+           </div>
+           <div className="col col-auto p-0">
+             <Button
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index ffbc788..e8c4748 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -56,14 +56,16 @@ function CourseTools({ courseId, intl }) {
+   return (
+     <section className="mb-4">
+       <h2 className="h6">{intl.formatMessage(messages.tools)}</h2>
+-      {courseTools.map((courseTool) => (
+-        <div key={courseTool.analyticsId}>
+-          <a href={courseTool.url} onClick={() => logClick(courseTool.analyticsId)}>
+-            <FontAwesomeIcon icon={renderIcon(courseTool.analyticsId)} className="mr-2" fixedWidth />
+-            {courseTool.title}
+-          </a>
+-        </div>
+-      ))}
++      <ul className="list-unstyled">
++        {courseTools.map((courseTool) => (
++          <li key={courseTool.analyticsId}>
++            <a href={courseTool.url} onClick={() => logClick(courseTool.analyticsId)}>
++              <FontAwesomeIcon icon={renderIcon(courseTool.analyticsId)} className="mr-2" fixedWidth />
++              {courseTool.title}
++            </a>
++          </li>
++        ))}
++      </ul>
+     </section>
+   );
+ }
+diff --git a/src/courseware/data/__factories__/courseBlocks.factory.js b/src/courseware/data/__factories__/courseBlocks.factory.js
+index cc9876c..46d2810 100644
+--- a/src/courseware/data/__factories__/courseBlocks.factory.js
++++ b/src/courseware/data/__factories__/courseBlocks.factory.js
+@@ -80,6 +80,7 @@ export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
+       {
+         courseId,
+         hasScheduledContent: options.hasScheduledContent || false,
++        title: 'Demo Course',
+       },
+       {
+         units: unitBlocks,
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 698fac8..be55a23 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -1,5 +1,8 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import { Helmet } from 'react-helmet';
++
++import { getConfig } from '@edx/frontend-platform';
+ 
+ import { Header, CourseTabsNavigation } from '../course-header';
+ import { useModel } from '../generic/model-store';
+@@ -25,8 +28,13 @@ function LoadedTabPage({
+   const logistrationAlert = useLogistrationAlert(courseId);
+   const enrollmentAlert = useEnrollmentAlert(courseId);
+ 
++  const activeTab = tabs.filter(tab => tab.slug === activeTabSlug)[0];
++
+   return (
+     <>
++      <Helmet>
++        <title>{`${activeTab.title} | ${title} | ${getConfig().SITE_NAME}`}</title>
++      </Helmet>
+       <Header
+         courseOrg={org}
+         courseNumber={number}
+@@ -38,7 +46,7 @@ function LoadedTabPage({
+           unitId={unitId}
+         />
+       )}
+-      <main className="d-flex flex-column flex-grow-1">
++      <main id="main-content" className="d-flex flex-column flex-grow-1">
+         <AlertList
+           topic="outline"
+           className="mx-5 mt-3"
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+index b098f68..10a55ca 100644
+--- a/src/tab-page/LoadedTabPage.test.jsx
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -7,7 +7,7 @@ jest.mock('../course-header/CourseTabsNavigation', () => () => <div data-testid=
+ jest.mock('../instructor-toolbar/InstructorToolbar', () => () => <div data-testid="InstructorToolbar" />);
+ 
+ describe('Loaded Tab Page', () => {
+-  const mockData = { activeTabSlug: 'dummy' };
++  const mockData = { activeTabSlug: 'courseware' };
+ 
+   beforeAll(async () => {
+     const store = await initializeTestStore({ excludeFetchSequence: true });
+-- 
+2.34.1
+

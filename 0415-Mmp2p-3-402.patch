@@ -1,0 +1,304 @@
+From 162f0ceeb5498be676c618d42c21c77896280af3 Mon Sep 17 00:00:00 2001
+From: Ben Warzeski <bwarzeski@edx.org>
+Date: Wed, 31 Mar 2021 10:43:38 -0400
+Subject: [PATCH 0415/1021] Mmp2p 3 (#402)
+
+* [MM-P2P] move access and meta logic to initialization and store in state
+
+* move model access to thunk action
+---
+ src/experiments/mm-p2p/index.jsx | 216 +++++++++++++++++--------------
+ 1 file changed, 117 insertions(+), 99 deletions(-)
+
+diff --git a/src/experiments/mm-p2p/index.jsx b/src/experiments/mm-p2p/index.jsx
+index d040dd2..33dd70b 100644
+--- a/src/experiments/mm-p2p/index.jsx
++++ b/src/experiments/mm-p2p/index.jsx
+@@ -1,4 +1,5 @@
+ import { useState } from 'react';
++import { useDispatch } from 'react-redux';
+ 
+ import { useModel } from '../../generic/model-store';
+ 
+@@ -16,6 +17,8 @@ const MMP2PKeys = StrictDict({
+   enableFn: 'enable',
+   flyoverVisible: 'flyoverVisible',
+   state: 'state',
++  access: 'access',
++  meta: 'meta',
+ });
+ 
+ let location;
+@@ -30,6 +33,11 @@ const defaultWindowVal = (field, val) => (
+   windowVal(field) === undefined ? val : windowVal(field)
+ );
+ 
++const createWindowStateSetter = (stateSetter, key) => (value) => {
++  stateSetter(value);
++  setWindowVal(key, value);
++};
++
+ const externalConfig = {
+   runs: [
+     {
+@@ -87,51 +95,57 @@ const initHomeMMP2P = (courseId) => {
+     upgradeDeadline: null,
+     afterUpgradeDeadline: false,
+   };
++  const defaultAccess = {
++    isAudit: false,
++    accessExpirationDate: null,
++    upgradeUrl: null,
++    price: null,
++  };
+ 
+-  const [MMP2POptions, setMMP2POptions] = useState(
+-    defaultWindowVal(MMP2PKeys.state, { ...defaultState }),
+-  );
++  const [MMP2POptions, _setMMP2POptions] = useState(defaultWindowVal(MMP2PKeys.state, { ...defaultState }));
++  const [MMP2PAccess, _setMMP2PAccess] = useState(defaultWindowVal(MMP2PKeys.access, { ...defaultAccess }));
+ 
+-  setWindowVal(MMP2PKeys.enableFn, (upgradeDeadline) => {
++  const setMMP2POptions = createWindowStateSetter(_setMMP2POptions, MMP2PKeys.state);
++  const setMMP2PAccess = createWindowStateSetter(_setMMP2PAccess, MMP2PKeys.access);
++
++  const loadAccess = () => {
++    const { accessExpiration, verifiedMode } = useModel('coursewareMeta', courseId);
++
++    if (accessExpiration !== null && accessExpiration !== undefined) {
++      setMMP2PAccess({
++        isAudit: true,
++        accessExpirationDate: accessExpiration.expirationDate,
++        upgradeUrl: accessExpiration.upgradeUrl,
++        price: ((verifiedMode !== null && verifiedMode !== undefined)
++          ? `${verifiedMode.currencySymbol}${verifiedMode.price}`
++          : ''
++        ),
++      });
++    }
++  };
++
++  const enableFunction = (upgradeDeadline) => {
+     if (upgradeDeadline === undefined) {
+       setMMP2POptions({ ...defaultState });
++      setMMP2PAccess({ ...defaultAccess });
+     } else {
+       setMMP2POptions({
+         isEnabled: true,
+         upgradeDeadline,
+         afterUpgradeDeadline: new Date() > new Date(upgradeDeadline),
+       });
++      loadAccess();
+     }
+-  });
+-
+-  const access = {
+-    isAudit: false,
+-    accessExpirationDate: null,
+-    upgradeUrl: null,
+-    price: null,
+   };
+ 
+-  const { accessExpiration, verifiedMode } = useModel('outline', courseId);
+-  if (
+-    accessExpiration !== null
+-    && accessExpiration !== undefined
+-  ) {
+-    access.isAudit = true;
+-    access.accessExpirationDate = accessExpiration.expirationDate;
+-    access.upgradeUrl = accessExpiration.upgradeUrl;
+-    if (
+-      verifiedMode !== null
+-      && verifiedMode !== undefined
+-    ) {
+-      access.price = `${verifiedMode.currencySymbol}${verifiedMode.price}`;
+-    }
+-  }
++  setWindowVal(MMP2PKeys.enableFn, enableFunction);
+ 
+   return {
+     state: MMP2POptions,
+-    access,
++    access: MMP2PAccess,
+   };
+ };
++
+ const initCoursewareMMP2P = (courseId, sequenceId, unitId) => {
+   location = 'course';
+ 
+@@ -142,96 +156,100 @@ const initCoursewareMMP2P = (courseId, sequenceId, unitId) => {
+     subSections: [],
+     isWhitelisted: false,
+   };
++  const defaultAccess = {
++    isAudit: false,
++    accessExpirationDate: null,
++    upgradeUrl: null,
++    price: null,
++  };
++  const defaultMeta = {
++    blockContent: false,
++    gradedLock: false,
++    modalLock: false,
++    showLock: false,
++    verifiedLock: false,
++  };
+ 
+-  const [MMP2POptions, _setMMP2POptions] = useState(
+-    defaultWindowVal(MMP2PKeys.state, { ...defaultState }),
++  const [MMP2POptions, _setMMP2POptions] = useState(defaultWindowVal(MMP2PKeys.state, { ...defaultState }));
++  const [MMP2PAccess, _setMMP2PAccess] = useState(defaultWindowVal(MMP2PKeys.access, { ...defaultAccess }));
++  const [MMP2PMeta, _setMMP2PMeta] = useState(defaultWindowVal(MMP2PKeys.meta, { ...defaultMeta }));
++  const [MMP2PIsFlyoverVisible, setMMP2PIsFlyoverVisible] = useState(
++    defaultWindowVal(MMP2PKeys.flyoverVisible, !isMobile()),
+   );
+ 
+-  const setMMP2POptions = (options) => {
+-    _setMMP2POptions(options);
+-    setWindowVal(MMP2PKeys.state, options);
+-  };
++  const setMMP2POptions = createWindowStateSetter(_setMMP2POptions, MMP2PKeys.state);
++  const setMMP2PAccess = createWindowStateSetter(_setMMP2PAccess, MMP2PKeys.access);
++  const setMMP2PMeta = createWindowStateSetter(_setMMP2PMeta, MMP2PKeys.meta);
+ 
+-  const [isMMP2PFlyoverVisible, setMMP2PFlyoverVisible] = useState(
+-    isMobile() ? false : defaultWindowVal(MMP2PKeys.flyoverVisible, true),
+-  );
+   const flyover = {
+-    isVisible: isMMP2PFlyoverVisible,
++    isVisible: MMP2PIsFlyoverVisible,
+     toggle: () => {
+-      setMMP2PFlyoverVisible(!isMMP2PFlyoverVisible);
+-      setWindowVal(MMP2PKeys.flyoverVisible, !isMMP2PFlyoverVisible);
++      setMMP2PIsFlyoverVisible(!MMP2PIsFlyoverVisible);
++      setWindowVal(MMP2PKeys.flyoverVisible, !MMP2PIsFlyoverVisible);
+     },
+   };
+ 
+-  setWindowVal(MMP2PKeys.enableFn,
+-    (upgradeDeadline, subSections) => {
+-      if (subSections.length !== undefined && subSections.length > 0) {
+-        setMMP2POptions({
+-          isEnabled: true,
+-          upgradeDeadline,
+-          afterUpgradeDeadline: new Date() > new Date(upgradeDeadline),
+-          isWhitelisted: subSections.indexOf(sequenceId) > -1,
+-        });
+-      } else {
+-        setMMP2POptions({ ...defaultState });
+-        setWindowVal(MMP2PKeys.state, { ...defaultState });
+-      }
+-    });
+-
+-  const access = {
+-    isAudit: false,
+-    accessExpirationDate: null,
+-    upgradeUrl: null,
+-    price: null,
++  const loadOptions = (upgradeDeadline, subSections) => (dispatch, getState) => {
++    const state = getState();
++
++    const options = {
++      isEnabled: true,
++      upgradeDeadline,
++      afterUpgradeDeadline: new Date() > new Date(upgradeDeadline),
++      isWhitelisted: subSections.indexOf(sequenceId) > -1,
++    };
++    setMMP2POptions(options);
++
++    const models = {
++      coursewareMeta: state.models.coursewareMeta[courseId],
++      units: state.models.units[unitId],
++    };
++    const { accessExpiration, verifiedMode } = models.coursewareMeta;
++    const graded = models.units !== undefined ? models.units.graded : false;
++
++    let access = {};
++    if (accessExpiration !== null && accessExpiration !== undefined) {
++      access = {
++        isAudit: true,
++        accessExpirationDate: accessExpiration.expirationDate,
++        upgradeUrl: accessExpiration.upgradeUrl,
++        price: ((verifiedMode !== null && verifiedMode !== undefined)
++          ? `${verifiedMode.currencySymbol}${verifiedMode.price}`
++          : ''
++        ),
++      };
++      setMMP2PAccess(access);
++    }
++    const meta = {
++      verifiedLock: (access.isAudit && !options.isWhitelisted),
++      gradedLock: (access.isAudit && options.isWhitelisted && graded),
++      modalLock: (access.isAudit && !options.isWhitelisted && options.afterUpgradeDeadline),
++    };
++    meta.showLock = (options.isEnabled && (meta.verifiedLock || meta.gradedLock));
++    meta.blockContent = (options.isEnabled && meta.verifiedLock);
++    setMMP2PMeta(meta);
+   };
+ 
+-  const { accessExpiration, verifiedMode } = useModel('coursewareMeta', courseId);
+-  if (
+-    accessExpiration !== null
+-    && accessExpiration !== undefined
+-  ) {
+-    access.isAudit = true;
+-    access.accessExpirationDate = accessExpiration.expirationDate;
+-    access.upgradeUrl = accessExpiration.upgradeUrl;
+-    if (
+-      verifiedMode !== null
+-      && verifiedMode !== undefined
+-    ) {
+-      access.price = `${verifiedMode.currencySymbol}${verifiedMode.price}`;
++  const dispatch = useDispatch();
++  const enableFunction = (upgradeDeadline, subSections) => {
++    if (subSections.length !== undefined && subSections.length > 0) {
++      dispatch(loadOptions(upgradeDeadline, subSections));
++    } else {
++      setMMP2POptions({ ...defaultState });
++      setMMP2PAccess({ ...defaultAccess });
++      setMMP2PMeta({ ...defaultMeta });
+     }
+-  }
++  };
++
++  setWindowVal(MMP2PKeys.enableFn, enableFunction);
+ 
+   // testing
+   setWindowVal('externalConfig', externalConfig);
+ 
+-  const unitModel = useModel('units', unitId);
+-  const graded = unitModel !== undefined ? unitModel.graded : false;
+-
+-  const meta = {};
+-  meta.verifiedLock = (
+-    access.isAudit
+-    && !MMP2POptions.isWhitelisted
+-  );
+-  meta.gradedLock = (
+-    access.isAudit
+-    && MMP2POptions.isWhitelisted
+-    && graded
+-  );
+-  meta.modalLock = (
+-    access.isAudit
+-    && !MMP2POptions.isWhitelisted
+-    && MMP2POptions.afterUpgradeDeadline
+-  );
+-  meta.showLock = (
+-    MMP2POptions.isEnabled
+-    && (meta.verifiedLock || meta.gradedLock)
+-  );
+-  meta.blockContent = (MMP2POptions.isEnabled && meta.verifiedLock);
+-
+   const config = {
+-    access,
++    access: MMP2PAccess,
+     flyover,
+-    meta,
++    meta: MMP2PMeta,
+     state: MMP2POptions,
+   };
+ 
+-- 
+2.34.1
+

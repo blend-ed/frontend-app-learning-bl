@@ -1,0 +1,40 @@
+From 07b252ecc6480acdb966bdd14711d0d2bdfb626a Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Wed, 6 Jan 2021 06:49:25 -0800
+Subject: [PATCH 0359/1021] AA-501: Send query param to recheck access to
+ xblocks for render (#335)
+
+---
+ src/courseware/course/sequence/Unit.jsx      | 2 +-
+ src/courseware/course/sequence/Unit.test.jsx | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 4913bb9..43ced92 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -63,7 +63,7 @@ function Unit({
+ }) {
+   const { authenticatedUser } = useContext(AppContext);
+   const view = authenticatedUser ? 'student_view' : 'public_view';
+-  let iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0&view=${view}`;
++  let iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0&recheck_access=1&view=${view}`;
+   if (format) {
+     iframeUrl += `&format=${format}`;
+   }
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 9142f7b..6a11b45 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -38,7 +38,7 @@ describe('Unit', () => {
+     const renderedUnit = screen.getByTitle(unit.display_name);
+     expect(renderedUnit).toHaveAttribute('height', String(0));
+     expect(renderedUnit).toHaveAttribute(
+-      'src', `http://localhost:18000/xblock/${mockData.id}?show_title=0&show_bookmark_button=0&view=student_view&format=${mockData.format}`,
++      'src', `http://localhost:18000/xblock/${mockData.id}?show_title=0&show_bookmark_button=0&recheck_access=1&view=student_view&format=${mockData.format}`,
+     );
+   });
+ 
+-- 
+2.34.1
+

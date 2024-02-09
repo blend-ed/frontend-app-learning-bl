@@ -1,0 +1,111 @@
+From b61057f2dffe70bb937a6370d308ed17f1d2c4e6 Mon Sep 17 00:00:00 2001
+From: Ihor Romaniuk <ihor.romaniuk@raccoongang.com>
+Date: Wed, 12 Jan 2022 16:40:58 +0200
+Subject: [PATCH 0778/1021] feat: add rtl support  (#783)
+
+* feat: add rtl support for chart on progress tab
+
+* feat: change 'div' to semantic 'main' tag
+
+* fix: revert changing div to main tag
+---
+ .../grades/course-grade/CurrentGradeTooltip.jsx  | 16 +++++++++++-----
+ .../grades/course-grade/PassingGradeTooltip.jsx  | 16 +++++++++++-----
+ 2 files changed, 22 insertions(+), 10 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index 9c35b70..186020e 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -2,7 +2,7 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { useSelector } from 'react-redux';
+ 
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { injectIntl, intlShape, isRtl } from '@edx/frontend-platform/i18n';
+ import { OverlayTrigger, Popover } from '@edx/paragon';
+ 
+ import { useModel } from '../../../../generic/model-store';
+@@ -23,6 +23,12 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+ 
+   const currentGrade = Number((visiblePercent * 100).toFixed(0));
+ 
++  let currentGradeDirection = currentGrade < 50 ? '' : '-';
++
++  if (isRtl) {
++    currentGradeDirection = currentGrade < 50 ? '-' : '';
++  }
++
+   return (
+     <>
+       <OverlayTrigger
+@@ -37,16 +43,16 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+         )}
+       >
+         <g>
+-          <circle cx={`${Math.min(...[currentGrade, 100])}%`} cy="50%" r="8.5" fill="transparent" />
+-          <rect className="grade-bar__divider" x={`${Math.min(...[currentGrade, 100])}%`} style={{ transform: 'translateY(2.61em)' }} />
++          <circle cx={`${Math.min(...[isRtl ? 100 - currentGrade : currentGrade, 100])}%`} cy="50%" r="8.5" fill="transparent" />
++          <rect className="grade-bar__divider" x={`${Math.min(...[isRtl ? 100 - currentGrade : currentGrade, 100])}%`} style={{ transform: 'translateY(2.61em)' }} />
+         </g>
+       </OverlayTrigger>
+       <text
+         className="x-small"
+         textAnchor={currentGrade < 50 ? 'start' : 'end'}
+-        x={`${Math.min(...[currentGrade, 100])}%`}
++        x={`${Math.min(...[isRtl ? 100 - currentGrade : currentGrade, 100])}%`}
+         y="20px"
+-        style={{ transform: `translateX(${currentGrade < 50 ? '' : '-'}3.4em)` }}
++        style={{ transform: `translateX(${currentGradeDirection}3.4em)` }}
+       >
+         {intl.formatMessage(messages.currentGradeLabel)}
+       </text>
+diff --git a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+index 4a7afdf..ee8b5cb 100644
+--- a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+@@ -1,12 +1,18 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { injectIntl, intlShape, isRtl } from '@edx/frontend-platform/i18n';
+ import { OverlayTrigger, Popover } from '@edx/paragon';
+ 
+ import messages from '../messages';
+ 
+ function PassingGradeTooltip({ intl, passingGrade, tooltipClassName }) {
++  let passingGradeDirection = passingGrade < 50 ? '' : '-';
++
++  if (isRtl) {
++    passingGradeDirection = passingGrade < 50 ? '-' : '';
++  }
++
+   return (
+     <>
+       <OverlayTrigger
+@@ -21,17 +27,17 @@ function PassingGradeTooltip({ intl, passingGrade, tooltipClassName }) {
+         )}
+       >
+         <g>
+-          <circle cx={`${passingGrade}%`} cy="50%" r="8.5" fill="transparent" />
+-          <circle className="grade-bar--passing" cx={`${passingGrade}%`} cy="50%" r="4.5" />
++          <circle cx={`${isRtl ? 100 - passingGrade : passingGrade}%`} cy="50%" r="8.5" fill="transparent" />
++          <circle className="grade-bar--passing" cx={`${isRtl ? 100 - passingGrade : passingGrade}%`} cy="50%" r="4.5" />
+         </g>
+       </OverlayTrigger>
+ 
+       <text
+         className="x-small"
+         textAnchor={passingGrade < 50 ? 'start' : 'end'}
+-        x={`${passingGrade}%`}
++        x={`${isRtl ? 100 - passingGrade : passingGrade}%`}
+         y="90px"
+-        style={{ transform: `translateX(${passingGrade < 50 ? '' : '-'}3.4em)` }}
++        style={{ transform: `translateX(${passingGradeDirection}3.4em)` }}
+       >
+         {intl.formatMessage(messages.passingGradeLabel)}
+       </text>
+-- 
+2.34.1
+

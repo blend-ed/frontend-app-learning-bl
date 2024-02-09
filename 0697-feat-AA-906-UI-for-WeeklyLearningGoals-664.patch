@@ -1,0 +1,1145 @@
+From d8f3c7441efae4c0e8b4d5abe7f6c057864c932b Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 19 Oct 2021 10:37:22 -0400
+Subject: [PATCH 0697/1021] feat: [AA-906] UI for WeeklyLearningGoals (#664)
+
+* feat: [AA-906] UI for WeeklyLearningGoals
+
+Add component to OutlineTab for selecting Weekly Learning Goals
+Move start button to before course outline, and put in card with Call to action.
+Unit tests
+Implement temporary a11y feedback
+add react-responsive as a dependency
+
+Everything except for the start/resume button move is behind a waffle flag: course_goals.number_of_days_goals
+---
+ package-lock.json                             |  13 +++
+ package.json                                  |   1 +
+ .../AccountActivationAlert.jsx                |  27 ++---
+ src/alerts/logistration-alert/messages.js     |  11 ++
+ .../__factories__/outlineTabData.factory.js   |   3 +
+ .../data/__snapshots__/redux.test.js.snap     |   3 +
+ src/course-home/data/api.js                   |  11 +-
+ src/course-home/data/index.js                 |   3 +-
+ src/course-home/data/redux.test.js            |   2 +-
+ src/course-home/data/thunks.js                |  11 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |  46 ++++----
+ .../outline-tab/OutlineTab.test.jsx           | 110 +++++++++++++++++-
+ src/course-home/outline-tab/messages.js       |  77 ++++++++++--
+ ...lCard.jsx => DeprecatedCourseGoalCard.jsx} |  10 +-
+ .../outline-tab/widgets/FlagButton.jsx        |  32 +++++
+ .../outline-tab/widgets/FlagButton.scss       |  25 ++++
+ .../widgets/LearningGoalButton.jsx            |  83 +++++++++++++
+ .../widgets/StartOrResumeCourseCard.jsx       |  65 +++++++++++
+ .../widgets/UpdateGoalSelector.jsx            |   4 +-
+ .../widgets/WeeklyLearningGoalCard.jsx        | 109 +++++++++++++++++
+ .../outline-tab/widgets/flag_gray.svg         |  18 +++
+ .../outline-tab/widgets/flag_outline.svg      |   3 +
+ src/index.scss                                |   1 +
+ 23 files changed, 603 insertions(+), 65 deletions(-)
+ create mode 100644 src/alerts/logistration-alert/messages.js
+ rename src/course-home/outline-tab/widgets/{CourseGoalCard.jsx => DeprecatedCourseGoalCard.jsx} (90%)
+ create mode 100644 src/course-home/outline-tab/widgets/FlagButton.jsx
+ create mode 100644 src/course-home/outline-tab/widgets/FlagButton.scss
+ create mode 100644 src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+ create mode 100644 src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+ create mode 100644 src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+ create mode 100644 src/course-home/outline-tab/widgets/flag_gray.svg
+ create mode 100644 src/course-home/outline-tab/widgets/flag_outline.svg
+
+diff --git a/package-lock.json b/package-lock.json
+index b52de28..e9e6558 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -3802,6 +3802,19 @@
+         "react-transition-group": "^4.0.0",
+         "tabbable": "^4.0.0",
+         "uncontrollable": "7.2.1"
++      },
++      "dependencies": {
++        "react-responsive": {
++          "version": "8.2.0",
++          "resolved": "https://registry.npmjs.org/react-responsive/-/react-responsive-8.2.0.tgz",
++          "integrity": "sha512-iagCqVrw4QSjhxKp3I/YK6+ODkWY6G+YPElvdYKiUUbywwh9Ds0M7r26Fj2/7dWFFbOpcGnJE6uE7aMck8j5Qg==",
++          "requires": {
++            "hyphenate-style-name": "^1.0.0",
++            "matchmediaquery": "^0.3.0",
++            "prop-types": "^15.6.1",
++            "shallow-equal": "^1.1.0"
++          }
++        }
+       }
+     },
+     "@formatjs/ecma402-abstract": {
+diff --git a/package.json b/package.json
+index 83392d2..b031836 100644
+--- a/package.json
++++ b/package.json
+@@ -54,6 +54,7 @@
+     "react-dom": "17.0.2",
+     "react-helmet": "6.1.0",
+     "react-redux": "7.2.5",
++    "react-responsive": "8.2.0",
+     "react-router": "5.2.1",
+     "react-router-dom": "5.3.0",
+     "react-share": "4.4.0",
+diff --git a/src/alerts/logistration-alert/AccountActivationAlert.jsx b/src/alerts/logistration-alert/AccountActivationAlert.jsx
+index bbb9f56..dcdd06d 100644
+--- a/src/alerts/logistration-alert/AccountActivationAlert.jsx
++++ b/src/alerts/logistration-alert/AccountActivationAlert.jsx
+@@ -9,10 +9,13 @@ import {
+   Icon,
+ } from '@edx/paragon';
+ import { Check, ArrowForward } from '@edx/paragon/icons';
+-import { FormattedMessage, injectIntl } from '@edx/frontend-platform/i18n';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { sendActivationEmail } from '../../courseware/data';
++import messages from './messages';
+ 
+-function AccountActivationAlert() {
++function AccountActivationAlert({
++  intl,
++}) {
+   const [showModal, setShowModal] = useState(false);
+   const [showSpinner, setShowSpinner] = useState(false);
+   const [showCheck, setShowCheck] = useState(false);
+@@ -29,22 +32,12 @@ function AccountActivationAlert() {
+   if (showAccountActivationAlert !== undefined) {
+     Cookies.remove('show-account-activation-popup', { path: '/', domain: process.env.SESSION_COOKIE_DOMAIN });
+     // extra check to make sure cookie was removed before updating the state. Updating the state without removal
+-    // of cookie would make it infinit rendering
++    // of cookie would make it infinite rendering
+     if (Cookies.get('show-account-activation-popup') === undefined) {
+       setShowModal(true);
+     }
+   }
+ 
+-  const title = (
+-    <h3>
+-      <FormattedMessage
+-        id="account-activation.alert.title"
+-        defaultMessage="Activate your account so you can log back in"
+-        description="Title for account activation alert which is shown after the registration"
+-      />
+-    </h3>
+-  );
+-
+   const button = (
+     <Button
+       variant="primary"
+@@ -64,7 +57,7 @@ function AccountActivationAlert() {
+   );
+ 
+   const children = () => {
+-    let bodyContent = null;
++    let bodyContent;
+     const message = (
+       <FormattedMessage
+         id="account-activation.alert.message"
+@@ -123,7 +116,7 @@ function AccountActivationAlert() {
+   return (
+     <AlertModal
+       isOpen={showModal}
+-      title={title}
++      title={intl.formatMessage(messages.accountActivationAlertTitle)}
+       footerNode={button}
+       onClose={() => ({})}
+     >
+@@ -132,4 +125,8 @@ function AccountActivationAlert() {
+   );
+ }
+ 
++AccountActivationAlert.propTypes = {
++  intl: intlShape.isRequired,
++};
++
+ export default injectIntl(AccountActivationAlert);
+diff --git a/src/alerts/logistration-alert/messages.js b/src/alerts/logistration-alert/messages.js
+new file mode 100644
+index 0000000..421d24d
+--- /dev/null
++++ b/src/alerts/logistration-alert/messages.js
+@@ -0,0 +1,11 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  accountActivationAlertTitle: {
++    id: 'account-activation.alert.title',
++    defaultMessage: 'Activate your account so you can log back in',
++    description: 'Title for account activation alert which is shown after the registration',
++  },
++});
++
++export default messages;
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index ee50116..d984c67 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -40,6 +40,9 @@ Factory.define('outlineTabData')
+     course_goals: {
+       goal_options: [],
+       selected_goal: null,
++      weekly_learning_goal_enabled: false,
++      days_per_week: null,
++      subscribed_to_reminders: null,
+     },
+     course_tools: [
+       {
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 19a5bd8..1f119f2 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -432,8 +432,11 @@ Object {
+           },
+         },
+         "courseGoals": Object {
++          "daysPerWeek": null,
+           "goalOptions": Array [],
+           "selectedGoal": null,
++          "subscribedToReminders": null,
++          "weeklyLearningGoalEnabled": false,
+         },
+         "courseTools": Array [
+           Object {
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 6680b42..d30746b 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -386,11 +386,20 @@ export async function postCourseDeadlines(courseId, model) {
+   });
+ }
+ 
+-export async function postCourseGoals(courseId, goalKey) {
++export async function deprecatedPostCourseGoals(courseId, goalKey) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`);
+   return getAuthenticatedHttpClient().post(url.href, { course_id: courseId, goal_key: goalKey });
+ }
+ 
++export async function postWeeklyLearningGoal(courseId, daysPerWeek, subscribedToReminders) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`);
++  return getAuthenticatedHttpClient().post(url.href, {
++    course_id: courseId,
++    days_per_week: daysPerWeek,
++    subscribed_to_reminders: subscribedToReminders,
++  });
++}
++
+ export async function postDismissWelcomeMessage(courseId) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/dismiss_welcome_message`);
+   await getAuthenticatedHttpClient().post(url.href, { course_id: courseId });
+diff --git a/src/course-home/data/index.js b/src/course-home/data/index.js
+index c5f79fa..c315d84 100644
+--- a/src/course-home/data/index.js
++++ b/src/course-home/data/index.js
+@@ -3,7 +3,8 @@ export {
+   fetchOutlineTab,
+   fetchProgressTab,
+   resetDeadlines,
+-  saveCourseGoal,
++  deprecatedSaveCourseGoal,
++  saveWeeklyLearningGoal,
+ } from './thunks';
+ 
+ export { reducer } from './slice';
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index 5ea0b85..d0afead 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -136,7 +136,7 @@ describe('Data layer integration tests', () => {
+       const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
+       axiosMock.onPost(goalUrl).reply(200, {});
+ 
+-      await thunks.saveCourseGoal(courseId, 'unsure');
++      await thunks.deprecatedSaveCourseGoal(courseId, 'unsure');
+ 
+       expect(axiosMock.history.post[0].url).toEqual(goalUrl);
+       expect(axiosMock.history.post[0].data).toEqual(`{"course_id":"${courseId}","goal_key":"unsure"}`);
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index 99fdc6f..a321a34 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -7,7 +7,8 @@ import {
+   getOutlineTabData,
+   getProgressTabData,
+   postCourseDeadlines,
+-  postCourseGoals,
++  deprecatedPostCourseGoals,
++  postWeeklyLearningGoal,
+   postDismissWelcomeMessage,
+   postRequestCert,
+ } from './api';
+@@ -109,8 +110,12 @@ export function resetDeadlines(courseId, model, getTabData) {
+   };
+ }
+ 
+-export async function saveCourseGoal(courseId, goalKey) {
+-  return postCourseGoals(courseId, goalKey);
++export async function deprecatedSaveCourseGoal(courseId, goalKey) {
++  return deprecatedPostCourseGoals(courseId, goalKey);
++}
++
++export async function saveWeeklyLearningGoal(courseId, daysPerWeek, subscribedToReminders) {
++  return postWeeklyLearningGoal(courseId, daysPerWeek, subscribedToReminders);
+ }
+ 
+ export function processEvent(eventData, getTabData) {
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 0b47b55..a889030 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -1,6 +1,6 @@
+ import React, { useState } from 'react';
+ import { useSelector } from 'react-redux';
+-import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+@@ -8,8 +8,10 @@ import { Button, Toast } from '@edx/paragon';
+ import { AlertList } from '../../generic/user-messages';
+ 
+ import CourseDates from './widgets/CourseDates';
+-import CourseGoalCard from './widgets/CourseGoalCard';
++import CourseGoalCard from './widgets/DeprecatedCourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
++import StartOrResumeCourseCard from './widgets/StartOrResumeCourseCard';
++import WeeklyLearningGoalCard from './widgets/WeeklyLearningGoalCard';
+ import CourseTools from './widgets/CourseTools';
+ import { fetchOutlineTab } from '../data';
+ import genericMessages from '../../generic/messages';
+@@ -54,13 +56,13 @@ function OutlineTab({ intl }) {
+     courseGoals: {
+       goalOptions,
+       selectedGoal,
++      weeklyLearningGoalEnabled,
+     } = {},
+     datesBannerInfo,
+     datesWidget: {
+       courseDateBlocks,
+     },
+     resumeCourse: {
+-      hasVisitedCourse,
+       url: resumeCourseUrl,
+     },
+     offer,
+@@ -68,7 +70,7 @@ function OutlineTab({ intl }) {
+     verifiedMode,
+   } = useModel('outline', courseId);
+ 
+-  const [courseGoalToDisplay, setCourseGoalToDisplay] = useState(selectedGoal);
++  const [deprecatedCourseGoalToDisplay, setDeprecatedCourseGoalToDisplay] = useState(selectedGoal);
+   const [goalToastHeader, setGoalToastHeader] = useState('');
+   const [expandAll, setExpandAll] = useState(false);
+ 
+@@ -77,14 +79,6 @@ function OutlineTab({ intl }) {
+     courserun_key: courseId,
+   };
+ 
+-  const logResumeCourseClick = () => {
+-    sendTrackingLogEvent('edx.course.home.resume_course.clicked', {
+-      ...eventProperties,
+-      event_type: hasVisitedCourse ? 'resume' : 'start',
+-      url: resumeCourseUrl,
+-    });
+-  };
+-
+   // Below the course title alerts (appearing in the order listed here)
+   const courseStartAlert = useCourseStartAlert(courseId);
+   const courseEndAlert = useCourseEndAlert(courseId);
+@@ -132,13 +126,6 @@ function OutlineTab({ intl }) {
+         <div className="col-12 col-sm-auto p-0">
+           <div role="heading" aria-level="1" className="h2">{title}</div>
+         </div>
+-        {resumeCourseUrl && (
+-          <div className="col-12 col-sm-auto p-0">
+-            <Button variant="brand" block href={resumeCourseUrl} onClick={() => logResumeCourseClick()}>
+-              {hasVisitedCourse ? intl.formatMessage(messages.resume) : intl.formatMessage(messages.start)}
+-            </Button>
+-          </div>
+-        )}
+       </div>
+       {/** [MM-P2P] Experiment (className for optimizely trigger) */}
+       <div className="row course-outline-tab">
+@@ -172,20 +159,23 @@ function OutlineTab({ intl }) {
+               <UpgradeToShiftDatesAlert model="outline" logUpgradeLinkClick={logUpgradeToShiftDatesLinkClick} />
+             </>
+           )}
+-          {!courseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
++          {!deprecatedCourseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
+             <CourseGoalCard
+               courseId={courseId}
+               goalOptions={goalOptions}
+               title={title}
+-              setGoalToDisplay={(newGoal) => { setCourseGoalToDisplay(newGoal); }}
++              setGoalToDisplay={(newGoal) => { setDeprecatedCourseGoalToDisplay(newGoal); }}
+               setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
+             />
+           )}
++          {resumeCourseUrl && (
++          <StartOrResumeCourseCard />
++          )}
+           <WelcomeMessage courseId={courseId} />
+           {rootCourseId && (
+             <>
+               <div className="row w-100 m-0 mb-3 justify-content-end">
+-                <div className="col-12 col-sm-auto p-0">
++                <div className="col-12 col-md-auto p-0">
+                   <Button variant="outline-primary" block onClick={() => { setExpandAll(!expandAll); }}>
+                     {expandAll ? intl.formatMessage(messages.collapseAll) : intl.formatMessage(messages.expandAll)}
+                   </Button>
+@@ -211,15 +201,21 @@ function OutlineTab({ intl }) {
+               courseId={courseId}
+               username={username}
+             />
+-            {courseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
++            {deprecatedCourseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
+               <UpdateGoalSelector
+                 courseId={courseId}
+                 goalOptions={goalOptions}
+-                selectedGoal={courseGoalToDisplay}
+-                setGoalToDisplay={(newGoal) => { setCourseGoalToDisplay(newGoal); }}
++                selectedGoal={deprecatedCourseGoalToDisplay}
++                setGoalToDisplay={(newGoal) => { setDeprecatedCourseGoalToDisplay(newGoal); }}
+                 setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
+               />
+             )}
++            {weeklyLearningGoalEnabled && (
++              <WeeklyLearningGoalCard
++                daysPerWeek={selectedGoal && 'daysPerWeek' in selectedGoal ? selectedGoal.daysPerWeek : null}
++                subscribedToReminders={selectedGoal && 'subscribedToReminders' in selectedGoal ? selectedGoal.subscribedToReminders : false}
++              />
++            )}
+             <CourseTools
+               courseId={courseId}
+             />
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 52c7753..a539c08 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -6,6 +6,7 @@ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import MockAdapter from 'axios-mock-adapter';
+ import Cookies from 'js-cookie';
+ import userEvent from '@testing-library/user-event';
++import messages from './messages';
+ 
+ import { buildMinimalCourseBlocks } from '../../shared/data/__factories__/courseBlocks.factory';
+ import {
+@@ -73,7 +74,7 @@ describe('Outline Tab', () => {
+   describe('Course Outline', () => {
+     it('displays link to start course', async () => {
+       await fetchAndRender();
+-      expect(screen.getByRole('link', { name: 'Start Course' })).toBeInTheDocument();
++      expect(screen.getByRole('link', { name: messages.start.defaultMessage })).toBeInTheDocument();
+     });
+ 
+     it('displays link to resume course', async () => {
+@@ -413,6 +414,111 @@ describe('Outline Tab', () => {
+     });
+   });
+ 
++  describe('Start or Resume Course Card', () => {
++    it('renders startOrResumeCourseCard', async () => {
++      await fetchAndRender();
++      expect(screen.queryByTestId('start-resume-card')).toBeInTheDocument();
++    });
++  });
++
++  describe('Weekly Learning Goal', () => {
++    it('does not render weekly learning goal if weeklyLearningGoalEnabled is false', async () => {
++      await fetchAndRender();
++      expect(screen.queryByTestId('weekly-learning-goal-card')).not.toBeInTheDocument();
++    });
++
++    describe('weekly learning goal is not set', () => {
++      beforeEach(async () => {
++        setTabData({
++          course_goals: {
++            weekly_learning_goal_enabled: true,
++          },
++        });
++        await fetchAndRender();
++      });
++
++      it('renders weekly learning goal card', async () => {
++        expect(screen.queryByTestId('weekly-learning-goal-card')).toBeInTheDocument();
++      });
++
++      it('disables the subscribe button if no goal is set', async () => {
++        expect(screen.getByLabelText(messages.setGoalReminder.defaultMessage)).toBeDisabled();
++      });
++
++      it('does not show the deprecated goals feature if WeeklyLearningGoal is enabled', async () => {
++        expect(screen.queryByTestId('course-goal-card')).not.toBeInTheDocument();
++        expect(screen.queryByLabelText('Goal')).not.toBeInTheDocument();
++        expect(screen.queryByTestId('edit-goal-selector')).not.toBeInTheDocument();
++      });
++
++      it.each`
++      level     | days 
++      ${'casual'}  | ${1}
++      ${'regular'} | ${3}
++      ${'intense'} | ${5}
++        `('calls the API with a goal of $days when $level goal is clicked', async ({ level, days }) => {
++  // click on Casual goal
++  const button = await screen.queryByTestId(`weekly-learning-goal-input-${level}`);
++  fireEvent.click(button);
++  // Verify the request was made
++  await waitFor(() => {
++    expect(axiosMock.history.post[0].url).toMatch(goalUrl);
++    // subscribe is turned on automatically
++    expect(axiosMock.history.post[0].data).toMatch(`{"course_id":"${courseId}","days_per_week":${days},"subscribed_to_reminders":true}`);
++    // verify that the additional info about subscriptions shows up
++    expect(screen.queryByText(messages.goalReminderDetail.defaultMessage)).toBeInTheDocument();
++  });
++  expect(screen.getByLabelText(messages.setGoalReminder.defaultMessage)).toBeEnabled();
++});
++      it('shows and hides subscribe to reminders additional text', async () => {
++        const button = await screen.getByTestId('weekly-learning-goal-input-regular');
++        fireEvent.click(button);
++        // Verify the request was made
++        await waitFor(() => {
++          expect(axiosMock.history.post[0].url).toMatch(goalUrl);
++          // subscribe is turned on automatically
++          expect(axiosMock.history.post[0].data).toMatch(`{"course_id":"${courseId}","days_per_week":3,"subscribed_to_reminders":true}`);
++          // verify that the additional info about subscriptions shows up
++          expect(screen.queryByText(messages.goalReminderDetail.defaultMessage)).toBeInTheDocument();
++        });
++        expect(screen.getByLabelText(messages.setGoalReminder.defaultMessage)).toBeEnabled();
++
++        // Click on subscribe to reminders toggle
++        const subscriptionSwitch = await screen.getByRole('switch', { name: messages.setGoalReminder.defaultMessage });
++        expect(subscriptionSwitch).toBeInTheDocument();
++
++        fireEvent.click(subscriptionSwitch);
++        await waitFor(() => {
++          expect(axiosMock.history.post[1].url).toMatch(goalUrl);
++          expect(axiosMock.history.post[1].data)
++            .toMatch(`{"course_id":"${courseId}","days_per_week":3,"subscribed_to_reminders":false}`);
++        });
++
++        // verify that the additional info about subscriptions gets hidden
++        expect(screen.queryByText(messages.goalReminderDetail.defaultMessage)).not.toBeInTheDocument();
++      });
++    });
++    describe('weekly learning goal is already set', () => {
++      beforeEach(async () => {
++        setTabData({
++          course_goals: {
++            weekly_learning_goal_enabled: true,
++            selected_goal: {
++              subscribed_to_reminders: true,
++              days_per_week: 3,
++            },
++          },
++        });
++        await fetchAndRender();
++      });
++
++      it('has button for weekly learning goal selected', async () => {
++        const radio = await screen.queryByTestId('weekly-learning-goal-input-regular');
++        expect(radio.checked).toEqual(true);
++      });
++    });
++  });
++
+   describe('Course Handouts', () => {
+     it('renders title when handouts are available', async () => {
+       await fetchAndRender();
+@@ -856,7 +962,7 @@ describe('Outline Tab', () => {
+           ],
+         });
+         await fetchAndRender();
+-        expect(screen.getByRole('link', { name: 'Start Course' })).toBeInTheDocument();
++        expect(screen.getByRole('link', { name: messages.start.defaultMessage })).toBeInTheDocument();
+         expect(screen.queryByText('More content is coming soon!')).not.toBeInTheDocument();
+       });
+     });
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index 0a2de61..f52e3e5 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -5,6 +5,20 @@ const messages = defineMessages({
+     id: 'learning.outline.dates.all',
+     defaultMessage: 'View all course dates',
+   },
++  casualGoalButtonText: {
++    id: 'learning.outline.goalButton.casual.text',
++    defaultMessage: '1 day a week',
++  },
++  casualGoalButtonTitle: {
++    id: 'learning.outline.goalButton.screenReader.text',
++    defaultMessage: 'Casual',
++    description: 'A very short description of the least intense of three learning goals',
++  },
++  certAlt: {
++    id: 'learning.outline.certificateAlt',
++    defaultMessage: 'Example Certificate',
++    description: 'Alternate text displayed when the example certificate image cannot be displayed.',
++  },
+   collapseAll: {
+     id: 'learning.outline.collapseAll',
+     defaultMessage: 'Collapse all',
+@@ -39,6 +53,10 @@ const messages = defineMessages({
+     defaultMessage: 'Goal',
+     description: 'Label for the selected course goal',
+   },
++  goalReminderDetail: {
++    id: 'learning.outline.goalReminderDetail',
++    defaultMessage: 'If we notice you’re not quite at your goal, we’ll send you an email reminder.',
++  },
+   goalUnsure: {
+     id: 'learning.outline.goalUnsure',
+     defaultMessage: 'Not sure yet',
+@@ -57,6 +75,15 @@ const messages = defineMessages({
+     defaultMessage: 'Incomplete section',
+     description: 'Text used to describe the gray checkmark icon in front of a section title',
+   },
++  intenseGoalButtonText: {
++    id: 'learning.outline.goalButton.intense.text',
++    defaultMessage: '5 days a week',
++  },
++  intenseGoalButtonTitle: {
++    id: 'learning.outline.goalButton.intense.title',
++    defaultMessage: 'Intense',
++    description: 'A very short description of the most intensive option of three learning goals, Casual, Regular and Intense',
++  },
+   learnMore: {
+     id: 'learning.outline.learnMore',
+     defaultMessage: 'Learn More',
+@@ -66,6 +93,24 @@ const messages = defineMessages({
+     defaultMessage: 'Open',
+     description: 'A button to open the given section of the course outline',
+   },
++  proctoringInfoPanel: {
++    id: 'learning.proctoringPanel.header',
++    defaultMessage: 'This course contains proctored exams',
++  },
++  regularGoalButtonText: {
++    id: 'learning.outline.goalButton.regular.text',
++    defaultMessage: '3 days a week',
++  },
++  regularGoalButtonTitle: {
++    id: 'learning.outline.goalButton.regular.title',
++    defaultMessage: 'Regular',
++    description: 'A very short description of the middle option of three learning goals, Casual, Regular and Intense',
++  },
++  resumeBlurb: {
++    id: 'learning.outline.resumeBlurb',
++    defaultMessage: 'Pick up where you left off',
++    description: 'Text describing to the learner that they can return to the last section they visited within the course.',
++  },
+   resume: {
+     id: 'learning.outline.resume',
+     defaultMessage: 'Resume course',
+@@ -74,9 +119,30 @@ const messages = defineMessages({
+     id: 'learning.outline.setGoal',
+     defaultMessage: 'To start, set a course goal by selecting the option below that best describes your learning plan.',
+   },
++  setGoalReminder: {
++    id: 'learning.outline.setGoalReminder',
++    defaultMessage: 'Set a goal reminder',
++  },
++  setLearningGoalButtonScreenReaderText: {
++    id: 'learning.outline.goalButton.casual.title',
++    defaultMessage: 'Set a learning goal style.',
++    description: 'screen reader text informing learner they can select an intensity of learning goal',
++  },
++  setWeeklyGoal: {
++    id: 'learning.outline.setWeeklyGoal',
++    defaultMessage: 'Set a weekly learning goal',
++  },
++  setWeeklyGoalDetail: {
++    id: 'learning.outline.setWeeklyGoalDetail',
++    defaultMessage: 'Setting a goal motivates you to finish the course. You can always change it later.',
++  },
+   start: {
+     id: 'learning.outline.start',
+-    defaultMessage: 'Start Course',
++    defaultMessage: 'Start course',
++  },
++  startBlurb: {
++    id: 'learning.outline.startBlurb',
++    defaultMessage: 'Begin your course today',
+   },
+   tools: {
+     id: 'learning.outline.tools',
+@@ -90,11 +156,6 @@ const messages = defineMessages({
+     id: 'learning.outline.upgradeTitle',
+     defaultMessage: 'Pursue a verified certificate',
+   },
+-  certAlt: {
+-    id: 'learning.outline.certificateAlt',
+-    defaultMessage: 'Example Certificate',
+-    description: 'Alternate text displayed when the example certificate image cannot be displayed.',
+-  },
+   welcomeMessage: {
+     id: 'learning.outline.welcomeMessage',
+     defaultMessage: 'Welcome Message',
+@@ -112,10 +173,6 @@ const messages = defineMessages({
+     defaultMessage: 'Welcome to',
+     description: 'This precedes the title of the course',
+   },
+-  proctoringInfoPanel: {
+-    id: 'learning.proctoringPanel.header',
+-    defaultMessage: 'This course contains proctored exams',
+-  },
+   notStartedProctoringStatus: {
+     id: 'learning.proctoringPanel.status.notStarted',
+     defaultMessage: 'Not Started',
+diff --git a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx b/src/course-home/outline-tab/widgets/DeprecatedCourseGoalCard.jsx
+similarity index 90%
+rename from src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+rename to src/course-home/outline-tab/widgets/DeprecatedCourseGoalCard.jsx
+index 6d724e3..de09016 100644
+--- a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/DeprecatedCourseGoalCard.jsx
+@@ -6,9 +6,9 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from '../messages';
+ 
+-import { saveCourseGoal } from '../../data';
++import { deprecatedSaveCourseGoal } from '../../data';
+ 
+-function CourseGoalCard({
++function DeprecatedCourseGoalCard({
+   courseId,
+   goalOptions,
+   intl,
+@@ -22,7 +22,7 @@ function CourseGoalCard({
+       text: event.currentTarget.getAttribute('data-goal-text'),
+     };
+ 
+-    saveCourseGoal(courseId, selectedGoal.key).then((response) => {
++    deprecatedSaveCourseGoal(courseId, selectedGoal.key).then((response) => {
+       const { data } = response;
+       const {
+         header,
+@@ -80,7 +80,7 @@ function CourseGoalCard({
+   );
+ }
+ 
+-CourseGoalCard.propTypes = {
++DeprecatedCourseGoalCard.propTypes = {
+   courseId: PropTypes.string.isRequired,
+   goalOptions: PropTypes.arrayOf(
+     PropTypes.arrayOf(PropTypes.string),
+@@ -91,4 +91,4 @@ CourseGoalCard.propTypes = {
+   setGoalToastHeader: PropTypes.func.isRequired,
+ };
+ 
+-export default injectIntl(CourseGoalCard);
++export default injectIntl(DeprecatedCourseGoalCard);
+diff --git a/src/course-home/outline-tab/widgets/FlagButton.jsx b/src/course-home/outline-tab/widgets/FlagButton.jsx
+new file mode 100644
+index 0000000..30deff7
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/FlagButton.jsx
+@@ -0,0 +1,32 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++function FlagButton({
++  buttonIcon,
++  title,
++  text,
++}) {
++  return (
++    <div
++      className="flag-button col flex-grow-1 p-3"
++    >
++      <div className="row justify-content-center">
++        {buttonIcon}
++      </div>
++      <div className="text-center small text-gray-700">
++        {title}
++      </div>
++      <div className="text-center micro text-gray-500">
++        {text}
++      </div>
++    </div>
++  );
++}
++
++FlagButton.propTypes = {
++  buttonIcon: PropTypes.element.isRequired,
++  title: PropTypes.string.isRequired,
++  text: PropTypes.string.isRequired,
++};
++
++export default FlagButton;
+diff --git a/src/course-home/outline-tab/widgets/FlagButton.scss b/src/course-home/outline-tab/widgets/FlagButton.scss
+new file mode 100644
+index 0000000..49b3524
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/FlagButton.scss
+@@ -0,0 +1,25 @@
++@import "~@edx/brand/paragon/variables";
++@import "~@edx/paragon/scss/core/core";
++@import "~@edx/brand/paragon/overrides";
++
++.flag-button {
++  background-color: white;
++  border: 2px solid $light-400;
++  border-radius:.2rem;
++
++
++  &:focus {
++    border: 2px $blue;
++    box-shadow: 2px solid $yellow;
++  }
++
++  &:hover {
++    border: 2px solid $green;
++    box-shadow: 2px solid $teal;
++  }
++}
++
++ input[type=radio]:checked + .flag-button  {
++   border: 2px solid $red;
++   box-shadow: 2px solid $green;
++}
+diff --git a/src/course-home/outline-tab/widgets/LearningGoalButton.jsx b/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+new file mode 100644
+index 0000000..77f5043
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+@@ -0,0 +1,83 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { ReactComponent as FlagIntenseIcon } from '@edx/paragon/icons/svg/flag.svg';
++import { useMediaQuery } from 'react-responsive';
++import classNames from 'classnames';
++import { ReactComponent as FlagCasualIcon } from './flag_outline.svg';
++import { ReactComponent as FlagRegularIcon } from './flag_gray.svg';
++import FlagButton from './FlagButton';
++import messages from '../messages';
++
++function LearningGoalButton({
++  level,
++  currentGoal,
++  handleSelect,
++  intl,
++}) {
++  /* This is not the standard XL media query */
++  const isPastXl = useMediaQuery({ query: '(min-width: 1225px)' });
++
++  const buttonDetails = {
++    casual: {
++      daysPerWeek: 1,
++      title: messages.casualGoalButtonTitle,
++      text: messages.casualGoalButtonText,
++      icon: <FlagCasualIcon />,
++    },
++    regular: {
++      daysPerWeek: 3,
++      title: messages.regularGoalButtonTitle,
++      text: messages.regularGoalButtonText,
++      icon: <FlagRegularIcon />,
++    },
++    intense: {
++      daysPerWeek: 5,
++      title: messages.intenseGoalButtonTitle,
++      text: messages.intenseGoalButtonText,
++      icon: <FlagIntenseIcon />,
++    },
++  };
++
++  const values = buttonDetails[level];
++
++  return (
++    <label
++      htmlFor={`weekly-learning-goal-input-${level}`}
++      className={classNames('col-auto col-md-12  m-0 p-0 pb-md-3 pb-xl-0 shadow-none',
++        `${isPastXl ? 'col-xl-auto' : ''}`)}
++      // This is required to make the component visible to tabbing
++      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
++      tabIndex="0"
++    >
++      <input
++        type="radio"
++        data-testid={`weekly-learning-goal-input-${level}`}
++        id={`weekly-learning-goal-input-${level}`}
++        name="learningGoal"
++        radioGroup="learningGoal"
++        value={values.daysPerWeek}
++        onChange={() => handleSelect(values.daysPerWeek)}
++        tabIndex="0"
++        checked={values.daysPerWeek === currentGoal}
++        className="position-absolute"
++        style={{ opacity: 0 }}
++      />
++      <FlagButton
++        buttonIcon={values.icon}
++        title={intl.formatMessage(values.title)}
++        text={intl.formatMessage(values.text)}
++      />
++    </label>
++  );
++}
++
++LearningGoalButton.propTypes = {
++  level: PropTypes.string.isRequired,
++  currentGoal: PropTypes.number.isRequired,
++  handleSelect: PropTypes.func.isRequired,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(LearningGoalButton);
+diff --git a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+new file mode 100644
+index 0000000..3269741
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+@@ -0,0 +1,65 @@
++import React from 'react';
++import { Button, Card } from '@edx/paragon';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import { useSelector } from 'react-redux';
++import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
++import messages from '../messages';
++import { useModel } from '../../../generic/model-store';
++
++function StartOrResumeCourseCard({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    org,
++  } = useModel('courseHomeMeta', courseId);
++
++  const eventProperties = {
++    org_key: org,
++    courserun_key: courseId,
++  };
++
++  const {
++    resumeCourse: {
++      hasVisitedCourse,
++      url: resumeCourseUrl,
++    },
++
++  } = useModel('outline', courseId);
++
++  const logResumeCourseClick = () => {
++    sendTrackingLogEvent('edx.course.home.resume_course.clicked', {
++      ...eventProperties,
++      event_type: hasVisitedCourse ? 'resume' : 'start',
++      url: resumeCourseUrl,
++    });
++  };
++
++  return (
++    <Card className="mb-3" data-testid="start-resume-card">
++      <Card.Body>
++        <div className="row w-100 m-0 justify-content-between align-items-center">
++          <h2 className="h3 m-md-0">{intl.formatMessage(messages.startBlurb)}</h2>
++          <div className="col-12 col-md-auto p-0">
++            <Button
++              variant="brand"
++              block
++              href={resumeCourseUrl}
++              onClick={() => logResumeCourseClick()}
++            >
++              {hasVisitedCourse ? intl.formatMessage(messages.resume) : intl.formatMessage(messages.start)}
++            </Button>
++          </div>
++        </div>
++      </Card.Body>
++    </Card>
++  );
++}
++
++StartOrResumeCourseCard.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(StartOrResumeCourseCard);
+diff --git a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+index b872930..38c593e 100644
+--- a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
++++ b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+@@ -5,7 +5,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Dropdown } from '@edx/paragon';
+ 
+ import messages from '../messages';
+-import { saveCourseGoal } from '../../data';
++import { deprecatedSaveCourseGoal } from '../../data';
+ 
+ function UpdateGoalSelector({
+   courseId,
+@@ -24,7 +24,7 @@ function UpdateGoalSelector({
+     };
+ 
+     setGoalToDisplay(newGoal);
+-    saveCourseGoal(courseId, key).then((response) => {
++    deprecatedSaveCourseGoal(courseId, key).then((response) => {
+       const { data } = response;
+       const {
+         header,
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+new file mode 100644
+index 0000000..65f45da
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -0,0 +1,109 @@
++import React, { useState } from 'react';
++import PropTypes from 'prop-types';
++
++import { Form, Card, Icon } from '@edx/paragon';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Email } from '@edx/paragon/icons';
++import { useSelector } from 'react-redux';
++import messages from '../messages';
++import LearningGoalButton from './LearningGoalButton';
++import { saveWeeklyLearningGoal } from '../../data';
++
++function WeeklyLearningGoalCard({
++  daysPerWeek,
++  subscribedToReminders,
++  intl,
++}) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const [daysPerWeekGoal, setDaysPerWeekGoal] = useState(daysPerWeek);
++  // eslint-disable-next-line react/prop-types
++  const [isGetReminderSelected, setGetReminderSelected] = useState(subscribedToReminders);
++
++  function handleSelect(days) {
++    // Set the subscription button if this is the first time selecting a goal
++    const selectReminders = daysPerWeekGoal === null ? true : isGetReminderSelected;
++    setGetReminderSelected(selectReminders);
++    setDaysPerWeekGoal(days);
++    saveWeeklyLearningGoal(courseId, days, selectReminders);
++  }
++
++  function handleSubscribeToReminders(event) {
++    const isGetReminderChecked = event.target.checked;
++    setGetReminderSelected(isGetReminderChecked);
++    saveWeeklyLearningGoal(courseId, daysPerWeekGoal, isGetReminderChecked);
++  }
++
++  return (
++    <div className="row w-100 m-0 p-0">
++      <Card className="mb-3 shadow-sm border-0" data-testid="weekly-learning-goal-card">
++        <Card.Body className="p-3.5">
++          <Card.Title>
++            <h2 className="h4 m-0 text-primary-500">{intl.formatMessage(messages.setWeeklyGoal)}</h2>
++          </Card.Title>
++          <Card.Text className="text-gray-700">
++            {intl.formatMessage(messages.setWeeklyGoalDetail)}
++          </Card.Text>
++          <div
++            className="row w-100 m-0 p-0 justify-content-between"
++          >
++            <LearningGoalButton
++              level="casual"
++              currentGoal={daysPerWeekGoal}
++              handleSelect={handleSelect}
++            />
++            <LearningGoalButton
++              level="regular"
++              currentGoal={daysPerWeekGoal}
++              handleSelect={handleSelect}
++            />
++            <LearningGoalButton
++              level="intense"
++              currentGoal={daysPerWeekGoal}
++              handleSelect={handleSelect}
++            />
++          </div>
++          <div className="pt-3 pb-1">
++            <Form.Switch
++              checked={isGetReminderSelected}
++              onChange={(event) => handleSubscribeToReminders(event)}
++              disabled={!daysPerWeekGoal}
++            >
++              {intl.formatMessage(messages.setGoalReminder)}
++            </Form.Switch>
++          </div>
++        </Card.Body>
++        {isGetReminderSelected && (
++          <Card.Footer className="border-0 px-2.5 bg-light-200 ">
++            <div className="row w-100 m-0 small align-center">
++              <div className="d-flex align-items-center pr-1">
++                <Icon
++                  className="text-primary-500"
++                  src={Email}
++                />
++              </div>
++              <div className="col">
++                {intl.formatMessage(messages.goalReminderDetail)}
++              </div>
++            </div>
++          </Card.Footer>
++        )}
++      </Card>
++
++    </div>
++  );
++}
++
++WeeklyLearningGoalCard.propTypes = {
++  daysPerWeek: PropTypes.number,
++  subscribedToReminders: PropTypes.bool,
++  intl: intlShape.isRequired,
++};
++
++WeeklyLearningGoalCard.defaultProps = {
++  daysPerWeek: null,
++  subscribedToReminders: false,
++};
++export default injectIntl(WeeklyLearningGoalCard);
+diff --git a/src/course-home/outline-tab/widgets/flag_gray.svg b/src/course-home/outline-tab/widgets/flag_gray.svg
+new file mode 100644
+index 0000000..4ae7e14
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/flag_gray.svg
+@@ -0,0 +1,18 @@
++<?xml version="1.0" encoding="UTF-8" standalone="no"?>
++<svg
++   width="15"
++   height="17"
++   viewBox="0 0 15 17"
++   fill="none"
++   version="1.1"
++   id="svg11"
++   xmlns="http://www.w3.org/2000/svg">
++  <path
++     d="M9.4 2L9 0H0V17H2V10H7.6L8 12H15V2H9.4ZM13 10H9.64L9.24 8H2V2H7.36L7.76 4H13V10Z"
++     fill="#002B2B"
++     id="path9" />
++  <path
++     style="fill:#808080;fill-rule:evenodd;stroke-width:0.0150977"
++     d="M 9.6594698,9.9871226 C 9.6577909,9.9829707 9.5654776,9.5311723 9.4543296,8.9831261 L 9.2522415,7.9866785 5.6376662,7.9790074 2.0230906,7.9713362 V 4.9970494 2.0227625 l 2.6636151,0.00771 2.6636151,0.00771 0.1968204,0.9888987 0.1968205,0.9888988 h 2.6200263 2.620026 v 2.9893428 2.9893428 h -1.660746 c -0.91341,0 -1.6621194,-0.0034 -1.6637982,-0.00755 z"
++     id="path302" />
++</svg>
+diff --git a/src/course-home/outline-tab/widgets/flag_outline.svg b/src/course-home/outline-tab/widgets/flag_outline.svg
+new file mode 100644
+index 0000000..78d1af2
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/flag_outline.svg
+@@ -0,0 +1,3 @@
++<svg width="15" height="17" viewBox="0 0 15 17" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path d="M9.4 2L9 0H0V17H2V10H7.6L8 12H15V2H9.4ZM13 10H9.64L9.24 8H2V2H7.36L7.76 4H13V10Z" fill="#002B2B"/>
++</svg>
+diff --git a/src/index.scss b/src/index.scss
+index 7ecf983..f383422 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -391,6 +391,7 @@
+ @import "course-home/dates-tab/timeline/Day.scss";
+ @import "generic/upgrade-notification/UpgradeNotification.scss";
+ @import "course-home/outline-tab/widgets/ProctoringInfoPanel.scss";
++@import "src/course-home/outline-tab/widgets/FlagButton.scss";
+ @import "course-home/progress-tab/course-completion/CompletionDonutChart.scss";
+ @import "course-home/progress-tab/grades/course-grade/GradeBar.scss";
+ @import "courseware/course/course-exit/CourseRecommendations";
+-- 
+2.34.1
+

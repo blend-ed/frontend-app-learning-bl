@@ -1,0 +1,57 @@
+From f2f4f5f3a55b5b34f66b48d7983a5b31b01eafd4 Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Wed, 14 Jul 2021 12:25:32 -0400
+Subject: [PATCH 0537/1021] Fix bug that was applying the CSS to other active
+ classes (#543)
+
+---
+ src/courseware/course/Course.test.jsx          | 4 ++--
+ src/courseware/course/NotificationTrigger.jsx  | 2 +-
+ src/courseware/course/NotificationTrigger.scss | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index d825d7c..dd4a778 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -94,9 +94,9 @@ describe('Course', () => {
+     const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
+ 
+     expect(notificationTrigger).toBeInTheDocument();
+-    expect(notificationTrigger).toHaveClass('active');
++    expect(notificationTrigger).toHaveClass('trigger-active');
+     fireEvent.click(notificationTrigger);
+-    expect(notificationTrigger).not.toHaveClass('active');
++    expect(notificationTrigger).not.toHaveClass('trigger-active');
+   });
+ 
+   it('passes handlers to the sequence', async () => {
+diff --git a/src/courseware/course/NotificationTrigger.jsx b/src/courseware/course/NotificationTrigger.jsx
+index 183a35a..3486ae4 100644
+--- a/src/courseware/course/NotificationTrigger.jsx
++++ b/src/courseware/course/NotificationTrigger.jsx
+@@ -9,7 +9,7 @@ import messages from './messages';
+ function NotificationTrigger({ intl, toggleNotificationTray, isNotificationTrayVisible }) {
+   return (
+     <button
+-      className={classNames('notification-trigger-btn', { active: isNotificationTrayVisible() })}
++      className={classNames('notification-trigger-btn', { 'trigger-active': isNotificationTrayVisible() })}
+       type="button"
+       onClick={() => { toggleNotificationTray(); }}
+       aria-label={intl.formatMessage(messages.openNotificationTrigger)}
+diff --git a/src/courseware/course/NotificationTrigger.scss b/src/courseware/course/NotificationTrigger.scss
+index 1273b66..fe06bb8 100644
+--- a/src/courseware/course/NotificationTrigger.scss
++++ b/src/courseware/course/NotificationTrigger.scss
+@@ -14,7 +14,7 @@
+     }
+ }
+ 
+-.active::after {
++.trigger-active::after {
+     content: '';
+     position: absolute;
+     border-bottom: 2px solid $primary-700;
+-- 
+2.34.1
+

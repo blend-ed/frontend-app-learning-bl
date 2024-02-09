@@ -1,0 +1,602 @@
+From b048ca818719cdcce09a53ea6364fb980b586443 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Wed, 29 Jul 2020 14:24:39 -0400
+Subject: [PATCH 0184/1021] Fixes saving unit position and unit redirection
+ bugs (#128)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Bumping axios-mock-adapter version
+
+Thought there was a feature in 1.18.2 that I needed - turns out the feature hasn’t been released yet.  Still fine to bump the dependency, though.
+
+* Hiding some warnings about console logging.
+
+* Fixes bugs in CoursewareContainer
+
+Fixes a few bugs in the courseware container:
+
+- Position was not being saved because we weren’t reading “saveUnitPosition” correctly.
+- We weren’t calling checkContentRedirect with the right arguments - it was using a non-existent unitId instead of the routeUnitId, meaning we would redirect to the active unit even if a unit was specified in the URL.
+
+Adds tests in CoursewareContainer for various URL and data states.
+
+Now explicitly tests:
+- Exam redirects
+- The resume block method when it has, and doesn’t have, a block to resume.
+- The content redirect when a unit isn’t present on the URL (uses sequence.position)
+- Loading a specific unit (not the first of a sequence!) by URL.
+
+Updated some of the factories to be more flexible/allow multiple units.
+---
+ package-lock.json                             |   6 +-
+ package.json                                  |   2 +-
+ .../__factories__/outlineTabData.factory.js   |  11 +-
+ src/courseware/CoursewareContainer.jsx        |  18 +-
+ src/courseware/CoursewareContainer.test.jsx   | 259 ++++++++++++++----
+ .../__factories__/courseBlocks.factory.js     |  66 ++---
+ src/courseware/data/redux.test.js             |   9 +-
+ .../masquerade-widget/MasqueradeWidget.jsx    |   2 +
+ 8 files changed, 262 insertions(+), 111 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 9097043..28ce802 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -3949,9 +3949,9 @@
+       }
+     },
+     "axios-mock-adapter": {
+-      "version": "1.18.1",
+-      "resolved": "https://registry.npmjs.org/axios-mock-adapter/-/axios-mock-adapter-1.18.1.tgz",
+-      "integrity": "sha512-kFBZsG1Ma5yxjRGHq5KuuL55mPb7WzFULhypquEhzPg8SH5CXICb+qwC2CCA5u+GQVpiqGPwKSRkd3mBCs6gdw==",
++      "version": "1.18.2",
++      "resolved": "https://registry.npmjs.org/axios-mock-adapter/-/axios-mock-adapter-1.18.2.tgz",
++      "integrity": "sha512-e5aTsPy2Viov22zNpFTlid76W1Scz82pXeEwwCXdtO85LROhHAF8pHF2qDhiyMONLxKyY3lQ+S4UCsKgrlx8Hw==",
+       "dev": true,
+       "requires": {
+         "fast-deep-equal": "^3.1.1",
+diff --git a/package.json b/package.json
+index c6387e5..4cb6c3b 100644
+--- a/package.json
++++ b/package.json
+@@ -64,7 +64,7 @@
+     "@testing-library/dom": "^7.16.2",
+     "@testing-library/jest-dom": "^5.10.1",
+     "@testing-library/react": "^10.3.0",
+-    "axios-mock-adapter": "^1.18.1",
++    "axios-mock-adapter": "^1.18.2",
+     "codecov": "^3.6.1",
+     "es-check": "^5.1.0",
+     "glob": "^7.1.6",
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index c9f5d39..9d84f68 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -1,6 +1,6 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ 
+-import '../../../courseware/data/__factories__/courseBlocks.factory';
++import buildSimpleCourseBlocks from '../../../courseware/data/__factories__/courseBlocks.factory';
+ 
+ Factory.define('outlineTabData')
+   .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+@@ -10,7 +10,10 @@ Factory.define('outlineTabData')
+     title: 'Bookmarks',
+     url: `${host}/courses/${courseId}/bookmarks/`,
+   }))
+-  .attr('course_blocks', ['courseId'], courseId => ({
+-    blocks: Factory.build('courseBlocks', { courseId }).blocks,
+-  }))
++  .attr('course_blocks', ['courseId'], courseId => {
++    const { courseBlocks } = buildSimpleCourseBlocks(courseId, null);
++    return {
++      blocks: courseBlocks.blocks,
++    };
++  })
+   .attr('handouts_html', [], () => '<ul><li>Handout 1</li></ul>');
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 94d03be..7485fc4 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -52,8 +52,14 @@ const checkContentRedirect = memoize((courseId, sequenceStatus, sequenceId, sequ
+ });
+ 
+ class CoursewareContainer extends Component {
+-  checkSaveSequencePosition = memoize((courseId, sequenceStatus, sequenceId, sequence, unitId) => {
+-    if (sequenceStatus === 'loaded' && sequence.savePosition) {
++  checkSaveSequencePosition = memoize((unitId) => {
++    const {
++      courseId,
++      sequenceId,
++      sequenceStatus,
++      sequence,
++    } = this.props;
++    if (sequenceStatus === 'loaded' && sequence.saveUnitPosition && unitId) {
+       const activeUnitIndex = sequence.unitIds.indexOf(unitId);
+       this.props.saveSequencePosition(courseId, sequenceId, activeUnitIndex);
+     }
+@@ -87,7 +93,6 @@ class CoursewareContainer extends Component {
+     const {
+       courseId,
+       sequenceId,
+-      unitId,
+       courseStatus,
+       sequenceStatus,
+       sequence,
+@@ -96,6 +101,7 @@ class CoursewareContainer extends Component {
+         params: {
+           courseId: routeCourseId,
+           sequenceId: routeSequenceId,
++          unitId: routeUnitId,
+         },
+       },
+     } = this.props;
+@@ -108,13 +114,13 @@ class CoursewareContainer extends Component {
+     checkExamRedirect(sequenceStatus, sequence);
+ 
+     // Determine if we need to redirect because our URL is incomplete.
+-    checkContentRedirect(courseId, sequenceStatus, sequenceId, sequence, unitId);
++    checkContentRedirect(courseId, sequenceStatus, sequenceId, sequence, routeUnitId);
+ 
+     // Determine if we can resume where we left off.
+     checkResumeRedirect(courseStatus, courseId, sequenceId, firstSequenceId);
+ 
+-    // Check if we should save our sequence position.
+-    this.checkSaveSequencePosition(courseId, sequenceStatus, sequenceId, sequence, unitId);
++    // Check if we should save our sequence position.  Only do this when the route unit ID changes.
++    this.checkSaveSequencePosition(routeUnitId);
+   }
+ 
+   handleUnitNavigationClick = (nextUnitId) => {
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 26b9a57..1aa1c18 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -36,14 +36,13 @@ jest.mock(
+ 
+ initializeMockApp();
+ 
+-const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+-
+ describe('CoursewareContainer', () => {
+   let store;
+   let component;
++  let axiosMock;
+ 
+   beforeEach(() => {
+-    axiosMock.reset();
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+ 
+     store = initializeStore();
+ 
+@@ -76,62 +75,210 @@ describe('CoursewareContainer', () => {
+     );
+   });
+ 
+-  it('should successfully render sequence navigation and unit', async () => {
+-    const courseMetadata = Factory.build('courseMetadata');
+-    const courseId = courseMetadata.id;
+-    const { courseBlocks, unitBlock, sequenceBlock } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
+-    const sequenceMetadata = Factory.build(
+-      'sequenceMetadata',
+-      {},
+-      { courseId, unitBlocks: [unitBlock], sequenceBlock },
+-    );
++  describe('when receiving successful course data', () => {
++    let courseId;
++    let courseMetadata;
++    let courseBlocks;
++    let sequenceMetadata;
++
++    let sequenceBlock;
++    let unitBlocks;
++
++    function assertLoadedHeader(container) {
++      const courseHeader = container.querySelector('.course-header');
++      // Ensure the course number and org appear - this proves we loaded course metadata properly.
++      expect(courseHeader).toHaveTextContent(courseMetadata.number);
++      expect(courseHeader).toHaveTextContent(courseMetadata.org);
++      // Ensure the course title is showing up in the header.  This means we loaded course blocks properly.
++      expect(courseHeader.querySelector('.course-title')).toHaveTextContent(courseMetadata.name);
++    }
++
++    function assertSequenceNavigation(container) {
++      // Ensure we had appropriate sequence navigation buttons.  We should only have one unit.
++      const sequenceNavButtons = container.querySelectorAll('nav.sequence-navigation button');
++      expect(sequenceNavButtons).toHaveLength(5);
++
++      expect(sequenceNavButtons[0]).toHaveTextContent('Previous');
++      // Prove this button is rendering an SVG book icon, meaning it's a unit.
++      expect(sequenceNavButtons[1].querySelector('svg')).toHaveClass('fa-book');
++      expect(sequenceNavButtons[4]).toHaveTextContent('Next');
++    }
++
++    function setupMockRequests() {
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`).reply(200, courseMetadata);
++      axiosMock.onGet(new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`)).reply(200, courseBlocks);
++      axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceBlock.id}`).reply(200, sequenceMetadata);
++    }
++
++    beforeEach(async () => {
++      // On page load, SequenceContext attempts to scroll to the top of the page.
++      global.scrollTo = jest.fn();
++
++      courseMetadata = Factory.build('courseMetadata');
++      courseId = courseMetadata.id;
++
++      const result = buildSimpleCourseBlocks(courseId, courseMetadata.name, 3); // 3 is for 3 units
++      courseBlocks = result.courseBlocks;
++      unitBlocks = result.unitBlocks;
++      sequenceBlock = result.sequenceBlock;
++
++      sequenceMetadata = Factory.build(
++        'sequenceMetadata',
++        {},
++        { courseId, unitBlocks, sequenceBlock },
++      );
++
++      setupMockRequests();
++    });
++
++    describe('when the URL only contains a course ID', () => {
++      it('should use the resume block repsonse to pick a unit if it contains one', async () => {
++        axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/courseware/resume/${courseId}`).reply(200, {
++          sectionId: sequenceBlock.id,
++          unitId: unitBlocks[1].id,
++        });
++
++        history.push(`/course/${courseId}`);
++        const { container } = render(component);
++
++        // This is an important line that ensures the spinner has been removed - and thus our main
++        // content has been loaded - prior to proceeding with our expectations.
++        await waitForElementToBeRemoved(screen.getByRole('status'));
++
++        assertLoadedHeader(container);
++        assertSequenceNavigation(container);
++
++        expect(container.querySelector('.fake-unit')).toHaveTextContent('Unit Contents');
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(courseId);
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(unitBlocks[1].id);
++      });
++
++      it('should use the first sequence ID and activeUnitIndex if the resume block response is empty', async () => {
++        // OVERRIDE SEQUENCE METADATA:
++        // set the position to the third unit so we can prove activeUnitIndex is working
++        sequenceMetadata = Factory.build(
++          'sequenceMetadata',
++          { position: 3 }, // position index is 1-based and is converted to 0-based for activeUnitIndex
++          { courseId, unitBlocks, sequenceBlock },
++        );
++
++        // Re-call the mock setup now that sequenceMetadata is different.
++        setupMockRequests();
++        // Note how there is no sectionId/unitId returned in this mock response!
++        axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/courseware/resume/${courseId}`).reply(200, {});
++
++        history.push(`/course/${courseId}`);
++        const { container } = render(component);
++
++        // This is an important line that ensures the spinner has been removed - and thus our main
++        // content has been loaded - prior to proceeding with our expectations.
++        await waitForElementToBeRemoved(screen.getByRole('status'));
++
++        assertLoadedHeader(container);
++        assertSequenceNavigation(container);
++
++        expect(container.querySelector('.fake-unit')).toHaveTextContent('Unit Contents');
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(courseId);
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(unitBlocks[2].id);
++      });
++    });
++
++    describe('when the URL contains a course ID and sequence ID', () => {
++      it('should pick the first unit if position was not defined (activeUnitIndex becomes 0)', async () => {
++        history.push(`/course/${courseId}/${sequenceBlock.id}`);
++        const { container } = render(component);
++
++        // This is an important line that ensures the spinner has been removed - and thus our main
++        // content has been loaded - prior to proceeding with our expectations.
++        await waitForElementToBeRemoved(screen.getByRole('status'));
++
++        assertLoadedHeader(container);
++        assertSequenceNavigation(container);
++
++        expect(container.querySelector('.fake-unit')).toHaveTextContent('Unit Contents');
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(courseId);
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(unitBlocks[0].id);
++      });
++
++      it('should use activeUnitIndex to pick a unit from the sequence', async () => {
++        // OVERRIDE SEQUENCE METADATA:
++        sequenceMetadata = Factory.build(
++          'sequenceMetadata',
++          { position: 3 }, // position index is 1-based and is converted to 0-based for activeUnitIndex
++          { courseId, unitBlocks, sequenceBlock },
++        );
++
++        // Re-call the mock setup now that sequenceMetadata is different.
++        setupMockRequests();
++
++        history.push(`/course/${courseId}/${sequenceBlock.id}`);
++        const { container } = render(component);
++
++        // This is an important line that ensures the spinner has been removed - and thus our main
++        // content has been loaded - prior to proceeding with our expectations.
++        await waitForElementToBeRemoved(screen.getByRole('status'));
++
++        assertLoadedHeader(container);
++        assertSequenceNavigation(container);
++
++        expect(container.querySelector('.fake-unit')).toHaveTextContent('Unit Contents');
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(courseId);
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(unitBlocks[2].id);
++      });
++    });
++
++    describe('when the URL contains a course, sequence, and unit ID', () => {
++      it('should load the specified unit', async () => {
++        history.push(`/course/${courseId}/${sequenceBlock.id}/${unitBlocks[2].id}`);
++        const { container } = render(component);
+ 
+-    const courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
+-    const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+-    const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceBlock.id}`;
+-    const unitId = unitBlock.id;
++        // This is an important line that ensures the spinner has been removed - and thus our main
++        // content has been loaded - prior to proceeding with our expectations.
++        await waitForElementToBeRemoved(screen.getByRole('status'));
+ 
+-    axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+-    axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+-    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/courseware/resume/${courseId}`).reply(200, {
+-      sectionId: sequenceBlock.id,
+-      unitId: unitBlock.id,
++        assertLoadedHeader(container);
++        assertSequenceNavigation(container);
++
++        expect(container.querySelector('.fake-unit')).toHaveTextContent('Unit Contents');
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(courseId);
++        expect(container.querySelector('.fake-unit')).toHaveTextContent(unitBlocks[2].id);
++      });
+     });
+-    axiosMock.onGet(sequenceMetadataUrl).reply(200, sequenceMetadata);
+ 
+-    // Print out any URLs that we didn't handle above - useful for debugging the test.
+-    axiosMock.onAny().reply((config) => {
+-      console.log(config.url);
+-      return [200, {}];
++    describe('when the current sequence is an exam', () => {
++      const { location } = window;
++
++      beforeEach(() => {
++        delete window.location;
++        window.location = {
++          assign: jest.fn(),
++        };
++      });
++
++      afterEach(() => {
++        window.location = location;
++      });
++
++      it('should redirect to the sequence lmsWebUrl', async () => {
++        // OVERRIDE SEQUENCE METADATA:
++        sequenceMetadata = Factory.build(
++          'sequenceMetadata',
++          { is_time_limited: true }, // position index is 1-based and is converted to 0-based for activeUnitIndex
++          { courseId, unitBlocks, sequenceBlock },
++        );
++
++        // Re-call the mock setup now that sequenceMetadata is different.
++        setupMockRequests();
++        history.push(`/course/${courseId}/${sequenceBlock.id}/${unitBlocks[2].id}`);
++        render(component);
++
++        // This is an important line that ensures the spinner has been removed - and thus our main
++        // content has been loaded - prior to proceeding with our expectations.
++        await waitForElementToBeRemoved(screen.getByRole('status'));
++
++        expect(global.location.assign).toHaveBeenCalledWith(sequenceBlock.lms_web_url);
++      });
+     });
+-    // On page load, SequenceContext attempts to scroll to the top of the page.
+-    global.scrollTo = jest.fn();
+-    history.push(`/course/${courseId}`);
+-    const { container } = render(component);
+-
+-    // This is an important line that ensures the spinner has been removed - and thus our main
+-    // content has been loaded - prior to proceeding with our expectations.
+-    await waitForElementToBeRemoved(screen.getByRole('status'));
+-
+-    const courseHeader = container.querySelector('.course-header');
+-    // Ensure the course number and org appear - this proves we loaded course metadata properly.
+-    expect(courseHeader).toHaveTextContent(courseMetadata.number);
+-    expect(courseHeader).toHaveTextContent(courseMetadata.org);
+-    // Ensure the course title is showing up in the header.  This means we loaded course blocks properly.
+-    expect(courseHeader.querySelector('.course-title')).toHaveTextContent(courseMetadata.name);
+-
+-    // Ensure we had appropriate sequence navigation buttons.  We should only have one unit.
+-    const sequenceNavButtons = container.querySelectorAll('nav.sequence-navigation button');
+-    expect(sequenceNavButtons).toHaveLength(3);
+-
+-    expect(sequenceNavButtons[0]).toHaveTextContent('Previous');
+-    // Prove this button is rendering an SVG book icon, meaning it's a unit.
+-    expect(sequenceNavButtons[1].querySelector('svg')).toHaveClass('fa-book');
+-    expect(sequenceNavButtons[2]).toHaveTextContent('Next');
+-
+-    expect(container.querySelector('.fake-unit')).toHaveTextContent('Unit Contents');
+-    expect(container.querySelector('.fake-unit')).toHaveTextContent(courseId);
+-    expect(container.querySelector('.fake-unit')).toHaveTextContent(unitId);
+   });
+ 
+   describe('when receiving a can_load_courseware error_code', () => {
+@@ -146,11 +293,11 @@ describe('CoursewareContainer', () => {
+         },
+       });
+       const courseId = courseMetadata.id;
+-      const { courseBlocks, unitBlock, sequenceBlock } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
++      const { courseBlocks, unitBlocks, sequenceBlock } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
+       const sequenceMetadata = Factory.build(
+         'sequenceMetadata',
+         {},
+-        { courseId, unitBlocks: [unitBlock], sequenceBlock },
++        { courseId, unitBlocks, sequenceBlock },
+       );
+ 
+       const forbiddenCourseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
+diff --git a/src/courseware/data/__factories__/courseBlocks.factory.js b/src/courseware/data/__factories__/courseBlocks.factory.js
+index 699d46f..e3d2aa5 100644
+--- a/src/courseware/data/__factories__/courseBlocks.factory.js
++++ b/src/courseware/data/__factories__/courseBlocks.factory.js
+@@ -4,50 +4,44 @@ import './block.factory';
+ 
+ Factory.define('courseBlocks')
+   .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+-  .option('unit', ['courseId'], courseId => Factory.build(
+-    'block',
+-    { type: 'vertical' },
+-    { courseId },
+-  ))
+-  .option('sequence', ['courseId', 'unit'], (courseId, child) => Factory.build(
+-    'block',
+-    { type: 'sequential', children: [child.id] },
+-    { courseId },
+-  ))
+-  .option('section', ['courseId', 'sequence'], (courseId, child) => Factory.build(
+-    'block',
+-    { type: 'chapter', children: [child.id] },
+-    { courseId },
+-  ))
+-  .option('course', ['courseId', 'section'], (courseId, child) => Factory.build(
+-    'block',
+-    { type: 'course', children: [child.id] },
+-    { courseId },
+-  ))
++  .option('units')
++  .option('sequence')
++  .option('section')
++  .option('course')
+   .attr(
+     'blocks',
+-    ['course', 'section', 'sequence', 'unit'],
+-    (course, section, sequence, unit) => ({
+-      [course.id]: course,
+-      [section.id]: section,
+-      [sequence.id]: sequence,
+-      [unit.id]: unit,
+-    }),
++    ['course', 'section', 'sequence', 'units'],
++    (course, section, sequence, units) => {
++      const unitsObj = {};
++      units.forEach(unit => {
++        unitsObj[unit.id] = unit;
++      });
++      return {
++        [course.id]: course,
++        [section.id]: section,
++        [sequence.id]: sequence,
++        ...unitsObj,
++      };
++    },
+   )
+   .attr('root', ['course'], course => course.id);
+ 
+ /**
+  * Builds a course with a single chapter, sequence, and unit.
+  */
+-export default function buildSimpleCourseBlocks(courseId, title) {
+-  const unitBlock = Factory.build(
+-    'block',
+-    { type: 'vertical' },
+-    { courseId },
+-  );
++export default function buildSimpleCourseBlocks(courseId, title, numUnits = 1) {
++  const unitBlocks = [];
++  for (let i = 0; i < numUnits; i++) {
++    const unitBlock = Factory.build(
++      'block',
++      { type: 'vertical' },
++      { courseId },
++    );
++    unitBlocks.push(unitBlock);
++  }
+   const sequenceBlock = Factory.build(
+     'block',
+-    { type: 'sequential', children: [unitBlock.id] },
++    { type: 'sequential', children: unitBlocks.map(unitBlock => unitBlock.id) },
+     { courseId },
+   );
+   const sectionBlock = Factory.build(
+@@ -65,13 +59,13 @@ export default function buildSimpleCourseBlocks(courseId, title) {
+       'courseBlocks',
+       { courseId },
+       {
+-        unit: unitBlock,
++        units: unitBlocks,
+         sequence: sequenceBlock,
+         section: sectionBlock,
+         course: courseBlock,
+       },
+     ),
+-    unitBlock,
++    unitBlocks,
+     sequenceBlock,
+     sectionBlock,
+     courseBlock,
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index 79d6094..dee86e3 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -25,16 +25,17 @@ describe('Data layer integration tests', () => {
+   // building minimum set of api responses to test all thunks
+   const courseMetadata = Factory.build('courseMetadata');
+   const courseId = courseMetadata.id;
+-  const { courseBlocks, unitBlock, sequenceBlock } = buildSimpleCourseBlocks(courseId);
++  const { courseBlocks, unitBlocks, sequenceBlock } = buildSimpleCourseBlocks(courseId);
+   const sequenceMetadata = Factory.build(
+     'sequenceMetadata',
+     {},
+-    { courseId, unitBlocks: [unitBlock], sequenceBlock },
++    { courseId, unitBlocks, sequenceBlock },
+   );
+ 
+   const courseUrl = `${courseBaseUrl}/${courseId}`;
+   const sequenceUrl = `${sequenceBaseUrl}/${sequenceMetadata.item_id}`;
+   const sequenceId = sequenceBlock.id;
++  const unitBlock = unitBlocks[0];
+   const unitId = unitBlock.id;
+ 
+   let store;
+@@ -66,9 +67,7 @@ describe('Data layer integration tests', () => {
+           has_access: false,
+         },
+       });
+-      const forbiddenCourseBlocks = Factory.build('courseBlocks', {
+-        courseId: forbiddenCourseMetadata.id,
+-      });
++      const { courseBlocks: forbiddenCourseBlocks } = buildSimpleCourseBlocks(forbiddenCourseMetadata.id, null);
+ 
+       const forbiddenCourseUrl = `${courseBaseUrl}/${forbiddenCourseMetadata.id}`;
+ 
+diff --git a/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+index e541d95..938e161 100644
+--- a/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
++++ b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+@@ -24,9 +24,11 @@ class MasqueradeWidget extends Component {
+           options,
+         });
+       } else {
++        // eslint-disable-next-line no-console
+         console.warn('Unable to get masquerade options', data);
+       }
+     }).catch((response) => {
++      // eslint-disable-next-line no-console
+       console.error('Unable to get masquerade options', response);
+     });
+   }
+-- 
+2.34.1
+

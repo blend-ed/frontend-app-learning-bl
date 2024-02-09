@@ -1,0 +1,58 @@
+From fcc0cceb8d1cec3cfc087304e0aa8cdfc3ad96ae Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Thu, 9 Sep 2021 10:07:35 -0400
+Subject: [PATCH 0643/1021] fix: update progress grade table styling (AA-934)
+ (#635)
+
+---
+ .../grades/detailed-grades/DetailedGradesTable.jsx          | 2 +-
+ .../progress-tab/grades/grade-summary/GradeSummaryTable.jsx | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index 22c3fd6..a25c1a7 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -51,7 +51,7 @@ function DetailedGradesTable({ intl }) {
+                 Header: `${intl.formatMessage(messages.score)}`,
+                 accessor: 'score',
+                 headerClassName: 'justify-content-end h5 mb-0',
+-                cellClassName: 'float-right small',
++                cellClassName: 'align-top text-right small',
+               },
+             ]}
+           >
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index 591c162..3056532 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -104,7 +104,7 @@ function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+             Cell: ({ value }) => (
+               <span className={value.locked ? 'greyed-out' : ''}>{value.weight}</span> // eslint-disable-line react/prop-types
+             ),
+-            cellClassName: 'float-right small',
++            cellClassName: 'text-right small',
+           },
+           {
+             Header: `${intl.formatMessage(messages.grade)}`,
+@@ -114,7 +114,7 @@ function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+             Cell: ({ value }) => (
+               <span className={value.locked ? 'greyed-out' : ''}>{value.grade}</span> // eslint-disable-line react/prop-types
+             ),
+-            cellClassName: 'float-right small',
++            cellClassName: 'text-right small',
+           },
+           {
+             Header: `${intl.formatMessage(messages.weightedGrade)}`,
+@@ -124,7 +124,7 @@ function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+             Cell: ({ value }) => (
+               <span className={value.locked ? 'greyed-out' : ''}>{value.weightedGrade}</span> // eslint-disable-line react/prop-types
+             ),
+-            cellClassName: 'float-right font-weight-bold small',
++            cellClassName: 'text-right font-weight-bold small',
+           },
+         ]}
+       >
+-- 
+2.34.1
+

@@ -1,0 +1,109 @@
+From 6c052a26619f89f2389d918d7b2de45e5a821047 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 22 Jun 2020 11:24:15 -0400
+Subject: [PATCH 0149/1021] Avoid redundant paragon sass import (#91)
+
+Move all scss imports into the main index.scss. This will let them
+all know about existing sass variables and avoid duplicate imports.
+---
+ src/courseware/course/celebration/CelebrationModal.jsx     | 2 --
+ src/courseware/course/celebration/CelebrationModal.scss    | 3 +--
+ src/courseware/course/content-tools/ContentTools.jsx       | 1 -
+ .../course/content-tools/calculator/Calculator.jsx         | 1 -
+ src/dates-tab/Badge.jsx                                    | 2 --
+ src/dates-tab/Day.jsx                                      | 2 --
+ src/index.scss                                             | 7 +++++++
+ 7 files changed, 8 insertions(+), 10 deletions(-)
+
+diff --git a/src/courseware/course/celebration/CelebrationModal.jsx b/src/courseware/course/celebration/CelebrationModal.jsx
+index 78c752a..cb8a57c 100644
+--- a/src/courseware/course/celebration/CelebrationModal.jsx
++++ b/src/courseware/course/celebration/CelebrationModal.jsx
+@@ -10,8 +10,6 @@ import messages from './messages';
+ import SocialIcons from './SocialIcons';
+ import { recordFirstSectionCelebration } from './utils';
+ 
+-import './CelebrationModal.scss';
+-
+ function CelebrationModal({
+   courseId, intl, open, ...rest
+ }) {
+diff --git a/src/courseware/course/celebration/CelebrationModal.scss b/src/courseware/course/celebration/CelebrationModal.scss
+index ef23832..5f561d5 100644
+--- a/src/courseware/course/celebration/CelebrationModal.scss
++++ b/src/courseware/course/celebration/CelebrationModal.scss
+@@ -1,5 +1,4 @@
+-@import '~@edx/paragon/scss/edx/theme.scss';
+-
++// Should be scoped better, but Modal doesn't seem to pass down classnames or ids
+ .modal {
+   text-align: center;
+ 
+diff --git a/src/courseware/course/content-tools/ContentTools.jsx b/src/courseware/course/content-tools/ContentTools.jsx
+index 2ea2676..25f57af 100644
+--- a/src/courseware/course/content-tools/ContentTools.jsx
++++ b/src/courseware/course/content-tools/ContentTools.jsx
+@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
+ 
+ import Calculator from './calculator';
+ import NotesVisibility from './notes-visibility';
+-import './contentTools.scss';
+ 
+ export default function ContentTools({
+   course,
+diff --git a/src/courseware/course/content-tools/calculator/Calculator.jsx b/src/courseware/course/content-tools/calculator/Calculator.jsx
+index 8d85297..08c7e4f 100644
+--- a/src/courseware/course/content-tools/calculator/Calculator.jsx
++++ b/src/courseware/course/content-tools/calculator/Calculator.jsx
+@@ -10,7 +10,6 @@ import {
+   faCalculator, faQuestionCircle, faTimesCircle, faEquals,
+ } from '@fortawesome/free-solid-svg-icons';
+ import messages from './messages';
+-import './calculator.scss';
+ 
+ class Calculator extends Component {
+   constructor(props) {
+diff --git a/src/dates-tab/Badge.jsx b/src/dates-tab/Badge.jsx
+index bde5477..f1e5938 100644
+--- a/src/dates-tab/Badge.jsx
++++ b/src/dates-tab/Badge.jsx
+@@ -2,8 +2,6 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ 
+-import './Badge.scss';
+-
+ export default function Badge({ children, className }) {
+   return (
+     <span className={classNames('dates-badge badge align-text-bottom font-italic ml-2 px-2', className)}>
+diff --git a/src/dates-tab/Day.jsx b/src/dates-tab/Day.jsx
+index ca00ff1..82afb77 100644
+--- a/src/dates-tab/Day.jsx
++++ b/src/dates-tab/Day.jsx
+@@ -9,8 +9,6 @@ import { useModel } from '../model-store';
+ import { getBadgeListAndColor } from './badgelist';
+ import { isLearnerAssignment } from './utils';
+ 
+-import './Day.scss';
+-
+ function Day({
+   date, first, intl, items, last,
+ }) {
+diff --git a/src/index.scss b/src/index.scss
+index 2faf598..128ee4b 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -306,3 +306,10 @@ $primary: #1176B2;
+     flex-basis: 25%;
+   }
+ }
++
++// Import component-specific sass files
++@import 'courseware/course/celebration/CelebrationModal.scss';
++@import 'courseware/course/content-tools/calculator/calculator.scss';
++@import 'courseware/course/content-tools/contentTools.scss';
++@import 'dates-tab/Badge.scss';
++@import 'dates-tab/Day.scss';
+-- 
+2.34.1
+

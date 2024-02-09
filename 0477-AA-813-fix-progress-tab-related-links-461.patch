@@ -1,0 +1,76 @@
+From 519cf27c4e036995f0dd0860c5b8847dd39298fc Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 26 May 2021 12:01:18 -0400
+Subject: [PATCH 0477/1021] AA-813: fix progress tab related links (#461)
+
+---
+ .../grades/detailed-grades/DetailedGrades.jsx         | 11 ++++-------
+ .../progress-tab/related-links/RelatedLinks.jsx       | 11 ++++++++---
+ 2 files changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 621ac48..29eb6d8 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -1,8 +1,9 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+-import { Link } from 'react-router-dom';
+ 
++import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Hyperlink } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+ 
+ import DetailedGradesTable from './DetailedGradesTable';
+@@ -21,13 +22,9 @@ function DetailedGrades({ intl }) {
+   const hasSectionScores = sectionScores.length > 0;
+ 
+   const outlineLink = (
+-    <Link
+-      className="text-dark-700"
+-      style={{ textDecoration: 'underline' }}
+-      to={`/course/${courseId}/home`}
+-    >
++    <Hyperlink className="muted-link inline-link" destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}>
+       {intl.formatMessage(messages.courseOutline)}
+-    </Link>
++    </Hyperlink>
+   );
+ 
+   return (
+diff --git a/src/course-home/progress-tab/related-links/RelatedLinks.jsx b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+index 8f1a07a..2ac5d35 100644
+--- a/src/course-home/progress-tab/related-links/RelatedLinks.jsx
++++ b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+@@ -1,7 +1,8 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+-import { Link } from 'react-router-dom';
++import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Hyperlink } from '@edx/paragon';
+ 
+ import messages from './messages';
+ 
+@@ -15,11 +16,15 @@ function RelatedLinks({ intl }) {
+       <h3 className="h4">{intl.formatMessage(messages.relatedLinks)}</h3>
+       <ul className="pl-4">
+         <li>
+-          <Link to={`course/${courseId}/dates`}>{intl.formatMessage(messages.datesCardLink)}</Link>
++          <Hyperlink destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/dates`}>
++            {intl.formatMessage(messages.datesCardLink)}
++          </Hyperlink>
+           <p>{intl.formatMessage(messages.datesCardDescription)}</p>
+         </li>
+         <li>
+-          <Link to={`course/${courseId}/home`}>{intl.formatMessage(messages.outlineCardLink)}</Link>
++          <Hyperlink destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}>
++            {intl.formatMessage(messages.outlineCardLink)}
++          </Hyperlink>
+           <p>{intl.formatMessage(messages.outlineCardDescription)}</p>
+         </li>
+       </ul>
+-- 
+2.34.1
+

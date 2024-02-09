@@ -1,0 +1,35 @@
+From bc30b20b0d872b434dac34dbc97b3a6707ca1302 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <ciduarte@wpi.edu>
+Date: Tue, 14 Jul 2020 15:58:48 -0400
+Subject: [PATCH 0164/1021] AA-221: Pull in `has_ended` variable for dates
+ banner logic (#107)
+
+Co-authored-by: Carla Duarte <cduarte@edx.org>
+---
+ src/course-home/dates-banner/DatesBannerContainer.jsx | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index 3c0d514..ec6fcdf 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -19,6 +19,7 @@ function DatesBannerContainer(props) {
+   const {
+     courseDateBlocks,
+     datesBannerInfo,
++    hasEnded,
+   } = useModel(model, courseId);
+ 
+   const {
+@@ -61,7 +62,7 @@ function DatesBannerContainer(props) {
+ 
+   return (
+     <>
+-      {datesBanners.map((banner) => banner.shouldDisplay && (
++      {!hasEnded && datesBanners.map((banner) => banner.shouldDisplay && (
+         <DatesBanner
+           name={banner.name}
+           bannerClickHandler={banner.clickHandler}
+-- 
+2.34.1
+

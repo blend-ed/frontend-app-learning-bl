@@ -1,0 +1,279 @@
+From 81188ae30f85a6de8dbd25a1412287b148416e7a Mon Sep 17 00:00:00 2001
+From: daphneli-chen <47010279+daphneli-chen@users.noreply.github.com>
+Date: Fri, 14 Aug 2020 13:50:10 -0700
+Subject: [PATCH 0231/1021] AA-274: Created credit requirements banner (#168)
+
+Co-authored-by: Daphne Li-Chen <dli-chen@edx.org>
+---
+ .../progress-tab/CertificateBanner.jsx        |   1 +
+ .../progress-tab/CreditRequirements.jsx       | 151 ++++++++++++++++++
+ src/course-home/progress-tab/ProgressTab.jsx  |   2 +
+ src/course-home/progress-tab/messages.js      |  62 ++++++-
+ 4 files changed, 215 insertions(+), 1 deletion(-)
+ create mode 100644 src/course-home/progress-tab/CreditRequirements.jsx
+
+diff --git a/src/course-home/progress-tab/CertificateBanner.jsx b/src/course-home/progress-tab/CertificateBanner.jsx
+index b44d0bd..fb5537b 100644
+--- a/src/course-home/progress-tab/CertificateBanner.jsx
++++ b/src/course-home/progress-tab/CertificateBanner.jsx
+@@ -17,6 +17,7 @@ function CertificateBanner({ intl }) {
+     certificateData,
+     enrollmentMode,
+   } = useModel('progress', courseId);
++
+   if (certificateData === null || enrollmentMode === 'audit') { return null; }
+   const { certUrl, certDownloadUrl } = certificateData;
+   const dispatch = useDispatch();
+diff --git a/src/course-home/progress-tab/CreditRequirements.jsx b/src/course-home/progress-tab/CreditRequirements.jsx
+new file mode 100644
+index 0000000..c74448a
+--- /dev/null
++++ b/src/course-home/progress-tab/CreditRequirements.jsx
+@@ -0,0 +1,151 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++
++import {
++  FormattedDate, FormattedTime, injectIntl, intlShape,
++} from '@edx/frontend-platform/i18n';
++
++import { useModel } from '../../generic/model-store';
++import messages from './messages';
++
++function CreditRequirements({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    creditCourseRequirements,
++    creditSupportUrl,
++    verificationData,
++    userTimezone,
++  } = useModel('progress', courseId);
++
++  if (creditCourseRequirements === null) { return null; }
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++  const eligibility = creditCourseRequirements.eligibilityStatus;
++  let message;
++  switch (eligibility) {
++    case 'not_eligible':
++      message = intl.formatMessage(messages.creditNotEligible);
++      break;
++    case 'eligible':
++      message = intl.formatMessage(messages.creditEligible);
++      break;
++    case 'partial_eligible':
++      message = intl.formatMessage(messages.creditPartialEligible);
++      break;
++    default:
++      break;
++  }
++
++  const completed = `✓ ${intl.formatMessage(messages.completed)} `;
++
++  const { status } = verificationData;
++  let verificationMessage;
++  let verificationLinkMessage = '';
++
++  switch (status) {
++    case 'none':
++    case 'expired':
++      verificationMessage = `${intl.formatMessage(messages.notStarted)}; `;
++      verificationLinkMessage = intl.formatMessage(messages.notStarted);
++      break;
++    case 'approved':
++      verificationMessage = completed;
++      break;
++    case 'pending':
++      verificationMessage = intl.formatMessage(messages.pending);
++      break;
++    case 'must_reverify':
++      verificationMessage = `${intl.formatMessage(messages.rejected)}; `;
++      verificationLinkMessage = intl.formatMessage(messages.tryAgain);
++      break;
++    default:
++      break;
++  }
++  return (
++    <section className="banner rounded row border border-primary-300 my-2">
++      <div className="col ml-4 my-3">
++        <div className="row font-weight-bold">
++          {intl.formatMessage(messages.courseCreditHeader)}
++        </div>
++        <div className="row mb-2">{message}</div>
++        {creditCourseRequirements.requirements.map((requirement) => (
++          <div key={requirement.displayName} className="row w-50 border-bottom">
++            <div className="col-4">
++              {requirement.displayName}
++              {requirement.minGrade && (
++                <span>{` ${requirement.minGrade}%`}</span>
++              )}
++            </div>
++            <div className="col-8">
++              {!requirement.status && (
++                intl.formatMessage(messages.notMet)
++              )}
++              {(requirement.status === 'failed' || requirement.status === 'declined') && (
++                intl.formatMessage(messages.failed)
++              )}
++              {requirement.status === 'submitted' && (
++                intl.formatMessage(messages.submitted)
++              )}
++              {requirement.status === 'satisfied' && (
++                <span>
++                  {completed}
++                  {requirement.statusDate && (
++                    <span>
++                      <FormattedDate
++                        value={requirement.statusDate}
++                        day="numeric"
++                        month="short"
++                        weekday="short"
++                        year="numeric"
++                        {...timezoneFormatArgs}
++                      /> <FormattedTime
++                        value={requirement.statusDate}
++                      />
++                    </span>
++                  )}
++                </span>
++              )}
++            </div>
++          </div>
++        ))}
++        <div className="row w-50 border-bottom">
++          <div className="col-4">Verification Status </div>
++          <div className="col-8">
++            {verificationMessage}
++            {verificationLinkMessage && (
++              <a href={verificationData.link}>{verificationLinkMessage}</a>
++            )}
++            {status === 'approved' && verificationData.statusDate && (
++              <span>
++                <FormattedDate
++                  value={verificationData.statusDate}
++                  day="numeric"
++                  month="short"
++                  weekday="short"
++                  year="numeric"
++                  {...timezoneFormatArgs}
++                />
++              </span>
++            )}
++          </div>
++        </div>
++        {eligibility === 'eligible' && (
++          <div className="mt-3 row">
++            <a className="btn btn-primary" href={creditCourseRequirements.dashboardUrl}>{intl.formatMessage(messages.purchaseCredit)}</a>
++          </div>
++        )}
++        <div className="mt-3 row">
++          <a href={creditSupportUrl}>{intl.formatMessage(messages.learnMoreCredit)}</a>
++        </div>
++      </div>
++    </section>
++  );
++}
++
++CreditRequirements.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CreditRequirements);
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index 78b5645..53f5201 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -6,6 +6,7 @@ import { useModel } from '../../generic/model-store';
+ import Chapter from './Chapter';
+ import CertificateBanner from './CertificateBanner';
+ import messages from './messages';
++import CreditRequirements from './CreditRequirements';
+ 
+ function ProgressTab({ intl }) {
+   const {
+@@ -29,6 +30,7 @@ function ProgressTab({ intl }) {
+         </div>
+       )}
+       <CertificateBanner />
++      <CreditRequirements />
+       {coursewareSummary.map((chapter) => (
+         <Chapter
+           key={chapter.displayName}
+diff --git a/src/course-home/progress-tab/messages.js b/src/course-home/progress-tab/messages.js
+index 5ede570..87bae7f 100644
+--- a/src/course-home/progress-tab/messages.js
++++ b/src/course-home/progress-tab/messages.js
+@@ -56,7 +56,67 @@ const messages = defineMessages({
+   },
+   studioLink: {
+     id: 'learning.progress.badge.studioLink',
+-    defaultMessage: 'View grading in studio',
++    defaultMessage: 'View grading in Studio',
++  },
++  courseCreditHeader: {
++    id: 'learning.progress.courseCreditHeader',
++    defaultMessage: 'Course Credit Eligibility',
++  },
++  creditNotEligible: {
++    id: 'learning.progress.creditNotEligible',
++    defaultMessage: 'You are not eligible for course credit because you have not met the requirements for credit.',
++  },
++  creditEligible: {
++    id: 'learning.progress.creditEligible',
++    defaultMessage: 'You have met the requirements for credit in this course.',
++  },
++  creditPartialEligible: {
++    id: 'learning.progress.creditPartialEligible',
++    defaultMessage: 'You have not met the minimum requirements for credit.',
++  },
++  start: {
++    id: 'learning.progress.startVerification',
++    defaultMessage: 'Start now',
++  },
++  tryAgain: {
++    id: 'learning.progress.start',
++    defaultMessage: 'Try again',
++  },
++  notStarted: {
++    id: 'learning.progress.notStarted',
++    defaultMessage: 'Not started',
++  },
++  failed: {
++    id: 'learning.progress.failed',
++    defaultMessage: 'Incomplete',
++  },
++  notMet: {
++    id: 'learning.progress.notMet',
++    defaultMessage: 'Not met',
++  },
++  pending: {
++    id: 'learning.progress.pending',
++    defaultMessage: 'Pending',
++  },
++  rejected: {
++    id: 'learning.progress.rejected',
++    defaultMessage: 'Rejected',
++  },
++  completed: {
++    id: 'learning.progress.completed',
++    defaultMessage: 'Completed',
++  },
++  submitted: {
++    id: 'learning.progress.submitted',
++    defaultMessage: 'Submitted',
++  },
++  learnMoreCredit: {
++    id: 'learning.progress.learnMoreCredit',
++    defaultMessage: 'Learn more about course credit',
++  },
++  purchaseCredit: {
++    id: 'learning.progress.purchaseCredit',
++    defaultMessage: 'Purchase course credit',
+   },
+ });
+ 
+-- 
+2.34.1
+

@@ -1,0 +1,1048 @@
+From 72168b56f82e566ec2d535af5460f62fb158934b Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 3 May 2021 13:11:22 -0400
+Subject: [PATCH 0440/1021] AA-723: progress tab locked content experience
+ (#426)
+
+---
+ package-lock.json                             | 89 +++++++++++--------
+ package.json                                  |  2 +-
+ .../__factories__/progressTabData.factory.js  |  4 +
+ src/course-home/data/api.js                   |  1 -
+ src/course-home/outline-tab/Section.jsx       |  2 +
+ src/course-home/progress-tab/ProgressTab.jsx  | 18 +++-
+ .../progress-tab/ProgressTab.test.jsx         | 54 ++++++-----
+ .../certificate-status/CertificateStatus.jsx  |  8 +-
+ .../certificate-status/messages.js            | 38 ++++----
+ .../grades/course-grade/CourseGrade.jsx       | 26 ++++--
+ .../grades/course-grade/CourseGradeFooter.jsx | 46 +++++-----
+ .../grades/course-grade/CourseGradeHeader.jsx | 53 +++++++++++
+ .../course-grade/CurrentGradeTooltip.jsx      | 10 ++-
+ .../grades/course-grade/GradeBar.jsx          | 10 ++-
+ .../grades/course-grade/GradeBar.scss         |  4 +
+ .../grades/course-grade/GradeRangeTooltip.jsx | 80 +++++++++--------
+ .../course-grade/PassingGradeTooltip.jsx      |  9 +-
+ .../grade-summary/GradeSummaryHeader.jsx      |  4 +-
+ .../progress-tab/grades/messages.js           | 16 ++++
+ .../SequenceNavigation.test.jsx               |  2 +-
+ src/index.scss                                | 13 +++
+ 21 files changed, 324 insertions(+), 165 deletions(-)
+ create mode 100644 src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+
+diff --git a/package-lock.json b/package-lock.json
+index 200319f..7652869 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1413,9 +1413,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "14.6.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-14.6.0.tgz",
+-      "integrity": "sha512-q3rnNz+SwYL444Dw/NgQdXEDXi7ocgNe+miNJbgfJz8aB06eu1weQWDmz4IR9S/WALnWZgLb716J2E1qUNvfCQ==",
++      "version": "14.8.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-14.8.0.tgz",
++      "integrity": "sha512-ZCT4bur0ZlwI+UrzYcSRU0Vo9rBbSszbXrCrCeA5aZV9/xiwjoVJcMGxhWAMEfk5n9/R/bXBakcxc2Z+PjBEaQ==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+@@ -2886,9 +2886,12 @@
+       }
+     },
+     "@types/classnames": {
+-      "version": "2.2.11",
+-      "resolved": "https://registry.npmjs.org/@types/classnames/-/classnames-2.2.11.tgz",
+-      "integrity": "sha512-2koNhpWm3DgWRp5tpkiJ8JGc1xTn2q0l+jUNUE7oMKXUf5NpI9AIdC4kbjGNFBdHtcxBD18LAksoudAVhFKCjw=="
++      "version": "2.3.1",
++      "resolved": "https://registry.npmjs.org/@types/classnames/-/classnames-2.3.1.tgz",
++      "integrity": "sha512-zeOWb0JGBoVmlQoznvqXbE0tEC/HONsnoUNH19Hc96NFsTAwTXbTqb8FMYkru1F/iqp7a18Ws3nWJvtA1sHD1A==",
++      "requires": {
++        "classnames": "*"
++      }
+     },
+     "@types/cookie": {
+       "version": "0.3.3",
+@@ -3021,9 +3024,9 @@
+       "dev": true
+     },
+     "@types/react": {
+-      "version": "17.0.3",
+-      "resolved": "https://registry.npmjs.org/@types/react/-/react-17.0.3.tgz",
+-      "integrity": "sha512-wYOUxIgs2HZZ0ACNiIayItyluADNbONl7kt8lkLjVK8IitMH5QMyAh75Fwhmo37r1m7L2JaFj03sIfxBVDvRAg==",
++      "version": "17.0.4",
++      "resolved": "https://registry.npmjs.org/@types/react/-/react-17.0.4.tgz",
++      "integrity": "sha512-onz2BqScSFMoTRdJUZUDD/7xrusM8hBA2Fktk2qgaTYPCgPvWnDEgkrOs8hhPUf2jfcIXkJ5yK6VfYormJS3Jw==",
+       "requires": {
+         "@types/prop-types": "*",
+         "@types/scheduler": "*",
+@@ -6572,9 +6575,9 @@
+       }
+     },
+     "csstype": {
+-      "version": "3.0.7",
+-      "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.0.7.tgz",
+-      "integrity": "sha512-KxnUB0ZMlnUWCsx2Z8MUsr6qV6ja1w9ArPErJaJaF8a5SOWoHLIszeCTKGRGRgtLgYrs1E8CHkNSP1VZTTPc9g=="
++      "version": "3.0.8",
++      "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.0.8.tgz",
++      "integrity": "sha512-jXKhWqXPmlUeoQnF/EhTtTl4C9SnrxSH/jZUih3jmO6lBKr99rP3/+FmrMj4EFpOXzMtXHAZkd3x0E6h6Fgflw=="
+     },
+     "currently-unhandled": {
+       "version": "0.4.1",
+@@ -7087,9 +7090,9 @@
+       }
+     },
+     "dom-helpers": {
+-      "version": "5.2.0",
+-      "resolved": "https://registry.npmjs.org/dom-helpers/-/dom-helpers-5.2.0.tgz",
+-      "integrity": "sha512-Ru5o9+V8CpunKnz5LGgWXkmrH/20cGKwcHwS4m73zIvs54CN9epEmT/HLqFJW3kXpakAFkEdzgy1hzlJe3E4OQ==",
++      "version": "5.2.1",
++      "resolved": "https://registry.npmjs.org/dom-helpers/-/dom-helpers-5.2.1.tgz",
++      "integrity": "sha512-nRCa7CK3VTrM2NmGkIy4cbK7IZlgBE/PYMn55rrXefr5xXDP0LdtfPnblFDoVdcAfslJ7or6iqAUnx0CCGIWQA==",
+       "requires": {
+         "@babel/runtime": "^7.8.7",
+         "csstype": "^3.0.2"
+@@ -7106,9 +7109,9 @@
+       },
+       "dependencies": {
+         "domhandler": {
+-          "version": "4.1.0",
+-          "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-4.1.0.tgz",
+-          "integrity": "sha512-/6/kmsGlMY4Tup/nGVutdrK9yQi4YjWVcVeoQmixpzjOUK1U7pQkvAPHBJeUxOgxF0J8f8lwCJSlCfD0V4CMGQ==",
++          "version": "4.2.0",
++          "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-4.2.0.tgz",
++          "integrity": "sha512-zk7sgt970kzPks2Bf+dwT/PLzghLnsivb9CcxkvR8Mzr66Olr0Ofd8neSbglHJHaHa2MadfoSdNlKYAaafmWfA==",
+           "requires": {
+             "domelementtype": "^2.2.0"
+           }
+@@ -7152,19 +7155,19 @@
+       }
+     },
+     "domutils": {
+-      "version": "2.5.2",
+-      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.5.2.tgz",
+-      "integrity": "sha512-MHTthCb1zj8f1GVfRpeZUbohQf/HdBos0oX5gZcQFepOZPLLRyj6Wn7XS7EMnY7CVpwv8863u2vyE83Hfu28HQ==",
++      "version": "2.6.0",
++      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.6.0.tgz",
++      "integrity": "sha512-y0BezHuy4MDYxh6OvolXYsH+1EMGmFbwv5FKW7ovwMG6zTPWqNPq3WF9ayZssFq+UlKdffGLbOEaghNdaOm1WA==",
+       "requires": {
+         "dom-serializer": "^1.0.1",
+         "domelementtype": "^2.2.0",
+-        "domhandler": "^4.1.0"
++        "domhandler": "^4.2.0"
+       },
+       "dependencies": {
+         "domhandler": {
+-          "version": "4.1.0",
+-          "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-4.1.0.tgz",
+-          "integrity": "sha512-/6/kmsGlMY4Tup/nGVutdrK9yQi4YjWVcVeoQmixpzjOUK1U7pQkvAPHBJeUxOgxF0J8f8lwCJSlCfD0V4CMGQ==",
++          "version": "4.2.0",
++          "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-4.2.0.tgz",
++          "integrity": "sha512-zk7sgt970kzPks2Bf+dwT/PLzghLnsivb9CcxkvR8Mzr66Olr0Ofd8neSbglHJHaHa2MadfoSdNlKYAaafmWfA==",
+           "requires": {
+             "domelementtype": "^2.2.0"
+           }
+@@ -17388,9 +17391,9 @@
+       },
+       "dependencies": {
+         "@babel/runtime": {
+-          "version": "7.13.10",
+-          "resolved": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.13.10.tgz",
+-          "integrity": "sha512-4QPkjJq6Ns3V/RgpEahRk+AGfL0eO6RHHtTWoNNr5mO49G6B5+X6d6THgWEAvTrznU5xYpbAlVKRYcsCgh/Akw==",
++          "version": "7.13.17",
++          "resolved": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.13.17.tgz",
++          "integrity": "sha512-NCdgJEelPTSh+FEFylhnP1ylq848l1z9t9N0j1Lfbcw0+KXGjsTvUmkxy+voLLXB5SOKMbLLx4jxYliGrYQseA==",
+           "requires": {
+             "regenerator-runtime": "^0.13.4"
+           }
+@@ -17805,18 +17808,28 @@
+       "integrity": "sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA=="
+     },
+     "react-overlays": {
+-      "version": "5.0.0",
+-      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-5.0.0.tgz",
+-      "integrity": "sha512-TKbqfAv23TFtCJ2lzISdx76p97G/DP8Rp4TOFdqM9n8GTruVYgE3jX7Zgb8+w7YJ18slTVcDTQ1/tFzdCqjVhA==",
++      "version": "5.0.1",
++      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-5.0.1.tgz",
++      "integrity": "sha512-plwUJieTBbLSrgvQ4OkkbTD/deXgxiJdNuKzo6n1RWE3OVnQIU5hffCGS/nvIuu6LpXFs2majbzaXY8rcUVdWA==",
+       "requires": {
+-        "@babel/runtime": "^7.12.1",
+-        "@popperjs/core": "^2.5.3",
+-        "@restart/hooks": "^0.3.25",
++        "@babel/runtime": "^7.13.8",
++        "@popperjs/core": "^2.8.6",
++        "@restart/hooks": "^0.3.26",
+         "@types/warning": "^3.0.0",
+         "dom-helpers": "^5.2.0",
+         "prop-types": "^15.7.2",
+-        "uncontrollable": "^7.0.0",
++        "uncontrollable": "^7.2.1",
+         "warning": "^4.0.3"
++      },
++      "dependencies": {
++        "@babel/runtime": {
++          "version": "7.13.17",
++          "resolved": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.13.17.tgz",
++          "integrity": "sha512-NCdgJEelPTSh+FEFylhnP1ylq848l1z9t9N0j1Lfbcw0+KXGjsTvUmkxy+voLLXB5SOKMbLLx4jxYliGrYQseA==",
++          "requires": {
++            "regenerator-runtime": "^0.13.4"
++          }
++        }
+       }
+     },
+     "react-popper": {
+@@ -17939,9 +17952,9 @@
+       }
+     },
+     "react-table": {
+-      "version": "7.6.3",
+-      "resolved": "https://registry.npmjs.org/react-table/-/react-table-7.6.3.tgz",
+-      "integrity": "sha512-hfPF13zDLxPMpLKzIKCE8RZud9T/XrRTsaCIf8zXpWZIZ2juCl7qrGpo3AQw9eAetXV5DP7s2GDm+hht7qq5Dw=="
++      "version": "7.7.0",
++      "resolved": "https://registry.npmjs.org/react-table/-/react-table-7.7.0.tgz",
++      "integrity": "sha512-jBlj70iBwOTvvImsU9t01LjFjy4sXEtclBovl3mTiqjz23Reu0DKnRza4zlLtOPACx6j2/7MrQIthIK1Wi+LIA=="
+     },
+     "react-transition-group": {
+       "version": "4.4.1",
+diff --git a/package.json b/package.json
+index c5d75bb..ad5f090 100644
+--- a/package.json
++++ b/package.json
+@@ -39,7 +39,7 @@
+     "@edx/frontend-component-footer": "10.1.4",
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-platform": "1.8.4",
+-    "@edx/paragon": "14.6.0",
++    "@edx/paragon": "14.8.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+index 716a472..e8321d1 100644
+--- a/src/course-home/data/__factories__/progressTabData.factory.js
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -4,6 +4,7 @@ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dep
+ // This set of data may not be realistic, but it is intended to demonstrate many UI results.
+ Factory.define('progressTabData')
+   .attrs({
++    end: '3027-03-31T00:00:00Z',
+     certificate_data: {},
+     completion_summary: {
+       complete_count: 1,
+@@ -63,10 +64,13 @@ Factory.define('progressTabData')
+         pass: 0.75,
+       },
+     },
++    has_scheduled_content: false,
+     studio_url: 'http://studio.edx.org/settings/grading/course-v1:edX+Test+run',
++    user_has_passing_grade: false,
+     verification_data: {
+       link: null,
+       status: 'none',
+       status_date: null,
+     },
++    verified_mode: null,
+   });
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index c692bb6..7730204 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -138,7 +138,6 @@ export async function getProgressTabData(courseId) {
+     const { httpErrorStatus } = error && error.customAttributes;
+     if (httpErrorStatus === 404) {
+       global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
+-      return {};
+     }
+     throw error;
+   }
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index b76126f..ce69f76 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -85,6 +85,7 @@ function Section({
+             alt={intl.formatMessage(messages.openSection)}
+             icon={faPlus}
+             onClick={() => { setOpen(true); }}
++            size="sm"
+           />
+         )}
+         iconWhenOpen={(
+@@ -92,6 +93,7 @@ function Section({
+             alt={intl.formatMessage(genericMessages.close)}
+             icon={faMinus}
+             onClick={() => { setOpen(false); }}
++            size="sm"
+           />
+         )}
+       >
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index e4861f9..55adf13 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -1,5 +1,6 @@
+ import React from 'react';
+ import { layoutGenerator } from 'react-break';
++import { useSelector } from 'react-redux';
+ 
+ import CertificateStatus from './certificate-status/CertificateStatus';
+ import CourseCompletion from './course-completion/CourseCompletion';
+@@ -9,7 +10,21 @@ import GradeSummary from './grades/grade-summary/GradeSummary';
+ import ProgressHeader from './ProgressHeader';
+ import RelatedLinks from './related-links/RelatedLinks';
+ 
++import { useModel } from '../../generic/model-store';
++
+ function ProgressTab() {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    completionSummary: {
++      lockedCount,
++    },
++  } = useModel('progress', courseId);
++  const isLocked = lockedCount > 0;
++  const applyLockedOverlay = isLocked ? 'locked-overlay' : '';
++
+   const layout = layoutGenerator({
+     mobile: 0,
+     desktop: 992,
+@@ -17,7 +32,6 @@ function ProgressTab() {
+ 
+   const OnMobile = layout.is('mobile');
+   const OnDesktop = layout.isAtLeast('desktop');
+-
+   return (
+     <>
+       <ProgressHeader />
+@@ -29,7 +43,7 @@ function ProgressTab() {
+             <CertificateStatus />
+           </OnMobile>
+           <CourseGrade />
+-          <div className="my-4 p-4 rounded shadow-sm">
++          <div className={`grades my-4 p-4 rounded shadow-sm ${applyLockedOverlay}`} aria-hidden={isLocked}>
+             <GradeSummary />
+             <DetailedGrades />
+           </div>
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 275a7aa..d2a46e4 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -161,6 +161,22 @@ describe('Progress Tab', () => {
+       expect(screen.getByText('B: 80%-90%'));
+       expect(screen.getByText('F: <80%'));
+     });
++
++    it('renders locked feature preview when user has locked content', async () => {
++      setTabData({
++        completion_summary: {
++          complete_count: 1,
++          incomplete_count: 1,
++          locked_count: 1,
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('locked feature')).toBeInTheDocument();
++    });
++    it('does not render locked feature preview when user does not have locked content', async () => {
++      await fetchAndRender();
++      expect(screen.queryByText('locked feature')).not.toBeInTheDocument();
++    });
+   });
+ 
+   describe('Grade Summary', () => {
+@@ -200,21 +216,23 @@ describe('Progress Tab', () => {
+   });
+ 
+   describe('Certificate Status', () => {
+-    Object.defineProperty(window, 'matchMedia', {
+-      writable: true,
+-      value: jest.fn().mockImplementation(query => {
+-        const matches = !!(query === 'screen and (min-width: 768px)' || query === 'screen and (min-width: 992px)');
+-        return {
+-          matches,
+-          media: query,
+-          onchange: null,
+-          addListener: jest.fn(), // deprecated
+-          removeListener: jest.fn(), // deprecated
+-          addEventListener: jest.fn(),
+-          removeEventListener: jest.fn(),
+-          dispatchEvent: jest.fn(),
+-        };
+-      }),
++    beforeAll(() => {
++      Object.defineProperty(window, 'matchMedia', {
++        writable: true,
++        value: jest.fn().mockImplementation(query => {
++          const matches = !!(query === 'screen and (min-width: 992px)');
++          return {
++            matches,
++            media: query,
++            onchange: null,
++            addListener: jest.fn(), // deprecated
++            removeListener: jest.fn(), // deprecated
++            addEventListener: jest.fn(),
++            removeEventListener: jest.fn(),
++            dispatchEvent: jest.fn(),
++          };
++        }),
++      });
+     });
+ 
+     describe('enrolled user', () => {
+@@ -223,16 +241,12 @@ describe('Progress Tab', () => {
+       });
+ 
+       it('Displays text for nonPassing case when learner does not have a passing grade', async () => {
+-        setTabData({
+-          user_has_passing_grade: false,
+-        });
+         await fetchAndRender();
+         expect(screen.getByText('In order to qualify for a certificate, you must have a passing grade.')).toBeInTheDocument();
+       });
+ 
+       it('Displays text for inProgress case when more content is scheduled and the learner does not have a passing grade', async () => {
+         setTabData({
+-          user_has_passing_grade: false,
+           has_scheduled_content: true,
+         });
+         await fetchAndRender();
+@@ -319,7 +333,6 @@ describe('Progress Tab', () => {
+       it('Displays nothing if audit only', async () => {
+         setTabData({
+           certificate_data: { cert_status: 'audit_passing' },
+-          verified_mode: null,
+         });
+         await fetchAndRender();
+         // Keep these queries in sync with "upgrade link" test above, so we don't end up checking for text that is
+@@ -342,7 +355,6 @@ describe('Progress Tab', () => {
+     });
+ 
+     it('Does not display the certificate component if the user is not enrolled', async () => {
+-      setMetadata({ is_enrolled: false });
+       await fetchAndRender();
+       expect(screen.queryByTestId('certificate-status-component')).not.toBeInTheDocument();
+     });
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index 8876592..c84b38f 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -151,10 +151,12 @@ function CertificateStatus({ intl }) {
+ 
+   return (
+     <section data-testid="certificate-status-component" className="text-dark-700 mb-4">
+-      <Card className="bg-light-200 shadow-sm">
++      <Card className="bg-light-200 shadow-sm border-0">
+         <Card.Body>
+-          <Card.Title><h3>{header}</h3></Card.Title>
+-          <Card.Text>
++          <Card.Title>
++            <h3>{header}</h3>
++          </Card.Title>
++          <Card.Text className="small text-gray-700">
+             {body}
+           </Card.Text>
+           {buttonText && (buttonLocation || buttonAction) && (
+diff --git a/src/course-home/progress-tab/certificate-status/messages.js b/src/course-home/progress-tab/certificate-status/messages.js
+index 719940f..f8253eb 100644
+--- a/src/course-home/progress-tab/certificate-status/messages.js
++++ b/src/course-home/progress-tab/certificate-status/messages.js
+@@ -2,79 +2,79 @@ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+   notPassingHeader: {
+-    id: 'notPassingHeader',
++    id: 'progress.certificateStatus.notPassingHeader',
+     defaultMessage: 'Certificate status',
+   },
+   notPassingBody: {
+-    id: 'notPassingBody',
++    id: 'progress.certificateStatus.notPassingBody',
+     defaultMessage: 'In order to qualify for a certificate, you must have a passing grade.',
+   },
+   inProgressHeader: {
+-    id: 'inProgressHeader',
++    id: 'progress.certificateStatus.inProgressHeader',
+     defaultMessage: 'More content is coming soon!',
+   },
+   inProgressBody: {
+-    id: 'inProgressBody',
++    id: 'progress.certificateStatus.inProgressBody',
+     defaultMessage: 'It looks like there is more content in this course that will be released in the future. Look out for email updates or check back on your course for when this content will be available.',
+   },
+   requestableHeader: {
+-    id: 'requestableHeader',
++    id: 'progress.certificateStatus.requestableHeader',
+     defaultMessage: 'Certificate status',
+   },
+   requestableBody: {
+-    id: 'requestableBody',
++    id: 'progress.certificateStatus.requestableBody',
+     defaultMessage: 'Congratulations, you qualified for a certificate! In order to access your certificate, request it below.',
+   },
+   requestableButton: {
+-    id: 'requestableButton',
++    id: 'progress.certificateStatus.requestableButton',
+     defaultMessage: 'Request certificate',
+   },
+   unverifiedHeader: {
+-    id: 'unverifiedHeader',
++    id: 'progress.certificateStatus.unverifiedHeader',
+     defaultMessage: 'Certificate status',
+   },
+   unverifiedButton: {
+-    id: 'unverifiedButton',
++    id: 'progress.certificateStatus.unverifiedButton',
+     defaultMessage: 'Verify ID',
+   },
+   unverifiedPendingBody: {
+-    id: 'courseCelebration.verificationPending',
++    id: 'progress.certificateStatus.courseCelebration.verificationPending',
+     defaultMessage: 'Your ID verification is pending and your certificate will be available once approved.',
+   },
+   downloadableHeader: {
+-    id: 'downloadableHeader',
++    id: 'progress.certificateStatus.downloadableHeader',
+     defaultMessage: 'Your certificate is available!',
+   },
+   downloadableBody: {
+-    id: 'downloadableBody',
++    id: 'progress.certificateStatus.downloadableBody',
+     defaultMessage: 'Showcase your accomplishment on LinkedIn or your resume today. You can download your certificate now and access it any time from your Dashboard and Profile.',
+   },
+   downloadableButton: {
+-    id: 'downloadableButton',
++    id: 'progress.certificateStatus.downloadableButton',
+     defaultMessage: 'Download my certificate',
+   },
+   viewableButton: {
+-    id: 'viewableButton',
++    id: 'progress.certificateStatus.viewableButton',
+     defaultMessage: 'View my certificate',
+   },
+   notAvailableHeader: {
+-    id: 'notAvailableHeader',
++    id: 'progress.certificateStatus.notAvailableHeader',
+     defaultMessage: 'Certificate status',
+   },
+   notAvailableBody: {
+-    id: 'notAvailableBody',
++    id: 'progress.certificateStatus.notAvailableBody',
+     defaultMessage: 'Your certificate will be available soon! After this course officially ends on {end_date}, you will receive an email notification with your certificate.',
+   },
+   upgradeHeader: {
+-    id: 'upgradeHeader',
++    id: 'progress.certificateStatus.upgradeHeader',
+     defaultMessage: 'Earn a certificate',
+   },
+   upgradeBody: {
+-    id: 'upgradeBody',
++    id: 'progress.certificateStatus.upgradeBody',
+     defaultMessage: 'You are in an audit track and do not qualify for a certificate. In order to work towards a certificate, upgrade your course today.',
+   },
+   upgradeButton: {
+-    id: 'upgradeButton',
++    id: 'progress.certificateStatus.upgradeButton',
+     defaultMessage: 'Upgrade now',
+   },
+ });
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+index ea655fc..862d930 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -5,6 +5,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useModel } from '../../../../generic/model-store';
+ 
+ import CourseGradeFooter from './CourseGradeFooter';
++import CourseGradeHeader from './CourseGradeHeader';
+ import GradeBar from './GradeBar';
+ 
+ import messages from '../messages';
+@@ -15,6 +16,9 @@ function CourseGrade({ intl }) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    completionSummary: {
++      lockedCount,
++    },
+     gradingPolicy: {
+       gradeRange,
+     },
+@@ -29,18 +33,24 @@ function CourseGrade({ intl }) {
+ 
+   passingGrade = Number(passingGrade.toFixed(0));
+ 
++  const isLocked = lockedCount > 0;
++  const applyLockedOverlay = isLocked ? 'locked-overlay' : '';
++
+   return (
+     <section className="text-dark-700 my-4 rounded shadow-sm">
+-      <div className="row w-100 m-0 p-4">
+-        <div className="col-12 col-sm-6 p-0 pr-sm-2">
+-          <h2>{intl.formatMessage(messages.grades)}</h2>
+-          <p className="small">
+-            {intl.formatMessage(messages.courseGradeBody)}
+-          </p>
++      {isLocked && <CourseGradeHeader />}
++      <div className={applyLockedOverlay}>
++        <div className="row w-100 m-0 p-4">
++          <div className="col-12 col-sm-6 p-0 pr-sm-2">
++            <h2>{intl.formatMessage(messages.grades)}</h2>
++            <p className="small">
++              {intl.formatMessage(messages.courseGradeBody)}
++            </p>
++          </div>
++          <GradeBar passingGrade={passingGrade} />
+         </div>
+-        <GradeBar passingGrade={passingGrade} />
++        <CourseGradeFooter passingGrade={passingGrade} />
+       </div>
+-      <CourseGradeFooter passingGrade={passingGrade} />
+     </section>
+   );
+ }
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+index e7dc1c0..c4c03bb 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+@@ -55,37 +55,33 @@ function CourseGradeFooter({ intl, passingGrade }) {
+     }
+   }
+ 
+-  const footerHtml = (
+-    <>
+-      <OnMobile>
+-        <span className="h5">{footerText}</span>
+-      </OnMobile>
+-      <OnAtLeastTablet>
+-        <span className="h4">{footerText}</span>
+-      </OnAtLeastTablet>
+-    </>
+-  );
+-
+   return (
+-    <div className={`row w-100 m-0 px-4 py-3 py-md-4 rounded-bottom ${isPassing ? 'bg-success-100' : 'bg-warning-100'}`}>
+-      <div className="col-1 col-md-auto pl-0 pr-2 align-self-top">
++    <div className={`row w-100 m-0 px-4 py-3 py-md-4 align-items-baseline rounded-bottom ${isPassing ? 'bg-success-100' : 'bg-warning-100'}`}>
++      <div className="col-auto p-0 align-self-md-center">
+         {isPassing && (
+-          <Icon src={CheckCircle} className="text-success-300" />
++          <Icon src={CheckCircle} className="text-success-300 mt-n1 mr-2" />
+         )}
+         {!isPassing && (
+-          <Icon src={WarningFilled} />
++          <Icon src={WarningFilled} className="mt-n1 mr-2" />
+         )}
+       </div>
+-      <div className="col-11 p-0">
+-        {!hasLetterGrades && footerHtml}
+-        {hasLetterGrades && (
+-          <div className="row w-100 m-0 flex-nowrap">
+-            <div className="col-11 col-md-auto m-0 p-0">
+-              {footerHtml}
+-            </div>
+-            <GradeRangeTooltip passingGrade={passingGrade} />
+-          </div>
+-        )}
++      <div className="col-11 col-md-auto p-0">
++        <OnMobile>
++          <span className="h5" style={{ verticalAlign: 'super' }}>
++            {footerText}
++            {hasLetterGrades && (
++              <GradeRangeTooltip iconButtonClassName="h4 ml-1" passingGrade={passingGrade} />
++            )}
++          </span>
++        </OnMobile>
++        <OnAtLeastTablet>
++          <span className="h4 m-0">
++            {footerText}
++            {hasLetterGrades && (
++              <GradeRangeTooltip iconButtonClassName="h3 ml-1" passingGrade={passingGrade} />
++            )}
++          </span>
++        </OnAtLeastTablet>
+       </div>
+     </div>
+   );
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+new file mode 100644
+index 0000000..d064e3a
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+@@ -0,0 +1,53 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Locked } from '@edx/paragon/icons';
++import { Button, Icon } from '@edx/paragon';
++
++import { useModel } from '../../../../generic/model-store';
++import messages from '../messages';
++
++function CourseGradeHeader({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++  const {
++    verifiedMode,
++  } = useModel('progress', courseId);
++  return (
++    <div className="row w-100 m-0 p-4 rounded-top bg-primary-500 text-white">
++      <div className="col-12 col-md-9 p-0">
++        <div className="row w-100 m-0 p-0">
++          <div className="col-1 p-0">
++            <Icon src={Locked} />
++          </div>
++          <div className="col-11 px-2 p-sm-0 h4 text-white">
++            <span aria-hidden="true">
++              {intl.formatMessage(messages.courseGradePreviewHeaderAriaHidden)}
++            </span>
++            {intl.formatMessage(messages.courseGradePreviewHeader)}
++          </div>
++        </div>
++        <div className="row w-100 m-0 p-0 justify-content-end">
++          <div className="col-11 px-2 p-sm-0 small">
++            {intl.formatMessage(messages.courseGradePreviewBody)}
++          </div>
++        </div>
++      </div>
++      <div className="col-12 col-md-3 mt-3 mt-md-0 p-0 align-self-center text-right">
++        {verifiedMode && (
++          <Button variant="brand" size="sm" href={verifiedMode.upgradeUrl}>
++            {intl.formatMessage(messages.courseGradePreviewUpgradeButton)}
++          </Button>
++        )}
++      </div>
++    </div>
++  );
++}
++
++CourseGradeHeader.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CourseGradeHeader);
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index c9706b9..b177d3c 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import PropTypes from 'prop-types';
+ import { useSelector } from 'react-redux';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -8,7 +9,7 @@ import { useModel } from '../../../../generic/model-store';
+ 
+ import messages from '../messages';
+ 
+-function CurrentGradeTooltip({ intl }) {
++function CurrentGradeTooltip({ intl, tooltipClassName }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -28,7 +29,7 @@ function CurrentGradeTooltip({ intl }) {
+         show
+         placement="top"
+         overlay={(
+-          <Popover id={`${isPassing ? 'passing' : 'non-passing'}-grade-tooltip`} aria-hidden="true">
++          <Popover id={`${isPassing ? 'passing' : 'non-passing'}-grade-tooltip`} aria-hidden="true" className={tooltipClassName}>
+             <Popover.Content className={isPassing ? 'text-white' : 'text-dark-700'}>
+               {currentGrade.toFixed(0)}%
+             </Popover.Content>
+@@ -53,8 +54,13 @@ function CurrentGradeTooltip({ intl }) {
+   );
+ }
+ 
++CurrentGradeTooltip.defaultProps = {
++  tooltipClassName: '',
++};
++
+ CurrentGradeTooltip.propTypes = {
+   intl: intlShape.isRequired,
++  tooltipClassName: PropTypes.string,
+ };
+ 
+ export default injectIntl(CurrentGradeTooltip);
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index d587498..4b5ddd4 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -15,6 +15,9 @@ function GradeBar({ intl, passingGrade }) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    completionSummary: {
++      lockedCount,
++    },
+     courseGrade: {
+       isPassing,
+       percent,
+@@ -23,6 +26,9 @@ function GradeBar({ intl, passingGrade }) {
+ 
+   const currentGrade = percent * 100;
+ 
++  const isLocked = lockedCount > 0;
++  const lockedTooltipClassName = isLocked ? 'locked-overlay' : '';
++
+   return (
+     <div className="col-12 col-sm-6 pr-sm-0 align-self-center">
+       <div className="sr-only">{intl.formatMessage(messages.courseGradeBarAltText, { currentGrade, passingGrade })}</div>
+@@ -37,8 +43,8 @@ function GradeBar({ intl, passingGrade }) {
+           {/* End divider */}
+           <rect className="grade-bar__divider" x="99.7%" />
+         </g>
+-        <PassingGradeTooltip passingGrade={passingGrade} />
+-        <CurrentGradeTooltip />
++        <PassingGradeTooltip passingGrade={passingGrade} tooltipClassName={lockedTooltipClassName} />
++        <CurrentGradeTooltip tooltipClassName={lockedTooltipClassName} />
+       </svg>
+     </div>
+   );
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.scss b/src/course-home/progress-tab/grades/course-grade/GradeBar.scss
+index 7ae6a61..6d373b9 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.scss
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.scss
+@@ -25,6 +25,10 @@
+   }
+ }
+ 
++.arrow {
++  margin: 0;
++}
++
+ #minimum-grade-tooltip {
+   .arrow::after {
+     border-bottom-color: $primary-500;
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+index c7b9615..109d878 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+@@ -11,7 +11,7 @@ import { useModel } from '../../../../generic/model-store';
+ 
+ import messages from '../messages';
+ 
+-function GradeRangeTooltip({ intl, passingGrade }) {
++function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -27,51 +27,55 @@ function GradeRangeTooltip({ intl, passingGrade }) {
+   const gradeRangeEntries = Object.entries(gradeRange);
+ 
+   return (
+-    <div className="col-auto m-0 pl-2 pr-0">
+-      <OverlayTrigger
+-        placement="top"
+-        trigger="click"
+-        show={showTooltip}
+-        overlay={(
+-          <Popover>
+-            <Popover.Content className="px-3">
+-              {intl.formatMessage(messages.courseGradeRangeTooltip)}
+-              <ul className="list-unstyled m-0">
+-                {gradeRangeEntries.map((entry, index) => {
+-                  if (index === 0) {
+-                    return (
+-                      <li key={entry[0]}>
+-                        {entry[0]}: {(entry[1] * 100).toFixed(0)}%-100%
+-                      </li>
+-                    );
+-                  }
+-                  const previousGrade = gradeRangeEntries[index - 1];
++    <OverlayTrigger
++      placement="top"
++      trigger="click"
++      show={showTooltip}
++      overlay={(
++        <Popover>
++          <Popover.Content className="px-3">
++            {intl.formatMessage(messages.courseGradeRangeTooltip)}
++            <ul className="list-unstyled m-0">
++              {gradeRangeEntries.map((entry, index) => {
++                if (index === 0) {
+                   return (
+                     <li key={entry[0]}>
+-                      {entry[0]}: {(entry[1] * 100).toFixed(0)}%-{(previousGrade[1] * 100).toFixed(0)}%
++                      {entry[0]}: {(entry[1] * 100).toFixed(0)}%-100%
+                     </li>
+                   );
+-                })}
+-                <li>F: {'<'}{passingGrade}%</li>
+-              </ul>
+-            </Popover.Content>
+-          </Popover>
+-        )}
+-      >
+-        <IconButton
+-          onClick={() => setShowTooltip(!showTooltip)}
+-          onBlur={() => setShowTooltip(false)}
+-          alt={intl.formatMessage(messages.gradeRangeTooltipAlt)}
+-          className="mt-n1"
+-          src={InfoOutline}
+-          iconAs={Icon}
+-        />
+-      </OverlayTrigger>
+-    </div>
++                }
++                const previousGrade = gradeRangeEntries[index - 1];
++                return (
++                  <li key={entry[0]}>
++                    {entry[0]}: {(entry[1] * 100).toFixed(0)}%-{(previousGrade[1] * 100).toFixed(0)}%
++                  </li>
++                );
++              })}
++              <li>F: {'<'}{passingGrade}%</li>
++            </ul>
++          </Popover.Content>
++        </Popover>
++      )}
++    >
++      <IconButton
++        onClick={() => setShowTooltip(!showTooltip)}
++        onBlur={() => setShowTooltip(false)}
++        alt={intl.formatMessage(messages.gradeRangeTooltipAlt)}
++        className={`mb-0 mt-n1 ${iconButtonClassName}`}
++        src={InfoOutline}
++        iconAs={Icon}
++        size="inline"
++      />
++    </OverlayTrigger>
+   );
+ }
+ 
++GradeRangeTooltip.defaultProps = {
++  iconButtonClassName: '',
++};
++
+ GradeRangeTooltip.propTypes = {
++  iconButtonClassName: PropTypes.string,
+   intl: intlShape.isRequired,
+   passingGrade: PropTypes.number.isRequired,
+ };
+diff --git a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+index 8422545..545f923 100644
+--- a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+@@ -6,14 +6,14 @@ import { OverlayTrigger, Popover } from '@edx/paragon';
+ 
+ import messages from '../messages';
+ 
+-function PassingGradeTooltip({ intl, passingGrade }) {
++function PassingGradeTooltip({ intl, passingGrade, tooltipClassName }) {
+   return (
+     <>
+       <OverlayTrigger
+         show
+         placement="bottom"
+         overlay={(
+-          <Popover id="minimum-grade-tooltip" className="bg-primary-500" aria-hidden="true">
++          <Popover id="minimum-grade-tooltip" className={`bg-primary-500 ${tooltipClassName}`} aria-hidden="true">
+             <Popover.Content className="text-white">
+               {passingGrade}%
+             </Popover.Content>
+@@ -39,9 +39,14 @@ function PassingGradeTooltip({ intl, passingGrade }) {
+   );
+ }
+ 
++PassingGradeTooltip.defaultProps = {
++  tooltipClassName: '',
++};
++
+ PassingGradeTooltip.propTypes = {
+   intl: intlShape.isRequired,
+   passingGrade: PropTypes.number.isRequired,
++  tooltipClassName: PropTypes.string,
+ };
+ 
+ export default injectIntl(PassingGradeTooltip);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+index 6b91236..f13de05 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+@@ -12,7 +12,7 @@ function GradeSummaryHeader({ intl }) {
+   const [showTooltip, setShowTooltip] = useState(false);
+   return (
+     <div className="row w-100 m-0 align-items-center">
+-      <h3 className="h4 mb-3 mr-2">{intl.formatMessage(messages.gradeSummary)}</h3>
++      <h3 className="h4 mb-3 mr-1">{intl.formatMessage(messages.gradeSummary)}</h3>
+       <OverlayTrigger
+         trigger="click"
+         placement="top"
+@@ -32,7 +32,7 @@ function GradeSummaryHeader({ intl }) {
+           src={InfoOutline}
+           iconAs={Icon}
+           className="mb-3"
+-          style={{ height: '1rem', width: '1rem' }}
++          size="sm"
+         />
+       </OverlayTrigger>
+     </div>
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 468f2fd..1fada58 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -29,6 +29,22 @@ const messages = defineMessages({
+     id: 'progress.courseGrade.footer.passing',
+     defaultMessage: 'You’re currently passing this course with a grade of {letterGrade} ({minGrade}-{maxGrade}%)',
+   },
++  courseGradePreviewHeader: {
++    id: 'progress.courseGrade.preview.header',
++    defaultMessage: 'locked feature',
++  },
++  courseGradePreviewHeaderAriaHidden: {
++    id: 'progress.courseGrade.preview.header.ariaHidden',
++    defaultMessage: 'Preview of a ',
++  },
++  courseGradePreviewBody: {
++    id: 'progress.courseGrade.preview.body',
++    defaultMessage: 'Unlock to view grades and work towards a certificate',
++  },
++  courseGradePreviewUpgradeButton: {
++    id: 'progress.courseGrade.preview.button.upgrade',
++    defaultMessage: 'Upgrade now',
++  },
+   courseGradeRangeTooltip: {
+     id: 'progress.courseGrade.gradeRange.tooltip',
+     defaultMessage: 'Grade ranges for this course:',
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index 58ac8c5..ef3bc27 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -70,7 +70,7 @@ describe('Sequence Navigation', () => {
+     expect(testData.onNavigate).not.toHaveBeenCalled();
+     // TODO: Not sure if this is working as expected, because the `contentType="lock"` will be overridden by the value
+     //  from Redux. To make this provide a `fa-icon` lock we could introduce something like `overriddenContentType`.
+-    expect(unitButton.firstChild).toHaveClass('fa-edit');
++    expect(unitButton.firstChild.firstChild).toHaveClass('fa-edit');
+   });
+ 
+   it('renders correctly and handles unit button clicks', () => {
+diff --git a/src/index.scss b/src/index.scss
+index e8cdc69..dfdd0de 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -361,6 +361,19 @@
+   }
+ }
+ 
++.locked-overlay {
++  opacity: 30%;
++  pointer-events: none;
++
++  &.grades {
++    overflow: hidden;
++    max-height: 852px;
++    @media screen and (min-width: 992px) {
++      max-height: 920px;
++    }
++  }
++}
++
+ // Import component-specific sass files
+ @import 'courseware/course/celebration/CelebrationModal.scss';
+ @import 'courseware/course/Sidebar.scss';
+-- 
+2.34.1
+

@@ -1,0 +1,461 @@
+From d93df0e06f166908e375ba321d6a97b1dc641a8c Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Wed, 14 Jul 2021 10:47:32 -0400
+Subject: [PATCH 0535/1021] feat: remove value_prop_cookie to show the
+ Notification feature in courseware (#524)
+
+Part 4 of REV-2130
+---
+ src/courseware/course/Course.jsx              | 14 +++-----
+ src/courseware/course/Course.test.jsx         | 34 ++++++-------------
+ src/courseware/course/NotificationTray.jsx    | 12 ++++---
+ src/courseware/course/NotificationTray.scss   | 16 ++++-----
+ .../course/NotificationTray.test.jsx          | 23 ++++++++++---
+ .../course/NotificationTrigger.scss           |  9 +++--
+ .../course/NotificationTrigger.test.jsx       |  6 ++--
+ src/courseware/course/messages.js             |  2 +-
+ src/courseware/course/sequence/Sequence.jsx   |  8 ++---
+ .../course/sequence/Sequence.test.jsx         | 33 +++++++++++-------
+ .../SequenceNavigation.jsx                    |  9 ++---
+ 11 files changed, 86 insertions(+), 80 deletions(-)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index d64a7f6..259ccaf 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -2,7 +2,6 @@ import React, { useState } from 'react';
+ import PropTypes from 'prop-types';
+ import { Helmet } from 'react-helmet';
+ import { useDispatch } from 'react-redux';
+-import Cookies from 'js-cookie';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+ import { AlertList } from '../../generic/user-messages';
+@@ -61,14 +60,12 @@ function Course({
+     courseId, sequenceId, unitId, celebrateFirstSection, dispatch, celebrations,
+   );
+ 
+-  // REV-2297 TODO: temporary cookie code that should be removed.
+-  // In order to see the Value Prop sidebar in prod, a cookie should be set in
+-  // the browser console and refresh: document.cookie = 'value_prop_cookie=true';
+-  const isValuePropCookieSet = Cookies.get('value_prop_cookie') === 'true';
+-
+   const shouldDisplayNotificationTrigger = useWindowSize().width >= responsiveBreakpoints.small.minWidth;
+ 
+-  const [notificationTrayVisible, setNotificationTray] = verifiedMode ? useState(true) : useState(false);
++  const shouldDisplayNotificationTrayOpen = useWindowSize().width > responsiveBreakpoints.medium.minWidth;
++
++  const [notificationTrayVisible, setNotificationTray] = verifiedMode
++    && shouldDisplayNotificationTrayOpen ? useState(true) : useState(false);
+   const isNotificationTrayVisible = () => notificationTrayVisible && setNotificationTray;
+   const toggleNotificationTray = () => {
+     if (notificationTrayVisible) { setNotificationTray(false); } else { setNotificationTray(true); }
+@@ -102,7 +99,7 @@ function Course({
+           mmp2p={MMP2P}
+         />
+ 
+-        { isValuePropCookieSet && shouldDisplayNotificationTrigger ? (
++        { shouldDisplayNotificationTrigger ? (
+           <NotificationTrigger
+             toggleNotificationTray={toggleNotificationTray}
+             isNotificationTrayVisible={isNotificationTrayVisible}
+@@ -121,7 +118,6 @@ function Course({
+         toggleNotificationTray={toggleNotificationTray}
+         isNotificationTrayVisible={isNotificationTrayVisible}
+         notificationTrayVisible={notificationTrayVisible}
+-        isValuePropCookieSet={isValuePropCookieSet}
+         //* * [MM-P2P] Experiment */
+         mmp2p={MMP2P}
+       />
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 5b795e5..e2efbdf 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -1,6 +1,5 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
+-import Cookies from 'js-cookie';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import {
+   loadUnit, render, screen, waitFor, getByRole, initializeTestStore, fireEvent,
+@@ -8,8 +7,11 @@ import {
+ import Course from './Course';
+ import { handleNextSectionCelebration } from './celebration';
+ import * as celebrationUtils from './celebration/utils';
++import useWindowSize from '../../generic/tabs/useWindowSize';
+ 
+ jest.mock('@edx/frontend-platform/analytics');
++jest.mock('../../generic/tabs/useWindowSize');
++useWindowSize.mockReturnValue({ width: 1200 });
+ 
+ const recordFirstSectionCelebration = jest.fn();
+ celebrationUtils.recordFirstSectionCelebration = recordFirstSectionCelebration;
+@@ -20,7 +22,6 @@ describe('Course', () => {
+     nextSequenceHandler: () => {},
+     previousSequenceHandler: () => {},
+     unitNavigationHandler: () => {},
+-    toggleNotificationTray: () => {},
+   };
+ 
+   beforeAll(async () => {
+@@ -87,29 +88,16 @@ describe('Course', () => {
+     expect(screen.getByRole('button', { name: 'Learn About Verified Certificates' })).toBeInTheDocument();
+   });
+ 
+-  it('displays notification trigger', async () => {
+-    const toggleNotificationTray = jest.fn();
+-    const isNotificationTrayVisible = jest.fn();
+-
+-    // REV-2297 TODO: remove cookie related code once temporary value prop cookie code is removed.
+-    const cookieName = 'value_prop_cookie';
+-    Cookies.set = jest.fn();
+-    Cookies.get = jest.fn().mockImplementation(() => cookieName);
+-    const getSpy = jest.spyOn(Cookies, 'get').mockReturnValueOnce('true');
+-
+-    const courseMetadata = Factory.build('courseMetadata');
+-    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
+-    const testData = {
+-      ...mockData,
+-      toggleNotificationTray,
+-      isNotificationTrayVisible,
+-    };
+-    render(<Course {...testData} courseId={courseMetadata.id} />, { store: testStore });
++  it('displays notification trigger and toggles active class on click', async () => {
++    useWindowSize.mockReturnValue({ width: 1200 });
++    render(<Course {...mockData} />);
+ 
+-    const notificationOpenButton = screen.getByRole('button', { name: /Show notification tray/i });
++    const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
+ 
+-    expect(getSpy).toBeCalledWith(cookieName);
+-    expect(notificationOpenButton).toBeInTheDocument();
++    expect(notificationTrigger).toBeInTheDocument();
++    expect(notificationTrigger).toHaveClass('active');
++    fireEvent.click(notificationTrigger);
++    expect(notificationTrigger).not.toHaveClass('active');
+   });
+ 
+   it('displays offer and expiration alert', async () => {
+diff --git a/src/courseware/course/NotificationTray.jsx b/src/courseware/course/NotificationTray.jsx
+index 85b83d1..779853b 100644
+--- a/src/courseware/course/NotificationTray.jsx
++++ b/src/courseware/course/NotificationTray.jsx
+@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Icon } from '@edx/paragon';
++import { Icon, IconButton } from '@edx/paragon';
+ import { ArrowBackIos, Close } from '@edx/paragon/icons';
+ 
+ import messages from './messages';
+@@ -40,11 +40,15 @@ function NotificationTray({
+           <span className="mobile-close">{intl.formatMessage(messages.responsiveCloseNotificationTray)}</span>
+         </div>
+       ) : null}
+-      <div className="notification-tray-header px-3">
+-        <span>{intl.formatMessage(messages.notificationTitle)}</span>
++      <div>
++        <span className="notification-tray-title">{intl.formatMessage(messages.notificationTitle)}</span>
+         {shouldDisplayFullScreen
+           ? null
+-          : <Icon src={Close} className="close-btn" onClick={() => { toggleNotificationTray(); }} onKeyDown={() => { toggleNotificationTray(); }} role="button" tabIndex="0" alt={intl.formatMessage(messages.closeNotificationTrigger)} />}
++          : (
++            <div className="d-inline-flex close-btn">
++              <IconButton src={Close} size="sm" iconAs={Icon} onClick={() => { toggleNotificationTray(); }} variant="primary" alt={intl.formatMessage(messages.closeNotificationTrigger)} />
++            </div>
++          )}
+       </div>
+       <div className="notification-tray-divider" />
+       <div>{verifiedMode
+diff --git a/src/courseware/course/NotificationTray.scss b/src/courseware/course/NotificationTray.scss
+index b3471a8..b4ac923 100644
+--- a/src/courseware/course/NotificationTray.scss
++++ b/src/courseware/course/NotificationTray.scss
+@@ -23,24 +23,22 @@
+     height: 15rem;
+ }
+ 
+-.notification-tray-header {
+-    padding: 0.625rem 0;
+-
+-    span {
+-        display: inline-block;
+-    }
++.notification-tray-title {
++    display: inline-block;
++    padding: 0.625rem 0 0.625rem 1.25rem;
+ }
+ 
+ .close-btn {
+     float: right;
++    margin-right: 0.5rem;
++    margin-top: 0.35rem;
+ }
+ 
+ .notification-tray-divider {
+-    width: 100.5%;
+     height: 0.5rem;
+     background: $gray-100;
+-    border: 1px solid $light-400;
+-    border-left: 0;
++    border-top: 1px solid $light-400;
++    border-bottom: 1px solid $light-400;
+ }
+ 
+ .notification-tray-content {
+diff --git a/src/courseware/course/NotificationTray.test.jsx b/src/courseware/course/NotificationTray.test.jsx
+index acbcf0a..6d688bd 100644
+--- a/src/courseware/course/NotificationTray.test.jsx
++++ b/src/courseware/course/NotificationTray.test.jsx
+@@ -47,10 +47,23 @@ describe('NotificationTray', () => {
+     };
+   });
+ 
+-  it('renders notification tray', async () => {
+-    useWindowSize.mockReturnValue({ width: 1200, height: 422 });
+-    await fetchAndRender(<NotificationTray />);
++  it('renders notification tray and close tray button', async () => {
++    useWindowSize.mockReturnValue({ width: 1200 });
++    const toggleNotificationTray = jest.fn();
++    const testData = {
++      ...mockData,
++      toggleNotificationTray,
++    };
++    await fetchAndRender(<NotificationTray {...testData} />);
++
+     expect(screen.getByText('Notifications')).toBeInTheDocument();
++    const notificationCloseIconButton = screen.getByRole('button', { name: /Close notification tray/i });
++    expect(notificationCloseIconButton).toBeInTheDocument();
++    expect(notificationCloseIconButton).toHaveClass('btn-icon-primary');
++    fireEvent.click(notificationCloseIconButton);
++    expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
++
++    // should not render responsive "Back to course" to close the tray
+     expect(screen.queryByText('Back to course')).not.toBeInTheDocument();
+   });
+ 
+@@ -69,8 +82,8 @@ describe('NotificationTray', () => {
+     expect(screen.queryByText('You have no new notifications at this time.')).toBeInTheDocument();
+   });
+ 
+-  it('renders notification tray with full screen "Back to course" at response width', async () => {
+-    useWindowSize.mockReturnValue({ width: 991, height: 422 });
++  it('renders notification tray with full screen "Back to course" at responsive view', async () => {
++    useWindowSize.mockReturnValue({ width: 991 });
+     const toggleNotificationTray = jest.fn();
+     const testData = {
+       ...mockData,
+diff --git a/src/courseware/course/NotificationTrigger.scss b/src/courseware/course/NotificationTrigger.scss
+index 15297a9..1273b66 100644
+--- a/src/courseware/course/NotificationTrigger.scss
++++ b/src/courseware/course/NotificationTrigger.scss
+@@ -14,6 +14,11 @@
+     }
+ }
+ 
+-.active {
+-    border-bottom: 3px solid $primary-700;
++.active::after {
++    content: '';
++    position: absolute;
++    border-bottom: 2px solid $primary-700;
++    right: 0;
++    left: 0;
++    bottom: -1px;
+ }
+\ No newline at end of file
+diff --git a/src/courseware/course/NotificationTrigger.test.jsx b/src/courseware/course/NotificationTrigger.test.jsx
+index 918bb73..32cbab7 100644
+--- a/src/courseware/course/NotificationTrigger.test.jsx
++++ b/src/courseware/course/NotificationTrigger.test.jsx
+@@ -35,9 +35,9 @@ describe('Notification Trigger', () => {
+     };
+     render(<NotificationTrigger {...testData} />);
+ 
+-    const notificationOpenButton = screen.getByRole('button', { name: /Show notification tray/i });
+-    expect(notificationOpenButton).toBeInTheDocument();
+-    fireEvent.click(notificationOpenButton);
++    const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
++    expect(notificationTrigger).toBeInTheDocument();
++    fireEvent.click(notificationTrigger);
+     expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
+   });
+ });
+diff --git a/src/courseware/course/messages.js b/src/courseware/course/messages.js
+index 1295797..acf6cc2 100644
+--- a/src/courseware/course/messages.js
++++ b/src/courseware/course/messages.js
+@@ -13,7 +13,7 @@ const messages = defineMessages({
+   },
+   closeNotificationTrigger: {
+     id: 'notification.close.button',
+-    defaultMessage: 'Close sidebar notification',
++    defaultMessage: 'Close notification tray',
+     description: 'Button for the learner to close the sidebar',
+   },
+   responsiveCloseNotificationTray: {
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 5be4abb..c56e457 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -40,7 +40,6 @@ function Sequence({
+   toggleNotificationTray,
+   notificationTrayVisible,
+   isNotificationTrayVisible,
+-  isValuePropCookieSet,
+   mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+@@ -189,10 +188,9 @@ function Sequence({
+             handlePrevious();
+           }}
+           goToCourseExitPage={() => goToCourseExitPage()}
+-          isValuePropCookieSet={isValuePropCookieSet}
+         />
+ 
+-        {isValuePropCookieSet && shouldDisplayNotificationTrigger ? (
++        {shouldDisplayNotificationTrigger ? (
+           <NotificationTrigger
+             toggleNotificationTray={toggleNotificationTray}
+             isNotificationTrayVisible={isNotificationTrayVisible}
+@@ -226,7 +224,7 @@ function Sequence({
+           )}
+         </div>
+       </div>
+-      {isValuePropCookieSet && notificationTrayVisible ? (
++      {notificationTrayVisible ? (
+         <NotificationTray
+           toggleNotificationTray={toggleNotificationTray}
+           notificationTrayVisible={notificationTrayVisible}
+@@ -272,7 +270,6 @@ Sequence.propTypes = {
+   toggleNotificationTray: PropTypes.func,
+   notificationTrayVisible: PropTypes.bool,
+   isNotificationTrayVisible: PropTypes.func,
+-  isValuePropCookieSet: PropTypes.bool,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+@@ -294,7 +291,6 @@ Sequence.defaultProps = {
+   toggleNotificationTray: null,
+   notificationTrayVisible: null,
+   isNotificationTrayVisible: null,
+-  isValuePropCookieSet: null,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: {
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 883ef79..fc3272c 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -6,8 +6,11 @@ import {
+ } from '../../../setupTest';
+ import Sequence from './Sequence';
+ import { fetchSequenceFailure } from '../../data/slice';
++import useWindowSize from '../../../generic/tabs/useWindowSize';
+ 
+ jest.mock('@edx/frontend-platform/analytics');
++jest.mock('../../../generic/tabs/useWindowSize');
++useWindowSize.mockReturnValue({ width: 1200 });
+ 
+ describe('Sequence', () => {
+   let mockData;
+@@ -28,7 +31,6 @@ describe('Sequence', () => {
+       unitNavigationHandler: () => {},
+       nextSequenceHandler: () => {},
+       previousSequenceHandler: () => {},
+-      notificationTrayVisible: false,
+     };
+   });
+ 
+@@ -130,17 +132,6 @@ describe('Sequence', () => {
+     expect(screen.getAllByRole('button', { name: /previous|next/i }).length).toEqual(4);
+   });
+ 
+-  it('renders notification tray in sequence', async () => {
+-    const testData = {
+-      ...mockData,
+-      notificationTrayVisible: true,
+-      isValuePropCookieSet: true,
+-    };
+-
+-    render(<Sequence {...testData} />);
+-    expect(await screen.findByText('Notifications')).toBeInTheDocument();
+-  });
+-
+   describe('sequence and unit navigation buttons', () => {
+     let testStore;
+     const sequenceBlocks = [Factory.build(
+@@ -388,4 +379,22 @@ describe('Sequence', () => {
+       });
+     });
+   });
++
++  describe('notification feature', () => {
++    it('renders notification tray in sequence', async () => {
++      const testData = {
++        ...mockData,
++        notificationTrayVisible: true,
++      };
++      render(<Sequence {...testData} />);
++      expect(await screen.findByText('Notifications')).toBeInTheDocument();
++    });
++
++    it('does not render notification tray in sequence by default if in responsive view', async () => {
++      useWindowSize.mockReturnValue({ width: 991 });
++      const { container } = render(<Sequence {...mockData} />);
++      // unable to test the absence of 'Notifications' by finding it by text, using the class of the tray instead:
++      expect(container).not.toHaveClass('notification-tray-container');
++    });
++  });
+ });
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index c723708..5156f21 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -27,7 +27,6 @@ function SequenceNavigation({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   goToCourseExitPage,
+-  isValuePropCookieSet,
+   mmp2p,
+ }) {
+   const sequence = useModel('sequences', sequenceId);
+@@ -70,15 +69,15 @@ function SequenceNavigation({
+     const disabled = isLastUnit && !exitActive;
+     return (
+       <Button variant="link" className="next-btn" onClick={buttonOnClick} disabled={disabled} iconAfter={ChevronRight}>
+-        {isValuePropCookieSet && shouldDisplayNotificationTrigger ? null : buttonText}
++        {shouldDisplayNotificationTrigger ? null : buttonText}
+       </Button>
+     );
+   };
+ 
+   return sequenceStatus === LOADED && (
+-    <nav className={classNames('sequence-navigation', className)} style={{ width: isValuePropCookieSet && shouldDisplayNotificationTrigger ? '90%' : null }}>
++    <nav className={classNames('sequence-navigation', className)} style={{ width: shouldDisplayNotificationTrigger ? '90%' : null }}>
+       <Button variant="link" className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit} iconBefore={ChevronLeft}>
+-        {isValuePropCookieSet && shouldDisplayNotificationTrigger ? null : intl.formatMessage(messages.previousButton)}
++        {shouldDisplayNotificationTrigger ? null : intl.formatMessage(messages.previousButton)}
+       </Button>
+       {renderUnitButtons()}
+       {renderNextButton()}
+@@ -98,7 +97,6 @@ SequenceNavigation.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   goToCourseExitPage: PropTypes.func.isRequired,
+-  isValuePropCookieSet: PropTypes.bool,
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+     state: PropTypes.shape({
+@@ -110,7 +108,6 @@ SequenceNavigation.propTypes = {
+ SequenceNavigation.defaultProps = {
+   className: null,
+   unitId: null,
+-  isValuePropCookieSet: null,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: {
+-- 
+2.34.1
+

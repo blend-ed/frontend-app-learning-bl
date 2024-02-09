@@ -1,0 +1,91 @@
+From d8243d6ea87b4e5d52a28918a5f0fe584b74f4bd Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Fri, 14 May 2021 09:48:50 -0400
+Subject: [PATCH 0463/1021] fix: remove currency symbol to avoid double
+ currency symbol with some upgrade buttons (#448)
+
+---
+ .../outline-tab/widgets/UpgradeCard.test.jsx     | 16 ++++++++--------
+ src/generic/upgrade-button/FormattedPricing.jsx  |  2 +-
+ .../StreakCelebrationModal.jsx                   |  4 ++--
+ 3 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+index ff54f21..847f699 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+@@ -134,8 +134,8 @@ describe('Upgrade Card', () => {
+         expirationDate: discountExpirationDate.toString(),
+         percentage: 15,
+         code: 'Welcome15',
+-        discountedPrice: '126.65',
+-        originalPrice: '149',
++        discountedPrice: '$126.65',
++        originalPrice: '$149',
+         upgradeUrl: 'www.exampleUpgradeUrl.com',
+       },
+     });
+@@ -163,8 +163,8 @@ describe('Upgrade Card', () => {
+         expirationDate: discountExpirationDate.toString(),
+         percentage: 15,
+         code: 'Welcome15',
+-        discountedPrice: '126.65',
+-        originalPrice: '149',
++        discountedPrice: '$126.65',
++        originalPrice: '$149',
+         upgradeUrl: 'www.exampleUpgradeUrl.com',
+       },
+     });
+@@ -192,8 +192,8 @@ describe('Upgrade Card', () => {
+         expirationDate: discountExpirationDate.toString(),
+         percentage: 15,
+         code: 'Welcome15',
+-        discountedPrice: '126.65',
+-        originalPrice: '149',
++        discountedPrice: '$126.65',
++        originalPrice: '$149',
+         upgradeUrl: 'www.exampleUpgradeUrl.com',
+       },
+     });
+@@ -221,8 +221,8 @@ describe('Upgrade Card', () => {
+         expirationDate: discountExpirationDate.toString(),
+         percentage: 15,
+         code: 'Welcome15',
+-        discountedPrice: '126.65',
+-        originalPrice: '149',
++        discountedPrice: '$126.65',
++        originalPrice: '$149',
+         upgradeUrl: 'www.exampleUpgradeUrl.com',
+       },
+     });
+diff --git a/src/generic/upgrade-button/FormattedPricing.jsx b/src/generic/upgrade-button/FormattedPricing.jsx
+index d13bc47..960e9c4 100644
+--- a/src/generic/upgrade-button/FormattedPricing.jsx
++++ b/src/generic/upgrade-button/FormattedPricing.jsx
+@@ -53,7 +53,7 @@ function FormattedPricing(props) {
+         {intl.formatMessage(messages.srPrices, { discountedPrice, originalPrice })}
+       </span>
+       <span aria-hidden="true">
+-        <span>{currencySymbol}{discountedPrice}</span> (<del>{currencySymbol}{originalPrice}</del>)
++        <span>{discountedPrice}</span> (<del>{originalPrice}</del>)
+       </span>
+     </>
+   );
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index a559bdd..7681a36 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -90,8 +90,8 @@ function StreakModal({
+     };
+ 
+     offer = {
+-      discountedPrice: (mode.price * 0.85).toFixed(2).toString(),
+-      originalPrice: mode.price.toString(),
++      discountedPrice: `${verifiedMode.currencySymbol}${(mode.price * 0.85).toFixed(2).toString()}`,
++      originalPrice: `${verifiedMode.currencySymbol}${mode.price.toString()}`,
+       upgradeUrl: mode.upgradeUrl,
+     };
+   }
+-- 
+2.34.1
+

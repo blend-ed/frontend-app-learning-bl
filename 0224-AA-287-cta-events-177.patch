@@ -1,0 +1,336 @@
+From 453f56c7c811c139a0ed4a897c4bb8a04397337f Mon Sep 17 00:00:00 2001
+From: Nick <ndalfonso@edx.org>
+Date: Wed, 12 Aug 2020 11:48:46 -0400
+Subject: [PATCH 0224/1021] AA-287 cta events (#177)
+
+---
+ .../data/__snapshots__/redux.test.js.snap     |  9 +++--
+ src/course-home/data/api.js                   |  7 +++-
+ src/course-home/data/redux.test.js            |  2 +-
+ src/course-home/data/slice.js                 | 14 +++++---
+ src/course-home/data/thunks.js                | 34 +++++++++++++++++--
+ src/courseware/course/sequence/Unit.jsx       |  6 ++--
+ src/tab-page/TabPage.jsx                      | 15 ++++----
+ src/tab-page/messages.js                      |  8 -----
+ src/toast/LearningToast.jsx                   | 28 +++++----------
+ 9 files changed, 73 insertions(+), 50 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 8a26fb6..8ebc3f7 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -5,7 +5,8 @@ Object {
+   "courseHome": Object {
+     "courseId": null,
+     "courseStatus": "loading",
+-    "displayResetDatesToast": false,
++    "resetDatesToastBody": null,
++    "resetDatesToastHeader": null,
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -22,7 +23,8 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+-    "displayResetDatesToast": false,
++    "resetDatesToastBody": null,
++    "resetDatesToastHeader": null,
+   },
+   "courseware": Object {
+     "courseId": null,
+@@ -106,7 +108,8 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+-    "displayResetDatesToast": false,
++    "resetDatesToastBody": null,
++    "resetDatesToastHeader": null,
+   },
+   "courseware": Object {
+     "courseId": null,
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index f362a5d..41cc6ad 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -93,7 +93,7 @@ export async function getOutlineTabData(courseId) {
+ 
+ export async function postCourseDeadlines(courseId) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`);
+-  await getAuthenticatedHttpClient().post(url.href, { course_key: courseId });
++  return getAuthenticatedHttpClient().post(url.href, { course_key: courseId });
+ }
+ 
+ export async function postDismissWelcomeMessage(courseId) {
+@@ -105,3 +105,8 @@ export async function postRequestCert(courseId) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/courses/${courseId}/generate_user_cert`);
+   await getAuthenticatedHttpClient().post(url.href);
+ }
++
++export async function executePostFromPostEvent(postData) {
++  const url = new URL(postData.url);
++  return getAuthenticatedHttpClient().post(url.href, { course_key: postData.bodyParams.courseId });
++}
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index 700535d..ad15269 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -109,7 +109,7 @@ describe('Data layer integration tests', () => {
+   describe('Test resetDeadlines', () => {
+     it('Should reset course deadlines', async () => {
+       const resetUrl = `${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`;
+-      axiosMock.onPost(resetUrl).reply(201);
++      axiosMock.onPost(resetUrl).reply(201, {});
+ 
+       const getTabDataMock = jest.fn(() => ({
+         type: 'MOCK_ACTION',
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index a136802..a78dc8b 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -10,7 +10,8 @@ const slice = createSlice({
+   initialState: {
+     courseStatus: 'loading',
+     courseId: null,
+-    displayResetDatesToast: false,
++    resetDatesToastBody: null,
++    resetDatesToastHeader: null,
+   },
+   reducers: {
+     fetchTabRequest: (state, { payload }) => {
+@@ -25,8 +26,13 @@ const slice = createSlice({
+       state.courseId = payload.courseId;
+       state.courseStatus = FAILED;
+     },
+-    toggleResetDatesToast: (state, { payload }) => {
+-      state.displayResetDatesToast = payload.displayResetDatesToast;
++    setResetDatesToast: (state, { payload }) => {
++      const {
++        body,
++        header,
++      } = payload;
++      state.resetDatesToastBody = body;
++      state.resetDatesToastHeader = header;
+     },
+   },
+ });
+@@ -35,7 +41,7 @@ export const {
+   fetchTabRequest,
+   fetchTabSuccess,
+   fetchTabFailure,
+-  toggleResetDatesToast,
++  setResetDatesToast,
+ } = slice.actions;
+ 
+ export const {
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index 8768a85..bd4373b 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -1,5 +1,7 @@
+ import { logError } from '@edx/frontend-platform/logging';
++import { camelCaseObject } from '@edx/frontend-platform';
+ import {
++  executePostFromPostEvent,
+   getCourseHomeCourseMetadata,
+   getDatesTabData,
+   getOutlineTabData,
+@@ -17,9 +19,13 @@ import {
+   fetchTabFailure,
+   fetchTabRequest,
+   fetchTabSuccess,
+-  toggleResetDatesToast,
++  setResetDatesToast,
+ } from './slice';
+ 
++const eventTypes = {
++  POST_EVENT: 'post_event',
++};
++
+ export function fetchTab(courseId, tab, getTabData) {
+   return async (dispatch) => {
+     dispatch(fetchTabRequest({ courseId }));
+@@ -77,9 +83,14 @@ export function fetchOutlineTab(courseId) {
+ 
+ export function resetDeadlines(courseId, getTabData) {
+   return async (dispatch) => {
+-    postCourseDeadlines(courseId).then(() => {
++    postCourseDeadlines(courseId).then(response => {
++      const { data } = response;
++      const {
++        body,
++        header,
++      } = data;
+       dispatch(getTabData(courseId));
+-      dispatch(toggleResetDatesToast({ displayResetDatesToast: true }));
++      dispatch(setResetDatesToast({ body, header }));
+     });
+   };
+ }
+@@ -91,3 +102,20 @@ export function dismissWelcomeMessage(courseId) {
+ export function requestCert(courseId) {
+   return async () => postRequestCert(courseId);
+ }
++
++export function processEvent(eventData, getTabData) {
++  return async (dispatch) => {
++    const event = camelCaseObject(eventData);
++    if (event.eventName === eventTypes.POST_EVENT) {
++      executePostFromPostEvent(event.postData).then(response => {
++        const { data } = response;
++        const {
++          body,
++          header,
++        } = data;
++        dispatch(getTabData(event.postData.bodyParams.courseId));
++        dispatch(setResetDatesToast({ body, header }));
++      });
++    }
++  };
++}
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 059c5ad..2023b22 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -13,7 +13,7 @@ import messages from './messages';
+ import BookmarkButton from '../bookmark/BookmarkButton';
+ import { useModel } from '../../../generic/model-store';
+ import PageLoading from '../../../generic/PageLoading';
+-import { resetDeadlines } from '../../../course-home/data/thunks';
++import { processEvent } from '../../../course-home/data/thunks';
+ import { fetchCourse } from '../../data/thunks';
+ 
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
+@@ -138,8 +138,8 @@ function Unit({
+           referrerPolicy="origin"
+           onLoad={() => {
+             window.onmessage = function (e) {
+-              if (e.data === 'reset_dates') {
+-                dispatch(resetDeadlines(courseId, fetchCourse));
++              if (e.data.event_name) {
++                dispatch(processEvent(e.data, fetchCourse));
+               }
+             };
+           }}
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index 1f5bce0..54d8fc5 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -9,16 +9,16 @@ import PageLoading from '../generic/PageLoading';
+ import messages from './messages';
+ import LoadedTabPage from './LoadedTabPage';
+ import LearningToast from '../toast/LearningToast';
+-import { toggleResetDatesToast } from '../course-home/data/slice';
++import { setResetDatesToast } from '../course-home/data/slice';
+ 
+ function TabPage({
+   intl,
+   courseStatus,
+   ...passthroughProps
+ }) {
+-  const courseId = useSelector(state => state.courseHome.courseId || state.courseware.courseId);
+   const {
+-    displayResetDatesToast,
++    resetDatesToastBody,
++    resetDatesToastHeader,
+   } = useSelector(state => state.courseHome);
+   const dispatch = useDispatch();
+ 
+@@ -37,11 +37,10 @@ function TabPage({
+     return (
+       <>
+         <LearningToast
+-          body={messages.datesResetSuccessBody}
+-          header={messages.datesResetSuccessHeader}
+-          link={`/course/${courseId}/dates`}
+-          onClose={() => dispatch(toggleResetDatesToast({ displayResetDatesToast: false }))}
+-          show={displayResetDatesToast}
++          body={resetDatesToastBody}
++          header={resetDatesToastHeader}
++          onClose={() => dispatch(setResetDatesToast({ body: null, header: null }))}
++          show={!!(resetDatesToastBody && resetDatesToastHeader)}
+         />
+         <LoadedTabPage {...passthroughProps} />
+       </>
+diff --git a/src/tab-page/messages.js b/src/tab-page/messages.js
+index c5b4366..3e913c0 100644
+--- a/src/tab-page/messages.js
++++ b/src/tab-page/messages.js
+@@ -9,14 +9,6 @@ const messages = defineMessages({
+     id: 'learning.loading',
+     defaultMessage: 'Loading course page…',
+   },
+-  datesResetSuccessBody: {
+-    id: 'learning.datesResetSuccessBody',
+-    defaultMessage: 'View all dates',
+-  },
+-  datesResetSuccessHeader: {
+-    id: 'learning.datesResetSuccessHeader',
+-    defaultMessage: 'Your due dates have been successfully shifted to help you stay on track.',
+-  },
+ });
+ 
+ export default messages;
+diff --git a/src/toast/LearningToast.jsx b/src/toast/LearningToast.jsx
+index 83bb0bf..24a8879 100644
+--- a/src/toast/LearningToast.jsx
++++ b/src/toast/LearningToast.jsx
+@@ -1,16 +1,12 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Toast } from '@edx/paragon';
+-import { Link } from 'react-router-dom';
+ 
+ import './LearningToast.scss';
+ 
+-function LearningToast({
+-  intl,
++export default function LearningToast({
+   body,
+   header,
+-  link,
+   onClose,
+   show,
+ }) {
+@@ -29,29 +25,23 @@ function LearningToast({
+       }}
+     >
+       <Toast.Header className="bg-gray-700 border-bottom-0 text-light">
+-        <div className="mr-auto">{intl.formatMessage(header)}</div>
++        <div dangerouslySetInnerHTML={{ __html: header }} />
+       </Toast.Header>
+       <Toast.Body className="bg-gray-700 text-light">
+-        <Link className="text-light" to={link}>{intl.formatMessage(body)}</Link>
++        <div dangerouslySetInnerHTML={{ __html: body }} />
+       </Toast.Body>
+     </Toast>
+   );
+ }
+ 
+ LearningToast.propTypes = {
+-  body: PropTypes.shape({
+-    possible: PropTypes.number,
+-    earned: PropTypes.number,
+-    graded: PropTypes.bool,
+-  }).isRequired,
+-  header: PropTypes.shape({
+-    id: PropTypes.string,
+-    defaultMessage: PropTypes.string,
+-  }).isRequired,
+-  intl: intlShape.isRequired,
+-  link: PropTypes.string.isRequired,
++  body: PropTypes.string,
++  header: PropTypes.string,
+   onClose: PropTypes.func.isRequired,
+   show: PropTypes.bool.isRequired,
+ };
+ 
+-export default injectIntl(LearningToast);
++LearningToast.defaultProps = {
++  body: null,
++  header: null,
++};
+-- 
+2.34.1
+

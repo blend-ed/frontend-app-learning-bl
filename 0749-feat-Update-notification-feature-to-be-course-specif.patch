@@ -1,0 +1,371 @@
+From 8c43de9fc0587f43076e4b8df188b55da0892c5f Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Tue, 30 Nov 2021 09:25:14 -0500
+Subject: [PATCH 0749/1021] feat: Update notification feature to be course
+ specific (#742)
+
+REV-2360
+---
+ src/courseware/course/Course.jsx              | 15 +--
+ src/courseware/course/NotificationTrigger.jsx |  9 +-
+ .../course/NotificationTrigger.test.jsx       | 98 ++++++++++++++-----
+ src/courseware/course/sequence/Sequence.jsx   |  1 +
+ .../UpgradeNotification.jsx                   | 27 +++--
+ 5 files changed, 106 insertions(+), 44 deletions(-)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index a33e829..6a0310b 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -61,20 +61,20 @@ function Course({
+     if (notificationTrayVisible) { setNotificationTray(false); } else { setNotificationTray(true); }
+   };
+ 
+-  if (!getLocalStorage('notificationStatus')) {
+-    setLocalStorage('notificationStatus', 'active'); // Show red dot on notificationTrigger until seen
++  if (!getLocalStorage(`notificationStatus.${courseId}`)) {
++    setLocalStorage(`notificationStatus.${courseId}`, 'active'); // Show red dot on notificationTrigger until seen
+   }
+ 
+-  if (!getLocalStorage('upgradeNotificationCurrentState')) {
+-    setLocalStorage('upgradeNotificationCurrentState', 'initialize');
++  if (!getLocalStorage(`upgradeNotificationCurrentState.${courseId}`)) {
++    setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'initialize');
+   }
+ 
+-  const [notificationStatus, setNotificationStatus] = useState(getLocalStorage('notificationStatus'));
+-  const [upgradeNotificationCurrentState, setupgradeNotificationCurrentState] = useState(getLocalStorage('upgradeNotificationCurrentState'));
++  const [notificationStatus, setNotificationStatus] = useState(getLocalStorage(`notificationStatus.${courseId}`));
++  const [upgradeNotificationCurrentState, setupgradeNotificationCurrentState] = useState(getLocalStorage(`upgradeNotificationCurrentState.${courseId}`));
+ 
+   const onNotificationSeen = () => {
+     setNotificationStatus('inactive');
+-    setLocalStorage('notificationStatus', 'inactive');
++    setLocalStorage(`notificationStatus.${courseId}`, 'inactive');
+   };
+ 
+   /** [MM-P2P] Experiment */
+@@ -98,6 +98,7 @@ function Course({
+ 
+         { shouldDisplayNotificationTrigger ? (
+           <NotificationTrigger
++            courseId={courseId}
+             toggleNotificationTray={toggleNotificationTray}
+             isNotificationTrayVisible={isNotificationTrayVisible}
+             notificationStatus={notificationStatus}
+diff --git a/src/courseware/course/NotificationTrigger.jsx b/src/courseware/course/NotificationTrigger.jsx
+index f679953..8078dce 100644
+--- a/src/courseware/course/NotificationTrigger.jsx
++++ b/src/courseware/course/NotificationTrigger.jsx
+@@ -8,7 +8,7 @@ import NotificationIcon from './NotificationIcon';
+ import messages from './messages';
+ 
+ function NotificationTrigger({
+-  intl, toggleNotificationTray, isNotificationTrayVisible, notificationStatus, setNotificationStatus,
++  courseId, intl, toggleNotificationTray, isNotificationTrayVisible, notificationStatus, setNotificationStatus,
+   upgradeNotificationCurrentState,
+ }) {
+   /* Re-show a red dot beside the notification trigger for each of the 7 UpgradeNotification stages
+@@ -16,10 +16,10 @@ function NotificationTrigger({
+   compare with the last state they've seen, and if it's different then set dot back to red */
+   function UpdateUpgradeNotificationLastSeen() {
+     if (upgradeNotificationCurrentState) {
+-      if (getLocalStorage('upgradeNotificationLastSeen') !== upgradeNotificationCurrentState) {
++      if (getLocalStorage(`upgradeNotificationLastSeen.${courseId}`) !== upgradeNotificationCurrentState) {
+         setNotificationStatus('active');
+-        setLocalStorage('notificationStatus', 'active');
+-        setLocalStorage('upgradeNotificationLastSeen', upgradeNotificationCurrentState);
++        setLocalStorage(`notificationStatus.${courseId}`, 'active');
++        setLocalStorage(`upgradeNotificationLastSeen.${courseId}`, upgradeNotificationCurrentState);
+       }
+     }
+   }
+@@ -39,6 +39,7 @@ function NotificationTrigger({
+ }
+ 
+ NotificationTrigger.propTypes = {
++  courseId: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
+   toggleNotificationTray: PropTypes.func.isRequired,
+   notificationStatus: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/NotificationTrigger.test.jsx b/src/courseware/course/NotificationTrigger.test.jsx
+index e48588c..2bc28f2 100644
+--- a/src/courseware/course/NotificationTrigger.test.jsx
++++ b/src/courseware/course/NotificationTrigger.test.jsx
+@@ -4,27 +4,49 @@ import {
+   render, initializeTestStore, screen, fireEvent,
+ } from '../../setupTest';
+ import NotificationTrigger from './NotificationTrigger';
+-import { getLocalStorage } from '../../data/localStorage';
+ 
+ describe('Notification Trigger', () => {
+   let mockData;
+-  // let mockDataSameState;
+-  // let mockDataDifferentState;
++  let getItemSpy;
++  let setItemSpy;
+   const courseMetadata = Factory.build('courseMetadata');
+ 
+   beforeEach(async () => {
+     await initializeTestStore({ courseMetadata, excludeFetchCourse: true, excludeFetchSequence: true });
+     mockData = {
++      courseId: courseMetadata.id,
+       toggleNotificationTray: () => {},
+       isNotificationTrayVisible: () => {},
+-      notificationStatus: 'active',
++      notificationStatus: 'inactive',
+       setNotificationStatus: () => {},
+       upgradeNotificationCurrentState: 'FPDdaysLeft',
+     };
++    // Jest does not support calls to localStorage, spying on localStorage's prototype directly instead
++    getItemSpy = jest.spyOn(Object.getPrototypeOf(window.localStorage), 'getItem');
++    setItemSpy = jest.spyOn(Object.getPrototypeOf(window.localStorage), 'setItem');
++  });
++
++  afterAll(() => {
++    getItemSpy.mockRestore();
++    setItemSpy.mockRestore();
++  });
++
++  it('handles onClick event toggling the notification tray', async () => {
++    const toggleNotificationTray = jest.fn();
++    const testData = {
++      ...mockData,
++      toggleNotificationTray,
++    };
++    render(<NotificationTrigger {...testData} />);
++
++    const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
++    expect(notificationTrigger).toBeInTheDocument();
++    fireEvent.click(notificationTrigger);
++    expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
+   });
+ 
+   it('renders notification trigger icon with red dot when notificationStatus is active', async () => {
+-    const { container } = render(<NotificationTrigger {...mockData} />);
++    const { container } = render(<NotificationTrigger {...mockData} notificationStatus="active" />);
+     expect(container).toBeInTheDocument();
+     const buttonIcon = container.querySelectorAll('svg');
+     expect(buttonIcon).toHaveLength(1);
+@@ -32,10 +54,12 @@ describe('Notification Trigger', () => {
+   });
+ 
+   it('renders notification trigger icon WITHOUT red dot 3 seconds later', async () => {
+-    const { container } = render(<NotificationTrigger {...mockData} />);
++    const { container } = render(<NotificationTrigger {...mockData} notificationStatus="active" />);
+     expect(container).toBeInTheDocument();
++    expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
+     jest.useFakeTimers();
+     setTimeout(() => {
++      expect(localStorage.setItem).toHaveBeenCalledTimes(2);
+       expect(screen.queryByRole('notification-dot')).not.toBeInTheDocument();
+     }, 3000);
+     jest.runAllTimers();
+@@ -43,37 +67,63 @@ describe('Notification Trigger', () => {
+ 
+   it('renders notification trigger icon WITHOUT red dot within the same phase', async () => {
+     const { container } = render(
+-      <NotificationTrigger {...mockData} upgradeNotificationCurrentState="sameState" upgradeNotificationLastSeen="sameState" />,
++      <NotificationTrigger
++        {...mockData}
++        upgradeNotificationCurrentState="sameState"
++        upgradeNotificationLastSeen="sameState"
++      />,
+     );
+     expect(container).toBeInTheDocument();
++    expect(localStorage.getItem).toHaveBeenCalledWith(`upgradeNotificationLastSeen.${mockData.courseId}`);
++    expect(localStorage.getItem(`upgradeNotificationLastSeen.${mockData.courseId}`)).toBe('"sameState"');
+     const buttonIcon = container.querySelectorAll('svg');
+     expect(buttonIcon).toHaveLength(1);
+     expect(screen.queryByRole('notification-dot')).not.toBeInTheDocument();
+   });
+ 
+-  it('handles onClick event toggling the notification tray', async () => {
+-    const toggleNotificationTray = jest.fn();
+-    const testData = {
+-      ...mockData,
+-      toggleNotificationTray,
+-    };
+-    render(<NotificationTrigger {...testData} />);
++  // Rendering NotificationTrigger has the effect of calling UpdateUpgradeNotificationLastSeen(),
++  // if upgradeNotificationLastSeen is different than upgradeNotificationCurrentState
++  // it should update localStorage accordingly
++  it('makes the right updates when rendering a new phase from an UpgradeNotification change (before -> after)', async () => {
++    const { container } = render(
++      <NotificationTrigger
++        {...mockData}
++        upgradeNotificationLastSeen="before"
++        upgradeNotificationCurrentState="after"
++      />,
++    );
++    expect(container).toBeInTheDocument();
+ 
+-    const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
+-    expect(notificationTrigger).toBeInTheDocument();
+-    fireEvent.click(notificationTrigger);
+-    expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
++    // verify localStorage get/set are called with correct arguments
++    expect(localStorage.getItem).toHaveBeenCalledWith(`upgradeNotificationLastSeen.${mockData.courseId}`);
++    expect(localStorage.setItem).toHaveBeenCalledWith(`notificationStatus.${mockData.courseId}`, '"active"');
++    expect(localStorage.setItem).toHaveBeenCalledWith(`upgradeNotificationLastSeen.${mockData.courseId}`, '"after"');
++
++    // verify localStorage is updated accordingly
++    expect(localStorage.getItem(`upgradeNotificationLastSeen.${mockData.courseId}`)).toBe('"after"');
++    expect(localStorage.getItem(`notificationStatus.${mockData.courseId}`)).toBe('"active"');
+   });
+ 
+-  // rendering NotificationTrigger has the effect of calling UpdateUpgradeNotificationLastSeen()
+-  // Verify that local storage was updated accordingly
+-  it('we make the right updates when rendering a new phase (before -> after)', async () => {
++  it('handles localStorage from a different course', async () => {
++    const courseMetadataSecondCourse = Factory.build('courseMetadata');
++    // set localStorage for a different course before rendering NotificationTrigger
++    localStorage.setItem(`upgradeNotificationLastSeen.${courseMetadataSecondCourse.id}`, '"accessDateView"');
++    localStorage.setItem(`notificationStatus.${courseMetadataSecondCourse.id}`, '"inactive"');
++
+     const { container } = render(
+-      <NotificationTrigger {...mockData} upgradeNotificationLastSeen="before" upgradeNotificationCurrentState="after" />,
++      <NotificationTrigger
++        {...mockData}
++        upgradeNotificationLastSeen="before"
++        upgradeNotificationCurrentState="after"
++      />,
+     );
+     expect(container).toBeInTheDocument();
++    // Verify localStorage was updated for the original course
++    expect(localStorage.getItem(`upgradeNotificationLastSeen.${mockData.courseId}`)).toBe('"after"');
++    expect(localStorage.getItem(`notificationStatus.${mockData.courseId}`)).toBe('"active"');
+ 
+-    expect(getLocalStorage('notificationStatus')).toBe('active');
+-    expect(getLocalStorage('upgradeNotificationLastSeen')).toBe('after');
++    // Verify the second course localStorage was not changed
++    expect(localStorage.getItem(`upgradeNotificationLastSeen.${courseMetadataSecondCourse.id}`)).toBe('"accessDateView"');
++    expect(localStorage.getItem(`notificationStatus.${courseMetadataSecondCourse.id}`)).toBe('"inactive"');
+   });
+ });
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index c072e4d..df13404 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -182,6 +182,7 @@ function Sequence({
+ 
+         {shouldDisplayNotificationTrigger ? (
+           <NotificationTrigger
++            courseId={courseId}
+             toggleNotificationTray={toggleNotificationTray}
+             isNotificationTrayVisible={isNotificationTrayVisible}
+             notificationStatus={notificationStatus}
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+index 32edac5..7a49f30 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -95,18 +95,20 @@ UpsellFBESoonCardContent.defaultProps = {
+   timezoneFormatArgs: {},
+ };
+ 
+-function ExpirationCountdown({ hoursToExpiration, setupgradeNotificationCurrentState, type }) {
++function ExpirationCountdown({
++  courseId, hoursToExpiration, setupgradeNotificationCurrentState, type,
++}) {
+   let expirationText;
+   if (hoursToExpiration >= 24) {
+     // setupgradeNotificationCurrentState is available in NotificationTray (not course home)
+     if (setupgradeNotificationCurrentState) {
+       if (type === 'access') {
+         setupgradeNotificationCurrentState('accessDaysLeft');
+-        setLocalStorage('upgradeNotificationCurrentState', 'accessDaysLeft');
++        setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'accessDaysLeft');
+       }
+       if (type === 'offer') {
+         setupgradeNotificationCurrentState('FPDdaysLeft');
+-        setLocalStorage('upgradeNotificationCurrentState', 'FPDdaysLeft');
++        setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'FPDdaysLeft');
+       }
+     }
+     expirationText = (
+@@ -125,11 +127,11 @@ function ExpirationCountdown({ hoursToExpiration, setupgradeNotificationCurrentS
+     if (setupgradeNotificationCurrentState) {
+       if (type === 'access') {
+         setupgradeNotificationCurrentState('accessHoursLeft');
+-        setLocalStorage('upgradeNotificationCurrentState', 'accessHoursLeft');
++        setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'accessHoursLeft');
+       }
+       if (type === 'offer') {
+         setupgradeNotificationCurrentState('FPDHoursLeft');
+-        setLocalStorage('upgradeNotificationCurrentState', 'FPDHoursLeft');
++        setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'FPDHoursLeft');
+       }
+     }
+     expirationText = (
+@@ -148,11 +150,11 @@ function ExpirationCountdown({ hoursToExpiration, setupgradeNotificationCurrentS
+     if (setupgradeNotificationCurrentState) {
+       if (type === 'access') {
+         setupgradeNotificationCurrentState('accessLastHour');
+-        setLocalStorage('upgradeNotificationCurrentState', 'accessLastHour');
++        setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'accessLastHour');
+       }
+       if (type === 'offer') {
+         setupgradeNotificationCurrentState('FPDLastHour');
+-        setLocalStorage('upgradeNotificationCurrentState', 'FPDLastHour');
++        setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'FPDLastHour');
+       }
+     }
+     expirationText = (
+@@ -166,6 +168,7 @@ function ExpirationCountdown({ hoursToExpiration, setupgradeNotificationCurrentS
+ }
+ 
+ ExpirationCountdown.propTypes = {
++  courseId: PropTypes.string.isRequired,
+   hoursToExpiration: PropTypes.number.isRequired,
+   setupgradeNotificationCurrentState: PropTypes.func,
+   type: PropTypes.string,
+@@ -175,10 +178,12 @@ ExpirationCountdown.defaultProps = {
+   type: null,
+ };
+ 
+-function AccessExpirationDateBanner({ accessExpirationDate, timezoneFormatArgs, setupgradeNotificationCurrentState }) {
++function AccessExpirationDateBanner({
++  courseId, accessExpirationDate, timezoneFormatArgs, setupgradeNotificationCurrentState,
++}) {
+   if (setupgradeNotificationCurrentState) {
+     setupgradeNotificationCurrentState('accessDateView');
+-    setLocalStorage('upgradeNotificationCurrentState', 'accessDateView');
++    setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'accessDateView');
+   }
+   return (
+     <div className="upsell-warning-light">
+@@ -202,6 +207,7 @@ function AccessExpirationDateBanner({ accessExpirationDate, timezoneFormatArgs,
+ }
+ 
+ AccessExpirationDateBanner.propTypes = {
++  courseId: PropTypes.string.isRequired,
+   accessExpirationDate: PropTypes.PropTypes.instanceOf(Date).isRequired,
+   timezoneFormatArgs: PropTypes.shape({
+     timeZone: PropTypes.string,
+@@ -298,6 +304,7 @@ function UpgradeNotification({
+         );
+         expirationBanner = (
+           <ExpirationCountdown
++            courseId={courseId}
+             hoursToExpiration={hoursToDiscountExpiration}
+             setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+             type="offer"
+@@ -312,6 +319,7 @@ function UpgradeNotification({
+         );
+         expirationBanner = (
+           <AccessExpirationDateBanner
++            courseId={courseId}
+             accessExpirationDate={accessExpirationDate}
+             timezoneFormatArgs={timezoneFormatArgs}
+             setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+@@ -328,6 +336,7 @@ function UpgradeNotification({
+       );
+       expirationBanner = (
+         <ExpirationCountdown
++          courseId={courseId}
+           hoursToExpiration={hoursToAccessExpiration}
+           setupgradeNotificationCurrentState={setupgradeNotificationCurrentState}
+           type="access"
+-- 
+2.34.1
+

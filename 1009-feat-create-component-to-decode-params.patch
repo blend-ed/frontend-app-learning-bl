@@ -1,0 +1,303 @@
+From 52235ebc1c2d2949c542e1acc0795beb103c55b5 Mon Sep 17 00:00:00 2001
+From: lunyachek <ananasgo@gmail.com>
+Date: Wed, 22 Feb 2023 00:10:33 +0200
+Subject: [PATCH 1009/1021] feat: create component to decode params
+
+---
+ .../CoursewareRedirectLandingPage.jsx         |   6 +-
+ .../__snapshots__/index.test.jsx.snap         |  16 +++
+ src/decode-page-route/index.jsx               |  49 +++++++++
+ src/decode-page-route/index.test.jsx          | 103 ++++++++++++++++++
+ src/index.jsx                                 |  27 ++---
+ 5 files changed, 186 insertions(+), 15 deletions(-)
+ create mode 100644 src/decode-page-route/__snapshots__/index.test.jsx.snap
+ create mode 100644 src/decode-page-route/index.jsx
+ create mode 100644 src/decode-page-route/index.test.jsx
+
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index 0597a7b..c3f965c 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -7,6 +7,8 @@ import { PageRoute } from '@edx/frontend-platform/react';
+ import queryString from 'query-string';
+ import PageLoading from '../generic/PageLoading';
+ 
++import DecodePageRoute from '../decode-page-route';
++
+ const CoursewareRedirectLandingPage = () => {
+   const { path } = useRouteMatch();
+   return (
+@@ -21,7 +23,7 @@ const CoursewareRedirectLandingPage = () => {
+       />
+ 
+       <Switch>
+-        <PageRoute
++        <DecodePageRoute
+           path={`${path}/survey/:courseId`}
+           render={({ match }) => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/survey`);
+@@ -40,7 +42,7 @@ const CoursewareRedirectLandingPage = () => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}${consentPath}`);
+           }}
+         />
+-        <PageRoute
++        <DecodePageRoute
+           path={`${path}/home/:courseId`}
+           render={({ match }) => {
+             global.location.assign(`/course/${match.params.courseId}/home`);
+diff --git a/src/decode-page-route/__snapshots__/index.test.jsx.snap b/src/decode-page-route/__snapshots__/index.test.jsx.snap
+new file mode 100644
+index 0000000..aff8eac
+--- /dev/null
++++ b/src/decode-page-route/__snapshots__/index.test.jsx.snap
+@@ -0,0 +1,16 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`DecodePageRoute should not modify the url if it does not need to be decoded 1`] = `
++<div>
++  PageRoute: {
++  "computedMatch": {
++    "path": "/course/:courseId/home",
++    "url": "/course/course-v1:edX+DemoX+Demo_Course/home",
++    "isExact": true,
++    "params": {
++      "courseId": "course-v1:edX+DemoX+Demo_Course"
++    }
++  }
++}
++</div>
++`;
+diff --git a/src/decode-page-route/index.jsx b/src/decode-page-route/index.jsx
+new file mode 100644
+index 0000000..cc38013
+--- /dev/null
++++ b/src/decode-page-route/index.jsx
+@@ -0,0 +1,49 @@
++import PropTypes from 'prop-types';
++import { PageRoute } from '@edx/frontend-platform/react';
++import React from 'react';
++import { useHistory, generatePath } from 'react-router';
++
++export const decodeUrl = (encodedUrl) => {
++  const decodedUrl = decodeURIComponent(encodedUrl);
++  if (encodedUrl === decodedUrl) {
++    return encodedUrl;
++  }
++  return decodeUrl(decodedUrl);
++};
++
++const DecodePageRoute = (props) => {
++  const history = useHistory();
++  if (props.computedMatch) {
++    const { url, path, params } = props.computedMatch;
++
++    Object.keys(params).forEach((param) => {
++      // only decode params not the entire url.
++      // it is just to be safe and less prone to errors
++      params[param] = decodeUrl(params[param]);
++    });
++
++    const newUrl = generatePath(path, params);
++
++    // if the url get decoded, reroute to the decoded url
++    if (newUrl !== url) {
++      history.replace(newUrl);
++    }
++  }
++
++  return <PageRoute {...props} />;
++};
++
++DecodePageRoute.propTypes = {
++  computedMatch: PropTypes.shape({
++    url: PropTypes.string.isRequired,
++    path: PropTypes.string.isRequired,
++    // eslint-disable-next-line react/forbid-prop-types
++    params: PropTypes.any,
++  }),
++};
++
++DecodePageRoute.defaultProps = {
++  computedMatch: null,
++};
++
++export default DecodePageRoute;
+diff --git a/src/decode-page-route/index.test.jsx b/src/decode-page-route/index.test.jsx
+new file mode 100644
+index 0000000..c32453e
+--- /dev/null
++++ b/src/decode-page-route/index.test.jsx
+@@ -0,0 +1,103 @@
++import React from 'react';
++import { render } from '@testing-library/react';
++import { createMemoryHistory } from 'history';
++import { Router, matchPath } from 'react-router';
++import DecodePageRoute, { decodeUrl } from '.';
++
++const decodedCourseId = 'course-v1:edX+DemoX+Demo_Course';
++const encodedCourseId = encodeURIComponent(decodedCourseId);
++const deepEncodedCourseId = (() => {
++  let path = encodedCourseId;
++  for (let i = 0; i < 5; i++) {
++    path = encodeURIComponent(path);
++  }
++  return path;
++})();
++
++jest.mock('@edx/frontend-platform/react', () => ({
++  PageRoute: (props) => `PageRoute: ${JSON.stringify(props, null, 2)}`,
++}));
++
++const renderPage = (props) => {
++  const memHistory = createMemoryHistory({
++    initialEntries: [props?.path],
++  });
++
++  const history = {
++    ...memHistory,
++    replace: jest.fn(),
++  };
++
++  const { container } = render(
++    <Router history={history}>
++      <DecodePageRoute computedMatch={props} />
++    </Router>,
++  );
++
++  return {
++    container,
++    history,
++    props,
++  };
++};
++
++describe('DecodePageRoute', () => {
++  it('should not modify the url if it does not need to be decoded', () => {
++    const props = matchPath(`/course/${decodedCourseId}/home`, {
++      path: '/course/:courseId/home',
++    });
++    const { container, history } = renderPage(props);
++
++    expect(props.url).toContain(decodedCourseId);
++    expect(history.replace).not.toHaveBeenCalled();
++    expect(container).toMatchSnapshot();
++  });
++
++  it('should decode the url and replace the history if necessary', () => {
++    const props = matchPath(`/course/${encodedCourseId}/home`, {
++      path: '/course/:courseId/home',
++    });
++    const { history } = renderPage(props);
++
++    expect(props.url).not.toContain(decodedCourseId);
++    expect(props.url).toContain(encodedCourseId);
++    expect(history.replace.mock.calls[0][0]).toContain(decodedCourseId);
++  });
++
++  it('should decode the url multiple times if necessary', () => {
++    const props = matchPath(`/course/${deepEncodedCourseId}/home`, {
++      path: '/course/:courseId/home',
++    });
++    const { history } = renderPage(props);
++
++    expect(props.url).not.toContain(decodedCourseId);
++    expect(props.url).toContain(deepEncodedCourseId);
++    expect(history.replace.mock.calls[0][0]).toContain(decodedCourseId);
++  });
++
++  it('should only decode the url params and not the entire url', () => {
++    const decodedUnitId = 'some+thing';
++    const encodedUnitId = encodeURIComponent(decodedUnitId);
++    const props = matchPath(`/course/${deepEncodedCourseId}/${encodedUnitId}/${encodedUnitId}`, {
++      path: `/course/:courseId/${encodedUnitId}/:unitId`,
++    });
++    const { history } = renderPage(props);
++
++    const decodedUrls = history.replace.mock.calls[0][0].split('/');
++
++    // unitId get decoded
++    expect(decodedUrls.pop()).toContain(decodedUnitId);
++
++    // path remain encoded
++    expect(decodedUrls.pop()).toContain(encodedUnitId);
++
++    // courseId get decoded
++    expect(decodedUrls.pop()).toContain(decodedCourseId);
++  });
++});
++
++describe('decodeUrl', () => {
++  expect(decodeUrl(decodedCourseId)).toEqual(decodedCourseId);
++  expect(decodeUrl(encodedCourseId)).toEqual(decodedCourseId);
++  expect(decodeUrl(deepEncodedCourseId)).toEqual(decodedCourseId);
++});
+diff --git a/src/index.jsx b/src/index.jsx
+index b42a651..a6806af 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -37,6 +37,7 @@ import NoticesProvider from './generic/notices';
+ import PathFixesProvider from './generic/path-fixes';
+ import LiveTab from './course-home/live-tab/LiveTab';
+ import CourseAccessErrorPage from './generic/CourseAccessErrorPage';
++import DecodePageRoute from './decode-page-route';
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+@@ -50,28 +51,28 @@ subscribe(APP_READY, () => {
+             <Switch>
+               <PageRoute exact path="/goal-unsubscribe/:token" component={GoalUnsubscribe} />
+               <PageRoute path="/redirect" component={CoursewareRedirectLandingPage} />
+-              <PageRoute path="/course/:courseId/access-denied" component={CourseAccessErrorPage} />
+-              <PageRoute path="/course/:courseId/home">
++              <DecodePageRoute path="/course/:courseId/access-denied" component={CourseAccessErrorPage} />
++              <DecodePageRoute path="/course/:courseId/home">
+                 <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
+                   <OutlineTab />
+                 </TabContainer>
+-              </PageRoute>
+-              <PageRoute path="/course/:courseId/live">
++              </DecodePageRoute>
++              <DecodePageRoute path="/course/:courseId/live">
+                 <TabContainer tab="lti_live" fetch={fetchLiveTab} slice="courseHome">
+                   <LiveTab />
+                 </TabContainer>
+-              </PageRoute>
+-              <PageRoute path="/course/:courseId/dates">
++              </DecodePageRoute>
++              <DecodePageRoute path="/course/:courseId/dates">
+                 <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
+                   <DatesTab />
+                 </TabContainer>
+-              </PageRoute>
+-              <PageRoute path="/course/:courseId/discussion/:path*">
++              </DecodePageRoute>
++              <DecodePageRoute path="/course/:courseId/discussion/:path*">
+                 <TabContainer tab="discussion" fetch={fetchDiscussionTab} slice="courseHome">
+                   <DiscussionTab />
+                 </TabContainer>
+-              </PageRoute>
+-              <PageRoute
++              </DecodePageRoute>
++              <DecodePageRoute
+                 path={[
+                   '/course/:courseId/progress/:targetUserId/',
+                   '/course/:courseId/progress',
+@@ -86,12 +87,12 @@ subscribe(APP_READY, () => {
+                   </TabContainer>
+                 )}
+               />
+-              <PageRoute path="/course/:courseId/course-end">
++              <DecodePageRoute path="/course/:courseId/course-end">
+                 <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
+                   <CourseExit />
+                 </TabContainer>
+-              </PageRoute>
+-              <PageRoute
++              </DecodePageRoute>
++              <DecodePageRoute
+                 path={[
+                   '/course/:courseId/:sequenceId/:unitId',
+                   '/course/:courseId/:sequenceId',
+-- 
+2.34.1
+

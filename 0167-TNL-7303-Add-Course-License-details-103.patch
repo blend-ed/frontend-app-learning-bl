@@ -1,0 +1,322 @@
+From 086b5d898611b424cec14bf85c63bebb0fa5c3aa Mon Sep 17 00:00:00 2001
+From: Patrick Cockwell <pcockwell@gmail.com>
+Date: Sat, 18 Jul 2020 00:26:21 +0700
+Subject: [PATCH 0167/1021] TNL-7303 Add Course License details (#103)
+
+---
+ .../course/course-license/CourseLicense.jsx   | 166 ++++++++++++++++++
+ src/courseware/course/course-license/index.js |   1 +
+ .../course/course-license/messages.js         |  47 +++++
+ src/courseware/course/sequence/Sequence.jsx   |   5 +
+ .../__factories__/courseMetadata.factory.js   |   1 +
+ src/courseware/data/api.js                    |   1 +
+ src/index.scss                                |   4 +
+ 7 files changed, 225 insertions(+)
+ create mode 100644 src/courseware/course/course-license/CourseLicense.jsx
+ create mode 100644 src/courseware/course/course-license/index.js
+ create mode 100644 src/courseware/course/course-license/messages.js
+
+diff --git a/src/courseware/course/course-license/CourseLicense.jsx b/src/courseware/course/course-license/CourseLicense.jsx
+new file mode 100644
+index 0000000..9aa0d72
+--- /dev/null
++++ b/src/courseware/course/course-license/CourseLicense.jsx
+@@ -0,0 +1,166 @@
++import React from 'react';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import PropTypes from 'prop-types';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faCopyright } from '@fortawesome/free-regular-svg-icons';
++import {
++  faCreativeCommons,
++  faCreativeCommonsBy,
++  faCreativeCommonsNc,
++  faCreativeCommonsNd,
++  faCreativeCommonsSa,
++  faCreativeCommonsZero,
++} from '@fortawesome/free-brands-svg-icons';
++
++import messages from './messages';
++
++const CreativeCommonsLicenseTags = {
++  by: {
++    intlMessagesId: 'learn.course.license.creativeCommons.terms.by',
++    icon: faCreativeCommonsBy,
++  },
++  nc: {
++    intlMessagesId: 'learn.course.license.creativeCommons.terms.nc',
++    icon: faCreativeCommonsNc,
++  },
++  nd: {
++    intlMessagesId: 'learn.course.license.creativeCommons.terms.nd',
++    icon: faCreativeCommonsNd,
++  },
++  sa: {
++    intlMessagesId: 'learn.course.license.creativeCommons.terms.sa',
++    icon: faCreativeCommonsSa,
++  },
++  zero: {
++    intlMessagesId: 'learn.course.license.creativeCommons.terms.zero',
++    icon: faCreativeCommonsZero,
++  },
++};
++
++function parseLicense(license) {
++  if (!license) {
++    // Default to All Rights Reserved if no license
++    // is detected
++    return ['all-rights-reserved', {}];
++  }
++
++  // Search for a colon character denoting the end
++  // of the license type and start of the options
++  const colonIndex = license.indexOf(':');
++  if (colonIndex === -1) {
++    // no options, so the entire thing is the license type
++    return [license, {}];
++  }
++
++  // Split the license on the colon
++  const licenseType = license.slice(0, colonIndex).trim();
++  const optionStr = license.slice(colonIndex + 1).trim();
++
++  let options = {};
++  let version = '';
++
++  // Set the defaultVersion to 4.0
++  const defaultVersion = '4.0';
++  optionStr.split(' ').forEach(option => {
++    // Split the option into key and value
++    // Default the value to `true` if no value
++    let key = '';
++    let value = '';
++    if (option.indexOf('=') !== -1) {
++      [key, value] = option.split('=');
++    } else {
++      key = option;
++      value = true;
++    }
++
++    // Check for version
++    if (key === 'ver') {
++      version = value;
++    } else {
++      // Set the option key to lowercase to make
++      // it easier to query
++      options[key.toLowerCase()] = value;
++    }
++  });
++
++  // No options
++  if (Object.keys(options).length === 0) {
++    // If no other options are set for the
++    // license, set version to 1.0
++    version = '1.0';
++
++    // Set the `zero` option so the link
++    // works correctly
++    options = {
++      zero: true,
++    };
++  }
++
++  // Set the version to whatever was included,
++  // using `defaultVersion` as a fallback if unset
++  version = version || defaultVersion;
++
++  return [licenseType, options, version];
++}
++
++function CourseLicense({
++  license,
++  intl,
++}) {
++  const renderAllRightsReservedLicense = () => (
++    <div>
++      <FontAwesomeIcon aria-hidden="true" className="mr-1" icon={faCopyright} />
++      <span className="license-text">
++        {intl.formatMessage(messages['learn.course.license.allRightsReserved.text'])}
++      </span>
++    </div>
++  );
++
++  const renderCreativeCommonsLicense = (activeCreativeCommonsLicenseTags, version) => (
++    <a
++      className="text-decoration-none text-gray-700"
++      rel="license noopener noreferrer"
++      target="_blank"
++      href={`https://creativecommons.org/licenses/${activeCreativeCommonsLicenseTags.join('-')}/${version}/`}
++    >
++      <span className="sr-only">
++        {intl.formatMessage(messages['learn.course.license.creativeCommons.terms.preamble'])}&nbsp;
++      </span>
++      <FontAwesomeIcon aria-hidden="true" className="mr-1" icon={faCreativeCommons} />
++      {activeCreativeCommonsLicenseTags.map(tag => (
++        <span key={tag}>
++          <span className="sr-only">
++            {intl.formatMessage(messages[CreativeCommonsLicenseTags[tag].intlMessagesId])}&nbsp;
++          </span>
++          <FontAwesomeIcon aria-hidden="true" className="mr-1" icon={CreativeCommonsLicenseTags[tag].icon} />
++        </span>
++      ))}
++      <span className="license-text">
++        {intl.formatMessage(messages['learn.course.license.creativeCommons.text'])}
++      </span>
++    </a>
++  );
++
++  const [licenseType, licenseOptions, licenseVersion] = parseLicense(license);
++
++  return (
++    <div className="course-license text-right small">
++      {licenseType === 'all-rights-reserved' && renderAllRightsReservedLicense()}
++      {licenseType === 'creative-commons' && renderCreativeCommonsLicense(
++        Object.keys(licenseOptions),
++        licenseVersion,
++      )}
++    </div>
++  );
++}
++
++CourseLicense.propTypes = {
++  license: PropTypes.string,
++  intl: intlShape.isRequired,
++};
++
++CourseLicense.defaultProps = {
++  license: 'all-rights-reserved',
++};
++
++export default injectIntl(CourseLicense);
+diff --git a/src/courseware/course/course-license/index.js b/src/courseware/course/course-license/index.js
+new file mode 100644
+index 0000000..8be76fc
+--- /dev/null
++++ b/src/courseware/course/course-license/index.js
+@@ -0,0 +1 @@
++export { default } from './CourseLicense';
+diff --git a/src/courseware/course/course-license/messages.js b/src/courseware/course/course-license/messages.js
+new file mode 100644
+index 0000000..65d6aed
+--- /dev/null
++++ b/src/courseware/course/course-license/messages.js
+@@ -0,0 +1,47 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learn.course.license.allRightsReserved.text': {
++    id: 'learn.course.license.allRightsReserved.text',
++    defaultMessage: 'All Rights Reserved',
++    description: 'License text shown when using All Rights Reserved license type.',
++  },
++  'learn.course.license.creativeCommons.terms.preamble': {
++    id: 'learn.course.license.creativeCommons.terms.preamble',
++    defaultMessage: 'Creative Commons licensed content, with terms as follows:',
++    description: 'Screen reader only text preamble before reading specific Creative Commons license terms.',
++  },
++  'learn.course.license.creativeCommons.terms.by': {
++    id: 'learn.course.license.creativeCommons.terms.by',
++    defaultMessage: 'Attribution',
++    description: 'Creative Commons license text for Attribution term.',
++  },
++  'learn.course.license.creativeCommons.terms.nc': {
++    id: 'learn.course.license.creativeCommons.terms.nc',
++    defaultMessage: 'Noncommercial',
++    description: 'Creative Commons license text for Noncommercial term.',
++  },
++  'learn.course.license.creativeCommons.terms.nd': {
++    id: 'learn.course.license.creativeCommons.terms.nd',
++    defaultMessage: 'No Derivatives',
++    description: 'Creative Commons license text for No Derivatives term.',
++  },
++  'learn.course.license.creativeCommons.terms.sa': {
++    id: 'learn.course.license.creativeCommons.terms.sa',
++    defaultMessage: 'Share Alike',
++    description: 'Creative Commons license text for Share Alike term.',
++  },
++  // No text for `zero` license
++  'learn.course.license.creativeCommons.terms.zero': {
++    id: 'learn.course.license.creativeCommons.terms.zero',
++    defaultMessage: 'No terms',
++    description: 'Creative Commons license text for license with no terms.',
++  },
++  'learn.course.license.creativeCommons.text': {
++    id: 'learn.course.license.creativeCommons.text',
++    defaultMessage: 'Some Rights Reserved',
++    description: 'License text shown when using all Creative Commons license types.',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index ccffcd1..2f1c92c 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -11,6 +11,7 @@ import PageLoading from '../../../generic/PageLoading';
+ import { UserMessagesContext, ALERT_TYPES } from '../../../generic/user-messages';
+ import { useModel } from '../../../generic/model-store';
+ 
++import CourseLicense from '../course-license';
+ import messages from './messages';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import SequenceContent from './SequenceContent';
+@@ -24,6 +25,7 @@ function Sequence({
+   previousSequenceHandler,
+   intl,
+ }) {
++  const course = useModel('courses', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+@@ -157,6 +159,9 @@ function Sequence({
+             )}
+           </div>
+         </div>
++        <div className="sequence-footer px-4 py-1">
++          <CourseLicense license={course.license || undefined} />
++        </div>
+       </div>
+     );
+   }
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 44372db..4d7a5a9 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -34,6 +34,7 @@ Factory.define('courseMetadata')
+     },
+     show_calculator: false,
+     is_staff: false,
++    license: 'all-rights-reserved',
+     can_load_courseware: {
+       has_access: true,
+       user_fragment: null,
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index ea5bb4b..838a6a0 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -127,6 +127,7 @@ function normalizeMetadata(metadata) {
+     isEnrolled: metadata.enrollment.is_active,
+     canLoadCourseware: camelCaseObject(metadata.can_load_courseware),
+     isStaff: metadata.is_staff,
++    license: metadata.license,
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+     tabs: normalizeTabUrls(metadata.id, camelCaseObject(metadata.tabs)),
+     showCalculator: metadata.show_calculator,
+diff --git a/src/index.scss b/src/index.scss
+index 0fa2c27..72bf819 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -262,6 +262,10 @@ $primary: #1176B2;
+   }
+ }
+ 
++.sequence-footer .course-license a:hover {
++  color: theme-color('primary', 500) !important;
++}
++
+ .unit-container {
+   padding: 0 $grid-gutter-width 2rem;
+   max-width: 1024px;
+-- 
+2.34.1
+

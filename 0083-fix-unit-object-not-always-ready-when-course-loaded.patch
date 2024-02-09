@@ -1,0 +1,52 @@
+From 57ca2948eb804f25d30a6709a491cf11798f8e5a Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 23 Mar 2020 11:59:34 -0400
+Subject: [PATCH 0083/1021] fix: unit object not always ready when course
+ loaded
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+If we don’t yet have the course blocks API loaded when the course metadata finishes, `unit` will be undefined still, and `unit.id` will fail.
+---
+ src/courseware/course/Course.jsx            | 3 +--
+ src/courseware/course/InstructorToolbar.jsx | 2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 55aceb1..bd39629 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -32,7 +32,6 @@ function Course({
+   const course = useModel('courses', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const section = useModel('sections', sequence ? sequence.sectionId : null);
+-  const unit = useModel('units', unitId);
+ 
+   useLogistrationAlert();
+   useEnrollmentAlert(courseId);
+@@ -60,7 +59,7 @@ function Course({
+         />
+         {isStaff && (
+         <InstructorToolbar
+-          unitId={unit.id}
++          unitId={unitId}
+         />
+         )}
+         <CourseTabsNavigation tabs={tabs} activeTabSlug="courseware" />
+diff --git a/src/courseware/course/InstructorToolbar.jsx b/src/courseware/course/InstructorToolbar.jsx
+index e18dd73..7b3ddb8 100644
+--- a/src/courseware/course/InstructorToolbar.jsx
++++ b/src/courseware/course/InstructorToolbar.jsx
+@@ -53,7 +53,7 @@ const mapStateToProps = (state, props) => {
+ 
+   const activeUnit = state.models.units[props.unitId];
+   return {
+-    activeUnitLmsWebUrl: activeUnit.lmsWebUrl,
++    activeUnitLmsWebUrl: activeUnit ? activeUnit.lmsWebUrl : undefined,
+   };
+ };
+ 
+-- 
+2.34.1
+

@@ -1,0 +1,29 @@
+From 41ab9fc68e11a1cb0d0919d7002b6aea998f7504 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Tue, 14 Jan 2020 17:21:48 -0500
+Subject: [PATCH 0034/1021] Fixing breadcrumbs so they contain the unit.
+
+---
+ src/learning-sequence/course/Course.jsx | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/learning-sequence/course/Course.jsx b/src/learning-sequence/course/Course.jsx
+index 79b3b47..bf8d940 100644
+--- a/src/learning-sequence/course/Course.jsx
++++ b/src/learning-sequence/course/Course.jsx
+@@ -11,8 +11,10 @@ export default function Course({
+ }) {
+   const breadcrumbs = useMemo(() => {
+     const sectionId = models[sequenceId].parentId;
+-    // TODO: Add unit ID back in here if it exists
+-    return [courseId, sectionId, sequenceId].map((nodeId) => {
++    if (!unitId) {
++      return [];
++    }
++    return [courseId, sectionId, sequenceId, unitId].map((nodeId) => {
+       const node = models[nodeId];
+       return {
+         id: node.id,
+-- 
+2.34.1
+

@@ -1,0 +1,48 @@
+From a2516e9fcccd0f06a62d98c4f6c4cbf546ef224a Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 7 Mar 2022 14:54:45 -0500
+Subject: [PATCH 0848/1021] fix: avoid a race condition with redux data on
+ course exit page
+
+I would sometimes see a case where we were trying to access
+recommendations data before it was defined.
+---
+ .../course/course-exit/CourseRecommendations.jsx          | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/course/course-exit/CourseRecommendations.jsx b/src/courseware/course/course-exit/CourseRecommendations.jsx
+index 112d2ea..8d0f92a 100644
+--- a/src/courseware/course/course-exit/CourseRecommendations.jsx
++++ b/src/courseware/course/course-exit/CourseRecommendations.jsx
+@@ -143,15 +143,17 @@ function CourseRecommendations({ intl, variant }) {
+     dispatch(fetchCourseRecommendations(courseKey, courseId));
+   }, [dispatch]);
+ 
++  const recommendationsLength = recommendations ? recommendations.length : 0;
++
+   if (recommendationsStatus && recommendationsStatus !== LOADING) {
+     sendTrackEvent('edx.ui.lms.course_exit.recommendations.viewed', {
+       course_key: courseKey,
+       recommendations_status: recommendationsStatus,
+-      recommendations_length: recommendations ? recommendations.length : 0,
++      recommendations_length: recommendationsLength,
+     });
+   }
+ 
+-  if (recommendationsStatus === FAILED || (recommendationsStatus === LOADED && recommendations.length < 2)) {
++  if (recommendationsStatus === FAILED || (recommendationsStatus === LOADED && recommendationsLength < 2)) {
+     return (<CatalogSuggestion variant={variant} />);
+   }
+ 
+@@ -177,7 +179,7 @@ function CourseRecommendations({ intl, variant }) {
+       <div className="mb-2 mt-3">
+         <DataTable
+           isPaginated
+-          itemCount={recommendations.length}
++          itemCount={recommendationsLength}
+           data={recommendationData}
+           columns={[{ Header: 'Title', accessor: 'title' }]}
+           initialState={{
+-- 
+2.34.1
+

@@ -1,0 +1,131 @@
+From 629382f7199d877e55c95dadc4eed1400ab119ae Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Mon, 1 Feb 2021 09:46:21 -0800
+Subject: [PATCH 0378/1021] AA-492: Add event data for consumption in the
+ backend (#355)
+
+---
+ src/course-home/data/api.js                        | 14 ++++++++++----
+ src/course-home/data/redux.test.js                 |  5 +++--
+ src/course-home/data/thunks.js                     |  9 ++++++---
+ .../dates-banner/DatesBannerContainer.jsx          |  2 +-
+ src/tab-page/TabPage.test.jsx                      |  3 ++-
+ 5 files changed, 22 insertions(+), 11 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index d3efe2b..366fdfd 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -194,9 +194,12 @@ export async function getOutlineTabData(courseId) {
+   };
+ }
+ 
+-export async function postCourseDeadlines(courseId) {
++export async function postCourseDeadlines(courseId, model) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`);
+-  return getAuthenticatedHttpClient().post(url.href, { course_key: courseId });
++  return getAuthenticatedHttpClient().post(url.href, {
++    course_key: courseId,
++    research_event_data: { location: `${model}-tab` },
++  });
+ }
+ 
+ export async function postCourseGoals(courseId, goalKey) {
+@@ -214,7 +217,10 @@ export async function postRequestCert(courseId) {
+   await getAuthenticatedHttpClient().post(url.href);
+ }
+ 
+-export async function executePostFromPostEvent(postData) {
++export async function executePostFromPostEvent(postData, researchEventData) {
+   const url = new URL(postData.url);
+-  return getAuthenticatedHttpClient().post(url.href, { course_key: postData.bodyParams.courseId });
++  return getAuthenticatedHttpClient().post(url.href, {
++    course_key: postData.bodyParams.courseId,
++    research_event_data: researchEventData,
++  });
+ }
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index 28e8247..fa20c70 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -102,16 +102,17 @@ describe('Data layer integration tests', () => {
+   describe('Test resetDeadlines', () => {
+     it('Should reset course deadlines', async () => {
+       const resetUrl = `${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`;
++      const model = 'dates';
+       axiosMock.onPost(resetUrl).reply(201, {});
+ 
+       const getTabDataMock = jest.fn(() => ({
+         type: 'MOCK_ACTION',
+       }));
+ 
+-      await executeThunk(thunks.resetDeadlines(courseId, getTabDataMock), store.dispatch);
++      await executeThunk(thunks.resetDeadlines(courseId, model, getTabDataMock), store.dispatch);
+ 
+       expect(axiosMock.history.post[0].url).toEqual(resetUrl);
+-      expect(axiosMock.history.post[0].data).toEqual(`{"course_key":"${courseId}"}`);
++      expect(axiosMock.history.post[0].data).toEqual(`{"course_key":"${courseId}","research_event_data":{"location":"dates-tab"}}`);
+ 
+       expect(getTabDataMock).toHaveBeenCalledWith(courseId);
+     });
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index df2fd4f..44cabea 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -90,9 +90,9 @@ export function requestCert(courseId) {
+   return async () => postRequestCert(courseId);
+ }
+ 
+-export function resetDeadlines(courseId, getTabData) {
++export function resetDeadlines(courseId, model, getTabData) {
+   return async (dispatch) => {
+-    postCourseDeadlines(courseId).then(response => {
++    postCourseDeadlines(courseId, model).then(response => {
+       const { data } = response;
+       const {
+         header,
+@@ -111,9 +111,12 @@ export async function saveCourseGoal(courseId, goalKey) {
+ 
+ export function processEvent(eventData, getTabData) {
+   return async (dispatch) => {
++    // Pulling this out early so the data doesn't get camelCased and is easier
++    // to use when it's passed to the backend
++    const { research_event_data: researchEventData } = eventData;
+     const event = camelCaseObject(eventData);
+     if (event.eventName === eventTypes.POST_EVENT) {
+-      executePostFromPostEvent(event.postData).then(response => {
++      executePostFromPostEvent(event.postData, researchEventData).then(response => {
+         const { data } = response;
+         const {
+           header,
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index 21ab82b..c5ac48c 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -54,7 +54,7 @@ function DatesBannerContainer({
+     {
+       name: 'resetDatesBanner',
+       shouldDisplay: resetDates,
+-      clickHandler: () => dispatch(resetDeadlines(courseId, tabFetch)),
++      clickHandler: () => dispatch(resetDeadlines(courseId, model, tabFetch)),
+     },
+   ];
+ 
+diff --git a/src/tab-page/TabPage.test.jsx b/src/tab-page/TabPage.test.jsx
+index bc5793d..a495255 100644
+--- a/src/tab-page/TabPage.test.jsx
++++ b/src/tab-page/TabPage.test.jsx
+@@ -47,8 +47,9 @@ describe('Tab Page', () => {
+     const getTabDataMock = jest.fn(() => ({
+       type: 'MOCK_ACTION',
+     }));
++    const model = 'outline';
+ 
+-    await executeThunk(thunks.resetDeadlines('courseId', getTabDataMock), testStore.dispatch);
++    await executeThunk(thunks.resetDeadlines('courseId', model, getTabDataMock), testStore.dispatch);
+ 
+     expect(screen.getByText('test-toast-header')).toBeInTheDocument();
+     expect(screen.getByText('test-toast-body')).toBeInTheDocument();
+-- 
+2.34.1
+

@@ -1,0 +1,26 @@
+From a9939a1b5e3aa83e33c947ee325b5af19edc1a95 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Thu, 25 Feb 2021 12:05:33 -0500
+Subject: [PATCH 0390/1021] fix three day streak bug with incorrect variable
+ (#370)
+
+---
+ src/shared/streak-celebration/utils.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/shared/streak-celebration/utils.jsx b/src/shared/streak-celebration/utils.jsx
+index 85825ab..026d256 100644
+--- a/src/shared/streak-celebration/utils.jsx
++++ b/src/shared/streak-celebration/utils.jsx
+@@ -19,7 +19,7 @@ function recordModalClosing(metadataModel, celebrations, org, courseId, dispatch
+     modelType: metadataModel,
+     model: {
+       id: courseId,
+-      celebrations: { ...celebrations, shouldCelebrateStreak: false },
++      celebrations: { ...celebrations, streakLengthToCelebrate: null },
+     },
+   }));
+ }
+-- 
+2.34.1
+

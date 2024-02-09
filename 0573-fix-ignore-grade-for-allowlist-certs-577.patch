@@ -1,0 +1,44 @@
+From 3b4dcfefaf6d2533ac854bfe06aca269b6415a3c Mon Sep 17 00:00:00 2001
+From: Matt Tuchfarber <mtuchfarber@edx.org>
+Date: Thu, 5 Aug 2021 16:07:54 -0400
+Subject: [PATCH 0573/1021] fix: ignore grade for allowlist certs (#577)
+
+Allowlist certs were hidden on the progress view because the grade
+wasn't passing. This gives "downloadable" certs preference over the
+grade.
+---
+ .../certificate-status/CertificateStatus.jsx           | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index ea79584..0679116 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -83,17 +83,21 @@ function CertificateStatus({ intl }) {
+   const idVerificationSupportLink = <IdVerificationSupportLink />;
+   const profileLink = <ProfileLink />;
+ 
++  // Some learners have a valid ("downloadable") certificate without being in a passing
++  // state (e.g. learners who have been added to a course's allowlist), so we need to
++  // skip grade validation for these learners
++  const certIsDownloadable = certStatus === 'downloadable';
+   if (mode === COURSE_EXIT_MODES.disabled) {
+     certEventName = 'certificate_status_disabled';
+-  } else if (mode === COURSE_EXIT_MODES.nonPassing) {
++  } else if (mode === COURSE_EXIT_MODES.nonPassing && !certIsDownloadable) {
+     certCase = 'notPassing';
+     certEventName = 'not_passing';
+     body = intl.formatMessage(messages[`${certCase}Body`]);
+-  } else if (mode === COURSE_EXIT_MODES.inProgress) {
++  } else if (mode === COURSE_EXIT_MODES.inProgress && !certIsDownloadable) {
+     certCase = 'inProgress';
+     certEventName = 'has_scheduled_content';
+     body = intl.formatMessage(messages[`${certCase}Body`]);
+-  } else if (mode === COURSE_EXIT_MODES.celebration) {
++  } else if (mode === COURSE_EXIT_MODES.celebration || certIsDownloadable) {
+     switch (certStatus) {
+       case 'requesting':
+         certCase = 'requestable';
+-- 
+2.34.1
+

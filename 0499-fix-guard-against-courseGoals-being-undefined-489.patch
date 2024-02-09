@@ -1,0 +1,31 @@
+From 99185a9b8a93d2be95c772b8a296d2837faed57e Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 15 Jun 2021 13:13:38 -0400
+Subject: [PATCH 0499/1021] fix: guard against courseGoals being undefined
+ (#489)
+
+No idea why this would happen honestly - it looks always defined
+from the backend, and api.js doesn't transorm it. But we are seeing
+JS errors related to it. So trying this as a first pass.
+
+AA-848
+---
+ src/course-home/outline-tab/OutlineTab.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index d2a86cf..4087081 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -52,7 +52,7 @@ function OutlineTab({ intl }) {
+     courseGoals: {
+       goalOptions,
+       selectedGoal,
+-    },
++    } = {},
+     datesBannerInfo,
+     datesWidget: {
+       courseDateBlocks,
+-- 
+2.34.1
+

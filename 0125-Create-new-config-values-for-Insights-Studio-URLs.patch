@@ -1,0 +1,80 @@
+From 5cb11189a755dc6812f6ec444a5b6845752f467a Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Fri, 15 May 2020 11:58:02 -0700
+Subject: [PATCH 0125/1021] Create new config values for Insights/Studio URLs
+
+---
+ .env             | 2 ++
+ .env.development | 1 +
+ .env.test        | 1 +
+ src/index.jsx    | 9 +++++++++
+ 4 files changed, 13 insertions(+)
+
+diff --git a/.env b/.env
+index 59fbc88..3c0d416 100644
+--- a/.env
++++ b/.env
+@@ -4,6 +4,7 @@ BASE_URL=null
+ CREDENTIALS_BASE_URL=null
+ CSRF_TOKEN_API_PATH=null
+ ECOMMERCE_BASE_URL=null
++INSIGHTS_BASE_URL=
+ LANGUAGE_PREFERENCE_COOKIE_NAME=null
+ LMS_BASE_URL=null
+ LOGIN_URL=null
+@@ -13,4 +14,5 @@ ORDER_HISTORY_URL=null
+ REFRESH_ACCESS_TOKEN_ENDPOINT=null
+ SEGMENT_KEY=null
+ SITE_NAME=null
++STUDIO_BASE_URL=
+ USER_INFO_COOKIE_NAME=null
+diff --git a/.env.development b/.env.development
+index 1e130d6..2bc0c1c 100644
+--- a/.env.development
++++ b/.env.development
+@@ -14,4 +14,5 @@ PORT=2000
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+ SEGMENT_KEY=null
+ SITE_NAME='edX'
++STUDIO_BASE_URL='http://localhost:18010'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+diff --git a/.env.test b/.env.test
+index f6b129a..3fae7f5 100644
+--- a/.env.test
++++ b/.env.test
+@@ -14,4 +14,5 @@ PORT=2000
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
+ SEGMENT_KEY=null
+ SITE_NAME='edX'
++STUDIO_BASE_URL='http://localhost:18010'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+diff --git a/src/index.jsx b/src/index.jsx
+index 21f3461..d849116 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -3,6 +3,7 @@ import 'regenerator-runtime/runtime';
+ 
+ import {
+   APP_INIT_ERROR, APP_READY, subscribe, initialize,
++  mergeConfig,
+ } from '@edx/frontend-platform';
+ import { AppProvider, ErrorPage } from '@edx/frontend-platform/react';
+ import React from 'react';
+@@ -51,6 +52,14 @@ subscribe(APP_INIT_ERROR, (error) => {
+ });
+ 
+ initialize({
++  handlers: {
++    config: () => {
++      mergeConfig({
++        INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
++        STUDIO_BASE_URL: process.env.STUDIO_BASE_URL || null,
++      }, 'LearnerAppConfig');
++    },
++  },
+   // TODO: Remove this once the course blocks api supports unauthenticated
+   // access and we are prepared to support public courses in this app.
+   requireAuthenticatedUser: true,
+-- 
+2.34.1
+

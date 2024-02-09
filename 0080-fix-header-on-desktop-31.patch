@@ -1,0 +1,41 @@
+From 94d11bc7c225b260dfc352fa997073f91946d8a7 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Mon, 16 Mar 2020 14:21:28 -0400
+Subject: [PATCH 0080/1021] fix header on desktop (#31)
+
+---
+ src/courseware/course/CourseHeader.jsx | 2 +-
+ src/index.scss                         | 4 +++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/courseware/course/CourseHeader.jsx b/src/courseware/course/CourseHeader.jsx
+index 20980ba..d8329c5 100644
+--- a/src/courseware/course/CourseHeader.jsx
++++ b/src/courseware/course/CourseHeader.jsx
+@@ -50,7 +50,7 @@ export default function CourseHeader({
+         <Dropdown className="user-dropdown">
+           <Dropdown.Button>
+             <FontAwesomeIcon icon={faUserCircle} className="d-md-none" size="lg" />
+-            <span className="d-none d-mb-block">
++            <span className="d-none d-md-inline">
+               {authenticatedUser.username}
+             </span>
+           </Dropdown.Button>
+diff --git a/src/index.scss b/src/index.scss
+index ad339dd..65b9331 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -66,7 +66,9 @@ $primary: #1176B2;
+   .user-dropdown {
+     .btn {
+       height: 3rem;
+-      padding: 0 .5rem;
++      @media (min-width: map-get($grid-breakpoints, 'sm')) {
++        padding: 0 .5rem;
++      }
+     }
+   }
+ }
+-- 
+2.34.1
+

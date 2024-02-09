@@ -1,0 +1,339 @@
+From 9e0f192ae7b17e48bbbf076fe03ff9688a9a01e2 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 6 Aug 2020 09:49:37 -0400
+Subject: [PATCH 0216/1021] AA-278 & AA-279: Add offer and course expired
+ alerts to outline (#164)
+
+* AA-278: Add offer alert to outline
+
+It was previously only used in the courseware. But to match the
+LMS, we also want to show it on the outline tab.
+
+* AA-279: Add course expired alert to outline
+
+It was previously only used in the courseware. But to match the
+LMS, we also want to show it on the outline tab.
+---
+ .../AccessExpirationAlert.jsx                 |  5 ++--
+ src/alerts/access-expiration-alert/hooks.js   | 17 +++++++------
+ src/alerts/access-expiration-alert/index.js   |  3 +--
+ src/alerts/offer-alert/OfferAlert.jsx         |  5 ++--
+ src/alerts/offer-alert/hooks.js               | 16 ++++++++-----
+ src/alerts/offer-alert/index.js               |  3 +--
+ .../__factories__/outlineTabData.factory.js   |  4 +++-
+ .../data/__snapshots__/redux.test.js.snap     |  2 ++
+ src/course-home/data/api.js                   |  6 ++++-
+ src/course-home/outline-tab/OutlineTab.jsx    | 19 +++++++++++----
+ src/courseware/course/Course.jsx              | 24 ++++++++-----------
+ 11 files changed, 63 insertions(+), 41 deletions(-)
+
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index bab938d..35aecec 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -1,14 +1,15 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { Alert } from '../../generic/user-messages';
++import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ 
+ function AccessExpirationAlert({ payload }) {
+   const {
+     rawHtml,
+   } = payload;
+   return rawHtml && (
+-    <Alert type="info">
++    <Alert type={ALERT_TYPES.INFO}>
++      {/* eslint-disable-next-line react/no-danger */}
+       <div dangerouslySetInnerHTML={{ __html: rawHtml }} />
+     </Alert>
+   );
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+index 58d0541..c60c159 100644
+--- a/src/alerts/access-expiration-alert/hooks.js
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -1,18 +1,21 @@
+-/* eslint-disable import/prefer-default-export */
+-import { useMemo } from 'react';
+-import { useModel } from '../../generic/model-store';
++import React, { useMemo } from 'react';
+ import { useAlert } from '../../generic/user-messages';
+ 
+-export function useAccessExpirationAlert(courseId) {
+-  const course = useModel('courses', courseId);
+-  const rawHtml = (course && course.courseExpiredMessage) || null;
++const AccessExpirationAlert = React.lazy(() => import('./AccessExpirationAlert'));
++
++function useAccessExpirationAlert(courseExpiredMessage, topic) {
++  const rawHtml = courseExpiredMessage || null;
+   const isVisible = !!rawHtml; // If it exists, show it.
+ 
+   const payload = useMemo(() => ({ rawHtml }), [rawHtml]);
+ 
+   useAlert(isVisible, {
+     code: 'clientAccessExpirationAlert',
+-    topic: 'course',
+     payload,
++    topic,
+   });
++
++  return { clientAccessExpirationAlert: AccessExpirationAlert };
+ }
++
++export default useAccessExpirationAlert;
+diff --git a/src/alerts/access-expiration-alert/index.js b/src/alerts/access-expiration-alert/index.js
+index d8b07c2..ed12eb0 100644
+--- a/src/alerts/access-expiration-alert/index.js
++++ b/src/alerts/access-expiration-alert/index.js
+@@ -1,2 +1 @@
+-export { default as AccessExpirationAlert } from './AccessExpirationAlert';
+-export { useAccessExpirationAlert } from './hooks';
++export { default } from './hooks';
+diff --git a/src/alerts/offer-alert/OfferAlert.jsx b/src/alerts/offer-alert/OfferAlert.jsx
+index ba62661..1685795 100644
+--- a/src/alerts/offer-alert/OfferAlert.jsx
++++ b/src/alerts/offer-alert/OfferAlert.jsx
+@@ -1,14 +1,15 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { Alert } from '../../generic/user-messages';
++import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ 
+ function OfferAlert({ payload }) {
+   const {
+     rawHtml,
+   } = payload;
+   return rawHtml && (
+-    <Alert type="info">
++    <Alert type={ALERT_TYPES.INFO}>
++      {/* eslint-disable-next-line react/no-danger */}
+       <div dangerouslySetInnerHTML={{ __html: rawHtml }} />
+     </Alert>
+   );
+diff --git a/src/alerts/offer-alert/hooks.js b/src/alerts/offer-alert/hooks.js
+index 64a1d9c..b3020cb 100644
+--- a/src/alerts/offer-alert/hooks.js
++++ b/src/alerts/offer-alert/hooks.js
+@@ -1,15 +1,19 @@
+-/* eslint-disable import/prefer-default-export */
+-import { useModel } from '../../generic/model-store';
++import React from 'react';
+ import { useAlert } from '../../generic/user-messages';
+ 
+-export function useOfferAlert(courseId) {
+-  const course = useModel('courses', courseId);
+-  const rawHtml = (course && course.offerHtml) || null;
++const OfferAlert = React.lazy(() => import('./OfferAlert'));
++
++export function useOfferAlert(offerHtml, topic) {
++  const rawHtml = offerHtml || null;
+   const isVisible = !!rawHtml; // if it exists, show it.
+ 
+   useAlert(isVisible, {
+     code: 'clientOfferAlert',
+-    topic: 'course',
++    topic,
+     payload: { rawHtml },
+   });
++
++  return { clientOfferAlert: OfferAlert };
+ }
++
++export default useOfferAlert;
+diff --git a/src/alerts/offer-alert/index.js b/src/alerts/offer-alert/index.js
+index 781efdb..ed12eb0 100644
+--- a/src/alerts/offer-alert/index.js
++++ b/src/alerts/offer-alert/index.js
+@@ -1,2 +1 @@
+-export { default as OfferAlert } from './OfferAlert';
+-export { useOfferAlert } from './hooks';
++export { default } from './hooks';
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 0fe0fe3..a523bb7 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -5,6 +5,7 @@ import buildSimpleCourseBlocks from '../../../courseware/data/__factories__/cour
+ Factory.define('outlineTabData')
+   .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+   .option('host', 'http://localhost:18000')
++  .attr('course_expired_html', [], () => '<div>Course expired</div>')
+   .attr('course_tools', ['host', 'courseId'], (host, courseId) => ({
+     analytics_id: 'edx.bookmarks',
+     title: 'Bookmarks',
+@@ -20,4 +21,5 @@ Factory.define('outlineTabData')
+     can_enroll: true,
+     extra_text: 'Contact the administrator.',
+   })
+-  .attr('handouts_html', [], () => '<ul><li>Handout 1</li></ul>');
++  .attr('handouts_html', [], () => '<ul><li>Handout 1</li></ul>')
++  .attr('offer_html', [], () => '<div>Great offer here</div>');
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 5e3dcfd..343133b 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -192,6 +192,7 @@ Object {
+             },
+           },
+         },
++        "courseExpiredHtml": "<div>Course expired</div>",
+         "courseTools": Object {
+           "analyticsId": "edx.bookmarks",
+           "title": "Bookmarks",
+@@ -204,6 +205,7 @@ Object {
+         },
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "offerHtml": "<div>Great offer here</div>",
+         "welcomeMessageHtml": undefined,
+       },
+     },
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index ac3a1e3..7faffb9 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -69,18 +69,22 @@ export async function getOutlineTabData(courseId) {
+     data,
+   } = tabData;
+   const courseBlocks = normalizeBlocks(courseId, data.course_blocks.blocks);
++  const courseExpiredHtml = data.course_expired_html;
+   const courseTools = camelCaseObject(data.course_tools);
+   const datesWidget = camelCaseObject(data.dates_widget);
+   const enrollAlert = camelCaseObject(data.enroll_alert);
+   const handoutsHtml = data.handouts_html;
++  const offerHtml = data.offer_html;
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+   return {
+-    courseTools,
+     courseBlocks,
++    courseExpiredHtml,
++    courseTools,
+     datesWidget,
+     enrollAlert,
+     handoutsHtml,
++    offerHtml,
+     welcomeMessageHtml,
+   };
+ }
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 89c7e4a..25a8136 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -10,11 +10,13 @@ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
+ import messages from './messages';
+ import Section from './Section';
++import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
+ import useCertificateAvailableAlert from './alerts/certificate-available-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+ import useCourseStartAlert from './alerts/course-start-alert';
+ import useEnrollmentAlert from '../../alerts/enrollment-alert';
+ import useLogistrationAlert from '../../alerts/logistration-alert';
++import useOfferAlert from '../../alerts/offer-alert';
+ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+ 
+@@ -38,13 +40,20 @@ function OutlineTab({ intl }) {
+       courses,
+       sections,
+     },
++    courseExpiredHtml,
++    offerHtml,
+   } = useModel('outline', courseId);
+ 
+-  const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
+-  const courseEndAlert = useCourseEndAlert(courseId);
+-  const courseStartAlert = useCourseStartAlert(courseId);
+-  const enrollmentAlert = useEnrollmentAlert(courseId);
++  // Above the tab alerts (appearing in the order listed here)
+   const logistrationAlert = useLogistrationAlert();
++  const enrollmentAlert = useEnrollmentAlert(courseId);
++
++  // Below the course title alerts (appearing in the order listed here)
++  const offerAlert = useOfferAlert(offerHtml, 'outline-course-alerts');
++  const accessExpirationAlert = useAccessExpirationAlert(courseExpiredHtml, 'outline-course-alerts');
++  const courseStartAlert = useCourseStartAlert(courseId);
++  const courseEndAlert = useCourseEndAlert(courseId);
++  const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
+ 
+   const rootCourseId = Object.keys(courses)[0];
+   const { sectionIds } = courses[rootCourseId];
+@@ -70,9 +79,11 @@ function OutlineTab({ intl }) {
+             topic="outline-course-alerts"
+             className="mb-3"
+             customAlerts={{
++              ...accessExpirationAlert,
+               ...certificateAvailableAlert,
+               ...courseEndAlert,
+               ...courseStartAlert,
++              ...offerAlert,
+             }}
+           />
+           {sectionIds.map((sectionId) => (
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 640017d..5c18092 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -5,8 +5,8 @@ import { useDispatch } from 'react-redux';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+ import { AlertList } from '../../generic/user-messages';
+-import { useAccessExpirationAlert } from '../../alerts/access-expiration-alert';
+-import { useOfferAlert } from '../../alerts/offer-alert';
++import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
++import useOfferAlert from '../../alerts/offer-alert';
+ 
+ import Sequence from './sequence';
+ 
+@@ -16,13 +16,6 @@ import CourseSock from './course-sock';
+ import ContentTools from './content-tools';
+ import { useModel } from '../../generic/model-store';
+ 
+-// Note that we import from the component files themselves in the enrollment-alert package.
+-// This is because Reacy.lazy() requires that we import() from a file with a Component as it's
+-// default export.
+-// See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
+-const AccessExpirationAlert = React.lazy(() => import('../../alerts/access-expiration-alert/AccessExpirationAlert'));
+-const OfferAlert = React.lazy(() => import('../../alerts/offer-alert/OfferAlert'));
+-
+ function Course({
+   courseId,
+   sequenceId,
+@@ -41,15 +34,18 @@ function Course({
+     course,
+   ].filter(element => element != null).map(element => element.title);
+ 
+-  useOfferAlert(courseId);
+-  useAccessExpirationAlert(courseId);
+-
+   const {
+     canShowUpgradeSock,
+     celebrations,
++    courseExpiredMessage,
++    offerHtml,
+     verifiedMode,
+   } = course;
+ 
++  // Below the tabs, above the breadcrumbs alerts (appearing in the order listed here)
++  const offerAlert = useOfferAlert(offerHtml, 'course');
++  const accessExpirationAlert = useAccessExpirationAlert(courseExpiredMessage, 'course');
++
+   const dispatch = useDispatch();
+   const celebrateFirstSection = celebrations && celebrations.firstSection;
+   const celebrationOpen = shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFirstSection, dispatch);
+@@ -63,8 +59,8 @@ function Course({
+         className="my-3"
+         topic="course"
+         customAlerts={{
+-          clientAccessExpirationAlert: AccessExpirationAlert,
+-          clientOfferAlert: OfferAlert,
++          ...accessExpirationAlert,
++          ...offerAlert,
+         }}
+       />
+       <CourseBreadcrumbs
+-- 
+2.34.1
+

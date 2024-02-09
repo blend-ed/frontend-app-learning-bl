@@ -1,0 +1,294 @@
+From a19903c0b1041eb74a09046d75d7c48757e67cc8 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Wed, 15 Jan 2020 12:00:29 -0500
+Subject: [PATCH 0036/1021] Route and breadcrumb cleanup.
+
+---
+ src/index.jsx                                 |  4 +-
+ src/learning-sequence/CourseContainer.jsx     | 25 ++++----
+ .../LearningSequencePage.jsx                  | 33 ++++-------
+ src/learning-sequence/course/Course.jsx       | 30 ++++------
+ .../course/CourseBreadcrumb.jsx               | 25 ++++++++
+ .../course/CourseBreadcrumbs.jsx              | 57 ++++++++++---------
+ 6 files changed, 93 insertions(+), 81 deletions(-)
+ create mode 100644 src/learning-sequence/course/CourseBreadcrumb.jsx
+
+diff --git a/src/index.jsx b/src/index.jsx
+index f9fdda3..dbff9c9 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -31,9 +31,7 @@ subscribe(APP_READY, () => {
+           path="/"
+           render={() => <Link to="/course/course-v1%3AedX%2BDemoX%2BDemo_Course/block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction/block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0270f6de40fc">Visit Demo Course</Link>}
+         />
+-        <Route path="/course/:courseUsageKey/:sequenceId/:unitId" component={LearningSequencePage} />
+-        <Route path="/course/:courseUsageKey/:sequenceId" component={LearningSequencePage} />
+-        <Route path="/course/:courseUsageKey" component={LearningSequencePage} />
++        <Route path="/course" component={LearningSequencePage} />
+       </Switch>
+       <Footer />
+     </AppProvider>,
+diff --git a/src/learning-sequence/CourseContainer.jsx b/src/learning-sequence/CourseContainer.jsx
+index 34d44cf..de66f81 100644
+--- a/src/learning-sequence/CourseContainer.jsx
++++ b/src/learning-sequence/CourseContainer.jsx
+@@ -48,9 +48,13 @@ function useLoadCourse(courseUsageKey) {
+ }
+ 
+ 
+-function CourseContainer({
+-  courseUsageKey, sequenceId, unitId, intl,
+-}) {
++function CourseContainer(props) {
++  const { intl, match } = props;
++  const {
++    courseUsageKey,
++    sequenceId,
++    unitId,
++  } = match.params;
+   const { models, courseId } = useLoadCourse(courseUsageKey);
+ 
+   useEffect(() => {
+@@ -81,15 +85,14 @@ function CourseContainer({
+ }
+ 
+ CourseContainer.propTypes = {
+-  courseUsageKey: PropTypes.string.isRequired,
+-  sequenceId: PropTypes.string,
+-  unitId: PropTypes.string,
+   intl: intlShape.isRequired,
+-};
+-
+-CourseContainer.defaultProps = {
+-  sequenceId: null,
+-  unitId: null,
++  match: PropTypes.shape({
++    params: PropTypes.shape({
++      courseUsageKey: PropTypes.string.isRequired,
++      sequenceId: PropTypes.string,
++      unitId: PropTypes.string,
++    }).isRequired,
++  }).isRequired,
+ };
+ 
+ export default injectIntl(CourseContainer);
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+index 742b81e..cb6e4e1 100644
+--- a/src/learning-sequence/LearningSequencePage.jsx
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -1,30 +1,19 @@
+ import React from 'react';
+-import PropTypes from 'prop-types';
++import { Switch, Route } from 'react-router';
+ 
+ import CourseContainer from './CourseContainer';
+ 
+-export default function LearningSequencePage({ match }) {
+-  const {
+-    courseUsageKey,
+-    sequenceId,
+-    unitId,
+-  } = match.params;
+-
++export default function LearningSequencePage() {
++  // In spirit, we determine which sort of course we're rendering here based on the URL parameters.
++  // Currently we only have one type, so this file doesn't have much to do.
+   return (
+-    <CourseContainer
+-      courseUsageKey={courseUsageKey}
+-      sequenceId={sequenceId}
+-      unitId={unitId}
++    <Route
++      path={[
++        '/course/:courseUsageKey/:sequenceId/:unitId',
++        '/course/:courseUsageKey/:sequenceId',
++        '/course/:courseUsageKey',
++       ]}
++      component={CourseContainer}
+     />
+   );
+ }
+-
+-LearningSequencePage.propTypes = {
+-  match: PropTypes.shape({
+-    params: PropTypes.shape({
+-      courseUsageKey: PropTypes.string.isRequired,
+-      sequenceId: PropTypes.string,
+-      unitId: PropTypes.string,
+-    }).isRequired,
+-  }).isRequired,
+-};
+diff --git a/src/learning-sequence/course/Course.jsx b/src/learning-sequence/course/Course.jsx
+index 6e7d7ef..c21fa17 100644
+--- a/src/learning-sequence/course/Course.jsx
++++ b/src/learning-sequence/course/Course.jsx
+@@ -1,6 +1,6 @@
+-import React, { useMemo, useCallback } from 'react';
++import React, { useCallback } from 'react';
+ import PropTypes from 'prop-types';
+-import { getConfig, history } from '@edx/frontend-platform';
++import { history } from '@edx/frontend-platform';
+ 
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import SequenceContainer from './SequenceContainer';
+@@ -9,21 +9,6 @@ import { createSequenceIdList } from '../utils';
+ export default function Course({
+   courseUsageKey, courseId, sequenceId, unitId, models,
+ }) {
+-  const breadcrumbs = useMemo(() => {
+-    const sectionId = models[sequenceId].parentId;
+-    if (!unitId) {
+-      return [];
+-    }
+-    return [courseId, sectionId, sequenceId, unitId].map((nodeId) => {
+-      const node = models[nodeId];
+-      return {
+-        id: node.id,
+-        label: node.displayName,
+-        url: `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/#${node.id}`,
+-      };
+-    });
+-  }, [courseUsageKey, courseId, sequenceId, unitId, models]);
+-
+   const nextSequenceHandler = useCallback(() => {
+     const sequenceIds = createSequenceIdList(models, courseId);
+     const currentIndex = sequenceIds.indexOf(sequenceId);
+@@ -48,7 +33,13 @@ export default function Course({
+ 
+   return (
+     <main className="container-fluid d-flex flex-column flex-grow-1">
+-      <CourseBreadcrumbs links={breadcrumbs} />
++      <CourseBreadcrumbs
++        courseUsageKey={courseUsageKey}
++        courseId={courseId}
++        sequenceId={sequenceId}
++        unitId={unitId}
++        models={models}
++      />
+       <SequenceContainer
+         key={sequenceId}
+         courseUsageKey={courseUsageKey}
+@@ -71,10 +62,11 @@ Course.propTypes = {
+   models: PropTypes.objectOf(PropTypes.shape({
+     id: PropTypes.string.isRequired,
+     displayName: PropTypes.string.isRequired,
++    children: PropTypes.arrayOf(PropTypes.string),
++    parentId: PropTypes.string,
+   })).isRequired,
+ };
+ 
+ Course.defaultProps = {
+-  sequenceId: null,
+   unitId: null,
+ };
+diff --git a/src/learning-sequence/course/CourseBreadcrumb.jsx b/src/learning-sequence/course/CourseBreadcrumb.jsx
+new file mode 100644
+index 0000000..a758594
+--- /dev/null
++++ b/src/learning-sequence/course/CourseBreadcrumb.jsx
+@@ -0,0 +1,25 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
++
++export default function CourseBreadcrumb({ url, label, last }) {
++  return (
++    <React.Fragment key={`${label}-${url}`}>
++      <li className="list-inline-item">
++        {last ? label : (<a href={url}>{label}</a>)}
++      </li>
++      {!last &&
++        <li className="list-inline-item" role="presentation" aria-label="spacer">
++          <FontAwesomeIcon icon={faChevronRight} />
++        </li>
++      }
++    </React.Fragment>
++  );
++}
++
++CourseBreadcrumb.propTypes = {
++  url: PropTypes.string.isRequired,
++  label: PropTypes.string.isRequired,
++  last: PropTypes.bool.isRequired,
++};
+diff --git a/src/learning-sequence/course/CourseBreadcrumbs.jsx b/src/learning-sequence/course/CourseBreadcrumbs.jsx
+index 5ee1da5..98e1fb6 100644
+--- a/src/learning-sequence/course/CourseBreadcrumbs.jsx
++++ b/src/learning-sequence/course/CourseBreadcrumbs.jsx
+@@ -1,10 +1,27 @@
+-import React from 'react';
++import React, { useMemo } from 'react';
+ import PropTypes from 'prop-types';
++import { getConfig } from '@edx/frontend-platform';
+ 
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
++import CourseBreadcrumb from './CourseBreadcrumb';
++
++export default function CourseBreadcrumbs({
++  courseUsageKey, courseId, sequenceId, unitId, models,
++}) {
++  const links = useMemo(() => {
++    const sectionId = models[sequenceId].parentId;
++    if (!unitId) {
++      return [];
++    }
++    return [courseId, sectionId, sequenceId, unitId].map((nodeId) => {
++      const node = models[nodeId];
++      return {
++        id: node.id,
++        label: node.displayName,
++        url: `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/#${node.id}`,
++      };
++    });
++  }, [courseUsageKey, courseId, sequenceId, unitId, models]);
+ 
+-export default function CourseBreadcrumbs({ links }) {
+   return (
+     <nav aria-label="breadcrumb">
+       <ol className="list-inline">
+@@ -17,30 +34,18 @@ export default function CourseBreadcrumbs({ links }) {
+ }
+ 
+ CourseBreadcrumbs.propTypes = {
+-  links: PropTypes.arrayOf(PropTypes.shape({
++  courseUsageKey: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
++  sequenceId: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
++  models: PropTypes.objectOf(PropTypes.shape({
+     id: PropTypes.string.isRequired,
+-    label: PropTypes.string.isRequired,
+-    url: PropTypes.string.isRequired,
++    displayName: PropTypes.string.isRequired,
++    children: PropTypes.arrayOf(PropTypes.string),
++    parentId: PropTypes.string,
+   })).isRequired,
+ };
+ 
+-function CourseBreadcrumb({ url, label, last }) {
+-  return (
+-    <React.Fragment key={`${label}-${url}`}>
+-      <li className="list-inline-item">
+-        {last ? label : (<a href={url}>{label}</a>)}
+-      </li>
+-      {!last &&
+-        <li className="list-inline-item" role="presentation" aria-label="spacer">
+-          <FontAwesomeIcon icon={faChevronRight} />
+-        </li>
+-      }
+-    </React.Fragment>
+-  );
+-}
+-
+-CourseBreadcrumb.propTypes = {
+-  url: PropTypes.string.isRequired,
+-  label: PropTypes.string.isRequired,
+-  last: PropTypes.bool.isRequired,
++CourseBreadcrumbs.defaultProps = {
++  unitId: null,
+ };
+-- 
+2.34.1
+

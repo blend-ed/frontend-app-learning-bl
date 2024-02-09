@@ -1,0 +1,44 @@
+From ed55920f993337c0c7d1a12bba392aecee0f366d Mon Sep 17 00:00:00 2001
+From: Viktor Rusakov <52399399+ViktorRusakov@users.noreply.github.com>
+Date: Tue, 6 Jul 2021 20:02:29 +0300
+Subject: [PATCH 0523/1021] refactor: place all logic regarding special exam
+ redirect into single function (#521)
+
+---
+ src/courseware/CoursewareContainer.jsx | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 05982cc..e8376fe 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -59,9 +59,11 @@ const checkUnitToSequenceUnitRedirect = memoize((courseStatus, courseId, sequenc
+   }
+ });
+ 
+-const checkSpecialExamRedirect = memoize((sequenceStatus, sequence) => {
++const checkSpecialExamRedirect = memoize((sequenceStatus, sequence, specialExamsEnabled, proctoredExamsEnabled) => {
+   if (sequenceStatus === 'loaded') {
+-    if (sequence.isTimeLimited && sequence.legacyWebUrl !== undefined) {
++    const shouldRedirectTimeLimited = sequence.isTimeLimited && !specialExamsEnabled;
++    const shouldRedirectProctored = sequence.isProctored && !proctoredExamsEnabled;
++    if ((shouldRedirectTimeLimited || shouldRedirectProctored) && sequence.legacyWebUrl !== undefined) {
+       global.location.assign(sequence.legacyWebUrl);
+     }
+   }
+@@ -178,11 +180,7 @@ class CoursewareContainer extends Component {
+     // Check special exam redirect:
+     //    /course/:courseId/:sequenceId(/:unitId) -> :legacyWebUrl
+     // because special exams are currently still served in the legacy LMS frontend.
+-    const shouldRedirectProctoredExams = specialExamsEnabledWaffleFlag && sequence.isProctored
+-      && !proctoredExamsEnabledWaffleFlag;
+-    if (!specialExamsEnabledWaffleFlag || shouldRedirectProctoredExams) {
+-      checkSpecialExamRedirect(sequenceStatus, sequence);
+-    }
++    checkSpecialExamRedirect(sequenceStatus, sequence, specialExamsEnabledWaffleFlag, proctoredExamsEnabledWaffleFlag);
+ 
+     // Check to sequence to sequence-unit redirect:
+     //    /course/:courseId/:sequenceId -> /course/:courseId/:sequenceId/:unitId
+-- 
+2.34.1
+

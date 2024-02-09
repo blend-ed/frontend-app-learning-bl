@@ -1,0 +1,49 @@
+From 7c4200e9d36adc5b778fff23cee999789462f566 Mon Sep 17 00:00:00 2001
+From: Abderraouf Mehdi Bouhali <armbouhali@gmail.com>
+Date: Fri, 14 Oct 2022 17:49:37 +0100
+Subject: [PATCH 0933/1021] fix(rtl): mirror position of grade rectangles in
+ grade bar (#980)
+
+Translates the rectangles for current and passing
+grades when to appear on the right when in RTL.
+---
+ .../progress-tab/grades/course-grade/GradeBar.jsx      | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index fb8b707..a0f72eb 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -2,7 +2,9 @@ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ 
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  getLocale, injectIntl, intlShape, isRtl,
++} from '@edx/frontend-platform/i18n';
+ import { useModel } from '../../../../generic/model-store';
+ import CurrentGradeTooltip from './CurrentGradeTooltip';
+ import PassingGradeTooltip from './PassingGradeTooltip';
+@@ -26,14 +28,16 @@ function GradeBar({ intl, passingGrade }) {
+ 
+   const lockedTooltipClassName = gradesFeatureIsFullyLocked ? 'locked-overlay' : '';
+ 
++  const adjustedRtlStyle = (percentOffest) => (isRtl(getLocale()) ? { transform: `translateX(${100 - percentOffest}%)` } : {});
++
+   return (
+     <div className="col-12 col-sm-6 align-self-center p-0">
+       <div className="sr-only">{intl.formatMessage(messages.courseGradeBarAltText, { currentGrade, passingGrade })}</div>
+       <svg width="100%" height="100px" className="grade-bar" aria-hidden="true">
+         <g style={{ transform: 'translateY(2.61em)' }}>
+           <rect className="grade-bar__base" width="100%" />
+-          <rect className="grade-bar--passing" width={`${passingGrade}%`} />
+-          <rect className={`grade-bar--current-${isPassing ? 'passing' : 'non-passing'}`} width={`${currentGrade}%`} />
++          <rect className="grade-bar--passing" width={`${passingGrade}%`} style={adjustedRtlStyle(passingGrade)} />
++          <rect className={`grade-bar--current-${isPassing ? 'passing' : 'non-passing'}`} width={`${currentGrade}%`} style={adjustedRtlStyle(currentGrade)} />
+ 
+           {/* Start divider */}
+           <rect className="grade-bar__divider" />
+-- 
+2.34.1
+

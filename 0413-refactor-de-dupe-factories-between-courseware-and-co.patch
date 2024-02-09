@@ -1,0 +1,813 @@
+From 4d1ed0f357d50f6d46173658cf1333cb5400fd00 Mon Sep 17 00:00:00 2001
+From: Kyle McCormick <kmccormick@edx.org>
+Date: Mon, 29 Mar 2021 16:05:51 -0400
+Subject: [PATCH 0413/1021] refactor: de-dupe factories between courseware and
+ course-home  (#400)
+
+---
+ .../__factories__/courseBlocks.factory.js     | 94 -------------------
+ .../courseHomeMetadata.factory.js             | 86 +----------------
+ .../__factories__/outlineTabData.factory.js   |  4 +-
+ .../data/__snapshots__/redux.test.js.snap     |  2 -
+ src/course-home/data/redux.test.js            |  2 +-
+ src/course-home/dates-tab/DatesTab.test.jsx   |  4 +-
+ .../outline-tab/OutlineTab.test.jsx           | 16 ++--
+ src/courseware/CoursewareContainer.test.jsx   |  2 +-
+ .../course/course-exit/CourseExit.test.jsx    |  2 +-
+ .../data/__factories__/block.factory.js       | 54 -----------
+ .../__factories__/courseMetadata.factory.js   | 82 +---------------
+ src/courseware/data/__factories__/index.js    |  2 -
+ .../__factories__/sequenceMetadata.factory.js |  4 +-
+ src/courseware/data/redux.test.js             |  2 +-
+ .../data/__factories__/block.factory.js       |  0
+ .../__factories__/courseBlocks.factory.js     | 47 +++++++++-
+ .../courseMetadataBase.factory.js             | 83 ++++++++++++++++
+ src/shared/data/__factories__/index.js        |  4 +
+ .../data/__factories__/tab.factory.js         |  6 +-
+ 19 files changed, 163 insertions(+), 333 deletions(-)
+ delete mode 100644 src/course-home/data/__factories__/courseBlocks.factory.js
+ delete mode 100644 src/courseware/data/__factories__/block.factory.js
+ rename src/{course-home => shared}/data/__factories__/block.factory.js (100%)
+ rename src/{courseware => shared}/data/__factories__/courseBlocks.factory.js (69%)
+ create mode 100644 src/shared/data/__factories__/courseMetadataBase.factory.js
+ create mode 100644 src/shared/data/__factories__/index.js
+ rename src/{courseware => shared}/data/__factories__/tab.factory.js (63%)
+
+diff --git a/src/course-home/data/__factories__/courseBlocks.factory.js b/src/course-home/data/__factories__/courseBlocks.factory.js
+deleted file mode 100644
+index a670889..0000000
+--- a/src/course-home/data/__factories__/courseBlocks.factory.js
++++ /dev/null
+@@ -1,94 +0,0 @@
+-import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+-import './block.factory';
+-
+-// Generates an Array of block IDs, either from a single block or an array of blocks.
+-const getIds = (attr) => {
+-  const blocks = Array.isArray(attr) ? attr : [attr];
+-  return blocks.map(block => block.id);
+-};
+-
+-// Generates an Object in { [block.id]: block } format, either from a single block or an array of blocks.
+-const getBlocks = (attr) => {
+-  const blocks = Array.isArray(attr) ? attr : [attr];
+-  // eslint-disable-next-line no-return-assign,no-sequences
+-  return blocks.reduce((acc, block) => (acc[block.id] = block, acc), {});
+-};
+-
+-Factory.define('courseBlocks')
+-  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+-  .option('units', ['courseId'], courseId => ([
+-    Factory.build(
+-      'block',
+-      { type: 'vertical' },
+-      { courseId },
+-    ),
+-  ]))
+-  .option('sequence', ['courseId', 'units'], (courseId, child) => Factory.build(
+-    'block',
+-    { type: 'sequential', children: getIds(child) },
+-    { courseId },
+-  ))
+-  .option('section', ['courseId', 'sequence'], (courseId, child) => Factory.build(
+-    'block',
+-    { type: 'chapter', children: getIds(child) },
+-    { courseId },
+-  ))
+-  .option('course', ['courseId', 'section'], (courseId, child) => Factory.build(
+-    'block',
+-    { type: 'course', children: getIds(child) },
+-    { courseId },
+-  ))
+-  .attr(
+-    'blocks',
+-    ['course', 'section', 'sequence', 'units'],
+-    (course, section, sequence, units) => ({
+-      [course.id]: course,
+-      ...getBlocks(section),
+-      ...getBlocks(sequence),
+-      ...getBlocks(units),
+-    }),
+-  )
+-  .attr('root', ['course'], course => course.id);
+-
+-/**
+- * Builds a course with a single chapter, sequence, and unit.
+- */
+-export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
+-  const sequenceBlock = options.sequenceBlock || [Factory.build(
+-    'block',
+-    { display_name: 'Title of Sequence', type: 'sequential' },
+-    { courseId },
+-  )];
+-  const sectionBlock = options.sectionBlock || Factory.build(
+-    'block',
+-    {
+-      type: 'chapter',
+-      display_name: 'Title of Section',
+-      complete: options.complete || false,
+-      effort_time: 15,
+-      effort_activities: 2,
+-      resume_block: options.resumeBlock || false,
+-      children: sequenceBlock.map(block => block.id),
+-    },
+-    { courseId },
+-  );
+-  const courseBlock = options.courseBlock || Factory.build(
+-    'block',
+-    { type: 'course', display_name: title, children: [sectionBlock.id] },
+-    { courseId },
+-  );
+-  return {
+-    courseBlocks: options.courseBlocks || Factory.build(
+-      'courseBlocks',
+-      { courseId },
+-      {
+-        sequence: sequenceBlock,
+-        section: sectionBlock,
+-        course: courseBlock,
+-      },
+-    ),
+-    sequenceBlock,
+-    sectionBlock,
+-    courseBlock,
+-  };
+-}
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 9d7bc72..00a2b3c 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -1,91 +1,13 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ 
++import courseMetadataBase from '../../../shared/data/__factories__/courseMetadataBase.factory';
++
+ Factory.define('courseHomeMetadata')
+-  .sequence(
+-    'courseId', (courseId) => `course-v1:edX+DemoX+Demo_Course_${courseId}`,
+-  )
++  .extend(courseMetadataBase)
+   .option('host', 'http://localhost:18000')
+   .attrs({
+-    is_staff: false,
+-    original_user_is_staff: false,
+-    number: 'DemoX',
+-    org: 'edX',
+     title: 'Demonstration Course',
+     is_self_paced: false,
+     is_enrolled: false,
+     can_load_courseware: false,
+-  })
+-  .attr(
+-    'tabs', ['courseId', 'host'], (courseId, host) => {
+-      const tabs = [
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Course',
+-            priority: 0,
+-            slug: 'courseware',
+-            type: 'courseware',
+-          },
+-          { courseId, path: 'course/' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Discussion',
+-            priority: 1,
+-            slug: 'discussion',
+-            type: 'discussion',
+-          },
+-          { courseId, path: 'discussion/forum/' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Wiki',
+-            priority: 2,
+-            slug: 'wiki',
+-            type: 'wiki',
+-          },
+-          { courseId, path: 'course_wiki' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Progress',
+-            priority: 3,
+-            slug: 'progress',
+-            type: 'progress',
+-          },
+-          { courseId, path: 'progress' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Instructor',
+-            priority: 4,
+-            slug: 'instructor',
+-            type: 'instructor',
+-          },
+-          { courseId, path: 'instructor' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Dates',
+-            priority: 5,
+-            slug: 'dates',
+-            type: 'dates',
+-          },
+-          { courseId, path: 'dates' },
+-        ),
+-      ];
+-
+-      return tabs.map(
+-        tab => ({
+-          tab_id: tab.slug,
+-          title: tab.title,
+-          url: `${host}${tab.url}`,
+-        }),
+-      );
+-    },
+-  );
++  });
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 615033c..0126a4e 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -1,13 +1,13 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ 
+-import buildSimpleCourseBlocks from './courseBlocks.factory';
++import { buildMinimalCourseBlocks } from '../../../shared/data/__factories__/courseBlocks.factory';
+ 
+ Factory.define('outlineTabData')
+   .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+   .option('host', 'http://localhost:18000')
+   .option('date_blocks', [])
+   .attr('course_blocks', ['courseId'], courseId => {
+-    const { courseBlocks } = buildSimpleCourseBlocks(courseId);
++    const { courseBlocks } = buildMinimalCourseBlocks(courseId);
+     return {
+       blocks: courseBlocks.blocks,
+     };
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 3aca4ca..b2c6602 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -19,7 +19,6 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "canLoadCourseware": false,
+-        "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "isEnrolled": false,
+         "isSelfPaced": false,
+@@ -308,7 +307,6 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "canLoadCourseware": false,
+-        "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "isEnrolled": false,
+         "isSelfPaced": false,
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index d422d97..1b9760c 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -17,7 +17,7 @@ const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+ 
+ describe('Data layer integration tests', () => {
+   const courseHomeMetadata = Factory.build('courseHomeMetadata');
+-  const { courseId } = courseHomeMetadata;
++  const { id: courseId } = courseHomeMetadata;
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index b89e419..d56ed4f 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -63,7 +63,7 @@ describe('DatesTab', () => {
+     beforeEach(() => {
+       const datesTabData = Factory.build('datesTabData');
+       const courseMetadata = Factory.build('courseHomeMetadata');
+-      const { courseId } = courseMetadata;
++      const { id: courseId } = courseMetadata;
+       let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
+       courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
+@@ -135,7 +135,7 @@ describe('DatesTab', () => {
+ 
+   describe('Dates banner container ', () => {
+     const courseMetadata = Factory.build('courseHomeMetadata', { is_self_paced: true, is_enrolled: true });
+-    const { courseId } = courseMetadata;
++    const { id: courseId } = courseMetadata;
+     const datesTabData = Factory.build('datesTabData');
+ 
+     let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 38336cc..e12c8d1 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -6,7 +6,7 @@ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import MockAdapter from 'axios-mock-adapter';
+ import userEvent from '@testing-library/user-event';
+ 
+-import buildSimpleCourseBlocks from '../data/__factories__/courseBlocks.factory';
++import { buildMinimalCourseBlocks } from '../../shared/data/__factories__/courseBlocks.factory';
+ import {
+   fireEvent, initializeMockApp, logUnhandledRequests, render, screen, waitFor, act,
+ } from '../../setupTest';
+@@ -30,11 +30,11 @@ describe('Outline Tab', () => {
+   const proctoringInfoUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?course_id=${encodeURIComponent(courseId)}`;
+ 
+   const store = initializeStore();
+-  const defaultMetadata = Factory.build('courseHomeMetadata', { courseId });
++  const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+   const defaultTabData = Factory.build('outlineTabData');
+ 
+   function setMetadata(attributes, options) {
+-    const courseMetadata = Factory.build('courseHomeMetadata', { courseId, ...attributes }, options);
++    const courseMetadata = Factory.build('courseHomeMetadata', { id: courseId, ...attributes }, options);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+   }
+ 
+@@ -83,7 +83,7 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('expands section that contains resume block', async () => {
+-      const { courseBlocks } = await buildSimpleCourseBlocks(courseId, 'Title', { resumeBlock: true });
++      const { courseBlocks } = await buildMinimalCourseBlocks(courseId, 'Title', { resumeBlock: true });
+       setTabData({
+         course_blocks: { blocks: courseBlocks.blocks },
+       });
+@@ -112,7 +112,7 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('displays correct icon for complete assignment', async () => {
+-      const { courseBlocks } = await buildSimpleCourseBlocks(courseId, 'Title', { complete: true });
++      const { courseBlocks } = await buildMinimalCourseBlocks(courseId, 'Title', { complete: true });
+       setTabData({
+         course_blocks: { blocks: courseBlocks.blocks },
+       });
+@@ -121,7 +121,7 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('displays correct icon for incomplete assignment', async () => {
+-      const { courseBlocks } = await buildSimpleCourseBlocks(courseId, 'Title', { complete: false });
++      const { courseBlocks } = await buildMinimalCourseBlocks(courseId, 'Title', { complete: false });
+       setTabData({
+         course_blocks: { blocks: courseBlocks.blocks },
+       });
+@@ -130,7 +130,7 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('SequenceLink displays points to legacy courseware', async () => {
+-      const { courseBlocks } = await buildSimpleCourseBlocks(courseId, 'Title', { resumeBlock: true });
++      const { courseBlocks } = await buildMinimalCourseBlocks(courseId, 'Title', { resumeBlock: true });
+       setMetadata({
+         can_load_courseware: false,
+       });
+@@ -144,7 +144,7 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('SequenceLink displays points to courseware MFE', async () => {
+-      const { courseBlocks } = await buildSimpleCourseBlocks(courseId, 'Title', { resumeBlock: true });
++      const { courseBlocks } = await buildMinimalCourseBlocks(courseId, 'Title', { resumeBlock: true });
+       setMetadata({
+         can_load_courseware: true,
+       });
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 59a0e24..647ebd4 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -14,7 +14,7 @@ import tabMessages from '../tab-page/messages';
+ import { initializeMockApp } from '../setupTest';
+ 
+ import CoursewareContainer from './CoursewareContainer';
+-import buildSimpleCourseBlocks from './data/__factories__/courseBlocks.factory';
++import { buildSimpleCourseBlocks } from '../shared/data/__factories__/courseBlocks.factory';
+ import initializeStore from '../store';
+ import { appendBrowserTimezoneToUrl } from '../utils';
+ 
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index b4f4935..24c36a5 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -5,7 +5,7 @@ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ 
+ import { fetchCourse } from '../../data';
+-import buildSimpleCourseBlocks from '../../data/__factories__/courseBlocks.factory';
++import { buildSimpleCourseBlocks } from '../../../shared/data/__factories__/courseBlocks.factory';
+ import {
+   initializeMockApp, logUnhandledRequests, render, screen,
+ } from '../../../setupTest';
+diff --git a/src/courseware/data/__factories__/block.factory.js b/src/courseware/data/__factories__/block.factory.js
+deleted file mode 100644
+index 915dc9b..0000000
+--- a/src/courseware/data/__factories__/block.factory.js
++++ /dev/null
+@@ -1,54 +0,0 @@
+-import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+-
+-Factory.define('block')
+-  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+-  .option('host', 'http://localhost:18000')
+-  // Generating block_id that is similar to md5 hash, but still deterministic
+-  .sequence('block_id', id => ('abcd'.repeat(8) + id).slice(-32))
+-  .attrs({
+-    graded: false,
+-    type: 'course',
+-    children: [],
+-  })
+-  .attr('display_name', ['display_name', 'block_id'], (displayName, blockId) => {
+-    if (displayName) {
+-      return displayName;
+-    }
+-
+-    return blockId;
+-  })
+-  .attr(
+-    'id',
+-    ['id', 'block_id', 'type', 'courseId'],
+-    (id, blockId, type, courseId) => {
+-      if (id) {
+-        return id;
+-      }
+-
+-      const courseInfo = courseId.split(':')[1];
+-
+-      return `block-v1:${courseInfo}+type@${type}+block@${blockId}`;
+-    },
+-  )
+-  .attr(
+-    'student_view_url',
+-    ['student_view_url', 'host', 'id'],
+-    (url, host, id) => {
+-      if (url) {
+-        return url;
+-      }
+-
+-      return `${host}/xblock/${id}`;
+-    },
+-  )
+-  .attr(
+-    'lms_web_url',
+-    ['lms_web_url', 'host', 'courseId', 'id'],
+-    (url, host, courseId, id) => {
+-      if (url) {
+-        return url;
+-      }
+-
+-      return `${host}/courses/${courseId}/jump_to/${id}`;
+-    },
+-  );
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index bf7a1af..9274f85 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -1,9 +1,10 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ 
+-import './tab.factory';
++import courseMetadataBase from '../../../shared/data/__factories__/courseMetadataBase.factory';
+ 
+ Factory.define('courseMetadata')
+-  .sequence('id', (id) => `course-v1:edX+DemoX+Demo_Course_${id}`)
++  .extend(courseMetadataBase)
++  .option('host', '')
+   .attrs({
+     can_show_upgrade_sock: false,
+     content_type_gating_enabled: false,
+@@ -13,9 +14,7 @@ Factory.define('courseMetadata')
+     enrollment_start: null,
+     enrollment_end: null,
+     name: 'Demonstration Course',
+-    number: 'DemoX',
+     offer_html: null,
+-    org: 'edX',
+     short_description: null,
+     start: '2013-02-05T05:00:00Z',
+     start_display: 'Feb. 5, 2013',
+@@ -34,8 +33,6 @@ Factory.define('courseMetadata')
+       currency_symbol: '$',
+     },
+     show_calculator: false,
+-    is_staff: false,
+-    original_user_is_staff: false,
+     license: 'all-rights-reserved',
+     can_load_courseware: {
+       has_access: true,
+@@ -59,75 +56,4 @@ Factory.define('courseMetadata')
+     verification_status: 'none',
+     linkedin_add_to_profile_url: null,
+     related_programs: null,
+-  }).attr(
+-    'tabs', ['tabs', 'id'], (passedTabs, id) => {
+-      if (passedTabs) {
+-        return passedTabs;
+-      }
+-
+-      const tabs = [
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Course',
+-            priority: 0,
+-            slug: 'courseware',
+-            type: 'courseware',
+-          },
+-          { courseId: id, path: 'course/' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Discussion',
+-            priority: 1,
+-            slug: 'discussion',
+-            type: 'discussion',
+-          },
+-          { courseId: id, path: 'discussion/forum/' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Wiki',
+-            priority: 2,
+-            slug: 'wiki',
+-            type: 'wiki',
+-          },
+-          { courseId: id, path: 'course_wiki' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Progress',
+-            priority: 3,
+-            slug: 'progress',
+-            type: 'progress',
+-          },
+-          { courseId: id, path: 'progress' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Instructor',
+-            priority: 4,
+-            slug: 'instructor',
+-            type: 'instructor',
+-          },
+-          { courseId: id, path: 'instructor' },
+-        ),
+-        Factory.build(
+-          'tab',
+-          {
+-            title: 'Dates',
+-            priority: 5,
+-            slug: 'dates',
+-            type: 'dates',
+-          },
+-          { courseId: id, path: 'dates' },
+-        ),
+-      ];
+-
+-      return tabs;
+-    },
+-  );
++  });
+diff --git a/src/courseware/data/__factories__/index.js b/src/courseware/data/__factories__/index.js
+index 08cc70a..e8f3e04 100644
+--- a/src/courseware/data/__factories__/index.js
++++ b/src/courseware/data/__factories__/index.js
+@@ -1,4 +1,2 @@
+-import './block.factory';
+-import './courseBlocks.factory';
+ import './courseMetadata.factory';
+ import './sequenceMetadata.factory';
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index 54d1ba7..d42ac05 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -1,6 +1,6 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+-import './block.factory';
+-import buildSimpleCourseBlocks from './courseBlocks.factory';
++import '../../../shared/data/__factories__/block.factory';
++import { buildSimpleCourseBlocks } from '../../../shared/data/__factories__/courseBlocks.factory';
+ 
+ Factory.define('sequenceMetadata')
+   .option('courseId', (courseId) => {
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index 17d29e5..2820c31 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -8,7 +8,7 @@ import * as thunks from './thunks';
+ 
+ import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
+ 
+-import buildSimpleCourseBlocks from './__factories__/courseBlocks.factory';
++import { buildSimpleCourseBlocks } from '../../shared/data/__factories__/courseBlocks.factory';
+ import { initializeMockApp } from '../../setupTest';
+ import initializeStore from '../../store';
+ 
+diff --git a/src/course-home/data/__factories__/block.factory.js b/src/shared/data/__factories__/block.factory.js
+similarity index 100%
+rename from src/course-home/data/__factories__/block.factory.js
+rename to src/shared/data/__factories__/block.factory.js
+diff --git a/src/courseware/data/__factories__/courseBlocks.factory.js b/src/shared/data/__factories__/courseBlocks.factory.js
+similarity index 69%
+rename from src/courseware/data/__factories__/courseBlocks.factory.js
+rename to src/shared/data/__factories__/courseBlocks.factory.js
+index 46d2810..e5a1229 100644
+--- a/src/courseware/data/__factories__/courseBlocks.factory.js
++++ b/src/shared/data/__factories__/courseBlocks.factory.js
+@@ -53,7 +53,7 @@ Factory.define('courseBlocks')
+ /**
+  * Builds a course with a single chapter, sequence, and unit.
+  */
+-export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
++export function buildSimpleCourseBlocks(courseId, title, options = {}) {
+   const unitBlocks = options.unitBlocks || [Factory.build(
+     'block',
+     { type: 'vertical' },
+@@ -95,3 +95,48 @@ export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
+     courseBlock,
+   };
+ }
++
++/**
++ * Builds a course with a single chapter and sequence, but no units.
++ */
++export function buildMinimalCourseBlocks(courseId, title, options = {}) {
++  const sequenceBlock = options.sequenceBlock || [Factory.build(
++    'block',
++    { display_name: 'Title of Sequence', type: 'sequential' },
++    { courseId },
++  )];
++  const sectionBlock = options.sectionBlock || Factory.build(
++    'block',
++    {
++      type: 'chapter',
++      display_name: 'Title of Section',
++      complete: options.complete || false,
++      effort_time: 15,
++      effort_activities: 2,
++      resume_block: options.resumeBlock || false,
++      children: sequenceBlock.map(block => block.id),
++    },
++    { courseId },
++  );
++  const courseBlock = options.courseBlock || Factory.build(
++    'block',
++    { type: 'course', display_name: title, children: [sectionBlock.id] },
++    { courseId },
++  );
++  return {
++    courseBlocks: options.courseBlocks || Factory.build(
++      'courseBlocks',
++      { courseId },
++      {
++        sequence: sequenceBlock,
++        section: sectionBlock,
++        course: courseBlock,
++        units: [],
++      },
++    ),
++    unitBlocks: [],
++    sequenceBlock,
++    sectionBlock,
++    courseBlock,
++  };
++}
+diff --git a/src/shared/data/__factories__/courseMetadataBase.factory.js b/src/shared/data/__factories__/courseMetadataBase.factory.js
+new file mode 100644
+index 0000000..a5914b9
+--- /dev/null
++++ b/src/shared/data/__factories__/courseMetadataBase.factory.js
+@@ -0,0 +1,83 @@
++/* A basic course metadata factory, to be specialized in courseware and course-home., */
++
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++import './tab.factory';
++
++export default new Factory()
++  .sequence('id', (i) => `course-v1:edX+DemoX+Demo_Course_${i}`)
++  .option('host')
++  .attrs({
++    is_staff: false,
++    original_user_is_staff: false,
++    number: 'DemoX',
++    org: 'edX',
++  })
++  .attr(
++    'tabs', ['id', 'host'], (id, host) => {
++      const tabs = [
++        Factory.build(
++          'tab',
++          {
++            title: 'Course',
++            priority: 0,
++            slug: 'courseware',
++            type: 'courseware',
++          },
++          { courseId: id, host, path: 'course/' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Discussion',
++            priority: 1,
++            slug: 'discussion',
++            type: 'discussion',
++          },
++          { courseId: id, host, path: 'discussion/forum/' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Wiki',
++            priority: 2,
++            slug: 'wiki',
++            type: 'wiki',
++          },
++          { courseId: id, host, path: 'course_wiki' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Progress',
++            priority: 3,
++            slug: 'progress',
++            type: 'progress',
++          },
++          { courseId: id, host, path: 'progress' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Instructor',
++            priority: 4,
++            slug: 'instructor',
++            type: 'instructor',
++          },
++          { courseId: id, host, path: 'instructor' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Dates',
++            priority: 5,
++            slug: 'dates',
++            type: 'dates',
++          },
++          { courseId: id, host, path: 'dates' },
++        ),
++      ];
++
++      return tabs;
++    },
++  );
+diff --git a/src/shared/data/__factories__/index.js b/src/shared/data/__factories__/index.js
+new file mode 100644
+index 0000000..ab3709c
+--- /dev/null
++++ b/src/shared/data/__factories__/index.js
+@@ -0,0 +1,4 @@
++import './block.factory';
++import './courseBlocks.factory';
++import './courseMetadataBase.factory';
++import './tab.factory';
+diff --git a/src/courseware/data/__factories__/tab.factory.js b/src/shared/data/__factories__/tab.factory.js
+similarity index 63%
+rename from src/courseware/data/__factories__/tab.factory.js
+rename to src/shared/data/__factories__/tab.factory.js
+index 1f5f84e..0868356 100644
+--- a/src/courseware/data/__factories__/tab.factory.js
++++ b/src/shared/data/__factories__/tab.factory.js
+@@ -3,14 +3,16 @@ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dep
+ Factory.define('tab')
+   .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+   .option('path', 'course/')
++  .option('host', 'http://localhost:18000')
+   .attrs({
+     title: 'Course',
+     priority: 0,
+     slug: 'courseware',
+     type: 'courseware',
+   })
++  .attr('tab_id', ['slug'], (slug) => slug)
+   .attr(
+     'url',
+-    ['courseId', 'path'],
+-    (courseId, path) => `/courses/${courseId}/${path}`,
++    ['courseId', 'path', 'host'],
++    (courseId, path, host) => `${host}/courses/${courseId}/${path}`,
+   );
+-- 
+2.34.1
+

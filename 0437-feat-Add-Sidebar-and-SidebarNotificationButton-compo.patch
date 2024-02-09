@@ -1,0 +1,904 @@
+From 28fddc555023727811640f0a4569221604180378 Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Thu, 29 Apr 2021 11:36:55 -0400
+Subject: [PATCH 0437/1021] feat: Add Sidebar and SidebarNotificationButton
+ components for Value Prop (#414)
+
+REV-2125
+---
+ package-lock.json                             |  5 ++
+ package.json                                  |  1 +
+ src/courseware/course/Course.jsx              | 47 ++++++++++--
+ src/courseware/course/Course.test.jsx         | 27 +++++++
+ src/courseware/course/CourseBreadcrumbs.jsx   |  2 +-
+ src/courseware/course/NotificationIcon.jsx    | 28 +++++++
+ src/courseware/course/NotificationIcon.scss   | 15 ++++
+ src/courseware/course/Sidebar.jsx             | 52 +++++++++++++
+ src/courseware/course/Sidebar.scss            | 73 +++++++++++++++++++
+ src/courseware/course/Sidebar.test.jsx        | 58 +++++++++++++++
+ .../course/SidebarNotificationButton.jsx      | 30 ++++++++
+ .../course/SidebarNotificationButton.scss     | 24 ++++++
+ .../course/SidebarNotificationButton.test.jsx | 43 +++++++++++
+ src/courseware/course/messages.js             | 36 +++++++++
+ src/courseware/course/sequence/Sequence.jsx   | 35 ++++++++-
+ .../course/sequence/Sequence.test.jsx         | 11 +++
+ .../SequenceNavigation.jsx                    | 17 +++--
+ src/generic/tabs/useWindowSize.js             | 23 ++++++
+ src/index.scss                                |  4 +
+ 19 files changed, 515 insertions(+), 16 deletions(-)
+ create mode 100644 src/courseware/course/NotificationIcon.jsx
+ create mode 100644 src/courseware/course/NotificationIcon.scss
+ create mode 100644 src/courseware/course/Sidebar.jsx
+ create mode 100644 src/courseware/course/Sidebar.scss
+ create mode 100644 src/courseware/course/Sidebar.test.jsx
+ create mode 100644 src/courseware/course/SidebarNotificationButton.jsx
+ create mode 100644 src/courseware/course/SidebarNotificationButton.scss
+ create mode 100644 src/courseware/course/SidebarNotificationButton.test.jsx
+ create mode 100644 src/courseware/course/messages.js
+
+diff --git a/package-lock.json b/package-lock.json
+index ed895f9..200319f 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -13886,6 +13886,11 @@
+         }
+       }
+     },
++    "js-cookie": {
++      "version": "2.2.1",
++      "resolved": "https://registry.npmjs.org/js-cookie/-/js-cookie-2.2.1.tgz",
++      "integrity": "sha512-HvdH2LzI/EAZcUwA8+0nKNtWHqS+ZmijLA30RwZA0bo7ToCckjK5MkGhjED9KoRcXO6BaGI3I9UIzSA1FKFPOQ=="
++    },
+     "js-tokens": {
+       "version": "4.0.0",
+       "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
+diff --git a/package.json b/package.json
+index 796fac7..c5d75bb 100644
+--- a/package.json
++++ b/package.json
+@@ -48,6 +48,7 @@
+     "@reduxjs/toolkit": "1.3.6",
+     "classnames": "2.2.6",
+     "core-js": "3.6.5",
++    "js-cookie": "2.2.1",
+     "lodash.camelcase": "^4.3.0",
+     "prop-types": "15.7.2",
+     "react": "16.13.1",
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 2220d63..6c2b5f2 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -1,7 +1,8 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import PropTypes from 'prop-types';
+ import { Helmet } from 'react-helmet';
+ import { useDispatch } from 'react-redux';
++import Cookies from 'js-cookie';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+ import { AlertList } from '../../generic/user-messages';
+@@ -13,8 +14,11 @@ import Sequence from './sequence';
+ import { CelebrationModal, shouldCelebrateOnSectionLoad } from './celebration';
+ import ContentTools from './content-tools';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
++import SidebarNotificationButton from './SidebarNotificationButton';
++
+ import CourseSock from '../../generic/course-sock';
+ import { useModel } from '../../generic/model-store';
++import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWindowSize';
+ 
+ /** [MM-P2P] Experiment */
+ import { initCoursewareMMP2P, MMP2PBlockModal } from '../../experiments/mm-p2p';
+@@ -57,6 +61,19 @@ function Course({
+     courseId, sequenceId, unitId, celebrateFirstSection, dispatch, celebrations,
+   );
+ 
++  // REV-2130 TODO: temporary cookie code that should be removed.
++  // In order to see the Value Prop sidebar in prod, a cookie should be set in
++  // the browser console and refresh: document.cookie = 'value_prop_cookie=true';
++  const isValuePropCookieSet = Cookies.get('value_prop_cookie') === 'true';
++
++  const shouldDisplaySidebarButton = useWindowSize().width >= responsiveBreakpoints.small.minWidth;
++
++  const [sidebarVisible, setSidebar] = useState(false);
++  const isSidebarVisible = () => sidebarVisible && setSidebar;
++  const toggleSidebar = () => {
++    if (sidebarVisible) { setSidebar(false); } else { setSidebar(true); }
++  };
++
+   /** [MM-P2P] Experiment */
+   const MMP2P = initCoursewareMMP2P(courseId, sequenceId, unitId);
+ 
+@@ -76,13 +93,23 @@ function Course({
+           }}
+         />
+       )}
+-      <CourseBreadcrumbs
+-        courseId={courseId}
+-        sectionId={section ? section.id : null}
+-        sequenceId={sequenceId}
+-        //* * [MM-P2P] Experiment */
+-        mmp2p={MMP2P}
+-      />
++      <div className="position-relative">
++        <CourseBreadcrumbs
++          courseId={courseId}
++          sectionId={section ? section.id : null}
++          sequenceId={sequenceId}
++          //* * [MM-P2P] Experiment */
++          mmp2p={MMP2P}
++        />
++
++        { isValuePropCookieSet && shouldDisplaySidebarButton ? (
++          <SidebarNotificationButton
++            toggleSidebar={toggleSidebar}
++            isSidebarVisible={isSidebarVisible}
++          />
++        ) : null}
++      </div>
++
+       <AlertList topic="sequence" />
+       <Sequence
+         unitId={unitId}
+@@ -91,6 +118,10 @@ function Course({
+         unitNavigationHandler={unitNavigationHandler}
+         nextSequenceHandler={nextSequenceHandler}
+         previousSequenceHandler={previousSequenceHandler}
++        toggleSidebar={toggleSidebar}
++        isSidebarVisible={isSidebarVisible}
++        sidebarVisible={sidebarVisible}
++        isValuePropCookieSet={isValuePropCookieSet}
+         //* * [MM-P2P] Experiment */
+         mmp2p={MMP2P}
+       />
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 389ce8d..4edd9a1 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -1,5 +1,6 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
++import Cookies from 'js-cookie';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import {
+   loadUnit, render, screen, waitFor, getByRole, initializeTestStore, fireEvent,
+@@ -19,6 +20,7 @@ describe('Course', () => {
+     nextSequenceHandler: () => {},
+     previousSequenceHandler: () => {},
+     unitNavigationHandler: () => {},
++    toggleSidebar: () => {},
+   };
+ 
+   beforeAll(async () => {
+@@ -85,6 +87,31 @@ describe('Course', () => {
+     expect(screen.getByRole('button', { name: 'Learn About Verified Certificates' })).toBeInTheDocument();
+   });
+ 
++  it('displays sidebar notification button', async () => {
++    const toggleSidebar = jest.fn();
++    const isSidebarVisible = jest.fn();
++
++    // REV-2130 TODO: remove cookie related code once temporary value prop cookie code is removed.
++    const cookieName = 'value_prop_cookie';
++    Cookies.set = jest.fn();
++    Cookies.get = jest.fn().mockImplementation(() => cookieName);
++    const getSpy = jest.spyOn(Cookies, 'get').mockReturnValueOnce('true');
++
++    const courseMetadata = Factory.build('courseMetadata');
++    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
++    const testData = {
++      ...mockData,
++      toggleSidebar,
++      isSidebarVisible,
++    };
++    render(<Course {...testData} courseId={courseMetadata.id} />, { store: testStore });
++
++    const sidebarOpenButton = screen.getByRole('button', { name: /Show sidebar notification/i });
++
++    expect(getSpy).toBeCalledWith(cookieName);
++    expect(sidebarOpenButton).toBeInTheDocument();
++  });
++
+   it('displays offer and expiration alert', async () => {
+     const courseMetadata = Factory.build('courseMetadata', {
+       access_expiration: {
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index a90dd5e..d8a73c8 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -60,7 +60,7 @@ export default function CourseBreadcrumbs({
+   }, [courseStatus, sequenceStatus]);
+ 
+   return (
+-    <nav aria-label="breadcrumb" className="my-4">
++    <nav aria-label="breadcrumb" className="my-4 d-inline-block col-sm-10">
+       <ol className="list-unstyled d-flex m-0">
+         <CourseBreadcrumb
+           url={`${getConfig().LMS_BASE_URL}/courses/${course.id}/course/`}
+diff --git a/src/courseware/course/NotificationIcon.jsx b/src/courseware/course/NotificationIcon.jsx
+new file mode 100644
+index 0000000..7f982ed
+--- /dev/null
++++ b/src/courseware/course/NotificationIcon.jsx
+@@ -0,0 +1,28 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Icon } from '@edx/paragon';
++import { WatchOutline } from '@edx/paragon/icons';
++
++import './NotificationIcon.scss';
++import messages from './messages';
++
++function NotificationIcon({ intl, status, notificationColor }) {
++  return (
++    <div className="icon-container">
++      <Icon src={WatchOutline} className="m-0 m-auto" alt={intl.formatMessage(messages.openSidebarButton)} />
++      {status === 'active'
++        ? <span className={classNames(notificationColor, 'notification-dot')} data-testid="notification-dot" />
++        : null}
++    </div>
++  );
++}
++
++NotificationIcon.propTypes = {
++  intl: intlShape.isRequired,
++  status: PropTypes.string.isRequired,
++  notificationColor: PropTypes.string.isRequired,
++};
++
++export default injectIntl(NotificationIcon);
+diff --git a/src/courseware/course/NotificationIcon.scss b/src/courseware/course/NotificationIcon.scss
+new file mode 100644
+index 0000000..c2671cd
+--- /dev/null
++++ b/src/courseware/course/NotificationIcon.scss
+@@ -0,0 +1,15 @@
++.icon-container {
++    position: relative;
++    display: flex;
++    align-items: center;
++    width: 2.4rem;
++    height: 2rem;
++}
++
++.notification-dot {
++    position: absolute;
++    top: 0.3rem;
++    right: 0.55rem;
++    border-radius: 50% !important;
++    padding: 0.25rem !important;
++}
+\ No newline at end of file
+diff --git a/src/courseware/course/Sidebar.jsx b/src/courseware/course/Sidebar.jsx
+new file mode 100644
+index 0000000..7fa5f45
+--- /dev/null
++++ b/src/courseware/course/Sidebar.jsx
+@@ -0,0 +1,52 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Icon } from '@edx/paragon';
++import { ArrowBackIos, Close } from '@edx/paragon/icons';
++import './Sidebar.scss';
++import messages from './messages';
++import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWindowSize';
++
++function Sidebar({
++  intl, toggleSidebar,
++}) {
++  const shouldDisplayFullScreen = useWindowSize().width < responsiveBreakpoints.large.minWidth;
++
++  // REV-2130 TODO: temporary variable set to true, should be replaced with
++  // whether the course can be upgraded (ie. shouldDisplayUpgradeNotification)
++  const shouldDisplayNoNotification = true;
++
++  return (
++    <section className={classNames('sidebar-container ml-0 ml-lg-4', { 'no-notification': shouldDisplayNoNotification && !shouldDisplayFullScreen })} aria-label={intl.formatMessage(messages.sidebarNotification)}>
++      {shouldDisplayFullScreen ? (
++        <div className="mobile-close-container" onClick={() => { toggleSidebar(); }} onKeyDown={() => { toggleSidebar(); }} role="button" tabIndex="0" alt={intl.formatMessage(messages.responsiveCloseSidebar)}>
++          <Icon src={ArrowBackIos} />
++          <span className="mobile-close">{intl.formatMessage(messages.responsiveCloseSidebar)}</span>
++        </div>
++      ) : null}
++      <div className="sidebar-header px-3">
++        <span>{intl.formatMessage(messages.notificationTitle)}</span>
++        {shouldDisplayFullScreen
++          ? null
++          : <Icon src={Close} className="close-btn" onClick={() => { toggleSidebar(); }} onKeyDown={() => { toggleSidebar(); }} role="button" tabIndex="0" alt={intl.formatMessage(messages.closeSidebarButton)} />}
++      </div>
++      <div className="sidebar-divider" />
++      <div className="sidebar-content">
++        {/* REV-2130 TODO: replace logic to display upgrade expiration box if condition is true */}
++        {shouldDisplayNoNotification ? <p>{intl.formatMessage(messages.noNotificationsMessage)}</p> : null}
++      </div>
++    </section>
++  );
++}
++
++Sidebar.propTypes = {
++  intl: intlShape.isRequired,
++  toggleSidebar: PropTypes.func,
++};
++
++Sidebar.defaultProps = {
++  toggleSidebar: null,
++};
++
++export default injectIntl(Sidebar);
+diff --git a/src/courseware/course/Sidebar.scss b/src/courseware/course/Sidebar.scss
+new file mode 100644
+index 0000000..4f40cd6
+--- /dev/null
++++ b/src/courseware/course/Sidebar.scss
+@@ -0,0 +1,73 @@
++@import "~@edx/brand/paragon/fonts";
++@import "~@edx/brand/paragon/variables";
++@import "~@edx/paragon/scss/core/core";
++@import "~@edx/brand/paragon/overrides";
++
++.sidebar-container {
++    border: 1px solid $light-400;
++    border-radius: 4px;
++    width: 20rem;
++    vertical-align: top;
++
++    @media (max-width: -1 + map-get($grid-breakpoints, 'lg')) {
++        position: fixed; 
++        top: 0; 
++        bottom: 0; 
++        left: 0; 
++        right: 0;
++        width: 100%;
++        height: 100% !important;
++        background-color: white;
++        margin: 0;
++        border: none;
++        border-radius: 0;
++    }
++}
++
++.no-notification {
++    height: 15rem;
++}
++
++.sidebar-header {
++    padding: 0.625rem 0;
++
++    span {
++        display: inline-block;
++    }
++}
++
++.close-btn {
++    float: right;
++}
++
++.sidebar-divider {
++    width: 100.5%;
++    height: 0.5rem;
++    background: $gray-100;
++    border: 1px solid $light-400;
++    border-left: 0;
++}
++
++.sidebar-content {
++    padding: 1rem;
++    font-size: 0.875rem;
++}
++
++.mobile-close-container {
++    padding-top: 0.5rem;
++    padding-bottom: 0.75rem;
++    border-bottom: 1px solid $light-400;
++
++    span {
++        display: inline-block;
++    }
++    svg {
++        top: 0.4rem;
++        left: 0.8rem;
++    }
++}
++
++.mobile-close {
++    font-weight: 500;
++    margin-left: 1.2rem;
++}
+\ No newline at end of file
+diff --git a/src/courseware/course/Sidebar.test.jsx b/src/courseware/course/Sidebar.test.jsx
+new file mode 100644
+index 0000000..2fda5c0
+--- /dev/null
++++ b/src/courseware/course/Sidebar.test.jsx
+@@ -0,0 +1,58 @@
++import React from 'react';
++import { Factory } from 'rosie';
++import {
++  render, initializeTestStore, screen, fireEvent, waitFor,
++} from '../../setupTest';
++import Sidebar from './Sidebar';
++import useWindowSize from '../../generic/tabs/useWindowSize';
++
++jest.mock('../../generic/tabs/useWindowSize');
++
++describe('Sidebar', () => {
++  let mockData;
++  const courseMetadata = Factory.build('courseMetadata');
++
++  beforeEach(async () => {
++    mockData = {
++      toggleSidebar: () => {},
++    };
++  });
++
++  beforeAll(async () => {
++    await initializeTestStore({ courseMetadata, excludeFetchCourse: true, excludeFetchSequence: true });
++  });
++
++  it('renders sidebar', async () => {
++    useWindowSize.mockReturnValue({ width: 1200, height: 422 });
++    const { container } = render(<Sidebar {...mockData} />);
++
++    expect(container).toBeInTheDocument();
++    expect(container).toHaveTextContent('Notifications');
++    expect(container).not.toHaveTextContent('Back to course');
++  });
++
++  it('renders no notifications message', async () => {
++    // REV-2130 TODO: add conditional if no expiration box/upgradeable
++    const testData = { ...mockData };
++    const { container } = render(<Sidebar {...testData} />);
++
++    expect(container).toBeInTheDocument();
++    expect(container).toHaveTextContent('You have no new notifications at this time.');
++  });
++
++  it('renders sidebar with full screen "Back to course" at response width', async () => {
++    useWindowSize.mockReturnValue({ width: 991, height: 422 });
++    const toggleSidebar = jest.fn();
++    const testData = {
++      ...mockData,
++      toggleSidebar,
++    };
++    render(<Sidebar {...testData} />);
++
++    const responsiveCloseButton = screen.getByRole('button', { name: 'Back to course' });
++    await waitFor(() => expect(responsiveCloseButton).toBeInTheDocument());
++
++    fireEvent.click(responsiveCloseButton);
++    expect(toggleSidebar).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/src/courseware/course/SidebarNotificationButton.jsx b/src/courseware/course/SidebarNotificationButton.jsx
+new file mode 100644
+index 0000000..0c77aa3
+--- /dev/null
++++ b/src/courseware/course/SidebarNotificationButton.jsx
+@@ -0,0 +1,30 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import NotificationIcon from './NotificationIcon';
++import './SidebarNotificationButton.scss';
++import messages from './messages';
++
++function SidebarNotificationButton({ intl, toggleSidebar, isSidebarVisible }) {
++  return (
++    <button
++      className={classNames('sidebar-notification-btn', { active: isSidebarVisible() })}
++      type="button"
++      onClick={() => { toggleSidebar(); }}
++      aria-label={intl.formatMessage(messages.openSidebarButton)}
++    >
++      {/* REV-2130 TODO: add logic for status "active" if red dot should display */}
++      <NotificationIcon status="active" notificationColor="bg-danger-500" />
++    </button>
++  );
++}
++
++SidebarNotificationButton.propTypes = {
++  intl: intlShape.isRequired,
++  toggleSidebar: PropTypes.func.isRequired,
++  isSidebarVisible: PropTypes.func.isRequired,
++};
++
++export default injectIntl(SidebarNotificationButton);
+diff --git a/src/courseware/course/SidebarNotificationButton.scss b/src/courseware/course/SidebarNotificationButton.scss
+new file mode 100644
+index 0000000..a4fdb0a
+--- /dev/null
++++ b/src/courseware/course/SidebarNotificationButton.scss
+@@ -0,0 +1,24 @@
++@import "~@edx/brand/paragon/fonts";
++@import "~@edx/brand/paragon/variables";
++@import "~@edx/paragon/scss/core/core";
++@import "~@edx/brand/paragon/overrides";
++
++.sidebar-notification-btn {
++    border: 1px solid $light-400;
++    background: none;
++    margin-top: 0.625rem;
++
++    position: absolute;
++    right: 0;
++
++    @media (max-width: -1 + map-get($grid-breakpoints, 'sm')) {
++        border: none;
++        margin: 0.3rem 1.25rem 0 0.25rem;
++        top: 0.1rem;
++        right: -3rem;
++    }
++}
++
++.active {
++    border-bottom: 3px solid $primary-700;
++}
+\ No newline at end of file
+diff --git a/src/courseware/course/SidebarNotificationButton.test.jsx b/src/courseware/course/SidebarNotificationButton.test.jsx
+new file mode 100644
+index 0000000..abaffe0
+--- /dev/null
++++ b/src/courseware/course/SidebarNotificationButton.test.jsx
+@@ -0,0 +1,43 @@
++import React from 'react';
++import { Factory } from 'rosie';
++import {
++  render, initializeTestStore, screen, fireEvent,
++} from '../../setupTest';
++import SidebarNotificationButton from './SidebarNotificationButton';
++
++describe('Sidebar Notification Button', () => {
++  let mockData;
++  const courseMetadata = Factory.build('courseMetadata');
++
++  beforeAll(async () => {
++    await initializeTestStore({ courseMetadata, excludeFetchCourse: true, excludeFetchSequence: true });
++    mockData = {
++      toggleSidebar: () => {},
++      isSidebarVisible: () => {},
++    };
++  });
++
++  it('renders sidebar notification button with icon', async () => {
++    const { container } = render(<SidebarNotificationButton {...mockData} />);
++    expect(container).toBeInTheDocument();
++    const buttonIcon = container.querySelectorAll('svg');
++    expect(buttonIcon).toHaveLength(1);
++
++    // REV-2130 TODO: update below test once the status=active or inactive is implemented
++    expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
++  });
++
++  it('handles onClick event toggling the sidebar', async () => {
++    const toggleSidebar = jest.fn();
++    const testData = {
++      ...mockData,
++      toggleSidebar,
++    };
++    render(<SidebarNotificationButton {...testData} />);
++
++    const sidebarOpenButton = screen.getByRole('button', { name: /Show sidebar notification/i });
++    expect(sidebarOpenButton).toBeInTheDocument();
++    fireEvent.click(sidebarOpenButton);
++    expect(toggleSidebar).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/src/courseware/course/messages.js b/src/courseware/course/messages.js
+new file mode 100644
+index 0000000..98c3c9f
+--- /dev/null
++++ b/src/courseware/course/messages.js
+@@ -0,0 +1,36 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  sidebarNotification: {
++    id: 'sidebar.notification.container',
++    defaultMessage: 'Sidebar notification',
++    description: 'Sidebar notification section container',
++  },
++  openSidebarButton: {
++    id: 'sidebar.open.button',
++    defaultMessage: 'Show sidebar notification',
++    description: 'Button to open the sidebar and show notifications',
++  },
++  closeSidebarButton: {
++    id: 'sidebar.close.button',
++    defaultMessage: 'Close sidebar notification',
++    description: 'Button for the learner to close the sidebar',
++  },
++  responsiveCloseSidebar: {
++    id: 'sidebar.responsive.close.button',
++    defaultMessage: 'Back to course',
++    description: 'Responsive button for the learner to go back to course and close the sidebar',
++  },
++  notificationTitle: {
++    id: 'sidebar.notification.title',
++    defaultMessage: 'Notifications',
++    description: 'Title text displayed for sidebar notifications',
++  },
++  noNotificationsMessage: {
++    id: 'sidebar.notification.no.message',
++    defaultMessage: 'You have no new notifications at this time.',
++    description: 'Text displayed when the learner has no notifications',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 010a683..7e5b4f8 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -3,6 +3,7 @@ import React, {
+   useEffect, useContext, useState,
+ } from 'react';
+ import PropTypes from 'prop-types';
++import classNames from 'classnames';
+ import {
+   sendTrackEvent,
+   sendTrackingLogEvent,
+@@ -13,12 +14,15 @@ import { history } from '@edx/frontend-platform';
+ 
+ import PageLoading from '../../../generic/PageLoading';
+ import { UserMessagesContext, ALERT_TYPES } from '../../../generic/user-messages';
++import useWindowSize, { responsiveBreakpoints } from '../../../generic/tabs/useWindowSize';
+ import { useModel } from '../../../generic/model-store';
+ 
+ import CourseLicense from '../course-license';
+ import messages from './messages';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import SequenceContent from './SequenceContent';
++import Sidebar from '../Sidebar';
++import SidebarNotificationButton from '../SidebarNotificationButton';
+ 
+ /** [MM-P2P] Experiment */
+ import { isMobile } from '../../../experiments/mm-p2p/utils';
+@@ -32,12 +36,18 @@ function Sequence({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   intl,
++  toggleSidebar,
++  sidebarVisible,
++  isSidebarVisible,
++  isValuePropCookieSet,
+   mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
++  const shouldDisplaySidebarButton = useWindowSize().width < responsiveBreakpoints.small.minWidth;
++
+   const handleNext = () => {
+     const nextIndex = sequence.unitIds.indexOf(unitId) + 1;
+     if (nextIndex < sequence.unitIds.length) {
+@@ -145,7 +155,7 @@ function Sequence({
+     return (
+       <div>
+         <div className="sequence-container" style={{ display: 'inline-flex', flexDirection: 'row' }}>
+-          <div className="sequence" style={{ width: '100%' }}>
++          <div className={classNames('sequence', { 'position-relative': shouldDisplaySidebarButton })} style={{ width: '100%' }}>
+             <SequenceNavigation
+               sequenceId={sequenceId}
+               unitId={unitId}
+@@ -167,7 +177,16 @@ function Sequence({
+                 handlePrevious();
+               }}
+               goToCourseExitPage={() => goToCourseExitPage()}
++              isValuePropCookieSet={isValuePropCookieSet}
+             />
++
++            {isValuePropCookieSet && shouldDisplaySidebarButton ? (
++              <SidebarNotificationButton
++                toggleSidebar={toggleSidebar}
++                isSidebarVisible={isSidebarVisible}
++              />
++            ) : null}
++
+             <div className="unit-container flex-grow-1">
+               <SequenceContent
+                 courseId={courseId}
+@@ -195,6 +214,12 @@ function Sequence({
+               )}
+             </div>
+           </div>
++          {sidebarVisible ? (
++            <Sidebar
++              toggleSidebar={toggleSidebar}
++              sidebarVisible={sidebarVisible}
++            />
++          ) : null }
+ 
+           {/** [MM-P2P] Experiment */}
+           {(mmp2p.state.isEnabled && mmp2p.flyover.isVisible) && (
+@@ -224,6 +249,10 @@ Sequence.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   intl: intlShape.isRequired,
++  toggleSidebar: PropTypes.func,
++  sidebarVisible: PropTypes.bool,
++  isSidebarVisible: PropTypes.func,
++  isValuePropCookieSet: PropTypes.bool,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+@@ -242,6 +271,10 @@ Sequence.propTypes = {
+ Sequence.defaultProps = {
+   sequenceId: null,
+   unitId: null,
++  toggleSidebar: null,
++  sidebarVisible: null,
++  isSidebarVisible: null,
++  isValuePropCookieSet: null,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: {
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 9d710b8..720aa02 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -28,6 +28,7 @@ describe('Sequence', () => {
+       unitNavigationHandler: () => {},
+       nextSequenceHandler: () => {},
+       previousSequenceHandler: () => {},
++      sidebarVisible: false,
+     };
+   });
+ 
+@@ -129,6 +130,16 @@ describe('Sequence', () => {
+     expect(screen.getAllByRole('button', { name: /previous|next/i }).length).toEqual(4);
+   });
+ 
++  it('renders sidebar in sequence', async () => {
++    const testData = {
++      ...mockData,
++      sidebarVisible: true,
++    };
++
++    render(<Sequence {...testData} />);
++    expect(await screen.findByText('Notifications')).toBeInTheDocument();
++  });
++
+   describe('sequence and unit navigation buttons', () => {
+     let testStore;
+     const sequenceBlocks = [Factory.build(
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index aaa6eb4..72c4e72 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -13,6 +13,7 @@ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import { useSequenceNavigationMetadata } from './hooks';
+ import { useModel } from '../../../../generic/model-store';
+ import { LOADED } from '../../../data/slice';
++import useWindowSize, { responsiveBreakpoints } from '../../../../generic/tabs/useWindowSize';
+ 
+ import messages from './messages';
+ /** [MM-P2P] Experiment */
+@@ -27,6 +28,7 @@ function SequenceNavigation({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   goToCourseExitPage,
++  isValuePropCookieSet,
+   mmp2p,
+ }) {
+   const sequence = useModel('sequences', sequenceId);
+@@ -39,6 +41,8 @@ function SequenceNavigation({
+     sequence.gatedContent !== undefined && sequence.gatedContent.gated
+   ) : undefined;
+ 
++  const shouldDisplaySidebarButton = useWindowSize().width < responsiveBreakpoints.small.minWidth;
++
+   const renderUnitButtons = () => {
+     if (isLocked) {
+       return (
+@@ -67,24 +71,23 @@ function SequenceNavigation({
+     const disabled = isLastUnit && !exitActive;
+     return (
+       <Button variant="link" className="next-btn" onClick={buttonOnClick} disabled={disabled}>
+-        {buttonText}
+-        <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
++        {isValuePropCookieSet && shouldDisplaySidebarButton ? null : buttonText}
++        <FontAwesomeIcon icon={faChevronRight} className="mx-3 mr-sm-0 ml-sm-2" size="sm" />
+       </Button>
+     );
+   };
+ 
+   return sequenceStatus === LOADED && (
+-    <nav className={classNames('sequence-navigation', className)}>
++    <nav className={classNames('sequence-navigation', className)} style={{ width: isValuePropCookieSet && shouldDisplaySidebarButton ? '90%' : null }}>
+       <Button variant="link" className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit}>
+-        <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
+-        {intl.formatMessage(messages.previousButton)}
++        <FontAwesomeIcon icon={faChevronLeft} className="mx-3 ml-sm-0 mr-sm-2" size="sm" />
++        {isValuePropCookieSet && shouldDisplaySidebarButton ? null : intl.formatMessage(messages.previousButton)}
+       </Button>
+       {renderUnitButtons()}
+       {renderNextButton()}
+ 
+       {/** [MM-P2P] Experiment */}
+       { mmp2p.state.isEnabled && <MMP2PFlyoverTriggerMobile options={mmp2p} /> }
+-      <div className="rev1512ToggleFlyoverSequenceLocation" />
+     </nav>
+   );
+ }
+@@ -98,6 +101,7 @@ SequenceNavigation.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   goToCourseExitPage: PropTypes.func.isRequired,
++  isValuePropCookieSet: PropTypes.bool,
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+     state: PropTypes.shape({
+@@ -109,6 +113,7 @@ SequenceNavigation.propTypes = {
+ SequenceNavigation.defaultProps = {
+   className: null,
+   unitId: null,
++  isValuePropCookieSet: null,
+ 
+   /** [MM-P2P] Experiment */
+   mmp2p: {
+diff --git a/src/generic/tabs/useWindowSize.js b/src/generic/tabs/useWindowSize.js
+index 20e7684..199b5fa 100644
+--- a/src/generic/tabs/useWindowSize.js
++++ b/src/generic/tabs/useWindowSize.js
+@@ -1,5 +1,28 @@
+ import { useState, useEffect } from 'react';
+ 
++// NOTE: These are the breakpoints used in Bootstrap v4.0.0 as seen in
++// the documentation (https://getbootstrap.com/docs/4.0/layout/overview/#responsive-breakpoints)
++export const responsiveBreakpoints = {
++  extraSmall: {
++    maxWidth: 575.98,
++  },
++  small: {
++    minWidth: 576,
++    maxWidth: 767.98,
++  },
++  medium: {
++    minWidth: 768,
++    maxWidth: 991.98,
++  },
++  large: {
++    minWidth: 992,
++    maxWidth: 1199.98,
++  },
++  extraLarge: {
++    minWidth: 1200,
++  },
++};
++
+ export default function useWindowSize() {
+   const isClient = typeof global === 'object';
+ 
+diff --git a/src/index.scss b/src/index.scss
+index 239eae5..e8cdc69 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -246,6 +246,7 @@
+   }
+ 
+   .previous-btn, .next-btn {
++    border: 1px solid $light-400 !important;
+     color: $gray-700;
+     display: inline-flex;
+     justify-content: center;
+@@ -362,6 +363,9 @@
+ 
+ // Import component-specific sass files
+ @import 'courseware/course/celebration/CelebrationModal.scss';
++@import 'courseware/course/Sidebar.scss';
++@import 'courseware/course/SidebarNotificationButton.scss';
++@import 'courseware/course/NotificationIcon.scss';
+ @import 'shared/streak-celebration/StreakCelebrationModal.scss';
+ @import 'courseware/course/content-tools/calculator/calculator.scss';
+ @import 'courseware/course/content-tools/contentTools.scss';
+-- 
+2.34.1
+

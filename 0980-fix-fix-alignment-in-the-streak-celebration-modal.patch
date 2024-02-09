@@ -1,0 +1,43 @@
+From 3b4561e1424d5f8e6f8f5d9b3be202ce4c91565e Mon Sep 17 00:00:00 2001
+From: ihor-romaniuk <ihor.romaniuk@raccoongang.com>
+Date: Mon, 12 Sep 2022 18:24:39 +0300
+Subject: [PATCH 0980/1021] fix: fix alignment in the streak celebration modal
+
+---
+ src/shared/streak-celebration/StreakCelebrationModal.jsx  | 4 ++--
+ src/shared/streak-celebration/StreakCelebrationModal.scss | 4 ++++
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index f103347..a47ffa3 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -160,8 +160,8 @@ function StreakModal({
+         </ModalDialog.Title>
+       </ModalDialog.Header>
+       <ModalDialog.Body className="modal-body">
+-        <p>{intl.formatMessage(messages.streakBody)}</p>
+-        <p className="modal-image">
++        <p className="text-center">{intl.formatMessage(messages.streakBody)}</p>
++        <p className="modal-image text-center">
+           {!wideScreen && <img src={StreakMobileImage} alt="" className="img-fluid" />}
+           {wideScreen && <img src={StreakDesktopImage} alt="" className="img-fluid" />}
+         </p>
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.scss b/src/shared/streak-celebration/StreakCelebrationModal.scss
+index e04aa9e..d770ed0 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.scss
++++ b/src/shared/streak-celebration/StreakCelebrationModal.scss
+@@ -26,6 +26,10 @@
+   .modal-body {
+     padding-top: .5rem;
+     font-size: 1.2rem;
++
++    .pgn__modal-body-content {
++      text-align: center;
++    }
+   }
+ 
+   .modal-footer {
+-- 
+2.34.1
+

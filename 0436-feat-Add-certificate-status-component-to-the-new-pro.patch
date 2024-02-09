@@ -1,0 +1,757 @@
+From ef635b2a9beefe3263d8af5b53c45c4ffb0141c5 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Thu, 29 Apr 2021 09:39:07 -0400
+Subject: [PATCH 0436/1021] feat: Add certificate status component to the new
+ progress page (#415)
+
+Much of the logic is copied from the course exit certificate states.
+AA-719
+---
+ .../__factories__/progressTabData.factory.js  |   2 +-
+ src/course-home/progress-tab/ProgressTab.jsx  |  16 +-
+ .../progress-tab/ProgressTab.test.jsx         | 154 ++++++++++++++++
+ .../certificate-status/CertificateStatus.jsx  | 171 +++++++++++++++++-
+ .../certificate-status/messages.js            |  82 +++++++++
+ .../course/course-exit/CourseCelebration.jsx  |  33 +---
+ .../course/course-exit/CourseExit.jsx         |  18 +-
+ src/courseware/course/course-exit/utils.js    |  36 ++--
+ src/setupTest.js                              |   1 +
+ src/shared/links.jsx                          |  66 +++++++
+ 10 files changed, 530 insertions(+), 49 deletions(-)
+ create mode 100644 src/course-home/progress-tab/certificate-status/messages.js
+ create mode 100644 src/shared/links.jsx
+
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+index a009ba4..716a472 100644
+--- a/src/course-home/data/__factories__/progressTabData.factory.js
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -4,7 +4,7 @@ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dep
+ // This set of data may not be realistic, but it is intended to demonstrate many UI results.
+ Factory.define('progressTabData')
+   .attrs({
+-    certificate_data: null,
++    certificate_data: {},
+     completion_summary: {
+       complete_count: 1,
+       incomplete_count: 1,
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index ea3569a..e4861f9 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import { layoutGenerator } from 'react-break';
+ 
+ import CertificateStatus from './certificate-status/CertificateStatus';
+ import CourseCompletion from './course-completion/CourseCompletion';
+@@ -9,6 +10,14 @@ import ProgressHeader from './ProgressHeader';
+ import RelatedLinks from './related-links/RelatedLinks';
+ 
+ function ProgressTab() {
++  const layout = layoutGenerator({
++    mobile: 0,
++    desktop: 992,
++  });
++
++  const OnMobile = layout.is('mobile');
++  const OnDesktop = layout.isAtLeast('desktop');
++
+   return (
+     <>
+       <ProgressHeader />
+@@ -16,6 +25,9 @@ function ProgressTab() {
+         {/* Main body */}
+         <div className="col-12 col-lg-8 p-0">
+           <CourseCompletion />
++          <OnMobile>
++            <CertificateStatus />
++          </OnMobile>
+           <CourseGrade />
+           <div className="my-4 p-4 rounded shadow-sm">
+             <GradeSummary />
+@@ -25,7 +37,9 @@ function ProgressTab() {
+ 
+         {/* Side panel */}
+         <div className="col-12 col-lg-4 p-0 px-lg-4">
+-          <CertificateStatus />
++          <OnDesktop>
++            <CertificateStatus />
++          </OnDesktop>
+           <RelatedLinks />
+         </div>
+       </div>
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 327073b..275a7aa 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -27,6 +27,11 @@ describe('Progress Tab', () => {
+   const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+   const defaultTabData = Factory.build('progressTabData');
+ 
++  function setMetadata(attributes, options) {
++    const courseMetadata = Factory.build('courseHomeMetadata', { id: courseId, ...attributes }, options);
++    axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++  }
++
+   function setTabData(attributes, options) {
+     const progressTabData = Factory.build('progressTabData', attributes, options);
+     axiosMock.onGet(progressUrl).reply(200, progressTabData);
+@@ -193,4 +198,153 @@ describe('Progress Tab', () => {
+       expect(screen.getByText('You currently have no graded problem scores.')).toBeInTheDocument();
+     });
+   });
++
++  describe('Certificate Status', () => {
++    Object.defineProperty(window, 'matchMedia', {
++      writable: true,
++      value: jest.fn().mockImplementation(query => {
++        const matches = !!(query === 'screen and (min-width: 768px)' || query === 'screen and (min-width: 992px)');
++        return {
++          matches,
++          media: query,
++          onchange: null,
++          addListener: jest.fn(), // deprecated
++          removeListener: jest.fn(), // deprecated
++          addEventListener: jest.fn(),
++          removeEventListener: jest.fn(),
++          dispatchEvent: jest.fn(),
++        };
++      }),
++    });
++
++    describe('enrolled user', () => {
++      beforeEach(async () => {
++        setMetadata({ is_enrolled: true });
++      });
++
++      it('Displays text for nonPassing case when learner does not have a passing grade', async () => {
++        setTabData({
++          user_has_passing_grade: false,
++        });
++        await fetchAndRender();
++        expect(screen.getByText('In order to qualify for a certificate, you must have a passing grade.')).toBeInTheDocument();
++      });
++
++      it('Displays text for inProgress case when more content is scheduled and the learner does not have a passing grade', async () => {
++        setTabData({
++          user_has_passing_grade: false,
++          has_scheduled_content: true,
++        });
++        await fetchAndRender();
++        expect(screen.getByText('It looks like there is more content in this course that will be released in the future. Look out for email updates or check back on your course for when this content will be available.')).toBeInTheDocument();
++      });
++
++      it('Displays request certificate link', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'requesting' },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++        expect(screen.getByRole('button', { name: 'Request certificate' })).toBeInTheDocument();
++      });
++
++      it('Displays verify identity link', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'unverified' },
++          user_has_passing_grade: true,
++          verification_data: { link: 'test' },
++        });
++        await fetchAndRender();
++        expect(screen.getByRole('link', { name: 'Verify ID' })).toBeInTheDocument();
++      });
++
++      it('Displays verification pending message', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'unverified' },
++          verification_data: { status: 'pending' },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++        expect(screen.getByText('Your ID verification is pending and your certificate will be available once approved.')).toBeInTheDocument();
++        expect(screen.queryByRole('link', { name: 'Verify ID' })).not.toBeInTheDocument();
++      });
++
++      it('Displays download link', async () => {
++        setTabData({
++          certificate_data: {
++            cert_status: 'downloadable',
++            download_url: 'fake.download.url',
++          },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++        expect(screen.getByRole('link', { name: 'Download my certificate' })).toBeInTheDocument();
++      });
++
++      it('Displays webview link', async () => {
++        setTabData({
++          certificate_data: {
++            cert_status: 'downloadable',
++            cert_web_view_url: '/certificates/cooluuidgoeshere',
++          },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++        expect(screen.getByRole('link', { name: 'View my certificate' })).toBeInTheDocument();
++      });
++
++      it('Displays certificate is earned but unavailable message', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'earned_but_not_available' },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++        expect(screen.queryByText('Certificate status')).toBeInTheDocument();
++      });
++
++      it('Displays upgrade link when available', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'audit_passing' },
++          verified_mode: {
++            upgrade_url: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++          },
++        });
++        await fetchAndRender();
++        // Keep these text checks in sync with "audit only" test below, so it doesn't end up checking for text that is
++        // never actually there, when/if the text changes.
++        expect(screen.getByText('You are in an audit track and do not qualify for a certificate. In order to work towards a certificate, upgrade your course today.')).toBeInTheDocument();
++        expect(screen.getByRole('link', { name: 'Upgrade now' })).toBeInTheDocument();
++      });
++
++      it('Displays nothing if audit only', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'audit_passing' },
++          verified_mode: null,
++        });
++        await fetchAndRender();
++        // Keep these queries in sync with "upgrade link" test above, so we don't end up checking for text that is
++        // never actually there, when/if the text changes.
++        expect(screen.queryByText('You are in an audit track and do not qualify for a certificate. In order to work towards a certificate, upgrade your course today.')).not.toBeInTheDocument();
++        expect(screen.queryByRole('link', { name: 'Upgrade now' })).not.toBeInTheDocument();
++      });
++
++      it('Does not display the certificate component if it does not match any statuses', async () => {
++        setTabData({
++          certificate_data: {
++            cert_status: 'bogus_status',
++          },
++          user_has_passing_grade: true,
++        });
++        setMetadata({ is_enrolled: true });
++        await fetchAndRender();
++        expect(screen.queryByTestId('certificate-status-component')).not.toBeInTheDocument();
++      });
++    });
++
++    it('Does not display the certificate component if the user is not enrolled', async () => {
++      setMetadata({ is_enrolled: false });
++      await fetchAndRender();
++      expect(screen.queryByTestId('certificate-status-component')).not.toBeInTheDocument();
++    });
++  });
+ });
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index e3c5af1..8876592 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -1,12 +1,173 @@
+ import React from 'react';
++import { useDispatch, useSelector } from 'react-redux';
++import {
++  FormattedDate, FormattedMessage, injectIntl, intlShape,
++} from '@edx/frontend-platform/i18n';
++
++import { Button, Card } from '@edx/paragon';
++import { getConfig } from '@edx/frontend-platform';
++import { useModel } from '../../../generic/model-store';
++import { COURSE_EXIT_MODES, getCourseExitMode } from '../../../courseware/course/course-exit/utils';
++import { DashboardLink, IdVerificationSupportLink, ProfileLink } from '../../../shared/links';
++import { requestCert } from '../../data/thunks';
++import messages from './messages';
++
++function CertificateStatus({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    isEnrolled,
++  } = useModel('courseHomeMeta', courseId);
++
++  const {
++    certificateData,
++    hasScheduledContent,
++    userHasPassingGrade,
++  } = useModel('progress', courseId);
++
++  const mode = getCourseExitMode(
++    certificateData,
++    hasScheduledContent,
++    isEnrolled,
++    userHasPassingGrade,
++  );
++  const dispatch = useDispatch();
++
++  const {
++    end,
++    verificationData,
++    certificateData: {
++      certStatus,
++      certWebViewUrl,
++      downloadUrl,
++    },
++    verifiedMode,
++  } = useModel('progress', courseId);
++
++  let certCase;
++  let body;
++  let buttonAction;
++  let buttonLocation;
++  let buttonText;
++  let endDate;
++
++  const dashboardLink = <DashboardLink />;
++  const idVerificationSupportLink = <IdVerificationSupportLink />;
++  const profileLink = <ProfileLink />;
++
++  if (mode === COURSE_EXIT_MODES.nonPassing) {
++    certCase = 'notPassing';
++    body = intl.formatMessage(messages[`${certCase}Body`]);
++  } else if (mode === COURSE_EXIT_MODES.inProgress) {
++    certCase = 'inProgress';
++    body = intl.formatMessage(messages[`${certCase}Body`]);
++  } else if (mode === COURSE_EXIT_MODES.celebration) {
++    switch (certStatus) {
++      case 'requesting':
++        // Requestable
++        certCase = 'requestable';
++        buttonAction = () => { dispatch(requestCert(courseId)); };
++        body = intl.formatMessage(messages[`${certCase}Body`]);
++        buttonText = intl.formatMessage(messages[`${certCase}Button`]);
++        break;
++
++      case 'unverified':
++        certCase = 'unverified';
++        if (verificationData.status === 'pending') {
++          body = (<p>{intl.formatMessage(messages.unverifiedPendingBody)}</p>);
++        } else {
++          body = (
++            <FormattedMessage
++              id="progress.certificateStatus.unverifiedBody"
++              defaultMessage="In order to generate a certificate, you must complete ID verification. {idVerificationSupportLink}."
++              values={{ idVerificationSupportLink }}
++            />
++          );
++          buttonLocation = verificationData.link;
++          buttonText = intl.formatMessage(messages[`${certCase}Button`]);
++        }
++        break;
++
++      case 'downloadable':
++        // Certificate available, download/viewable
++        certCase = 'downloadable';
++        body = (
++          <FormattedMessage
++            id="progress.certificateStatus.downloadableBody"
++            defaultMessage="
++              Showcase your accomplishment on LinkedIn or your resume today.
++              You can download your certificate now and access it any time from your
++              {dashboardLink} and {profileLink}."
++            values={{ dashboardLink, profileLink }}
++          />
++        );
++
++        if (certWebViewUrl) {
++          buttonLocation = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
++          buttonText = intl.formatMessage(messages.viewableButton);
++        } else if (downloadUrl) {
++          buttonLocation = downloadUrl;
++          buttonText = intl.formatMessage(messages.downloadableButton);
++        }
++        break;
++
++      case 'earned_but_not_available':
++        certCase = 'notAvailable';
++        endDate = <FormattedDate value={end} day="numeric" month="long" year="numeric" />;
++        body = (
++          <FormattedMessage
++            id="courseCelebration.certificateBody.notAvailable.endDate"
++            defaultMessage="Your certificate will be available soon! After this course officially ends on {endDate}, you will receive an
++              email notification with your certificate."
++            values={{ endDate }}
++          />
++        );
++        break;
++
++      case 'audit_passing':
++      case 'honor_passing':
++        if (verifiedMode) {
++          certCase = 'upgrade';
++          body = intl.formatMessage(messages[`${certCase}Body`]);
++          buttonLocation = verifiedMode.upgradeUrl;
++          buttonText = intl.formatMessage(messages[`${certCase}Button`]);
++        }
++        break;
++
++      // This code shouldn't be hit but coding defensively since switch expects a default statement
++      default:
++        certCase = null;
++        break;
++    }
++  }
++
++  if (!certCase) {
++    return null;
++  }
++
++  const header = intl.formatMessage(messages[`${certCase}Header`]);
+ 
+-function CertificateStatus() {
+   return (
+-    <section className="text-dark-700 rounded shadow-sm mb-4 p-4">
+-      {/* TODO: AA-719 */}
+-      <h3 className="h4">Certificate status</h3>
++    <section data-testid="certificate-status-component" className="text-dark-700 mb-4">
++      <Card className="bg-light-200 shadow-sm">
++        <Card.Body>
++          <Card.Title><h3>{header}</h3></Card.Title>
++          <Card.Text>
++            {body}
++          </Card.Text>
++          {buttonText && (buttonLocation || buttonAction) && (
++            <Button variant="outline-brand" onClick={buttonAction} href={buttonLocation} block>{buttonText}</Button>
++          )}
++        </Card.Body>
++      </Card>
+     </section>
+   );
+ }
+ 
+-export default CertificateStatus;
++CertificateStatus.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CertificateStatus);
+diff --git a/src/course-home/progress-tab/certificate-status/messages.js b/src/course-home/progress-tab/certificate-status/messages.js
+new file mode 100644
+index 0000000..719940f
+--- /dev/null
++++ b/src/course-home/progress-tab/certificate-status/messages.js
+@@ -0,0 +1,82 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  notPassingHeader: {
++    id: 'notPassingHeader',
++    defaultMessage: 'Certificate status',
++  },
++  notPassingBody: {
++    id: 'notPassingBody',
++    defaultMessage: 'In order to qualify for a certificate, you must have a passing grade.',
++  },
++  inProgressHeader: {
++    id: 'inProgressHeader',
++    defaultMessage: 'More content is coming soon!',
++  },
++  inProgressBody: {
++    id: 'inProgressBody',
++    defaultMessage: 'It looks like there is more content in this course that will be released in the future. Look out for email updates or check back on your course for when this content will be available.',
++  },
++  requestableHeader: {
++    id: 'requestableHeader',
++    defaultMessage: 'Certificate status',
++  },
++  requestableBody: {
++    id: 'requestableBody',
++    defaultMessage: 'Congratulations, you qualified for a certificate! In order to access your certificate, request it below.',
++  },
++  requestableButton: {
++    id: 'requestableButton',
++    defaultMessage: 'Request certificate',
++  },
++  unverifiedHeader: {
++    id: 'unverifiedHeader',
++    defaultMessage: 'Certificate status',
++  },
++  unverifiedButton: {
++    id: 'unverifiedButton',
++    defaultMessage: 'Verify ID',
++  },
++  unverifiedPendingBody: {
++    id: 'courseCelebration.verificationPending',
++    defaultMessage: 'Your ID verification is pending and your certificate will be available once approved.',
++  },
++  downloadableHeader: {
++    id: 'downloadableHeader',
++    defaultMessage: 'Your certificate is available!',
++  },
++  downloadableBody: {
++    id: 'downloadableBody',
++    defaultMessage: 'Showcase your accomplishment on LinkedIn or your resume today. You can download your certificate now and access it any time from your Dashboard and Profile.',
++  },
++  downloadableButton: {
++    id: 'downloadableButton',
++    defaultMessage: 'Download my certificate',
++  },
++  viewableButton: {
++    id: 'viewableButton',
++    defaultMessage: 'View my certificate',
++  },
++  notAvailableHeader: {
++    id: 'notAvailableHeader',
++    defaultMessage: 'Certificate status',
++  },
++  notAvailableBody: {
++    id: 'notAvailableBody',
++    defaultMessage: 'Your certificate will be available soon! After this course officially ends on {end_date}, you will receive an email notification with your certificate.',
++  },
++  upgradeHeader: {
++    id: 'upgradeHeader',
++    defaultMessage: 'Earn a certificate',
++  },
++  upgradeBody: {
++    id: 'upgradeBody',
++    defaultMessage: 'You are in an audit track and do not qualify for a certificate. In order to work towards a certificate, upgrade your course today.',
++  },
++  upgradeButton: {
++    id: 'upgradeButton',
++    defaultMessage: 'Upgrade now',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index f812bcc..6272fa6 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -26,6 +26,7 @@ import DashboardFootnote from './DashboardFootnote';
+ import UpgradeFootnote from './UpgradeFootnote';
+ import SocialIcons from '../../social-share/SocialIcons';
+ import { logClick, logVisit } from './utils';
++import { DashboardLink, IdVerificationSupportLink, ProfileLink } from '../../../shared/links';
+ import CourseRecommendations from './CourseRecommendationsExp/CourseRecommendations.exp';
+ 
+ const LINKEDIN_BLUE = '#2867B2';
+@@ -65,35 +66,11 @@ function CourseCelebration({ intl }) {
+   const [showWS1681, setShowWS1681] = useState(window.experiment__courseware_celebration_bShowWS1681);
+   useEffect(() => { setShowWS1681(window.experiment__courseware_celebration_bShowWS1681); });
+ 
+-  const { administrator, username } = getAuthenticatedUser();
++  const { administrator } = getAuthenticatedUser();
+ 
+-  const dashboardLink = (
+-    <Hyperlink
+-      className="text-gray-700"
+-      style={{ textDecoration: 'underline' }}
+-      destination={`${getConfig().LMS_BASE_URL}/dashboard`}
+-    >
+-      {intl.formatMessage(messages.dashboardLink)}
+-    </Hyperlink>
+-  );
+-  const idVerificationSupportLink = getConfig().SUPPORT_URL_ID_VERIFICATION && (
+-    <Hyperlink
+-      className="text-gray-700"
+-      style={{ textDecoration: 'underline' }}
+-      destination={getConfig().SUPPORT_URL_ID_VERIFICATION}
+-    >
+-      {intl.formatMessage(messages.idVerificationSupportLink)}
+-    </Hyperlink>
+-  );
+-  const profileLink = (
+-    <Hyperlink
+-      className="text-gray-700"
+-      style={{ textDecoration: 'underline' }}
+-      destination={`${getConfig().LMS_BASE_URL}/u/${username}`}
+-    >
+-      {intl.formatMessage(messages.profileLink)}
+-    </Hyperlink>
+-  );
++  const dashboardLink = <DashboardLink />;
++  const idVerificationSupportLink = <IdVerificationSupportLink />;
++  const profileLink = <ProfileLink />;
+ 
+   let buttonPrefix = null;
+   let buttonLocation;
+diff --git a/src/courseware/course/course-exit/CourseExit.jsx b/src/courseware/course/course-exit/CourseExit.jsx
+index a45d426..37b28cf 100644
+--- a/src/courseware/course/course-exit/CourseExit.jsx
++++ b/src/courseware/course/course-exit/CourseExit.jsx
+@@ -12,9 +12,25 @@ import CourseNonPassing from './CourseNonPassing';
+ import { COURSE_EXIT_MODES, getCourseExitMode } from './utils';
+ import messages from './messages';
+ 
++import { useModel } from '../../../generic/model-store';
++
+ function CourseExit({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const mode = getCourseExitMode(courseId);
++  const {
++    certificateData,
++    hasScheduledContent,
++    isEnrolled,
++    userHasPassingGrade,
++    courseExitPageIsActive,
++  } = useModel('coursewareMeta', courseId);
++
++  const mode = getCourseExitMode(
++    certificateData,
++    hasScheduledContent,
++    isEnrolled,
++    userHasPassingGrade,
++    courseExitPageIsActive,
++  );
+ 
+   let body = null;
+   if (mode === COURSE_EXIT_MODES.nonPassing) {
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index b4ce4c7..7fabdcd 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -1,9 +1,8 @@
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+-import { useModel } from '../../../generic/model-store';
+-
+ import messages from './messages';
++import { useModel } from '../../../generic/model-store';
+ 
+ const COURSE_EXIT_MODES = {
+   disabled: 0,
+@@ -26,18 +25,16 @@ const NON_CERTIFICATE_STATUSES = [ // no certificate will be given, though a val
+   'honor_passing', // provided when honor is configured to not give a certificate
+ ];
+ 
+-function getCourseExitMode(courseId) {
+-  const {
+-    certificateData,
+-    courseExitPageIsActive,
+-    hasScheduledContent,
+-    isEnrolled,
+-    userHasPassingGrade,
+-  } = useModel('coursewareMeta', courseId);
+-
++function getCourseExitMode(
++  certificateData,
++  hasScheduledContent,
++  isEnrolled,
++  userHasPassingGrade,
++  courseExitPageIsActive = null,
++) {
+   const authenticatedUser = getAuthenticatedUser();
+ 
+-  if (!courseExitPageIsActive || !authenticatedUser || !isEnrolled) {
++  if (courseExitPageIsActive === false || !authenticatedUser || !isEnrolled) {
+     return COURSE_EXIT_MODES.disabled;
+   }
+ 
+@@ -69,7 +66,20 @@ function getCourseExitMode(courseId) {
+ 
+ // Returns null in order to render the default navigation text
+ function getCourseExitNavigation(courseId, intl) {
+-  const exitMode = getCourseExitMode(courseId);
++  const {
++    certificateData,
++    hasScheduledContent,
++    isEnrolled,
++    userHasPassingGrade,
++    courseExitPageIsActive,
++  } = useModel('coursewareMeta', courseId);
++  const exitMode = getCourseExitMode(
++    certificateData,
++    hasScheduledContent,
++    isEnrolled,
++    userHasPassingGrade,
++    courseExitPageIsActive,
++  );
+   const exitActive = exitMode !== COURSE_EXIT_MODES.disabled;
+ 
+   let exitText;
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 7ae18ab..7f35ba4 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -76,6 +76,7 @@ export function initializeMockApp() {
+       roles: [],
+       administrator: false,
+     },
++    SUPPORT_URL_ID_VERIFICATION: true,
+   });
+ 
+   const loggingService = configureLogging(MockLoggingService, {
+diff --git a/src/shared/links.jsx b/src/shared/links.jsx
+new file mode 100644
+index 0000000..7b7316a
+--- /dev/null
++++ b/src/shared/links.jsx
+@@ -0,0 +1,66 @@
++import React from 'react';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { getConfig } from '@edx/frontend-platform';
++import { Hyperlink } from '@edx/paragon';
++
++import messages from '../courseware/course/course-exit/messages';
++
++function IntlDashboardLink({ intl }) {
++  return (
++    <Hyperlink
++      className="text-gray-700"
++      style={{ textDecoration: 'underline' }}
++      destination={`${getConfig().LMS_BASE_URL}/dashboard`}
++    >
++      {intl.formatMessage(messages.dashboardLink)}
++    </Hyperlink>
++  );
++}
++
++IntlDashboardLink.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++function IntlIdVerificationSupportLink({ intl }) {
++  if (!getConfig().SUPPORT_URL_ID_VERIFICATION) {
++    return null;
++  }
++  return (
++    <Hyperlink
++      className="text-gray-700"
++      style={{ textDecoration: 'underline' }}
++      destination={getConfig().SUPPORT_URL_ID_VERIFICATION}
++    >
++      {intl.formatMessage(messages.idVerificationSupportLink)}
++    </Hyperlink>
++  );
++}
++
++IntlIdVerificationSupportLink.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++function IntlProfileLink({ intl }) {
++  const { username } = getAuthenticatedUser();
++
++  return (
++    <Hyperlink
++      className="text-gray-700"
++      style={{ textDecoration: 'underline' }}
++      destination={`${getConfig().LMS_BASE_URL}/u/${username}`}
++    >
++      {intl.formatMessage(messages.profileLink)}
++    </Hyperlink>
++  );
++}
++
++IntlProfileLink.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++const DashboardLink = injectIntl(IntlDashboardLink);
++const IdVerificationSupportLink = injectIntl(IntlIdVerificationSupportLink);
++const ProfileLink = injectIntl(IntlProfileLink);
++
++export { DashboardLink, IdVerificationSupportLink, ProfileLink };
+-- 
+2.34.1
+

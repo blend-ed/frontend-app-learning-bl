@@ -1,0 +1,443 @@
+From 57c3f3080eaa173be5a68bffc1269997877e336f Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Mon, 14 Mar 2022 08:09:15 -0700
+Subject: [PATCH 0858/1021] feat: AA-1205: Enable Entrance Exam support for
+ Learning MFE (#840)
+
+Adds an alert to the courseware if the section is an Entrance Exam. Also
+adds a listener to reload the page upon receiving a message from the LMS
+indicating the user has now passed the exam.
+
+Commit also contains misc. clean up for i18n messages switching to variable names.
+---
+ src/alerts/sequence-alerts/hooks.js           | 56 ++++++++++++
+ src/alerts/sequence-alerts/messages.js        | 14 +++
+ src/courseware/course/Course.test.jsx         | 90 +++++++++++++++++++
+ src/courseware/course/sequence/Sequence.jsx   | 38 ++++----
+ .../course/sequence/SequenceContent.jsx       |  4 +-
+ src/courseware/course/sequence/Unit.jsx       |  8 +-
+ src/courseware/course/sequence/messages.js    | 35 ++++----
+ .../__factories__/courseMetadata.factory.js   |  7 ++
+ src/courseware/data/api.js                    |  1 +
+ 9 files changed, 207 insertions(+), 46 deletions(-)
+ create mode 100644 src/alerts/sequence-alerts/hooks.js
+ create mode 100644 src/alerts/sequence-alerts/messages.js
+
+diff --git a/src/alerts/sequence-alerts/hooks.js b/src/alerts/sequence-alerts/hooks.js
+new file mode 100644
+index 0000000..b16dbeb
+--- /dev/null
++++ b/src/alerts/sequence-alerts/hooks.js
+@@ -0,0 +1,56 @@
++import { useSelector } from 'react-redux';
++
++import { useModel } from '../../generic/model-store';
++import { ALERT_TYPES, useAlert } from '../../generic/user-messages';
++
++import messages from './messages';
++
++function useSequenceBannerTextAlert(sequenceId) {
++  const sequence = useModel('sequences', sequenceId);
++  const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
++
++  // Show Alert that comes along with the sequence
++  useAlert(sequenceStatus === 'loaded' && sequence.bannerText, {
++    code: null,
++    dismissible: false,
++    text: sequence.bannerText,
++    type: ALERT_TYPES.INFO,
++    topic: 'sequence',
++  });
++}
++
++function useSequenceEntranceExamAlert(courseId, sequenceId, intl) {
++  const course = useModel('coursewareMeta', courseId);
++  const sequence = useModel('sequences', sequenceId);
++  const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
++  const {
++    entranceExamCurrentScore,
++    entranceExamEnabled,
++    entranceExamId,
++    entranceExamMinimumScorePct,
++    entranceExamPassed,
++  } = course.entranceExamData || {};
++  const entranceExamAlertVisible = sequenceStatus === 'loaded' && entranceExamEnabled && entranceExamId === sequence.sectionId;
++  let entranceExamText;
++
++  if (entranceExamPassed) {
++    entranceExamText = intl.formatMessage(
++      messages.entranceExamTextPassed, { entranceExamCurrentScore: entranceExamCurrentScore * 100 },
++    );
++  } else {
++    entranceExamText = intl.formatMessage(messages.entranceExamTextNotPassing, {
++      entranceExamCurrentScore: entranceExamCurrentScore * 100,
++      entranceExamMinimumScorePct: entranceExamMinimumScorePct * 100,
++    });
++  }
++
++  useAlert(entranceExamAlertVisible, {
++    code: null,
++    dismissible: false,
++    text: entranceExamText,
++    type: ALERT_TYPES.INFO,
++    topic: 'sequence',
++  });
++}
++
++export { useSequenceBannerTextAlert, useSequenceEntranceExamAlert };
+diff --git a/src/alerts/sequence-alerts/messages.js b/src/alerts/sequence-alerts/messages.js
+new file mode 100644
+index 0000000..941e7aa
+--- /dev/null
++++ b/src/alerts/sequence-alerts/messages.js
+@@ -0,0 +1,14 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  entranceExamTextNotPassing: {
++    id: 'learn.sequence.entranceExamTextNotPassing',
++    defaultMessage: 'To access course materials, you must score {entranceExamMinimumScorePct}% or higher on this exam. Your current score is {entranceExamCurrentScore}%.',
++  },
++  entranceExamTextPassed: {
++    id: 'learn.sequence.entranceExamTextPassed',
++    defaultMessage: 'Your score is {entranceExamCurrentScore}%. You have passed the entrance exam.',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index d218036..84b60b5 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -220,4 +220,94 @@ describe('Course', () => {
+     expect(nextSequenceHandler).not.toHaveBeenCalled();
+     expect(unitNavigationHandler).toHaveBeenCalledTimes(4);
+   });
++
++  describe('Sequence alerts display', () => {
++    it('renders banner text alert', async () => {
++      const courseMetadata = Factory.build('courseMetadata');
++      const sequenceBlocks = [Factory.build(
++        'block', { type: 'sequential', banner_text: 'Some random banner text to display.' },
++      )];
++      const sequenceMetadata = [Factory.build(
++        'sequenceMetadata', { banner_text: sequenceBlocks[0].banner_text },
++        { courseId: courseMetadata.id, sequenceBlock: sequenceBlocks[0] },
++      )];
++
++      const testStore = await initializeTestStore({ courseMetadata, sequenceBlocks, sequenceMetadata });
++      const testData = {
++        ...mockData,
++        courseId: courseMetadata.id,
++        sequenceId: sequenceBlocks[0].id,
++      };
++      render(<Course {...testData} />, { store: testStore });
++      await waitFor(() => expect(screen.getByText('Some random banner text to display.')).toBeInTheDocument());
++    });
++
++    it('renders Entrance Exam alert with passing score', async () => {
++      const sectionId = 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@entrance_exam';
++      const testCourseMetadata = Factory.build('courseMetadata', {
++        entrance_exam_data: {
++          entrance_exam_current_score: 1.0,
++          entrance_exam_enabled: true,
++          entrance_exam_id: sectionId,
++          entrance_exam_minimum_score_pct: 0.7,
++          entrance_exam_passed: true,
++        },
++      });
++      const sequenceBlocks = [Factory.build(
++        'block',
++        { type: 'sequential', sectionId },
++        { courseId: testCourseMetadata.id },
++      )];
++      const sectionBlocks = [Factory.build(
++        'block',
++        { type: 'chapter', children: sequenceBlocks.map(block => block.id), id: sectionId },
++        { courseId: testCourseMetadata.id },
++      )];
++
++      const testStore = await initializeTestStore({
++        courseMetadata: testCourseMetadata, sequenceBlocks, sectionBlocks,
++      });
++      const testData = {
++        ...mockData,
++        courseId: testCourseMetadata.id,
++        sequenceId: sequenceBlocks[0].id,
++      };
++      render(<Course {...testData} />, { store: testStore });
++      await waitFor(() => expect(screen.getByText('Your score is 100%. You have passed the entrance exam.')).toBeInTheDocument());
++    });
++
++    it('renders Entrance Exam alert with non-passing score', async () => {
++      const sectionId = 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@entrance_exam';
++      const testCourseMetadata = Factory.build('courseMetadata', {
++        entrance_exam_data: {
++          entrance_exam_current_score: 0.3,
++          entrance_exam_enabled: true,
++          entrance_exam_id: sectionId,
++          entrance_exam_minimum_score_pct: 0.7,
++          entrance_exam_passed: false,
++        },
++      });
++      const sequenceBlocks = [Factory.build(
++        'block',
++        { type: 'sequential', sectionId },
++        { courseId: testCourseMetadata.id },
++      )];
++      const sectionBlocks = [Factory.build(
++        'block',
++        { type: 'chapter', children: sequenceBlocks.map(block => block.id), id: sectionId },
++        { courseId: testCourseMetadata.id },
++      )];
++
++      const testStore = await initializeTestStore({
++        courseMetadata: testCourseMetadata, sequenceBlocks, sectionBlocks,
++      });
++      const testData = {
++        ...mockData,
++        courseId: testCourseMetadata.id,
++        sequenceId: sequenceBlocks[0].id,
++      };
++      render(<Course {...testData} />, { store: testStore });
++      await waitFor(() => expect(screen.getByText('To access course materials, you must score 70% or higher on this exam. Your current score is 30%.')).toBeInTheDocument());
++    });
++  });
+ });
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index cc3baad..12d1306 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -1,6 +1,6 @@
+ /* eslint-disable no-use-before-define */
+ import React, {
+-  useEffect, useContext, useState,
++  useEffect, useState,
+ } from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+@@ -15,8 +15,8 @@ import SequenceExamWrapper from '@edx/frontend-lib-special-exams';
+ import { breakpoints, useWindowSize } from '@edx/paragon';
+ 
+ import PageLoading from '../../../generic/PageLoading';
+-import { UserMessagesContext, ALERT_TYPES } from '../../../generic/user-messages';
+ import { useModel } from '../../../generic/model-store';
++import { useSequenceBannerTextAlert, useSequenceEntranceExamAlert } from '../../../alerts/sequence-alerts/hooks';
+ 
+ import CourseLicense from '../course-license';
+ import Sidebar from '../sidebar/Sidebar';
+@@ -89,26 +89,20 @@ function Sequence({
+     sendTrackingLogEvent(eventName, payload);
+   };
+ 
+-  const { add, remove } = useContext(UserMessagesContext);
++  useSequenceBannerTextAlert(sequenceId);
++  useSequenceEntranceExamAlert(courseId, sequenceId, intl);
++
+   useEffect(() => {
+-    let id = null;
+-    if (sequenceStatus === 'loaded') {
+-      if (sequence.bannerText) {
+-        id = add({
+-          code: null,
+-          dismissible: false,
+-          text: sequence.bannerText,
+-          type: ALERT_TYPES.INFO,
+-          topic: 'sequence',
+-        });
++    function receiveMessage(event) {
++      const { type } = event.data;
++      if (type === 'entranceExam.passed') {
++        // I know this seems (is) intense. It is implemented this way since we need to refetch the underlying
++        // course blocks that were originally hidden because the Entrance Exam was not passed.
++        global.location.reload();
+       }
+     }
+-    return () => {
+-      if (id) {
+-        remove(id);
+-      }
+-    };
+-  }, [sequenceStatus, sequence]);
++    global.addEventListener('message', receiveMessage);
++  }, []);
+ 
+   const [unitHasLoaded, setUnitHasLoaded] = useState(false);
+   const handleUnitLoaded = () => {
+@@ -130,11 +124,11 @@ function Sequence({
+   const loading = sequenceStatus === 'loading' || (sequenceStatus === 'failed' && sequenceMightBeUnit);
+   if (loading) {
+     if (!sequenceId) {
+-      return (<div> {intl.formatMessage(messages['learn.sequence.no.content'])} </div>);
++      return (<div> {intl.formatMessage(messages.noContent)} </div>);
+     }
+     return (
+       <PageLoading
+-        srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++        srMessage={intl.formatMessage(messages.loadingSequence)}
+       />
+     );
+   }
+@@ -236,7 +230,7 @@ function Sequence({
+   // sequence status 'failed' and any other unexpected sequence status.
+   return (
+     <p className="text-center py-5 mx-auto" style={{ maxWidth: '30em' }}>
+-      {intl.formatMessage(messages['learn.course.load.failure'])}
++      {intl.formatMessage(messages.loadFailure)}
+     </p>
+   );
+ }
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index d6eff20..4807ddd 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -31,7 +31,7 @@ function SequenceContent({
+       <Suspense
+         fallback={(
+           <PageLoading
+-            srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
++            srMessage={intl.formatMessage(messages.loadingLockedContent)}
+           />
+         )}
+       >
+@@ -49,7 +49,7 @@ function SequenceContent({
+   if (!unitId || !unit) {
+     return (
+       <div>
+-        {intl.formatMessage(messages['learn.sequence.no.content'])}
++        {intl.formatMessage(messages.noContent)}
+       </div>
+     );
+   }
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 7da7a81..31a9bf9 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -146,7 +146,7 @@ function Unit({
+   return (
+     <div className="unit">
+       <h1 className="mb-0 h3">{unit.title}</h1>
+-      <h2 className="sr-only">{intl.formatMessage(messages['learn.header.h2.placeholder'])}</h2>
++      <h2 className="sr-only">{intl.formatMessage(messages.headerPlaceholder)}</h2>
+       <BookmarkButton
+         unitId={unit.id}
+         isBookmarked={unit.bookmarked}
+@@ -156,7 +156,7 @@ function Unit({
+         <Suspense
+           fallback={(
+             <PageLoading
+-              srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
++              srMessage={intl.formatMessage(messages.loadingLockedContent)}
+             />
+           )}
+         >
+@@ -171,7 +171,7 @@ function Unit({
+         <Suspense
+           fallback={(
+             <PageLoading
+-              srMessage={intl.formatMessage(messages['learn.loading.honor.code'])}
++              srMessage={intl.formatMessage(messages.loadingHonorCode)}
+             />
+           )}
+         >
+@@ -181,7 +181,7 @@ function Unit({
+       { /** [MM-P2P] Experiment (conditional) */ }
+       {!mmp2p.meta.blockContent && !shouldDisplayHonorCode && !hasLoaded && !showError && (
+         <PageLoading
+-          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++          srMessage={intl.formatMessage(messages.loadingSequence)}
+         />
+       )}
+       {!mmp2p.meta.blockContent && !shouldDisplayHonorCode && !hasLoaded && showError && (
+diff --git a/src/courseware/course/sequence/messages.js b/src/courseware/course/sequence/messages.js
+index e31728e..1643157 100644
+--- a/src/courseware/course/sequence/messages.js
++++ b/src/courseware/course/sequence/messages.js
+@@ -1,37 +1,36 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  'learn.loading.content.lock': {
+-    id: 'learn.loading.content.lock',
+-    defaultMessage: 'Loading locked content messaging...',
+-    description: 'Message shown when an interface about locked content is being loaded',
++  headerPlaceholder: {
++    id: 'learn.header.h2.placeholder',
++    defaultMessage: 'Level 2 headings may be created by course providers in the future.',
++    description: 'Message spoken by a screenreader indicating that the h2 tag is a placeholder.',
+   },
+-  'learn.loading.honor.code': {
++  loadFailure: {
++    id: 'learn.course.load.failure',
++    defaultMessage: 'There was an error loading this course.',
++    description: 'Message when a course fails to load',
++  },
++  loadingHonorCode: {
+     id: 'learn.loading.honor.codk',
+     defaultMessage: 'Loading honor code messaging...',
+     description: 'Message shown when an interface about the honor code is being loaded',
+   },
+-  'learn.loading.learning.sequence': {
++  loadingLockedContent: {
++    id: 'learn.loading.content.lock',
++    defaultMessage: 'Loading locked content messaging...',
++    description: 'Message shown when an interface about locked content is being loaded',
++  },
++  loadingSequence: {
+     id: 'learn.loading.learning.sequence',
+     defaultMessage: 'Loading learning sequence...',
+     description: 'Message when learning sequence is being loaded',
+   },
+-  'learn.course.load.failure': {
+-    id: 'learn.course.load.failure',
+-    defaultMessage: 'There was an error loading this course.',
+-    description: 'Message when a course fails to load',
+-  },
+-  'learn.sequence.no.content': {
++  noContent: {
+     id: 'learn.sequence.no.content',
+     defaultMessage: 'There is no content here.',
+     description: 'Message shown when there is no content to show a user inside a learning sequence.',
+   },
+-  'learn.header.h2.placeholder': {
+-    id: 'learn.header.h2.placeholder',
+-    defaultMessage: 'Level 2 headings may be created by course providers in the future.',
+-    description: 'Message spoken by a screenreader indicating that the h2 tag is a placeholder.',
+-
+-  },
+ });
+ 
+ export default messages;
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 272b942..09b60b4 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -52,6 +52,13 @@ Factory.define('courseMetadata')
+     course_exit_page_is_active: true,
+     user_has_passing_grade: false,
+     certificate_data: null,
++    entrance_exam_data: {
++      entrance_exam_current_score: 0.0,
++      entrance_exam_enabled: false,
++      entrance_exam_id: '',
++      entrance_exam_minimum_score_pct: 0.65,
++      entrance_exam_passed: true,
++    },
+     verify_identity_url: null,
+     verification_status: 'none',
+     linkedin_add_to_profile_url: null,
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index ae2f5e1..ed36a0b 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -117,6 +117,7 @@ function normalizeMetadata(metadata) {
+     userHasPassingGrade: data.user_has_passing_grade,
+     courseExitPageIsActive: data.course_exit_page_is_active,
+     certificateData: camelCaseObject(data.certificate_data),
++    entranceExamData: camelCaseObject(data.entrance_exam_data),
+     timeOffsetMillis: getTimeOffsetMillis(headers && headers.date, requestTime, responseTime),
+     verifyIdentityUrl: data.verify_identity_url,
+     verificationStatus: data.verification_status,
+-- 
+2.34.1
+

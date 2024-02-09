@@ -1,0 +1,86 @@
+From ca8afb32943387273caed29a77b10e3639cb392f Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 21 Apr 2020 15:05:00 -0700
+Subject: [PATCH 0106/1021] Add new upgrade offer alert
+
+---
+ src/offer-alert/OfferAlert.jsx | 21 +++++++++++++++++++++
+ src/offer-alert/hooks.js       | 28 ++++++++++++++++++++++++++++
+ src/offer-alert/index.js       |  2 ++
+ 3 files changed, 51 insertions(+)
+ create mode 100644 src/offer-alert/OfferAlert.jsx
+ create mode 100644 src/offer-alert/hooks.js
+ create mode 100644 src/offer-alert/index.js
+
+diff --git a/src/offer-alert/OfferAlert.jsx b/src/offer-alert/OfferAlert.jsx
+new file mode 100644
+index 0000000..2df0b70
+--- /dev/null
++++ b/src/offer-alert/OfferAlert.jsx
+@@ -0,0 +1,21 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import Alert from '../user-messages/Alert';
++
++function OfferAlert(props) {
++  const {
++    rawHtml,
++  } = props;
++  return rawHtml && (
++    <Alert type="info">
++      <div dangerouslySetInnerHTML={{ __html: rawHtml }} />
++    </Alert>
++  );
++}
++
++OfferAlert.propTypes = {
++  rawHtml: PropTypes.string.isRequired,
++};
++
++export default OfferAlert;
+diff --git a/src/offer-alert/hooks.js b/src/offer-alert/hooks.js
+new file mode 100644
+index 0000000..4518c0b
+--- /dev/null
++++ b/src/offer-alert/hooks.js
+@@ -0,0 +1,28 @@
++/* eslint-disable import/prefer-default-export */
++import { useContext, useState, useEffect } from 'react';
++import UserMessagesContext from '../user-messages/UserMessagesContext';
++import { useModel } from '../model-store';
++
++export function useOfferAlert(courseId) {
++  const course = useModel('courses', courseId);
++  const { add, remove } = useContext(UserMessagesContext);
++  const [alertId, setAlertId] = useState(null);
++  const rawHtml = (course && course.offerHtml) || null;
++  useEffect(() => {
++    if (rawHtml && alertId === null) {
++      setAlertId(add({
++        code: 'clientOfferAlert',
++        topic: 'course',
++        rawHtml,
++      }));
++    } else if (!rawHtml && alertId !== null) {
++      remove(alertId);
++      setAlertId(null);
++    }
++    return () => {
++      if (alertId !== null) {
++        remove(alertId);
++      }
++    };
++  }, [course, rawHtml]);
++}
+diff --git a/src/offer-alert/index.js b/src/offer-alert/index.js
+new file mode 100644
+index 0000000..781efdb
+--- /dev/null
++++ b/src/offer-alert/index.js
+@@ -0,0 +1,2 @@
++export { default as OfferAlert } from './OfferAlert';
++export { useOfferAlert } from './hooks';
+-- 
+2.34.1
+

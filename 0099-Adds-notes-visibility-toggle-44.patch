@@ -1,0 +1,286 @@
+From 15c3053e878f0d773c4f08d431b5848aeb7ce806 Mon Sep 17 00:00:00 2001
+From: "Dave St.Germain" <dstgermain@edx.org>
+Date: Thu, 9 Apr 2020 14:46:33 -0400
+Subject: [PATCH 0099/1021] Adds notes visibility toggle (#44)
+
+* added notes
+
+* moved around components
+
+* Addressed feedback
+---
+ src/courseware/course/Course.jsx              |  6 +-
+ src/courseware/course/tools/ContentTools.jsx  | 33 ++++++++++
+ .../course/tools/calculator/calculator.scss   |  7 ++
+ .../course/{ => tools}/calculator/index.jsx   |  4 +-
+ .../course/{ => tools}/calculator/messages.js |  0
+ src/courseware/course/tools/data/api.js       |  6 ++
+ .../course/tools/notes/NotesVisibility.jsx    | 66 +++++++++++++++++++
+ src/courseware/course/tools/notes/messages.js | 16 +++++
+ .../calculator.scss => tools/tools.scss}      |  8 +--
+ src/data/api.js                               |  1 +
+ 10 files changed, 136 insertions(+), 11 deletions(-)
+ create mode 100644 src/courseware/course/tools/ContentTools.jsx
+ create mode 100644 src/courseware/course/tools/calculator/calculator.scss
+ rename src/courseware/course/{ => tools}/calculator/index.jsx (99%)
+ rename src/courseware/course/{ => tools}/calculator/messages.js (100%)
+ create mode 100644 src/courseware/course/tools/data/api.js
+ create mode 100644 src/courseware/course/tools/notes/NotesVisibility.jsx
+ create mode 100644 src/courseware/course/tools/notes/messages.js
+ rename src/courseware/course/{calculator/calculator.scss => tools/tools.scss} (77%)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 1c751e8..75af027 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -14,7 +14,7 @@ import Sequence from './sequence';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import { Header, CourseTabsNavigation } from '../../course-header';
+ import CourseSock from './course-sock';
+-import Calculator from './calculator';
++import ContentTools from './tools/ContentTools';
+ import messages from './messages';
+ import { useModel } from '../../model-store';
+ 
+@@ -54,7 +54,7 @@ function Course({
+ 
+   if (courseStatus === 'loaded') {
+     const {
+-      org, number, title, isStaff, tabs, verifiedMode, showCalculator,
++      org, number, title, isStaff, tabs, verifiedMode,
+     } = course;
+     return (
+       <>
+@@ -96,7 +96,7 @@ function Course({
+             previousSequenceHandler={previousSequenceHandler}
+           />
+           {verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
+-          {showCalculator && <Calculator />}
++          <ContentTools course={course} />
+         </div>
+       </>
+     );
+diff --git a/src/courseware/course/tools/ContentTools.jsx b/src/courseware/course/tools/ContentTools.jsx
+new file mode 100644
+index 0000000..0485b42
+--- /dev/null
++++ b/src/courseware/course/tools/ContentTools.jsx
+@@ -0,0 +1,33 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import Calculator from './calculator';
++import NotesVisibility from './notes/NotesVisibility';
++import './tools.scss';
++
++export default function ContentTools({
++  course,
++}) {
++  return (
++    <div className="content-tools">
++      <div className="d-flex justify-content-end m-0">
++        {course.showCalculator && (
++          <Calculator />
++        )}
++        {course.notes.enabled && (
++          <NotesVisibility course={course} />
++        )}
++      </div>
++    </div>
++  );
++}
++
++
++ContentTools.propTypes = {
++  course: PropTypes.shape({
++    notes: PropTypes.shape({
++      enabled: PropTypes.bool,
++    }),
++    showCalculator: PropTypes.bool,
++  }).isRequired,
++};
+diff --git a/src/courseware/course/tools/calculator/calculator.scss b/src/courseware/course/tools/calculator/calculator.scss
+new file mode 100644
+index 0000000..2c5d11d
+--- /dev/null
++++ b/src/courseware/course/tools/calculator/calculator.scss
+@@ -0,0 +1,7 @@
++.calculator {
++  width: 100%;
++  .calculator-content {
++    background-color: #f1f1f1;
++    box-shadow: 0 -1px 0 0 #ddd;
++  }
++}
+diff --git a/src/courseware/course/calculator/index.jsx b/src/courseware/course/tools/calculator/index.jsx
+similarity index 99%
+rename from src/courseware/course/calculator/index.jsx
+rename to src/courseware/course/tools/calculator/index.jsx
+index d173913..8d85297 100644
+--- a/src/courseware/course/calculator/index.jsx
++++ b/src/courseware/course/tools/calculator/index.jsx
+@@ -41,8 +41,8 @@ class Calculator extends Component {
+   render() {
+     return (
+       <Collapsible.Advanced className="calculator">
+-        <div className="container-fluid text-right">
+-          <Collapsible.Trigger tag="a" className="calculator-trigger btn">
++        <div className="text-right">
++          <Collapsible.Trigger tag="a" className="trigger btn">
+             <Collapsible.Visible whenOpen>
+               <FontAwesomeIcon icon={faTimesCircle} aria-hidden="true" className="mr-2" />
+             </Collapsible.Visible>
+diff --git a/src/courseware/course/calculator/messages.js b/src/courseware/course/tools/calculator/messages.js
+similarity index 100%
+rename from src/courseware/course/calculator/messages.js
+rename to src/courseware/course/tools/calculator/messages.js
+diff --git a/src/courseware/course/tools/data/api.js b/src/courseware/course/tools/data/api.js
+new file mode 100644
+index 0000000..5084a7a
+--- /dev/null
++++ b/src/courseware/course/tools/data/api.js
+@@ -0,0 +1,6 @@
++import { getConfig } from '@edx/frontend-platform';
++
++export default function toggleNotes() {
++  const iframe = document.getElementById('unit-iframe');
++  iframe.contentWindow.postMessage('tools.toggleNotes', getConfig().LMS_BASE_URL);
++}
+diff --git a/src/courseware/course/tools/notes/NotesVisibility.jsx b/src/courseware/course/tools/notes/NotesVisibility.jsx
+new file mode 100644
+index 0000000..309d753
+--- /dev/null
++++ b/src/courseware/course/tools/notes/NotesVisibility.jsx
+@@ -0,0 +1,66 @@
++import React, { Component } from 'react';
++import PropTypes from 'prop-types';
++
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import {
++  injectIntl, intlShape,
++} from '@edx/frontend-platform/i18n';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faPencilAlt } from '@fortawesome/free-solid-svg-icons';
++import toggleNotes from '../data/api';
++import messages from './messages';
++
++
++class NotesVisibility extends Component {
++  constructor(props) {
++    super(props);
++    this.state = {
++      visible: props.course.notes.visible,
++    };
++    this.visibilityUrl = `${getConfig().LMS_BASE_URL}/courses/${props.course.id}/edxnotes/visibility/`;
++  }
++
++  handleClick = () => {
++    const data = { visibility: this.state.visible };
++    getAuthenticatedHttpClient().put(
++      this.visibilityUrl,
++      data,
++    ).then(() => {
++      this.setState((state) => ({ visible: !state.visible }));
++      toggleNotes();
++    });
++  }
++
++  render() {
++    const message = this.state.visible ? 'notes.button.hide' : 'notes.button.show';
++    return (
++      <div className="trigger" style={{ width: '200px' }}>
++        <div
++          role="switch"
++          className={`btn ${this.state.visible ? 'text-secondary' : 'text-success'}`}
++          onClick={this.handleClick}
++          onKeyDown={this.handleClick}
++          tabIndex="-1"
++          aria-checked={this.state.visible ? 'true' : 'false'}
++        >
++          <FontAwesomeIcon icon={faPencilAlt} aria-hidden="true" className="mr-2" />
++          {this.props.intl.formatMessage(messages[message])}
++        </div>
++      </div>
++    );
++  }
++}
++
++NotesVisibility.propTypes = {
++  intl: intlShape.isRequired,
++  course: PropTypes.shape({
++    id: PropTypes.string,
++    notes: PropTypes.shape({
++      enabled: PropTypes.bool,
++      visible: PropTypes.bool,
++    }),
++  }).isRequired,
++};
++
++export default injectIntl(NotesVisibility);
+diff --git a/src/courseware/course/tools/notes/messages.js b/src/courseware/course/tools/notes/messages.js
+new file mode 100644
+index 0000000..253fb0f
+--- /dev/null
++++ b/src/courseware/course/tools/notes/messages.js
+@@ -0,0 +1,16 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'notes.button.show': {
++    id: 'notes.button.show',
++    defaultMessage: 'Show Notes',
++    description: 'Message for toggling notes visibility',
++  },
++  'notes.button.hide': {
++    id: 'notes.button.hide',
++    defaultMessage: 'Hide Notes',
++    description: 'Message for toggling notes visibility',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/course/calculator/calculator.scss b/src/courseware/course/tools/tools.scss
+similarity index 77%
+rename from src/courseware/course/calculator/calculator.scss
+rename to src/courseware/course/tools/tools.scss
+index 6a64a20..ad2337c 100644
+--- a/src/courseware/course/calculator/calculator.scss
++++ b/src/courseware/course/tools/tools.scss
+@@ -1,10 +1,10 @@
+-.calculator {
++.content-tools {
+   position: fixed;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   z-index: 100;
+-  .calculator-trigger {
++  .trigger {
+     cursor: pointer;
+     display: inline-block;
+     position: relative;
+@@ -20,8 +20,4 @@
+       border-radius: .5rem;
+     }
+   }
+-  .calculator-content {
+-    background-color: #f1f1f1;
+-    box-shadow: 0 -1px 0 0 #ddd;
+-  }
+ }
+diff --git a/src/data/api.js b/src/data/api.js
+index 9559616..a1f38cb 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -20,6 +20,7 @@ function normalizeMetadata(metadata) {
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+     tabs: camelCaseObject(metadata.tabs),
+     showCalculator: metadata.show_calculator,
++    notes: camelCaseObject(metadata.notes),
+   };
+ }
+ 
+-- 
+2.34.1
+

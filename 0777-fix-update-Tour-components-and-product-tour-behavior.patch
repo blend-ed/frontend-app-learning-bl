@@ -1,0 +1,731 @@
+From 2d46bacdc7d6ca213bc70cf7a1ef540f345b9175 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Tue, 11 Jan 2022 13:50:12 -0500
+Subject: [PATCH 0777/1021] fix: update Tour components and product tour
+ behavior (#794)
+
+---
+ .../courseHomeMetadata.factory.js             |  2 +-
+ .../data/__snapshots__/redux.test.js.snap     |  9 ++-
+ src/course-home/data/slice.js                 |  5 ++
+ src/course-home/outline-tab/OutlineTab.jsx    | 29 ++------
+ .../outline-tab/OutlineTab.test.jsx           |  2 +-
+ .../outline-tab/widgets/CourseDates.jsx       |  7 +-
+ .../outline-tab/widgets/CourseHandouts.jsx    |  8 ++-
+ .../outline-tab/widgets/CourseTools.jsx       | 12 ++--
+ .../widgets/ProctoringInfoPanel.jsx           | 25 +++----
+ .../widgets/StartOrResumeCourseCard.jsx       |  5 +-
+ .../__factories__/courseMetadata.factory.js   |  2 +-
+ src/product-tours/ProductTours.jsx            | 39 +++++------
+ src/product-tours/ProductTours.test.jsx       |  8 ++-
+ .../NewUserCourseHomeTour.jsx                 | 68 ++++++-------------
+ src/setupTest.js                              |  4 +-
+ .../StreakCelebrationModal.test.jsx           |  2 +-
+ src/tab-page/LoadedTabPage.jsx                |  1 -
+ 17 files changed, 100 insertions(+), 128 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 02bc83c..53b5045 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -20,5 +20,5 @@ Factory.define('courseHomeMetadata')
+     },
+     start: '2013-02-05T05:00:00Z',
+     user_timezone: 'UTC',
+-    username: 'testuser',
++    username: 'MockUser',
+   });
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 46e507e..a5a7932 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -5,6 +5,7 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
++    "proctoringPanelStatus": "loading",
+     "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+@@ -71,7 +72,7 @@ Object {
+         ],
+         "title": "Demonstration Course",
+         "userTimezone": "UTC",
+-        "username": "testuser",
++        "username": "MockUser",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+@@ -317,6 +318,7 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
++    "proctoringPanelStatus": "loading",
+     "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+@@ -383,7 +385,7 @@ Object {
+         ],
+         "title": "Demonstration Course",
+         "userTimezone": "UTC",
+-        "username": "testuser",
++        "username": "MockUser",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+@@ -509,6 +511,7 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
++    "proctoringPanelStatus": "loading",
+     "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+@@ -575,7 +578,7 @@ Object {
+         ],
+         "title": "Demonstration Course",
+         "userTimezone": "UTC",
+-        "username": "testuser",
++        "username": "MockUser",
+         "verifiedMode": Object {
+           "currencySymbol": "$",
+           "price": 10,
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index b195b42..cefe918 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -11,11 +11,15 @@ const slice = createSlice({
+   initialState: {
+     courseStatus: 'loading',
+     courseId: null,
++    proctoringPanelStatus: 'loading',
+     toastBodyText: null,
+     toastBodyLink: null,
+     toastHeader: '',
+   },
+   reducers: {
++    fetchProctoringInfoResolved: (state) => {
++      state.proctoringPanelStatus = LOADED;
++    },
+     fetchTabDenied: (state, { payload }) => {
+       state.courseId = payload.courseId;
+       state.courseStatus = DENIED;
+@@ -47,6 +51,7 @@ const slice = createSlice({
+ });
+ 
+ export const {
++  fetchProctoringInfoResolved,
+   fetchTabDenied,
+   fetchTabFailure,
+   fetchTabRequest,
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 9239839..1949a1f 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -34,13 +34,13 @@ import { initHomeMMP2P, MMP2PFlyover } from '../../experiments/mm-p2p';
+ function OutlineTab({ intl }) {
+   const {
+     courseId,
++    proctoringPanelStatus,
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+     isSelfPaced,
+     org,
+     title,
+-    username,
+     userTimezone,
+   } = useModel('courseHomeMeta', courseId);
+ 
+@@ -60,17 +60,11 @@ function OutlineTab({ intl }) {
+     },
+     enableProctoredExams,
+     offer,
+-    resumeCourse: {
+-      url: resumeCourseUrl,
+-    },
+     timeOffsetMillis,
+     verifiedMode,
+   } = useModel('outline', courseId);
+ 
+   const [expandAll, setExpandAll] = useState(false);
+-  // Defer showing the goal widget until the ProctoringInfoPanel is either shown or determined as not showing
+-  // to avoid components bouncing around too much as screen is displayed
+-  const [proctorPanelResolved, setProctorPanelResolved] = useState(!enableProctoredExams);
+ 
+   const eventProperties = {
+     org_key: org,
+@@ -150,9 +144,7 @@ function OutlineTab({ intl }) {
+               <UpgradeToShiftDatesAlert model="outline" logUpgradeLinkClick={logUpgradeToShiftDatesLinkClick} />
+             </>
+           )}
+-          {resumeCourseUrl && (
+           <StartOrResumeCourseCard />
+-          )}
+           <WelcomeMessage courseId={courseId} />
+           {rootCourseId && (
+             <>
+@@ -179,20 +171,16 @@ function OutlineTab({ intl }) {
+         </div>
+         {rootCourseId && (
+           <div className="col col-12 col-md-4">
+-            <ProctoringInfoPanel
+-              courseId={courseId}
+-              username={username}
+-              isResolved={() => setProctorPanelResolved(true)}
+-            />
+-            {weeklyLearningGoalEnabled && proctorPanelResolved && (
++            <ProctoringInfoPanel />
++            { /** Defer showing the goal widget until the ProctoringInfoPanel has resolved or has been determined as
++             disabled to avoid components bouncing around too much as screen is rendered */ }
++            {(!enableProctoredExams || proctoringPanelStatus === 'loaded') && weeklyLearningGoalEnabled && (
+               <WeeklyLearningGoalCard
+                 daysPerWeek={selectedGoal && 'daysPerWeek' in selectedGoal ? selectedGoal.daysPerWeek : null}
+                 subscribedToReminders={selectedGoal && 'subscribedToReminders' in selectedGoal ? selectedGoal.subscribedToReminders : false}
+               />
+             )}
+-            <CourseTools
+-              courseId={courseId}
+-            />
++            <CourseTools />
+             { /** [MM-P2P] Experiment (conditional) */ }
+             { MMP2P.state.isEnabled
+               ? <MMP2PFlyover isStatic options={MMP2P} />
+@@ -211,13 +199,10 @@ function OutlineTab({ intl }) {
+                 />
+               )}
+             <CourseDates
+-              courseId={courseId}
+               /** [MM-P2P] Experiment */
+               mmp2p={MMP2P}
+             />
+-            <CourseHandouts
+-              courseId={courseId}
+-            />
++            <CourseHandouts />
+           </div>
+         )}
+       </div>
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 4a7e5c9..5316731 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -35,7 +35,7 @@ describe('Outline Tab', () => {
+   const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
+   const masqueradeUrl = `${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`;
+   const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+-  const proctoringInfoUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=${encodeURIComponent(courseId)}&username=testuser`;
++  const proctoringInfoUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=${encodeURIComponent(courseId)}&username=MockUser`;
+ 
+   const store = initializeStore();
+   const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index c78dbef..fbce095 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -8,11 +9,13 @@ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+ function CourseDates({
+-  courseId,
+   intl,
+   /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
+   const {
+     userTimezone,
+   } = useModel('courseHomeMeta', courseId);
+@@ -51,14 +54,12 @@ function CourseDates({
+ }
+ 
+ CourseDates.propTypes = {
+-  courseId: PropTypes.string,
+   intl: intlShape.isRequired,
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({}),
+ };
+ 
+ CourseDates.defaultProps = {
+-  courseId: null,
+   /** [MM-P2P] Experiment */
+   mmp2p: {},
+ };
+diff --git a/src/course-home/outline-tab/widgets/CourseHandouts.jsx b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+index 6364d53..7a07175 100644
+--- a/src/course-home/outline-tab/widgets/CourseHandouts.jsx
++++ b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+@@ -1,5 +1,5 @@
+ import React from 'react';
+-import PropTypes from 'prop-types';
++import { useSelector } from 'react-redux';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+@@ -7,7 +7,10 @@ import LmsHtmlFragment from '../LmsHtmlFragment';
+ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function CourseHandouts({ courseId, intl }) {
++function CourseHandouts({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
+   const {
+     handoutsHtml,
+   } = useModel('outline', courseId);
+@@ -29,7 +32,6 @@ function CourseHandouts({ courseId, intl }) {
+ }
+ 
+ CourseHandouts.propTypes = {
+-  courseId: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
+ };
+ 
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 9ac0927..0847dea 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -1,5 +1,5 @@
+ import React from 'react';
+-import PropTypes from 'prop-types';
++import { useSelector } from 'react-redux';
+ 
+ import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+@@ -14,7 +14,10 @@ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ import LaunchCourseHomeTourButton from '../../../product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton';
+ 
+-function CourseTools({ courseId, intl }) {
++function CourseTools({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
+   const { org } = useModel('courseHomeMeta', courseId);
+   const {
+     courseTools,
+@@ -79,12 +82,7 @@ function CourseTools({ courseId, intl }) {
+ }
+ 
+ CourseTools.propTypes = {
+-  courseId: PropTypes.string,
+   intl: intlShape.isRequired,
+ };
+ 
+-CourseTools.defaultProps = {
+-  courseId: null,
+-};
+-
+ export default injectIntl(CourseTools);
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index 3d68c00..0ee5d70 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -1,16 +1,24 @@
+ import React, { useState, useEffect } from 'react';
++import { useDispatch, useSelector } from 'react-redux';
+ import camelCase from 'lodash.camelcase';
+-import PropTypes from 'prop-types';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Button } from '@edx/paragon';
+ 
+ import messages from '../messages';
+ import { getProctoringInfoData } from '../../data/api';
++import { fetchProctoringInfoResolved } from '../../data/slice';
++import { useModel } from '../../../generic/model-store';
++
++function ProctoringInfoPanel({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++  const {
++    username,
++  } = useModel('courseHomeMeta', courseId);
++  const dispatch = useDispatch();
+ 
+-function ProctoringInfoPanel({
+-  courseId, username, intl, isResolved,
+-}) {
+   const [link, setLink] = useState('');
+   const [onboardingPastDue, setOnboardingPastDue] = useState(false);
+   const [showInfoPanel, setShowInfoPanel] = useState(false);
+@@ -102,7 +110,7 @@ function ProctoringInfoPanel({
+         /* Do nothing. API throws 404 when class does not have proctoring */
+       })
+       .finally(() => {
+-        isResolved();
++        dispatch(fetchProctoringInfoResolved());
+       });
+   }, []);
+ 
+@@ -191,14 +199,7 @@ function ProctoringInfoPanel({
+ }
+ 
+ ProctoringInfoPanel.propTypes = {
+-  courseId: PropTypes.string.isRequired,
+-  username: PropTypes.string,
+   intl: intlShape.isRequired,
+-  isResolved: PropTypes.func.isRequired,
+-};
+-
+-ProctoringInfoPanel.defaultProps = {
+-  username: null,
+ };
+ 
+ export default injectIntl(ProctoringInfoPanel);
+diff --git a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+index 963ddb3..b7987b0 100644
+--- a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
++++ b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+@@ -26,9 +26,12 @@ function StartOrResumeCourseCard({ intl }) {
+       hasVisitedCourse,
+       url: resumeCourseUrl,
+     },
+-
+   } = useModel('outline', courseId);
+ 
++  if (!resumeCourseUrl) {
++    return null;
++  }
++
+   const logResumeCourseClick = () => {
+     sendTrackingLogEvent('edx.course.home.resume_course.clicked', {
+       ...eventProperties,
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 3f77e82..11053fa 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -63,5 +63,5 @@ Factory.define('courseMetadata')
+     related_programs: null,
+     user_needs_integrity_signature: false,
+     recommendations: null,
+-    username: 'testuser',
++    username: 'MockUser',
+   });
+diff --git a/src/product-tours/ProductTours.jsx b/src/product-tours/ProductTours.jsx
+index 81e0d20..5b102e2 100644
+--- a/src/product-tours/ProductTours.jsx
++++ b/src/product-tours/ProductTours.jsx
+@@ -6,8 +6,6 @@ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+ import Tour from '../tour/Tour';
+ 
+-import { useModel } from '../generic/model-store';
+-
+ import abandonTour from './AbandonTour';
+ import coursewareTour from './CoursewareTour';
+ import existingUserCourseHomeTour from './ExistingUserCourseHomeTour';
+@@ -24,7 +22,6 @@ function ProductTours({
+   activeTab,
+   courseId,
+   isStreakCelebrationOpen,
+-  metadataModel,
+   org,
+ }) {
+   if (isStreakCelebrationOpen) {
+@@ -32,9 +29,8 @@ function ProductTours({
+   }
+ 
+   const {
+-    username,
+-    verifiedMode,
+-  } = useModel(metadataModel, courseId);
++    proctoringPanelStatus,
++  } = useSelector(state => state.courseHome);
+ 
+   const {
+     showCoursewareTour,
+@@ -49,41 +45,43 @@ function ProductTours({
+   const [isNewUserCourseHomeTourEnabled, setIsNewUserCourseHomeTourEnabled] = useState(false);
+ 
+   const dispatch = useDispatch();
+-  const administrator = getAuthenticatedUser() && getAuthenticatedUser().administrator;
++  const {
++    administrator,
++    username,
++  } = getAuthenticatedUser() || {};
++  const isCoursewareTab = activeTab === 'courseware';
++  const isOutlineTab = activeTab === 'outline';
+ 
+   useEffect(() => {
++    const isOutlineTabResolved = isOutlineTab && proctoringPanelStatus === 'loaded';
++    const userIsAuthenticated = !!username;
++
+     // Tours currently only exist on the Outline Tab and within Courseware, so we'll avoid
+     // calling the tour endpoint unnecessarily.
+-    if (username && (activeTab === 'outline' || metadataModel === 'coursewareMeta')) {
++    if (userIsAuthenticated && (isCoursewareTab || isOutlineTabResolved)) {
+       dispatch(fetchTourData(username));
+     }
+-  }, []);
++  }, [proctoringPanelStatus]);
+ 
+   useEffect(() => {
+-    if (metadataModel === 'coursewareMeta' && showCoursewareTour) {
++    if (isCoursewareTab && showCoursewareTour) {
+       setIsCoursewareTourEnabled(true);
+     }
+   }, [showCoursewareTour]);
+ 
+   useEffect(() => {
+-    if (metadataModel === 'courseHomeMeta') {
++    if (isOutlineTab) {
+       setIsExistingUserCourseHomeTourEnabled(!!showExistingUserCourseHomeTour);
+     }
+   }, [showExistingUserCourseHomeTour]);
+ 
+   useEffect(() => {
+-    if (metadataModel === 'courseHomeMeta' && showNewUserCourseHomeTour) {
++    if (isOutlineTab && showNewUserCourseHomeTour) {
+       setIsAbandonTourEnabled(false);
+       setIsNewUserCourseHomeTourEnabled(true);
+     }
+   }, [showNewUserCourseHomeTour]);
+ 
+-  const upgradeData = {
+-    courseId,
+-    org,
+-    upgradeUrl: verifiedMode && verifiedMode.upgradeUrl,
+-  };
+-
+   // The <Tour /> component cannot handle rendering multiple enabled tours at once.
+   // I.e. when adding new tours, beware that if multiple tours are enabled,
+   // the first enabled tour in the following array will be the only one that renders.
+@@ -128,6 +126,7 @@ function ProductTours({
+           is_staff: administrator,
+         });
+         dispatch(endCourseHomeTour(username));
++        dispatch(endCoursewareTour(username));
+       },
+       onEnd: () => {
+         setIsNewUserCourseHomeTourEnabled(false);
+@@ -138,7 +137,6 @@ function ProductTours({
+         });
+         dispatch(endCourseHomeTour(username));
+       },
+-      upgradeData,
+     }),
+   ];
+ 
+@@ -148,7 +146,7 @@ function ProductTours({
+         tours={tours}
+       />
+       <NewUserCourseHomeTourModal
+-        isOpen={metadataModel === 'courseHomeMeta' && showNewUserCourseHomeModal}
++        isOpen={isOutlineTab && showNewUserCourseHomeModal}
+         onDismiss={() => {
+           sendTrackEvent('edx.ui.lms.new_user_modal.dismissed', {
+             org_key: org,
+@@ -177,7 +175,6 @@ ProductTours.propTypes = {
+   activeTab: PropTypes.string.isRequired,
+   courseId: PropTypes.string.isRequired,
+   isStreakCelebrationOpen: PropTypes.bool.isRequired,
+-  metadataModel: PropTypes.string.isRequired,
+   org: PropTypes.string.isRequired,
+ };
+ 
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+index 37ec3a5..be79be8 100644
+--- a/src/product-tours/ProductTours.test.jsx
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -36,7 +36,8 @@ describe('Course Home Tours', () => {
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+   const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+-  const tourDataUrl = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/testuser`;
++  const tourDataUrl = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/MockUser`;
++  const proctoringUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=course-v1%3AedX%2BTest%2Brun&username=MockUser`;
+ 
+   const store = initializeStore();
+   const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+@@ -70,6 +71,7 @@ describe('Course Home Tours', () => {
+     // Set defaults for network requests
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
+     axiosMock.onGet(outlineUrl).reply(200, defaultTabData);
++    axiosMock.onGet(proctoringUrl).reply(404, {});
+     axiosMock.onGet(tourDataUrl).reply(200, {
+       course_home_tour_status: 'no-tour',
+       show_courseware_tour: false,
+@@ -237,7 +239,7 @@ describe('Courseware Tour', () => {
+   }
+ 
+   describe('when receiving successful course data', () => {
+-    const tourDataUrl = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/testuser`;
++    const tourDataUrl = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/MockUser`;
+ 
+     beforeEach(async () => {
+       // On page load, SequenceContext attempts to scroll to the top of the page.
+@@ -272,7 +274,7 @@ describe('Courseware Tour', () => {
+         const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceMetadata.item_id}`;
+         axiosMock.onGet(sequenceMetadataUrl).reply(200, sequenceMetadata);
+         const proctoredExamApiUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/proctored_exam/attempt/course_id/${courseId}/content_id/${sequenceMetadata.item_id}?is_learning_mfe=true`;
+-        axiosMock.onGet(proctoredExamApiUrl).reply(200, { exam: {}, active_attempt: {} });
++        axiosMock.onGet(proctoredExamApiUrl).reply(404);
+       });
+ 
+       axiosMock.onPost(`${courseId}/xblock/${defaultSequenceBlock.id}/handler/get_completion`).reply(200, {
+diff --git a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTour.jsx b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTour.jsx
+index fbfa927..829ef7f 100644
+--- a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTour.jsx
++++ b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTour.jsx
+@@ -1,5 +1,4 @@
+ import React from 'react';
+-import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import {
+   DismissButtonFormattedMessage,
+@@ -12,7 +11,7 @@ const datesCheckpoint = {
+     id="tours.datesCheckpoint.body"
+     defaultMessage="Important dates can help you stay on track."
+   />,
+-  placement: 'left-start',
++  placement: 'left',
+   target: '#courseHome-dates',
+   title: <FormattedMessage
+     id="tours.datesCheckpoint.title"
+@@ -46,28 +45,18 @@ const tabNavigationCheckpoint = {
+   />,
+ };
+ 
+-const upgradeCheckpoint = (logUpgradeClick, upgradeLink) => ({
++const upgradeCheckpoint = {
+   body: <FormattedMessage
+     id="tours.upgradeCheckpoint.body"
+-    defaultMessage="Work towards a certificate and gain full access to course materials. {upgradeLink}"
+-    values={{
+-      upgradeLink: (
+-        <a href={upgradeLink} onClick={logUpgradeClick}>
+-          <FormattedMessage
+-            id="tours.upgradeCheckpoint.upgradeLink"
+-            defaultMessage="Upgrade now!"
+-          />
+-        </a>
+-      ),
+-    }}
++    defaultMessage="Work towards a certificate and gain full access to course materials. Upgrade now!"
+   />,
+-  placement: 'left-start',
++  placement: 'left',
+   target: '#courseHome-upgradeNotification',
+   title: <FormattedMessage
+     id="tours.upgradeCheckpoint.title"
+     defaultMessage="Unlock your course"
+   />,
+-});
++};
+ 
+ const weeklyGoalsCheckpoint = {
+   body: <FormattedMessage
+@@ -86,35 +75,22 @@ const newUserCourseHomeTour = ({
+   enabled,
+   onDismiss,
+   onEnd,
+-  upgradeData,
+-}) => {
+-  const logUpgradeClick = () => {
+-    sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
+-      org_key: upgradeData.org,
+-      courserun_key: upgradeData.courseId,
+-      linkCategory: '(none)',
+-      linkName: 'course_home_upgrade_product_tour',
+-      linkType: 'link',
+-      pageName: 'course_home',
+-    });
+-  };
+-  return ({
+-    advanceButtonText: <NextButtonFormattedMessage />,
+-    checkpoints: [
+-      outlineCheckpoint,
+-      datesCheckpoint,
+-      tabNavigationCheckpoint,
+-      upgradeCheckpoint(logUpgradeClick, upgradeData.upgradeUrl),
+-      weeklyGoalsCheckpoint,
+-    ],
+-    dismissButtonText: <DismissButtonFormattedMessage />,
+-    enabled,
+-    endButtonText: <OkayButtonFormattedMessage />,
+-    onDismiss,
+-    onEnd,
+-    onEscape: onDismiss,
+-    tourId: 'newUserCourseHomeTour',
+-  });
+-};
++}) => ({
++  advanceButtonText: <NextButtonFormattedMessage />,
++  checkpoints: [
++    outlineCheckpoint,
++    datesCheckpoint,
++    tabNavigationCheckpoint,
++    upgradeCheckpoint,
++    weeklyGoalsCheckpoint,
++  ],
++  dismissButtonText: <DismissButtonFormattedMessage />,
++  enabled,
++  endButtonText: <OkayButtonFormattedMessage />,
++  onDismiss,
++  onEnd,
++  onEscape: onDismiss,
++  tourId: 'newUserCourseHomeTour',
++});
+ 
+ export default newUserCourseHomeTour;
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 2afe10c..e086cb1 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -66,7 +66,7 @@ Object.defineProperty(window, 'matchMedia', {
+ 
+ export const authenticatedUser = {
+   userId: 'abc123',
+-  username: 'Mock User',
++  username: 'MockUser',
+   roles: [],
+   administrator: false,
+ };
+@@ -79,7 +79,7 @@ export function initializeMockApp() {
+     TWITTER_URL: process.env.TWITTER_URL || null,
+     authenticatedUser: {
+       userId: 'abc123',
+-      username: 'Mock User',
++      username: 'MockUser',
+       roles: [],
+       administrator: false,
+     },
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index bfabfa1..0bc9d4d 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -21,7 +21,7 @@ describe('Loaded Tab Page', () => {
+   let mockData;
+   let testStore;
+   let axiosMock;
+-  const calculateUrl = `${getConfig().ECOMMERCE_BASE_URL}/api/v2/baskets/calculate/?code=ZGY11119949&sku=8CF08E5&username=testuser`;
++  const calculateUrl = `${getConfig().ECOMMERCE_BASE_URL}/api/v2/baskets/calculate/?code=ZGY11119949&sku=8CF08E5&username=MockUser`;
+   const courseMetadata = Factory.build('courseMetadata', { celebrations: { streak_length_to_celebrate: 3 } });
+ 
+   function setDiscount(percent) {
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 12a00f9..b71ed87 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -49,7 +49,6 @@ function LoadedTabPage({
+         activeTab={activeTabSlug}
+         courseId={courseId}
+         isStreakCelebrationOpen={isStreakCelebrationOpen}
+-        metadataModel={metadataModel}
+         org={org}
+       />
+       <Helmet>
+-- 
+2.34.1
+

@@ -1,0 +1,438 @@
+From 4655b344a7ade8227356d2fb09428fd354a452a5 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Mon, 10 Jan 2022 13:38:57 -0500
+Subject: [PATCH 0776/1021] feat: [AA-922] remove deprecated goals feature
+ (#789)
+
+* fix: [AA-922] remove deprecated goals feature
+
+While the new Weekly Learning Goals were being rolled out, the previous goal setting feature still existed behind a waffle flag.
+The Weekly Learning Goals now become the one and only learning goal feature. It is managed behind the course_experience.enable_course_goals flag
+
+- Remove original Goals panel and related components
+
+- Remove references to weeklyLearningGoalEnabled Waffle flag
+---
+ src/course-home/outline-tab/OutlineTab.jsx    | 35 +------
+ .../outline-tab/OutlineTab.test.jsx           | 97 +------------------
+ .../widgets/DeprecatedCourseGoalCard.jsx      | 94 ------------------
+ .../widgets/UpdateGoalSelector.jsx            | 85 ----------------
+ 4 files changed, 3 insertions(+), 308 deletions(-)
+ delete mode 100644 src/course-home/outline-tab/widgets/DeprecatedCourseGoalCard.jsx
+ delete mode 100644 src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index cfcbf8d..9239839 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -4,21 +4,18 @@ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+-import { Button, Toast } from '@edx/paragon';
++import { Button } from '@edx/paragon';
+ import { AlertList } from '../../generic/user-messages';
+ 
+ import CourseDates from './widgets/CourseDates';
+-import CourseGoalCard from './widgets/DeprecatedCourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
+ import StartOrResumeCourseCard from './widgets/StartOrResumeCourseCard';
+ import WeeklyLearningGoalCard from './widgets/WeeklyLearningGoalCard';
+ import CourseTools from './widgets/CourseTools';
+ import { fetchOutlineTab } from '../data';
+-import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ import Section from './Section';
+ import ShiftDatesAlert from '../suggested-schedule-messaging/ShiftDatesAlert';
+-import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+ import UpgradeNotification from '../../generic/upgrade-notification/UpgradeNotification';
+ import UpgradeToShiftDatesAlert from '../suggested-schedule-messaging/UpgradeToShiftDatesAlert';
+ import useCertificateAvailableAlert from './alerts/certificate-status-alert';
+@@ -54,7 +51,6 @@ function OutlineTab({ intl }) {
+       sections,
+     },
+     courseGoals: {
+-      goalOptions,
+       selectedGoal,
+       weeklyLearningGoalEnabled,
+     } = {},
+@@ -71,8 +67,6 @@ function OutlineTab({ intl }) {
+     verifiedMode,
+   } = useModel('outline', courseId);
+ 
+-  const [deprecatedCourseGoalToDisplay, setDeprecatedCourseGoalToDisplay] = useState(selectedGoal);
+-  const [goalToastHeader, setGoalToastHeader] = useState('');
+   const [expandAll, setExpandAll] = useState(false);
+   // Defer showing the goal widget until the ProctoringInfoPanel is either shown or determined as not showing
+   // to avoid components bouncing around too much as screen is displayed
+@@ -119,13 +113,6 @@ function OutlineTab({ intl }) {
+ 
+   return (
+     <>
+-      <Toast
+-        closeLabel={intl.formatMessage(genericMessages.close)}
+-        onClose={() => setGoalToastHeader('')}
+-        show={!!(goalToastHeader)}
+-      >
+-        {goalToastHeader}
+-      </Toast>
+       <div data-learner-type={learnerType} className="row w-100 mx-0 my-3 justify-content-between">
+         <div className="col-12 col-sm-auto p-0">
+           <div role="heading" aria-level="1" className="h2">{title}</div>
+@@ -163,15 +150,6 @@ function OutlineTab({ intl }) {
+               <UpgradeToShiftDatesAlert model="outline" logUpgradeLinkClick={logUpgradeToShiftDatesLinkClick} />
+             </>
+           )}
+-          {!deprecatedCourseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
+-            <CourseGoalCard
+-              courseId={courseId}
+-              goalOptions={goalOptions}
+-              title={title}
+-              setGoalToDisplay={(newGoal) => { setDeprecatedCourseGoalToDisplay(newGoal); }}
+-              setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
+-            />
+-          )}
+           {resumeCourseUrl && (
+           <StartOrResumeCourseCard />
+           )}
+@@ -206,16 +184,7 @@ function OutlineTab({ intl }) {
+               username={username}
+               isResolved={() => setProctorPanelResolved(true)}
+             />
+-            {deprecatedCourseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
+-              <UpdateGoalSelector
+-                courseId={courseId}
+-                goalOptions={goalOptions}
+-                selectedGoal={deprecatedCourseGoalToDisplay}
+-                setGoalToDisplay={(newGoal) => { setDeprecatedCourseGoalToDisplay(newGoal); }}
+-                setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
+-              />
+-            )}
+-            {proctorPanelResolved && weeklyLearningGoalEnabled && (
++            {weeklyLearningGoalEnabled && proctorPanelResolved && (
+               <WeeklyLearningGoalCard
+                 daysPerWeek={selectedGoal && 'daysPerWeek' in selectedGoal ? selectedGoal.daysPerWeek : null}
+                 subscribedToReminders={selectedGoal && 'subscribedToReminders' in selectedGoal ? selectedGoal.subscribedToReminders : false}
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index bab3157..4a7e5c9 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -332,91 +332,6 @@ describe('Outline Tab', () => {
+     });
+   });
+ 
+-  describe('Course Goals', () => {
+-    const goalOptions = [
+-      ['certify', 'Earn a certificate'],
+-      ['complete', 'Complete the course'],
+-      ['explore', 'Explore the course'],
+-      ['unsure', 'Not sure yet'],
+-    ];
+-
+-    it('does not render goal widgets if no goals available', async () => {
+-      await fetchAndRender();
+-      expect(screen.queryByTestId('course-goal-card')).not.toBeInTheDocument();
+-      expect(screen.queryByLabelText('Goal')).not.toBeInTheDocument();
+-      expect(screen.queryByTestId('edit-goal-selector')).not.toBeInTheDocument();
+-    });
+-
+-    describe('goal is not set', () => {
+-      beforeEach(async () => {
+-        setTabData({
+-          course_goals: {
+-            goal_options: goalOptions,
+-            selected_goal: null,
+-          },
+-        });
+-        await fetchAndRender();
+-      });
+-
+-      it('renders goal card', () => {
+-        expect(screen.queryByLabelText('Goal')).not.toBeInTheDocument();
+-        expect(screen.getByTestId('course-goal-card')).toBeInTheDocument();
+-        expect(screen.getByRole('button', { name: 'Earn a certificate' })).toBeInTheDocument();
+-        expect(screen.getByRole('button', { name: 'Complete the course' })).toBeInTheDocument();
+-        expect(screen.getByRole('button', { name: 'Explore the course' })).toBeInTheDocument();
+-        expect(screen.getByRole('button', { name: 'Not sure yet' })).toBeInTheDocument();
+-      });
+-
+-      it('renders goal selector on goal selection', async () => {
+-        const certifyGoalButton = screen.getByRole('button', { name: 'Earn a certificate' });
+-        fireEvent.click(certifyGoalButton);
+-
+-        const goalSelector = await screen.findByTestId('edit-goal-selector');
+-        expect(goalSelector).toBeInTheDocument();
+-      });
+-    });
+-
+-    describe('goal is set', () => {
+-      beforeEach(async () => {
+-        setTabData({
+-          course_goals: {
+-            goal_options: goalOptions,
+-            selected_goal: { text: 'Earn a certificate', key: 'certify' },
+-          },
+-        });
+-        await fetchAndRender();
+-      });
+-
+-      it('renders edit goal selector', () => {
+-        expect(screen.getByLabelText('Goal')).toBeInTheDocument();
+-        expect(screen.getByTestId('edit-goal-selector')).toBeInTheDocument();
+-        expect(screen.getByRole('button', { name: 'Earn a certificate' })).toBeInTheDocument();
+-      });
+-
+-      it('updates goal on click', async () => {
+-        // Open dropdown
+-        const dropdownButtonNode = screen.getByRole('button', { name: 'Earn a certificate' });
+-        await waitFor(() => {
+-          expect(dropdownButtonNode).toBeInTheDocument();
+-        });
+-        fireEvent.click(dropdownButtonNode);
+-
+-        // Select a new goal
+-        const unsureButtonNode = screen.getByRole('button', { name: 'Not sure yet' });
+-        await waitFor(() => {
+-          expect(unsureButtonNode).toBeInTheDocument();
+-        });
+-        fireEvent.click(unsureButtonNode);
+-
+-        // Verify the request was made
+-        await waitFor(() => {
+-          expect(axiosMock.history.post[0].url).toMatch(goalUrl);
+-          expect(axiosMock.history.post[0].data).toMatch(`{"course_id":"${courseId}","goal_key":"unsure"}`);
+-        });
+-      });
+-    });
+-  });
+-
+   describe('Start or Resume Course Card', () => {
+     it('renders startOrResumeCourseCard', async () => {
+       await fetchAndRender();
+@@ -425,11 +340,6 @@ describe('Outline Tab', () => {
+   });
+ 
+   describe('Weekly Learning Goal', () => {
+-    it('does not render weekly learning goal if weeklyLearningGoalEnabled is false', async () => {
+-      await fetchAndRender();
+-      expect(screen.queryByTestId('weekly-learning-goal-card')).not.toBeInTheDocument();
+-    });
+-
+     it('does not post goals while masquerading', async () => {
+       setMetadata({ is_enrolled: true, original_user_is_staff: true });
+       setTabData({
+@@ -452,6 +362,7 @@ describe('Outline Tab', () => {
+             weekly_learning_goal_enabled: true,
+           },
+         });
++
+         await fetchAndRender();
+       });
+ 
+@@ -463,12 +374,6 @@ describe('Outline Tab', () => {
+         expect(screen.getByLabelText(messages.setGoalReminder.defaultMessage)).toBeDisabled();
+       });
+ 
+-      it('does not show the deprecated goals feature if WeeklyLearningGoal is enabled', async () => {
+-        expect(screen.queryByTestId('course-goal-card')).not.toBeInTheDocument();
+-        expect(screen.queryByLabelText('Goal')).not.toBeInTheDocument();
+-        expect(screen.queryByTestId('edit-goal-selector')).not.toBeInTheDocument();
+-      });
+-
+       it.each`
+       level     | days 
+       ${'Casual'}  | ${1}
+diff --git a/src/course-home/outline-tab/widgets/DeprecatedCourseGoalCard.jsx b/src/course-home/outline-tab/widgets/DeprecatedCourseGoalCard.jsx
+deleted file mode 100644
+index de09016..0000000
+--- a/src/course-home/outline-tab/widgets/DeprecatedCourseGoalCard.jsx
++++ /dev/null
+@@ -1,94 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-import { Button, Card } from '@edx/paragon';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-
+-import messages from '../messages';
+-
+-import { deprecatedSaveCourseGoal } from '../../data';
+-
+-function DeprecatedCourseGoalCard({
+-  courseId,
+-  goalOptions,
+-  intl,
+-  title,
+-  setGoalToDisplay,
+-  setGoalToastHeader,
+-}) {
+-  function selectGoalHandler(event) {
+-    const selectedGoal = {
+-      key: event.currentTarget.getAttribute('data-goal-key'),
+-      text: event.currentTarget.getAttribute('data-goal-text'),
+-    };
+-
+-    deprecatedSaveCourseGoal(courseId, selectedGoal.key).then((response) => {
+-      const { data } = response;
+-      const {
+-        header,
+-      } = data;
+-
+-      setGoalToDisplay(selectedGoal);
+-      setGoalToastHeader(header);
+-    });
+-  }
+-
+-  return (
+-    <Card className="mb-3" data-testid="course-goal-card">
+-      <Card.Body>
+-        <div className="row w-100 m-0 justify-content-between align-items-center">
+-          <div className="col col-8 p-0">
+-            <h2 className="h4 m-0">{intl.formatMessage(messages.welcomeTo)} {title}</h2>
+-          </div>
+-          <div className="col col-auto p-0">
+-            <Button
+-              variant="link"
+-              className="p-0"
+-              size="sm"
+-              block
+-              data-goal-key="unsure"
+-              data-goal-text={`${intl.formatMessage(messages.goalUnsure)}`}
+-              onClick={(event) => { selectGoalHandler(event); }}
+-            >
+-              {intl.formatMessage(messages.goalUnsure)}
+-            </Button>
+-          </div>
+-        </div>
+-        <Card.Text className="my-2 mx-1 text-dark-500">{intl.formatMessage(messages.setGoal)}</Card.Text>
+-        <div className="row w-100 m-0">
+-          {goalOptions.map((goal) => {
+-            const [goalKey, goalText] = goal;
+-            return (
+-              (goalKey !== 'unsure') && (
+-                <div key={`goal-${goalKey}`} className="col-auto flex-grow-1 mx-1 my-2 p-0">
+-                  <Button
+-                    variant="outline-primary"
+-                    block
+-                    data-goal-key={goalKey}
+-                    data-goal-text={goalText}
+-                    onClick={(event) => { selectGoalHandler(event); }}
+-                  >
+-                    {goalText}
+-                  </Button>
+-                </div>
+-              )
+-            );
+-          })}
+-        </div>
+-      </Card.Body>
+-    </Card>
+-  );
+-}
+-
+-DeprecatedCourseGoalCard.propTypes = {
+-  courseId: PropTypes.string.isRequired,
+-  goalOptions: PropTypes.arrayOf(
+-    PropTypes.arrayOf(PropTypes.string),
+-  ).isRequired,
+-  intl: intlShape.isRequired,
+-  title: PropTypes.string.isRequired,
+-  setGoalToDisplay: PropTypes.func.isRequired,
+-  setGoalToastHeader: PropTypes.func.isRequired,
+-};
+-
+-export default injectIntl(DeprecatedCourseGoalCard);
+diff --git a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+deleted file mode 100644
+index 38c593e..0000000
+--- a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
++++ /dev/null
+@@ -1,85 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Dropdown } from '@edx/paragon';
+-
+-import messages from '../messages';
+-import { deprecatedSaveCourseGoal } from '../../data';
+-
+-function UpdateGoalSelector({
+-  courseId,
+-  goalOptions,
+-  intl,
+-  selectedGoal,
+-  setGoalToDisplay,
+-  setGoalToastHeader,
+-}) {
+-  function selectGoalHandler(event) {
+-    const key = event.currentTarget.id;
+-    const text = event.currentTarget.innerText;
+-    const newGoal = {
+-      key,
+-      text,
+-    };
+-
+-    setGoalToDisplay(newGoal);
+-    deprecatedSaveCourseGoal(courseId, key).then((response) => {
+-      const { data } = response;
+-      const {
+-        header,
+-      } = data;
+-
+-      setGoalToastHeader(header);
+-    });
+-  }
+-
+-  return (
+-    <>
+-      <section className="mb-4">
+-        <div className="row w-100 m-0">
+-          <div className="col-12 p-0">
+-            <label className="h4 m-0" htmlFor="edit-goal-selector">
+-              {intl.formatMessage(messages.goal)}
+-            </label>
+-          </div>
+-          <div className="col-12 p-0">
+-            <Dropdown className="py-2">
+-              <Dropdown.Toggle variant="outline-primary" block id="edit-goal-selector" data-testid="edit-goal-selector">
+-                {selectedGoal.text}
+-              </Dropdown.Toggle>
+-              <Dropdown.Menu>
+-                {goalOptions.map(([goalKey, goalText]) => (
+-                  <Dropdown.Item
+-                    id={goalKey}
+-                    key={goalKey}
+-                    onClick={(event) => { selectGoalHandler(event); }}
+-                    role="button"
+-                  >
+-                    {goalText}
+-                  </Dropdown.Item>
+-                ))}
+-              </Dropdown.Menu>
+-            </Dropdown>
+-          </div>
+-        </div>
+-      </section>
+-    </>
+-  );
+-}
+-
+-UpdateGoalSelector.propTypes = {
+-  courseId: PropTypes.string.isRequired,
+-  goalOptions: PropTypes.arrayOf(
+-    PropTypes.arrayOf(PropTypes.string),
+-  ).isRequired,
+-  intl: intlShape.isRequired,
+-  selectedGoal: PropTypes.shape({
+-    key: PropTypes.string,
+-    text: PropTypes.string,
+-  }).isRequired,
+-  setGoalToDisplay: PropTypes.func.isRequired,
+-  setGoalToastHeader: PropTypes.func.isRequired,
+-};
+-
+-export default injectIntl(UpdateGoalSelector);
+-- 
+2.34.1
+

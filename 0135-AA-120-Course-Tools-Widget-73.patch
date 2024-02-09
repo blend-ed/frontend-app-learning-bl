@@ -1,0 +1,191 @@
+From 025f37cd21c4f737ffce1335c58b5494ef3c6c1e Mon Sep 17 00:00:00 2001
+From: Carla Duarte <ciduarte@wpi.edu>
+Date: Tue, 2 Jun 2020 13:41:23 -0400
+Subject: [PATCH 0135/1021] AA-120: Course Tools Widget (#73)
+
+Co-authored-by: Carla Duarte <cduarte@edx.org>
+---
+ src/course-home/CourseHome.jsx  |  6 +++-
+ src/course-home/CourseTools.jsx | 58 +++++++++++++++++++++++++++++++++
+ src/data/api.js                 | 11 +++++++
+ src/data/thunks.js              | 19 +++++++++--
+ 4 files changed, 90 insertions(+), 4 deletions(-)
+ create mode 100644 src/course-home/CourseTools.jsx
+
+diff --git a/src/course-home/CourseHome.jsx b/src/course-home/CourseHome.jsx
+index 877fc83..c26351c 100644
+--- a/src/course-home/CourseHome.jsx
++++ b/src/course-home/CourseHome.jsx
+@@ -5,11 +5,12 @@ import { Button } from '@edx/paragon';
+ import { AlertList } from '../user-messages';
+ 
+ import CourseDates from './CourseDates';
++import CourseTools from './CourseTools';
+ import Section from './Section';
+ import { useModel } from '../model-store';
+ 
+ // Note that we import from the component files themselves in the enrollment-alert package.
+-// This is because Reacy.lazy() requires that we import() from a file with a Component as it's
++// This is because React.lazy() requires that we import() from a file with a Component as its
+ // default export.
+ // See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
+ const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../enrollment-alert'));
+@@ -57,6 +58,9 @@ export default function CourseHome() {
+           ))}
+         </div>
+         <div className="col col-4">
++          <CourseTools
++            courseId={courseId}
++          />
+           <CourseDates
+             start={start}
+             end={end}
+diff --git a/src/course-home/CourseTools.jsx b/src/course-home/CourseTools.jsx
+new file mode 100644
+index 0000000..ac3b5ef
+--- /dev/null
++++ b/src/course-home/CourseTools.jsx
+@@ -0,0 +1,58 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import {
++  faBookmark, faCertificate, faInfo, faCalendar, faStar,
++} from '@fortawesome/free-solid-svg-icons';
++import { faNewspaper } from '@fortawesome/free-regular-svg-icons';
++import { useModel } from '../model-store';
++
++
++export default function CourseTools(
++  { courseId },
++) {
++  const {
++    courseTools,
++  } = useModel('outline', courseId);
++
++  const renderIcon = (iconClasses) => {
++    switch (iconClasses) {
++      case 'edx.bookmarks':
++        return faBookmark;
++      case 'edx.tool.verified_upgrade':
++        return faCertificate;
++      case 'edx.tool.financial_assistance':
++        return faInfo;
++      case 'edx.calendar-sync':
++        return faCalendar;
++      case 'edx.updates':
++        return faNewspaper;
++      case 'edx.reviews':
++        return faStar;
++      default:
++        return null;
++    }
++  };
++
++  return (
++    <section className="mb-3">
++      <h4>Course Tools</h4>
++      {courseTools.map((courseTool) => (
++        <div key={courseTool.analyticsId}>
++          <a data-analytics-id={courseTool.analyticsId} href={courseTool.url}>
++            <FontAwesomeIcon icon={renderIcon(courseTool.analyticsId)} className="mr-2" style={{ width: '20px' }} />
++            {courseTool.title}
++          </a>
++        </div>
++      ))}
++    </section>
++  );
++}
++
++CourseTools.propTypes = {
++  courseId: PropTypes.string,
++};
++
++CourseTools.defaultProps = {
++  courseId: null,
++};
+diff --git a/src/data/api.js b/src/data/api.js
+index c8bffa7..9653caf 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -63,6 +63,17 @@ export async function getTabData(courseId, tab, version) {
+   }
+ }
+ 
++function normalizeOutlineTabData(courseId, courseToolData) {
++  const courseTools = camelCaseObject(courseToolData);
++  return { id: courseId, courseTools };
++}
++
++export async function getOutlineTabData(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline/${courseId}`;
++  const { data } = await getAuthenticatedHttpClient().get(url, {});
++  return normalizeOutlineTabData(courseId, data.course_tools);
++}
++
+ function normalizeBlocks(courseId, blocks) {
+   const models = {
+     courses: {},
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index 986352c..604d4cb 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -4,6 +4,7 @@ import {
+   getCourseBlocks,
+   getSequenceMetadata,
+   getTabData,
++  getOutlineTabData,
+ } from './api';
+ import {
+   addModelsMap, updateModel, updateModels, updateModelsMap, addModel,
+@@ -27,7 +28,8 @@ export function fetchCourse(courseId) {
+     Promise.allSettled([
+       getCourseMetadata(courseId),
+       getCourseBlocks(courseId),
+-    ]).then(([courseMetadataResult, courseBlocksResult]) => {
++      getOutlineTabData(courseId),
++    ]).then(([courseMetadataResult, courseBlocksResult, outlineTabResult]) => {
+       if (courseMetadataResult.status === 'fulfilled') {
+         dispatch(addModel({
+           modelType: 'courses',
+@@ -70,8 +72,16 @@ export function fetchCourse(courseId) {
+         }));
+       }
+ 
++      if (outlineTabResult.status === 'fulfilled') {
++        dispatch(addModel({
++          modelType: 'outline',
++          model: outlineTabResult.value,
++        }));
++      }
++
+       const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
+       const fetchedBlocks = courseBlocksResult.status === 'fulfilled';
++      const fetchedOutline = outlineTabResult.status === 'fulfilled';
+ 
+       // Log errors for each request if needed. Course block failures may occur
+       // even if the course metadata request is successful
+@@ -81,15 +91,18 @@ export function fetchCourse(courseId) {
+       if (!fetchedMetadata) {
+         logError(courseMetadataResult.reason);
+       }
++      if (!fetchedOutline) {
++        logError(outlineTabResult.reason);
++      }
+ 
+       if (fetchedMetadata) {
+-        if (courseMetadataResult.value.canLoadCourseware.hasAccess && fetchedBlocks) {
++        if (courseMetadataResult.value.canLoadCourseware.hasAccess && fetchedBlocks && fetchedOutline) {
+           // User has access
+           dispatch(fetchCourseSuccess({ courseId }));
+           return;
+         }
+         // User either doesn't have access or only has partial access
+-        // (can't access course blocks)
++        // (can't access course blocks or course outline)
+         dispatch(fetchCourseDenied({ courseId }));
+         return;
+       }
+-- 
+2.34.1
+

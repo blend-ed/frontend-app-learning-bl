@@ -1,0 +1,569 @@
+From 9cbe0b7c8b608cf2bcb32ff0cfd7c53b06f0a5fd Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 31 Aug 2020 16:44:30 -0400
+Subject: [PATCH 0244/1021] AA-126: Update outline tab to be a little closer to
+ LMS (#198)
+
+- Changed it to use its own normalizeBlocks call (and stop sharing
+  with courseware)
+- Add green checkmarks for complete blocks
+- Added icons, descriptions, and due dates for subsections
+- Updated look of subsections to match LMS a bit more
+---
+ .../data/__factories__/block.factory.js       |  59 ++++++++++
+ .../__factories__/courseBlocks.factory.js     |  86 +++++++++++++++
+ .../__factories__/outlineTabData.factory.js   |   2 +-
+ .../data/__snapshots__/redux.test.js.snap     |  39 +++----
+ src/course-home/data/api.js                   |  73 ++++++++++++-
+ src/course-home/outline-tab/OutlineTab.jsx    |   3 +-
+ src/course-home/outline-tab/Section.jsx       |  56 +++++-----
+ src/course-home/outline-tab/SequenceLink.jsx  | 101 +++++++++++++++++-
+ 8 files changed, 356 insertions(+), 63 deletions(-)
+ create mode 100644 src/course-home/data/__factories__/block.factory.js
+ create mode 100644 src/course-home/data/__factories__/courseBlocks.factory.js
+
+diff --git a/src/course-home/data/__factories__/block.factory.js b/src/course-home/data/__factories__/block.factory.js
+new file mode 100644
+index 0000000..0bda473
+--- /dev/null
++++ b/src/course-home/data/__factories__/block.factory.js
+@@ -0,0 +1,59 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('block')
++  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .option('host', 'http://localhost:18000')
++  // Generating block_id that is similar to md5 hash, but still deterministic
++  .sequence('block_id', id => ('abcd'.repeat(8) + id).slice(-32))
++  .attrs({
++    complete: false,
++    description: null,
++    due: null,
++    graded: false,
++    icon: null,
++    showLink: true,
++    type: 'course',
++    children: [],
++  })
++  .attr('display_name', ['display_name', 'block_id'], (displayName, blockId) => {
++    if (displayName) {
++      return displayName;
++    }
++
++    return blockId;
++  })
++  .attr(
++    'id',
++    ['id', 'block_id', 'type', 'courseId'],
++    (id, blockId, type, courseId) => {
++      if (id) {
++        return id;
++      }
++
++      const courseInfo = courseId.split(':')[1];
++
++      return `block-v1:${courseInfo}+type@${type}+block@${blockId}`;
++    },
++  )
++  .attr(
++    'student_view_url',
++    ['student_view_url', 'host', 'id'],
++    (url, host, id) => {
++      if (url) {
++        return url;
++      }
++
++      return `${host}/xblock/${id}`;
++    },
++  )
++  .attr(
++    'lms_web_url',
++    ['lms_web_url', 'host', 'courseId', 'id'],
++    (url, host, courseId, id) => {
++      if (url) {
++        return url;
++      }
++
++      return `${host}/courses/${courseId}/jump_to/${id}`;
++    },
++  );
+diff --git a/src/course-home/data/__factories__/courseBlocks.factory.js b/src/course-home/data/__factories__/courseBlocks.factory.js
+new file mode 100644
+index 0000000..026cf8a
+--- /dev/null
++++ b/src/course-home/data/__factories__/courseBlocks.factory.js
+@@ -0,0 +1,86 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++import './block.factory';
++
++// Generates an Array of block IDs, either from a single block or an array of blocks.
++const getIds = (attr) => {
++  const blocks = Array.isArray(attr) ? attr : [attr];
++  return blocks.map(block => block.id);
++};
++
++// Generates an Object in { [block.id]: block } format, either from a single block or an array of blocks.
++const getBlocks = (attr) => {
++  const blocks = Array.isArray(attr) ? attr : [attr];
++  // eslint-disable-next-line no-return-assign,no-sequences
++  return blocks.reduce((acc, block) => (acc[block.id] = block, acc), {});
++};
++
++Factory.define('courseBlocks')
++  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .option('units', ['courseId'], courseId => ([
++    Factory.build(
++      'block',
++      { type: 'vertical' },
++      { courseId },
++    ),
++  ]))
++  .option('sequence', ['courseId', 'units'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'sequential', children: getIds(child) },
++    { courseId },
++  ))
++  .option('section', ['courseId', 'sequence'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'chapter', children: getIds(child) },
++    { courseId },
++  ))
++  .option('course', ['courseId', 'section'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'course', children: getIds(child) },
++    { courseId },
++  ))
++  .attr(
++    'blocks',
++    ['course', 'section', 'sequence', 'units'],
++    (course, section, sequence, units) => ({
++      [course.id]: course,
++      ...getBlocks(section),
++      ...getBlocks(sequence),
++      ...getBlocks(units),
++    }),
++  )
++  .attr('root', ['course'], course => course.id);
++
++/**
++ * Builds a course with a single chapter, sequence, and unit.
++ */
++export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
++  const sequenceBlock = options.sequenceBlock || [Factory.build(
++    'block',
++    { type: 'sequential' },
++    { courseId },
++  )];
++  const sectionBlock = options.sectionBlock || Factory.build(
++    'block',
++    { type: 'chapter', children: sequenceBlock.map(block => block.id) },
++    { courseId },
++  );
++  const courseBlock = options.courseBlocks || Factory.build(
++    'block',
++    { type: 'course', display_name: title, children: [sectionBlock.id] },
++    { courseId },
++  );
++  return {
++    courseBlocks: options.courseBlocks || Factory.build(
++      'courseBlocks',
++      { courseId },
++      {
++        sequence: sequenceBlock,
++        section: sectionBlock,
++        course: courseBlock,
++      },
++    ),
++    sequenceBlock,
++    sectionBlock,
++    courseBlock,
++  };
++}
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 381a7c7..771a62f 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -1,6 +1,6 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ 
+-import buildSimpleCourseBlocks from '../../../courseware/data/__factories__/courseBlocks.factory';
++import buildSimpleCourseBlocks from './courseBlocks.factory';
+ 
+ Factory.define('outlineTabData')
+   .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 8a5cd8d..fac3b8b 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -164,41 +164,34 @@ Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "courseBlocks": Object {
+           "courses": Object {
+-            "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd4": Object {
++            "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
+               "id": "course-v1:edX+DemoX+Demo_Course_1",
+               "sectionIds": Array [
+-                "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++                "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+               ],
+-              "title": "bcdabcdabcdabcdabcdabcdabcdabcd4",
++              "title": "bcdabcdabcdabcdabcdabcdabcdabcd3",
+             },
+           },
+           "sections": Object {
+-            "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
++            "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2": Object {
++              "complete": false,
+               "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+-              "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++              "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+               "sequenceIds": Array [
+-                "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++                "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+               ],
+-              "title": "bcdabcdabcdabcdabcdabcdabcdabcd3",
+-            },
+-          },
+-          "sequences": Object {
+-            "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2": Object {
+-              "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+-              "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+-              "sectionId": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
+               "title": "bcdabcdabcdabcdabcdabcdabcdabcd2",
+-              "unitIds": Array [
+-                "block-v1:edX+DemoX+Demo_Course+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+-              ],
+             },
+           },
+-          "units": Object {
+-            "block-v1:edX+DemoX+Demo_Course+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1": Object {
+-              "graded": false,
+-              "id": "block-v1:edX+DemoX+Demo_Course+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+-              "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+-              "sequenceId": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++          "sequences": Object {
++            "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1": Object {
++              "complete": false,
++              "description": null,
++              "due": null,
++              "icon": null,
++              "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++              "sectionId": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++              "showLink": true,
+               "title": "bcdabcdabcdabcdabcdabcdabcdabcd1",
+             },
+           },
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 5dca115..686ad62 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -1,7 +1,6 @@
+ import { camelCaseObject, getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+-// TODO: Pull this normalization function up so we're not reaching into courseware
+-import { normalizeBlocks } from '../../courseware/data/api';
++import { logError } from '@edx/frontend-platform/logging';
+ 
+ function normalizeCourseHomeCourseMetadata(metadata) {
+   const data = camelCaseObject(metadata);
+@@ -15,6 +14,74 @@ function normalizeCourseHomeCourseMetadata(metadata) {
+   };
+ }
+ 
++export function normalizeOutlineBlocks(courseId, blocks) {
++  const models = {
++    courses: {},
++    sections: {},
++    sequences: {},
++  };
++  Object.values(blocks).forEach(block => {
++    switch (block.type) {
++      case 'course':
++        models.courses[block.id] = {
++          id: courseId,
++          title: block.display_name,
++          sectionIds: block.children || [],
++        };
++        break;
++
++      case 'chapter':
++        models.sections[block.id] = {
++          complete: block.complete,
++          id: block.id,
++          title: block.display_name,
++          sequenceIds: block.children || [],
++        };
++        break;
++
++      case 'sequential':
++        models.sequences[block.id] = {
++          complete: block.complete,
++          description: block.description,
++          due: block.due,
++          icon: block.icon,
++          id: block.id,
++          showLink: !!block.lms_web_url, // we reconstruct the url ourselves as an MFE-internal <Link>
++          title: block.display_name,
++        };
++        break;
++
++      default:
++        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, and sequential.`);
++    }
++  });
++
++  // Next go through each list and use their child lists to decorate those children with a
++  // reference back to their parent.
++  Object.values(models.courses).forEach(course => {
++    if (Array.isArray(course.sectionIds)) {
++      course.sectionIds.forEach(sectionId => {
++        const section = models.sections[sectionId];
++        section.courseId = course.id;
++      });
++    }
++  });
++
++  Object.values(models.sections).forEach(section => {
++    if (Array.isArray(section.sequenceIds)) {
++      section.sequenceIds.forEach(sequenceId => {
++        if (sequenceId in models.sequences) {
++          models.sequences[sequenceId].sectionId = section.id;
++        } else {
++          logError(`Section ${section.id} has child block ${sequenceId}, but that block is not in the list of sequences.`);
++        }
++      });
++    }
++  });
++
++  return models;
++}
++
+ export async function getCourseHomeCourseMetadata(courseId) {
+   const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
+   const { data } = await getAuthenticatedHttpClient().get(url);
+@@ -68,7 +135,7 @@ export async function getOutlineTabData(courseId) {
+   const {
+     data,
+   } = tabData;
+-  const courseBlocks = normalizeBlocks(courseId, data.course_blocks.blocks);
++  const courseBlocks = normalizeOutlineBlocks(courseId, data.course_blocks.blocks);
+   const courseGoals = camelCaseObject(data.course_goals);
+   const courseExpiredHtml = data.course_expired_html;
+   const courseTools = camelCaseObject(data.course_tools);
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 9238750..fee3721 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -121,8 +121,7 @@ function OutlineTab({ intl }) {
+             <Section
+               key={sectionId}
+               courseId={courseId}
+-              title={sections[sectionId].title}
+-              sequenceIds={sections[sectionId].sequenceIds}
++              section={sections[sectionId]}
+             />
+           ))}
+         </div>
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index 2131835..62de2ab 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -1,50 +1,46 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { Collapsible } from '@edx/paragon';
+-import { faChevronRight, faChevronDown } from '@fortawesome/free-solid-svg-icons';
++import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import SequenceLink from './SequenceLink';
+ import { useModel } from '../../generic/model-store';
+ 
+-export default function Section({ courseId, title, sequenceIds }) {
++export default function Section({ courseId, section }) {
++  const {
++    complete,
++    sequenceIds,
++    title,
++  } = section;
+   const {
+     courseBlocks: {
+       sequences,
+     },
+   } = useModel('outline', courseId);
+ 
+-  return (
+-    <Collapsible.Advanced className="collapsible-card mb-2">
+-      <Collapsible.Trigger className="collapsible-trigger d-flex align-items-start">
+-        <Collapsible.Visible whenClosed>
+-          <div style={{ minWidth: '1rem' }}>
+-            <FontAwesomeIcon icon={faChevronRight} />
+-          </div>
+-        </Collapsible.Visible>
+-        <Collapsible.Visible whenOpen>
+-          <div style={{ minWidth: '1rem' }}>
+-            <FontAwesomeIcon icon={faChevronDown} />
+-          </div>
+-        </Collapsible.Visible>
+-        <div className="ml-2 flex-grow-1">{title}</div>
+-      </Collapsible.Trigger>
++  const sectionTitle = (
++    <div>
++      {complete && <FontAwesomeIcon icon={faCheckCircle} className="float-left text-success mt-1" />}
++      <div className="ml-4 font-weight-bold">{title}</div>
++    </div>
++  );
+ 
+-      <Collapsible.Body className="collapsible-body">
+-        {sequenceIds.map((sequenceId) => (
+-          <SequenceLink
+-            key={sequenceId}
+-            id={sequenceId}
+-            courseId={courseId}
+-            title={sequences[sequenceId].title}
+-          />
+-        ))}
+-      </Collapsible.Body>
+-    </Collapsible.Advanced>
++  return (
++    <Collapsible className="mb-2" styling="card-lg" title={sectionTitle} defaultOpen>
++      {sequenceIds.map((sequenceId, index) => (
++        <SequenceLink
++          key={sequenceId}
++          id={sequenceId}
++          courseId={courseId}
++          sequence={sequences[sequenceId]}
++          first={index === 0}
++        />
++      ))}
++    </Collapsible>
+   );
+ }
+ 
+ Section.propTypes = {
+   courseId: PropTypes.string.isRequired,
+-  title: PropTypes.string.isRequired,
+-  sequenceIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++  section: PropTypes.shape().isRequired,
+ };
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index 73e72da..e17bdb4 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -1,11 +1,103 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import classNames from 'classnames';
+ import { Link } from 'react-router-dom';
++import { FormattedMessage, FormattedTime } from '@edx/frontend-platform/i18n';
++import { faClock, faEdit } from '@fortawesome/free-regular-svg-icons';
++import {
++  faCheck,
++  faCheckCircle,
++  faExclamationTriangle,
++  faSpinner,
++  faTimesCircle,
++} from '@fortawesome/free-solid-svg-icons';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++
++import { useModel } from '../../generic/model-store';
++
++export default function SequenceLink({
++  id,
++  courseId,
++  first,
++  sequence,
++}) {
++  const {
++    complete,
++    description,
++    due,
++    icon,
++    showLink,
++    title,
++  } = sequence;
++  const {
++    datesWidget: {
++      userTimezone,
++    },
++  } = useModel('outline', courseId);
++
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  let text = title;
++
++  let faIcon;
++  switch (icon) {
++    // list of possible ones here: https://github.com/edx/edx-proctoring/blob/master/edx_proctoring/api.py
++    case 'fa-check': faIcon = faCheck; break;
++    case 'fa-clock-o': faIcon = faClock; break;
++    case 'fa-exclamation-triangle': faIcon = faExclamationTriangle; break;
++    case 'fa-pencil-square-o': faIcon = faEdit; break;
++    case 'fa-spinner fa-spin': faIcon = faSpinner; break;
++    case 'fa-times-circle': faIcon = faTimesCircle; break;
++    default: faIcon = null; break;
++  }
++  if (faIcon) {
++    text = <><FontAwesomeIcon icon={faIcon} /> {text}</>;
++  }
++
++  if (due) {
++    text = (
++      <>
++        {text}<br />
++        <small className="text-body">
++          <FormattedMessage
++            id="learning.outline.sequence-due"
++            defaultMessage="{description} due {assignmentDue}"
++            description="Used below an assignment title"
++            values={{
++              assignmentDue: (
++                <FormattedTime
++                  key={`${id}-due`}
++                  day="numeric"
++                  month="short"
++                  year="numeric"
++                  hour12={false}
++                  timeZoneName="short"
++                  value={due}
++                  {...timezoneFormatArgs}
++                />
++              ),
++              description: description || '',
++            }}
++          />
++        </small>
++      </>
++    );
++  }
++
++  text = <div className="ml-4">{text}</div>;
++
++  if (complete) {
++    text = <><FontAwesomeIcon icon={faCheckCircle} className="float-left text-success mt-1" />{text}</>;
++  }
++
++  // Do link last so we include everything above in the link
++  if (showLink) {
++    text = <Link to={`/course/${courseId}/${id}`}><div>{text}</div></Link>;
++  }
+ 
+-export default function SequenceLink({ id, courseId, title }) {
+   return (
+-    <div className="ml-4">
+-      <Link to={`/course/${courseId}/${id}`}>{title}</Link>
++    <div className={classNames('', { 'mt-2 pt-2 border-top border-light': !first })}>
++      {text}
+     </div>
+   );
+ }
+@@ -13,5 +105,6 @@ export default function SequenceLink({ id, courseId, title }) {
+ SequenceLink.propTypes = {
+   id: PropTypes.string.isRequired,
+   courseId: PropTypes.string.isRequired,
+-  title: PropTypes.string.isRequired,
++  first: PropTypes.bool.isRequired,
++  sequence: PropTypes.shape().isRequired,
+ };
+-- 
+2.34.1
+

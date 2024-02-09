@@ -1,0 +1,1001 @@
+From a8348e156878d9a970689462087a36edbb30ac00 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 28 Jul 2021 09:39:31 -0400
+Subject: [PATCH 0560/1021] feat: updating alerts to use Paragon Alert over
+ custom (AA-914) (#557)
+
+---
+ package-lock.json                             |  22 ++--
+ package.json                                  |   2 +-
+ .../AccessExpirationAlert.jsx                 |   6 +-
+ .../AccessExpirationAlertMMP2P.jsx            |   6 +-
+ .../AccessExpirationAlertMasquerade.jsx       |   6 +-
+ .../enrollment-alert/EnrollmentAlert.jsx      |  24 +++--
+ .../logistration-alert/LogistrationAlert.jsx  |   6 +-
+ .../outline-tab/OutlineTab.test.jsx           |   8 +-
+ .../course-end-alert/CourseEndAlert.jsx       |   6 +-
+ .../course-start-alert/CourseStartAlert.jsx   |   8 +-
+ .../PrivateCourseAlert.jsx                    |  23 ++--
+ .../alerts/private-course-alert/messages.js   |   7 +-
+ .../outline-tab/widgets/WelcomeMessage.jsx    |  86 +++++++--------
+ .../course/course-exit/CourseCelebration.jsx  |  56 +++++-----
+ .../course/course-exit/CourseInProgress.jsx   |   6 +-
+ .../course/course-exit/CourseNonPassing.jsx   |   2 +-
+ .../course/course-exit/ProgramCompletion.jsx  |  84 ++++++++-------
+ src/generic/user-messages/Alert.jsx           | 102 ++++++------------
+ src/generic/user-messages/Alert.scss          |   3 -
+ src/generic/user-messages/Alert.test.jsx      |  55 ----------
+ .../StreakCelebrationModal.jsx                |  26 ++---
+ 21 files changed, 229 insertions(+), 315 deletions(-)
+ delete mode 100644 src/generic/user-messages/Alert.scss
+ delete mode 100644 src/generic/user-messages/Alert.test.jsx
+
+diff --git a/package-lock.json b/package-lock.json
+index 5a5c013..108e9d5 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1447,9 +1447,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "16.2.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-16.2.0.tgz",
+-      "integrity": "sha512-13xGUU+BezQ27NvR1gtm7YxbcborgUxX78PlUXjamSM3bqMt4LfviyxZjewyxBuevAF+Tj4PlLzKMLe3SkuwFw==",
++      "version": "16.5.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-16.5.0.tgz",
++      "integrity": "sha512-oXZBL1eaBKtPnypVx3hAoVs/zwTjQP+jfj6Vk610+GlsoYzevho4H2CXvrym5HKYAvYvKwXuIibh/IOdzhk+tQ==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+@@ -1467,7 +1467,7 @@
+         "react-focus-on": "^3.5.0",
+         "react-popper": "^2.2.4",
+         "react-proptype-conditional-require": "^1.0.4",
+-        "react-responsive": "^6.1.1",
++        "react-responsive": "^8.2.0",
+         "react-table": "^7.6.1",
+         "react-transition-group": "^4.0.0",
+         "tabbable": "^4.0.0",
+@@ -17689,13 +17689,14 @@
+       }
+     },
+     "react-responsive": {
+-      "version": "6.1.2",
+-      "resolved": "https://registry.npmjs.org/react-responsive/-/react-responsive-6.1.2.tgz",
+-      "integrity": "sha512-AXentVC/kN3KED9zhzJv2pu4vZ0i6cSHdTtbCScVV1MT6F5KXaG2qs5D7WLmhdaOvmiMX8UfmS4ZSO+WPwDt4g==",
++      "version": "8.2.0",
++      "resolved": "https://registry.npmjs.org/react-responsive/-/react-responsive-8.2.0.tgz",
++      "integrity": "sha512-iagCqVrw4QSjhxKp3I/YK6+ODkWY6G+YPElvdYKiUUbywwh9Ds0M7r26Fj2/7dWFFbOpcGnJE6uE7aMck8j5Qg==",
+       "requires": {
+         "hyphenate-style-name": "^1.0.0",
+         "matchmediaquery": "^0.3.0",
+-        "prop-types": "^15.6.1"
++        "prop-types": "^15.6.1",
++        "shallow-equal": "^1.1.0"
+       }
+     },
+     "react-router": {
+@@ -18985,6 +18986,11 @@
+         "kind-of": "^6.0.2"
+       }
+     },
++    "shallow-equal": {
++      "version": "1.2.1",
++      "resolved": "https://registry.npmjs.org/shallow-equal/-/shallow-equal-1.2.1.tgz",
++      "integrity": "sha512-S4vJDjHHMBaiZuT9NPb616CSmLf618jawtv3sufLl6ivK8WocjAo58cXwbRV1cgqxH0Qbv+iUt6m05eqEa2IRA=="
++    },
+     "shebang-command": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/shebang-command/-/shebang-command-1.2.0.tgz",
+diff --git a/package.json b/package.json
+index d3ea9f8..39bb6e2 100644
+--- a/package.json
++++ b/package.json
+@@ -40,7 +40,7 @@
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-lib-special-exams": "1.11.0",
+     "@edx/frontend-platform": "1.11.0",
+-    "@edx/paragon": "16.2.0",
++    "@edx/paragon": "16.5.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index db62776..d40d28f 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -4,9 +4,9 @@ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import {
+   FormattedMessage, FormattedDate, injectIntl, intlShape,
+ } from '@edx/frontend-platform/i18n';
+-import { Hyperlink } from '@edx/paragon';
++import { Alert, Hyperlink } from '@edx/paragon';
++import { Info } from '@edx/paragon/icons';
+ 
+-import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ import messages from './messages';
+ import AccessExpirationAlertMMP2P from './AccessExpirationAlertMMP2P';
+ import AccessExpirationAlertMasquerade from './AccessExpirationAlertMasquerade';
+@@ -100,7 +100,7 @@ function AccessExpirationAlert({ intl, payload }) {
+   }
+ 
+   return (
+-    <Alert type={ALERT_TYPES.INFO}>
++    <Alert variant="info" icon={Info}>
+       <span className="font-weight-bold">
+         <FormattedMessage
+           id="learning.accessExpiration.header"
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlertMMP2P.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlertMMP2P.jsx
+index 15e703d..e6f0607 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlertMMP2P.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlertMMP2P.jsx
+@@ -1,9 +1,9 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { FormattedDate, injectIntl } from '@edx/frontend-platform/i18n';
+-import { Hyperlink } from '@edx/paragon';
++import { Alert, Hyperlink } from '@edx/paragon';
++import { Info } from '@edx/paragon/icons';
+ 
+-import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ import messages from './messages';
+ 
+ function AccessExpirationAlertMMP2P({ payload }) {
+@@ -52,7 +52,7 @@ function AccessExpirationAlertMMP2P({ payload }) {
+   }
+ 
+   return (
+-    <Alert type={ALERT_TYPES.INFO}>
++    <Alert variant="info" icon={Info}>
+       <span className="font-weight-bold">
+         Unlock full course content by {formatDate(upgradeDeadline, 'upgradeTitle')}
+       </span>
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
+index 305cedb..a71df84 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
+@@ -1,8 +1,8 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { FormattedMessage, FormattedDate } from '@edx/frontend-platform/i18n';
+-
+-import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++import { Alert } from '@edx/paragon';
++import { Info } from '@edx/paragon/icons';
+ 
+ function AccessExpirationAlertMasquerade({ payload }) {
+   const {
+@@ -26,7 +26,7 @@ function AccessExpirationAlertMasquerade({ payload }) {
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+   return (
+-    <Alert type={ALERT_TYPES.INFO}>
++    <Alert variant="info" icon={Info}>
+       <FormattedMessage
+         id="learning.accessExpiration.expired"
+         defaultMessage="This learner does not have access to this course. Their access expired on {date}."
+diff --git a/src/alerts/enrollment-alert/EnrollmentAlert.jsx b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+index 6707883..d388298 100644
+--- a/src/alerts/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+@@ -1,12 +1,12 @@
+ import React from 'react';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import PropTypes from 'prop-types';
+-import { Button } from '@edx/paragon';
++import { Alert, Button } from '@edx/paragon';
++import { Info, WarningFilled } from '@edx/paragon/icons';
+ 
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+ import { useModel } from '../../generic/model-store';
+-import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ 
+ import messages from './messages';
+ import { useEnrollClickHandler } from './hooks';
+@@ -30,27 +30,29 @@ function EnrollmentAlert({ intl, payload }) {
+   );
+ 
+   let text = intl.formatMessage(messages.alert);
+-  let type = ALERT_TYPES.ERROR;
++  let type = 'warning';
++  let icon = WarningFilled;
+   if (isStaff) {
+     text = intl.formatMessage(messages.staffAlert);
+-    type = ALERT_TYPES.INFO;
++    type = 'info';
++    icon = Info;
+   } else if (extraText) {
+     text = `${text} ${extraText}`;
+   }
+ 
+   const button = canEnroll && (
+-    <Button disabled={loading} variant="link" className="p-0 border-0 align-top" style={{ textDecoration: 'underline' }} onClick={enrollClickHandler}>
++    <Button disabled={loading} variant="link" className="p-0 border-0 align-top mx-1" size="sm" style={{ textDecoration: 'underline' }} onClick={enrollClickHandler}>
+       {intl.formatMessage(messages.enrollNowSentence)}
+     </Button>
+   );
+ 
+   return (
+-    <Alert type={type}>
+-      {text}
+-      {' '}
+-      {button}
+-      {' '}
+-      {loading && <FontAwesomeIcon icon={faSpinner} spin />}
++    <Alert variant={type} icon={icon}>
++      <div className="d-flex">
++        {text}
++        {button}
++        {loading && <FontAwesomeIcon icon={faSpinner} spin />}
++      </div>
+     </Alert>
+   );
+ }
+diff --git a/src/alerts/logistration-alert/LogistrationAlert.jsx b/src/alerts/logistration-alert/LogistrationAlert.jsx
+index 3271329..be72180 100644
+--- a/src/alerts/logistration-alert/LogistrationAlert.jsx
++++ b/src/alerts/logistration-alert/LogistrationAlert.jsx
+@@ -2,9 +2,9 @@ import React from 'react';
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
+-import { Hyperlink } from '@edx/paragon';
++import { Alert, Hyperlink } from '@edx/paragon';
++import { WarningFilled } from '@edx/paragon/icons';
+ 
+-import { Alert } from '../../generic/user-messages';
+ import genericMessages from '../../generic/messages';
+ 
+ function LogistrationAlert({ intl }) {
+@@ -29,7 +29,7 @@ function LogistrationAlert({ intl }) {
+   );
+ 
+   return (
+-    <Alert type="error">
++    <Alert variant="warning" icon={WarningFilled}>
+       <FormattedMessage
+         id="learning.logistration.alert"
+         description="Prompts the user to sign in or register to see course content."
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index f5c75f6..040f3ce 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -485,8 +485,8 @@ describe('Outline Tab', () => {
+         });
+         await fetchAndRender();
+ 
+-        const alert = await screen.findByText('Welcome to Demonstration Course');
+-        expect(alert.parentElement).toHaveAttribute('role', 'alert');
++        const alert = await screen.findByTestId('private-course-alert');
++        expect(alert).toHaveAttribute('role', 'alert');
+ 
+         expect(screen.queryByRole('button', { name: 'Enroll now' })).not.toBeInTheDocument();
+         expect(screen.getByText('You must be enrolled in the course to see course content.')).toBeInTheDocument();
+@@ -495,8 +495,8 @@ describe('Outline Tab', () => {
+       it('displays alert for unenrolled user', async () => {
+         await fetchAndRender();
+ 
+-        const alert = await screen.findByText('Welcome to Demonstration Course');
+-        expect(alert.parentElement).toHaveAttribute('role', 'alert');
++        const alert = await screen.findByTestId('private-course-alert');
++        expect(alert).toHaveAttribute('role', 'alert');
+ 
+         expect(screen.getByRole('button', { name: 'Enroll now' })).toBeInTheDocument();
+       });
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+index ee2fd80..3e5d06c 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+@@ -6,8 +6,8 @@ import {
+   FormattedRelative,
+   FormattedTime,
+ } from '@edx/frontend-platform/i18n';
+-
+-import { Alert, ALERT_TYPES } from '../../../../generic/user-messages';
++import { Alert } from '@edx/paragon';
++import { Info } from '@edx/paragon/icons';
+ 
+ const DAY_MS = 24 * 60 * 60 * 1000; // in ms
+ 
+@@ -78,7 +78,7 @@ function CourseEndAlert({ payload }) {
+   }
+ 
+   return (
+-    <Alert type={ALERT_TYPES.INFO}>
++    <Alert variant="info" icon={Info}>
+       <strong>{msg}</strong><br />
+       {description}
+     </Alert>
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+index 51db209..5304d5f 100644
+--- a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+@@ -6,8 +6,8 @@ import {
+   FormattedRelative,
+   FormattedTime,
+ } from '@edx/frontend-platform/i18n';
+-
+-import { Alert, ALERT_TYPES } from '../../../../generic/user-messages';
++import { Alert } from '@edx/paragon';
++import { Info } from '@edx/paragon/icons';
+ 
+ const DAY_MS = 24 * 60 * 60 * 1000; // in ms
+ 
+@@ -30,7 +30,7 @@ function CourseStartAlert({ payload }) {
+   const delta = new Date(startDate) - new Date();
+   if (delta < DAY_MS) {
+     return (
+-      <Alert type={ALERT_TYPES.INFO}>
++      <Alert variant="info" icon={Info}>
+         <FormattedMessage
+           id="learning.outline.alert.start.short"
+           defaultMessage="Course starts {timeRemaining} at {courseStartTime}."
+@@ -55,7 +55,7 @@ function CourseStartAlert({ payload }) {
+   }
+ 
+   return (
+-    <Alert type={ALERT_TYPES.INFO}>
++    <Alert variant="info" icon={Info}>
+       <strong>
+         <FormattedMessage
+           id="learning.outline.alert.end.long"
+diff --git a/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx b/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+index 4255eaa..369e03d 100644
+--- a/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
++++ b/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+@@ -3,13 +3,13 @@ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
+-import { Button, Hyperlink } from '@edx/paragon';
++import { Alert, Button, Hyperlink } from '@edx/paragon';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+ 
+-import { Alert } from '../../../../generic/user-messages';
+ import enrollmentMessages from '../../../../alerts/enrollment-alert/messages';
+ import genericMessages from '../../../../generic/messages';
++import messages from './messages';
+ import outlineMessages from '../../messages';
+ import { useEnrollClickHandler } from '../../../../alerts/enrollment-alert/hooks';
+ import { useModel } from '../../../../generic/model-store';
+@@ -32,12 +32,13 @@ function PrivateCourseAlert({ intl, payload }) {
+     intl.formatMessage(enrollmentMessages.success),
+   );
+ 
+-  const enrollNow = (
++  const enrollNowButton = (
+     <Button
+       disabled={loading}
+       variant="link"
+-      className="p-0 border-0 align-top"
++      className="p-0 border-0 align-top mr-1"
+       style={{ textDecoration: 'underline' }}
++      size="sm"
+       onClick={enrollClickHandler}
+     >
+       {intl.formatMessage(enrollmentMessages.enrollNowInline)}
+@@ -63,7 +64,7 @@ function PrivateCourseAlert({ intl, payload }) {
+   );
+ 
+   return (
+-    <Alert type="welcome">
++    <Alert variant="light" data-testid="private-course-alert">
+       {anonymousUser && (
+         <>
+           <p className="font-weight-bold">
+@@ -84,15 +85,11 @@ function PrivateCourseAlert({ intl, payload }) {
+         <>
+           <p className="font-weight-bold">{intl.formatMessage(outlineMessages.welcomeTo)} {title}</p>
+           {canEnroll && (
+-            <>
+-              <FormattedMessage
+-                id="learning.privateCourse.canEnroll"
+-                description="Prompts the user to enroll in the course to see course content."
+-                defaultMessage="{enrollNow} to access the full course."
+-                values={{ enrollNow }}
+-              />
++            <div className="d-flex">
++              {enrollNowButton}
++              {intl.formatMessage(messages.toAccess)}
+               {loading && <FontAwesomeIcon icon={faSpinner} spin />}
+-            </>
++            </div>
+           )}
+           {!canEnroll && (
+             <>
+diff --git a/src/course-home/outline-tab/alerts/private-course-alert/messages.js b/src/course-home/outline-tab/alerts/private-course-alert/messages.js
+index 903f92a..67388a6 100644
+--- a/src/course-home/outline-tab/alerts/private-course-alert/messages.js
++++ b/src/course-home/outline-tab/alerts/private-course-alert/messages.js
+@@ -1,10 +1,11 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  enroll: {
++  toAccess: {
+     id: 'alert.enroll',
+-    defaultMessage: 'You must be enrolled in the course to see course content.',
+-    description: 'Text instructing the learner to enroll in the course in order to see course content.',
++    defaultMessage: ' to access the full course.',
++    description: 'Text instructing the learner to enroll in the course in order to see course content. The full string'
++      + 'would say "Enroll now to access the full course", where "Enroll now" is a button.',
+   },
+ });
+ 
+diff --git a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+index 6600393..4cd9051 100644
+--- a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
++++ b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+@@ -2,14 +2,13 @@ import React, { useState } from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Button, TransitionReplace } from '@edx/paragon';
++import { Alert, Button, TransitionReplace } from '@edx/paragon';
+ import truncate from 'truncate-html';
+ 
+ import { useDispatch } from 'react-redux';
+ import LmsHtmlFragment from '../LmsHtmlFragment';
+ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+-import { Alert } from '../../../generic/user-messages';
+ import { dismissWelcomeMessage } from '../../data/thunks';
+ 
+ function WelcomeMessage({ courseId, intl }) {
+@@ -27,52 +26,47 @@ function WelcomeMessage({ courseId, intl }) {
+   const messageCanBeShortened = shortWelcomeMessageHtml.length < welcomeMessageHtml.length;
+   const [showShortMessage, setShowShortMessage] = useState(messageCanBeShortened);
+   const dispatch = useDispatch();
+-
+   return (
+-    display && (
+-      <Alert
+-        type="welcome"
+-        dismissible
+-        onDismiss={() => {
+-          setDisplay(false);
+-          dispatch(dismissWelcomeMessage(courseId));
+-        }}
+-        footer={messageCanBeShortened && (
+-          <div className="row w-100 m-0">
+-            <div className="col-12 col-sm-auto p-0">
+-              <Button
+-                block
+-                onClick={() => setShowShortMessage(!showShortMessage)}
+-                variant="outline-primary"
+-              >
+-                {showShortMessage ? intl.formatMessage(messages.welcomeMessageShowMoreButton)
+-                  : intl.formatMessage(messages.welcomeMessageShowLessButton)}
+-              </Button>
+-            </div>
+-          </div>
++    <Alert
++      data-testid="alert-container-welcome"
++      variant="light"
++      stacked
++      dismissible
++      show={display}
++      onClose={() => {
++        setDisplay(false);
++        dispatch(dismissWelcomeMessage(courseId));
++      }}
++      actions={messageCanBeShortened ? [
++        <Button
++          onClick={() => setShowShortMessage(!showShortMessage)}
++          variant="outline-primary"
++        >
++          {showShortMessage ? intl.formatMessage(messages.welcomeMessageShowMoreButton)
++            : intl.formatMessage(messages.welcomeMessageShowLessButton)}
++        </Button>,
++      ] : []}
++    >
++      <TransitionReplace className="mb-3" enterDuration={400} exitDuration={200}>
++        {showShortMessage ? (
++          <LmsHtmlFragment
++            className="inline-link"
++            data-testid="short-welcome-message-iframe"
++            key="short-html"
++            html={shortWelcomeMessageHtml}
++            title={intl.formatMessage(messages.welcomeMessage)}
++          />
++        ) : (
++          <LmsHtmlFragment
++            className="inline-link"
++            data-testid="long-welcome-message-iframe"
++            key="full-html"
++            html={welcomeMessageHtml}
++            title={intl.formatMessage(messages.welcomeMessage)}
++          />
+         )}
+-      >
+-        <TransitionReplace className="mb-3" enterDuration={200} exitDuration={200}>
+-          {showShortMessage ? (
+-            <LmsHtmlFragment
+-              className="inline-link"
+-              data-testid="short-welcome-message-iframe"
+-              key="short-html"
+-              html={shortWelcomeMessageHtml}
+-              title={intl.formatMessage(messages.welcomeMessage)}
+-            />
+-          ) : (
+-            <LmsHtmlFragment
+-              className="inline-link"
+-              data-testid="long-welcome-message-iframe"
+-              key="full-html"
+-              html={welcomeMessageHtml}
+-              title={intl.formatMessage(messages.welcomeMessage)}
+-            />
+-          )}
+-        </TransitionReplace>
+-      </Alert>
+-    )
++      </TransitionReplace>
++    </Alert>
+   );
+ }
+ 
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 72fae79..87c61b3 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -9,6 +9,7 @@ import { layoutGenerator } from 'react-break';
+ import { Helmet } from 'react-helmet';
+ import { useDispatch, useSelector } from 'react-redux';
+ import { Alert, Button, Hyperlink } from '@edx/paragon';
++import { CheckCircle } from '@edx/paragon/icons';
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+@@ -285,34 +286,37 @@ function CourseCelebration({ intl }) {
+         </div>
+         <div className="col-12 px-0 px-md-5">
+           {certHeader && (
+-          <Alert variant="success" className="row w-100 m-0">
+-            <div className="col order-1 order-md-0 pl-0 pr-0 pr-md-5">
+-              <div className="h4">{certHeader}</div>
+-              {message}
+-              <div className="mt-2">
+-                {buttonPrefix}
+-                {buttonLocation && (
+-                  <Button
+-                    variant={buttonVariant}
+-                    href={buttonLocation}
+-                    onClick={() => logClick(org, courseId, administrator, buttonEvent)}
+-                  >
+-                    {buttonText}
+-                  </Button>
+-                )}
+-                {buttonSuffix}
++          <Alert variant="success" icon={CheckCircle}>
++            <div className="row w-100 m-0">
++              <div className="col order-1 order-md-0 pl-0 pr-0 pr-md-5">
++                <div className="h4">{certHeader}</div>
++                {message}
++                <div className="mt-2">
++                  {buttonPrefix}
++                  {buttonLocation && (
++                    <Button
++                      variant={buttonVariant}
++                      href={buttonLocation}
++                      className="w-xs-100 w-md-auto"
++                      onClick={() => logClick(org, courseId, administrator, buttonEvent)}
++                    >
++                      {buttonText}
++                    </Button>
++                  )}
++                  {buttonSuffix}
++                </div>
+               </div>
++              {certStatus !== 'unverified' && (
++                <div className="col-12 order-0 col-md-3 order-md-1 w-100 mb-3 p-0 text-center">
++                  <img
++                    src={certificateImage}
++                    alt={`${intl.formatMessage(messages.certificateImage)}`}
++                    className="w-100"
++                    style={{ maxWidth: '13rem' }}
++                  />
++                </div>
++              )}
+             </div>
+-            {certStatus !== 'unverified' && (
+-              <div className="col-12 order-0 col-md-3 order-md-1 w-100 mb-3 p-0 text-center">
+-                <img
+-                  src={certificateImage}
+-                  alt={`${intl.formatMessage(messages.certificateImage)}`}
+-                  className="w-100"
+-                  style={{ maxWidth: '13rem' }}
+-                />
+-              </div>
+-            )}
+           </Alert>
+           )}
+           {relatedPrograms && relatedPrograms.map(program => (
+diff --git a/src/courseware/course/course-exit/CourseInProgress.jsx b/src/courseware/course/course-exit/CourseInProgress.jsx
+index 96132f9..a575d3a 100644
+--- a/src/courseware/course/course-exit/CourseInProgress.jsx
++++ b/src/courseware/course/course-exit/CourseInProgress.jsx
+@@ -34,13 +34,13 @@ function CourseInProgress({ intl }) {
+         <div className="col-12 p-0 h2 text-center">
+           { intl.formatMessage(messages.courseInProgressHeader) }
+         </div>
+-        <Alert variant="primary" className="col col-lg-10 mt-4 d-flex">
++        <Alert variant="primary" className="mt-4">
+           <div className="row w-100 m-0 align-items-start">
+-            <div className="flex-grow-1 col-md p-0">{ intl.formatMessage(messages.courseInProgressDescription) }</div>
++            <div className="col-md p-0">{ intl.formatMessage(messages.courseInProgressDescription) }</div>
+             {datesTabLink && (
+               <Button
+                 variant="primary"
+-                className="flex-shrink-0 mt-3 mt-md-0 mb-1 mb-md-0 ml-md-5"
++                className="mt-3 my-md-0 mb-1 ml-md-5 w-xs-100 w-md-auto"
+                 href={datesTabLink}
+                 onClick={() => logClick(org, courseId, administrator, 'view_dates_tab')}
+               >
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index 5ee55c4..3c5046f 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -34,7 +34,7 @@ function CourseNonPassing({ intl }) {
+         <div className="col-12 p-0 h2 text-center">
+           { intl.formatMessage(messages.endOfCourseHeader) }
+         </div>
+-        <Alert variant="primary" className="col col-lg-10 mt-4 d-flex">
++        <Alert variant="primary" className="col col-lg-10 mt-4">
+           <div className="row w-100 m-0 align-items-start">
+             <div className="flex-grow-1 col-sm p-0">{ intl.formatMessage(messages.endOfCourseDescription) }</div>
+             {progressLink && (
+diff --git a/src/courseware/course/course-exit/ProgramCompletion.jsx b/src/courseware/course/course-exit/ProgramCompletion.jsx
+index 2b6e1bf..816f418 100644
+--- a/src/courseware/course/course-exit/ProgramCompletion.jsx
++++ b/src/courseware/course/course-exit/ProgramCompletion.jsx
+@@ -41,54 +41,56 @@ function ProgramCompletion({
+   );
+ 
+   return (
+-    <Alert variant="primary" className="row w-100 mx-0 my-3" data-testid="program-completion">
+-      <div className="col order-1 order-md-0 pl-0 pr-0 pr-md-5">
+-        <div className="h4">{intl.formatMessage(messages.programsLastCourseHeader, { title })}</div>
+-        <p>
+-          <FormattedMessage
+-            id="courseExit.programCompletion.dashboardMessage"
+-            defaultMessage="To view your certificate status, check the Programs section of your {programLink}."
+-            values={{ programLink }}
+-          />
+-        </p>
+-        {type === 'microbachelors' && (
+-          <>
++    <Alert variant="primary" className="my-3" data-testid="program-completion">
++      <div className="d-flex">
++        <div className="col order-1 order-md-0 pl-0 pr-0 pr-md-5">
++          <div className="h4">{intl.formatMessage(messages.programsLastCourseHeader, { title })}</div>
++          <p>
++            <FormattedMessage
++              id="courseExit.programCompletion.dashboardMessage"
++              defaultMessage="To view your certificate status, check the Programs section of your {programLink}."
++              values={{ programLink }}
++            />
++          </p>
++          {type === 'microbachelors' && (
++            <>
++              <p>
++                <Hyperlink
++                  style={{ textDecoration: 'underline' }}
++                  destination={`${getConfig().SUPPORT_URL}/hc/en-us/articles/360004623154`}
++                  className="text-reset"
++                >
++                  {intl.formatMessage(messages.microBachelorsLearnMore)}
++                </Hyperlink>
++              </p>
++              <Button variant="primary" className="mb-2 mb-sm-0" href={`${getConfig().CREDENTIALS_BASE_URL}/records`}>
++                {intl.formatMessage(messages.applyForCredit)}
++              </Button>
++            </>
++          )}
++          {type === 'micromasters' && (
+             <p>
++              {intl.formatMessage(messages.microMastersMessage)}
++              {' '}
+               <Hyperlink
+                 style={{ textDecoration: 'underline' }}
+-                destination={`${getConfig().SUPPORT_URL}/hc/en-us/articles/360004623154`}
++                destination={`${getConfig().SUPPORT_URL}/hc/en-us/articles/360010346853-Does-a-Micromasters-certificate-count-towards-the-online-Master-s-degree-`}
+                 className="text-reset"
+               >
+-                {intl.formatMessage(messages.microBachelorsLearnMore)}
++                {intl.formatMessage(messages.microMastersLearnMore)}
+               </Hyperlink>
+             </p>
+-            <Button variant="primary" className="mb-2 mb-sm-0" href={`${getConfig().CREDENTIALS_BASE_URL}/records`}>
+-              {intl.formatMessage(messages.applyForCredit)}
+-            </Button>
+-          </>
+-        )}
+-        {type === 'micromasters' && (
+-          <p>
+-            {intl.formatMessage(messages.microMastersMessage)}
+-            {' '}
+-            <Hyperlink
+-              style={{ textDecoration: 'underline' }}
+-              destination={`${getConfig().SUPPORT_URL}/hc/en-us/articles/360010346853-Does-a-Micromasters-certificate-count-towards-the-online-Master-s-degree-`}
+-              className="text-reset"
+-            >
+-              {intl.formatMessage(messages.microMastersLearnMore)}
+-            </Hyperlink>
+-          </p>
+-        )}
+-      </div>
+-      <div className="col-12 order-0 col-md-3 order-md-1 w-100 mb-3 p-0 text-center">
+-        <img
+-          src={certImage}
+-          alt={`${intl.formatMessage(messages.certificateImage)}`}
+-          className="w-100"
+-          style={{ maxWidth: '13rem' }}
+-          data-testid={type}
+-        />
++          )}
++        </div>
++        <div className="col-12 order-0 col-md-3 order-md-1 w-100 mb-3 p-0 text-center">
++          <img
++            src={certImage}
++            alt={`${intl.formatMessage(messages.certificateImage)}`}
++            className="w-100"
++            style={{ maxWidth: '13rem' }}
++            data-testid={type}
++          />
++        </div>
+       </div>
+     </Alert>
+   );
+diff --git a/src/generic/user-messages/Alert.jsx b/src/generic/user-messages/Alert.jsx
+index 9f8f752..b43026d 100644
+--- a/src/generic/user-messages/Alert.jsx
++++ b/src/generic/user-messages/Alert.jsx
+@@ -1,82 +1,48 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import classNames from 'classnames';
+-import {
+-  faExclamationTriangle, faInfoCircle, faCheckCircle, faMinusCircle, faTimes,
+-} from '@fortawesome/free-solid-svg-icons';
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { IconButton } from '@edx/paragon';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Alert as ParagonAlert } from '@edx/paragon';
++import { CheckCircle, Info, WarningFilled } from '@edx/paragon/icons';
+ 
+ import { ALERT_TYPES } from './UserMessagesProvider';
+-import './Alert.scss';
+-import messages from '../messages';
+ 
+-function getAlertClass(type) {
+-  if (type === ALERT_TYPES.ERROR) {
+-    return 'alert-warning';
++function getAlertVariant(type) {
++  switch (type) {
++    case ALERT_TYPES.ERROR:
++      return 'warning';
++    case ALERT_TYPES.DANGER:
++      return 'danger';
++    case ALERT_TYPES.SUCCESS:
++      return 'success';
++    default:
++      return 'info';
+   }
+-  if (type === ALERT_TYPES.DANGER) {
+-    return 'alert-danger';
+-  }
+-  if (type === ALERT_TYPES.SUCCESS) {
+-    return 'alert-success';
+-  }
+-  if (type === ALERT_TYPES.WELCOME) {
+-    return 'alert-welcome alert-light';
+-  }
+-  return 'alert-info';
+ }
+ 
+ function getAlertIcon(type) {
+-  if (type === ALERT_TYPES.ERROR) {
+-    return faExclamationTriangle;
+-  }
+-  if (type === ALERT_TYPES.DANGER) {
+-    return faMinusCircle;
+-  }
+-  if (type === ALERT_TYPES.SUCCESS) {
+-    return faCheckCircle;
+-  }
+-  return faInfoCircle;
+-}
+-
+-function getAlertIconColor(type) {
+-  if (type === ALERT_TYPES.SUCCESS) {
+-    return 'text-success-500';
++  switch (type) {
++    case ALERT_TYPES.ERROR:
++      return WarningFilled;
++    case ALERT_TYPES.SUCCESS:
++      return CheckCircle;
++    default:
++      return Info;
+   }
+-  return '';
+ }
+ 
+ function Alert({
+-  type, dismissible, children, footer, intl, onDismiss,
++  type, dismissible, children, onDismiss, stacked,
+ }) {
+   return (
+-    <div data-testid={`alert-container-${type}`} className={classNames('alert', { 'alert-dismissible': dismissible }, getAlertClass(type))} style={{ padding: '1em' }}>
+-      <div className="row w-100 m-0">
+-        {type !== ALERT_TYPES.WELCOME && (
+-          <div className="col-auto p-0 mr-3">
+-            <FontAwesomeIcon icon={getAlertIcon(type)} className={getAlertIconColor(type)} />
+-          </div>
+-        )}
+-        <div className="col mr-4 p-0 align-items-start">
+-          <div role="alert" className="flex-grow-1">
+-            {children}
+-          </div>
+-        </div>
+-        {dismissible && (
+-          <div className="col-auto p-0" style={{ margin: '-0.2em -0.2em 0em 0em' }}>
+-            <IconButton
+-              icon={faTimes}
+-              onClick={onDismiss}
+-              alt={intl.formatMessage(messages.close)}
+-              variant="primary"
+-            />
+-          </div>
+-        )}
+-      </div>
+-      {footer}
+-    </div>
++    <ParagonAlert
++      data-testid={`alert-container-${type}`}
++      variant={getAlertVariant(type)}
++      icon={getAlertIcon(type)}
++      dismissible={dismissible}
++      onClose={onDismiss}
++      stacked={stacked}
++    >
++      {children}
++    </ParagonAlert>
+   );
+ }
+ 
+@@ -86,20 +52,18 @@ Alert.propTypes = {
+     ALERT_TYPES.DANGER,
+     ALERT_TYPES.INFO,
+     ALERT_TYPES.SUCCESS,
+-    ALERT_TYPES.WELCOME,
+   ]).isRequired,
+   dismissible: PropTypes.bool,
+   children: PropTypes.node,
+-  footer: PropTypes.node,
+-  intl: intlShape.isRequired,
+   onDismiss: PropTypes.func,
++  stacked: PropTypes.bool,
+ };
+ 
+ Alert.defaultProps = {
+   dismissible: false,
+   children: undefined,
+-  footer: null,
+   onDismiss: null,
++  stacked: false,
+ };
+ 
+-export default injectIntl(Alert);
++export default Alert;
+diff --git a/src/generic/user-messages/Alert.scss b/src/generic/user-messages/Alert.scss
+deleted file mode 100644
+index 93d77aa..0000000
+--- a/src/generic/user-messages/Alert.scss
++++ /dev/null
+@@ -1,3 +0,0 @@
+-.alert-welcome {
+-  border: #b9babe solid 1px !important;
+-}
+diff --git a/src/generic/user-messages/Alert.test.jsx b/src/generic/user-messages/Alert.test.jsx
+deleted file mode 100644
+index 0e08ffd..0000000
+--- a/src/generic/user-messages/Alert.test.jsx
++++ /dev/null
+@@ -1,55 +0,0 @@
+-import React from 'react';
+-import {
+-  render, screen, fireEvent, initializeMockApp,
+-} from '../../setupTest';
+-import { Alert, ALERT_TYPES } from './index';
+-
+-describe('Alert', () => {
+-  const types = {
+-    [ALERT_TYPES.ERROR]: {
+-      alert_class: 'alert-warning',
+-      icon: 'fa-exclamation-triangle',
+-    },
+-    [ALERT_TYPES.DANGER]: {
+-      alert_class: 'alert-danger',
+-      icon: 'fa-minus-circle',
+-    },
+-    [ALERT_TYPES.SUCCESS]: {
+-      alert_class: 'alert-success',
+-      icon: 'fa-check-circle',
+-    },
+-    [ALERT_TYPES.INFO]: {
+-      alert_class: 'alert-info',
+-      icon: 'fa-info-circle',
+-    },
+-  };
+-
+-  beforeAll(async () => {
+-    // We need to mock AuthService to implicitly use `getAuthenticatedUser` within `AppContext.Provider`.
+-    await initializeMockApp();
+-  });
+-
+-  Object.entries(types).forEach(([alert, properties]) => {
+-    it(`renders ${alert} alert`, () => {
+-      const alertContent = 'Test alert.';
+-      const { container } = render(<Alert type={alert}>{alertContent}</Alert>);
+-
+-      expect(container.firstChild).toHaveClass(properties.alert_class);
+-      expect(container.querySelector('svg')).toHaveClass(properties.icon);
+-      expect(screen.getByText(alertContent)).toBeInTheDocument();
+-    });
+-  });
+-
+-  it('is dismissible', () => {
+-    const onDismiss = jest.fn();
+-    const { container } = render(<Alert type={ALERT_TYPES.ERROR} dismissible {...{ onDismiss }} />);
+-
+-    expect(container.firstChild).toHaveClass('alert-dismissible');
+-
+-    const dismissButton = screen.getByRole('button');
+-    expect(container.querySelector('svg')).toHaveClass('fa-exclamation-triangle');
+-
+-    fireEvent.click(dismissButton);
+-    expect(onDismiss).toHaveBeenCalledTimes(1);
+-  });
+-});
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index f201cfa..722be5d 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -134,18 +134,20 @@ function StreakModal({
+           </div>
+         )}
+         { AA759ExperimentEnabled && (
+-          <Alert variant="success" className="px-0 d-flex">
+-            <Icon className="col-small ml-3 text-success-500" src={MoneyFilled} />
+-            <div className="col-11 factoid-wrapper">
+-              <b>{intl.formatMessage(messages.congratulations)}</b>
+-              &nbsp;{intl.formatMessage(messages.streakDiscountMessage)}&nbsp;
+-              <FormattedMessage
+-                id="learning.streakCelebration.streakAA759EndDateMessage"
+-                defaultMessage="Ends {date}."
+-                values={{
+-                  date: new Date('2021-7-20 00:00').toLocaleDateString({ timeZone: 'UTC' }),
+-                }}
+-              />
++          <Alert variant="success" className="px-0">
++            <div className="d-flex">
++              <Icon className="col-small ml-3 text-success-500" src={MoneyFilled} />
++              <div className="col-11 factoid-wrapper">
++                <b>{intl.formatMessage(messages.congratulations)}</b>
++                &nbsp;{intl.formatMessage(messages.streakDiscountMessage)}&nbsp;
++                <FormattedMessage
++                  id="learning.streakCelebration.streakAA759EndDateMessage"
++                  defaultMessage="Ends {date}."
++                  values={{
++                    date: new Date('2021-7-20 00:00').toLocaleDateString({ timeZone: 'UTC' }),
++                  }}
++                />
++              </div>
+             </div>
+           </Alert>
+         )}
+-- 
+2.34.1
+

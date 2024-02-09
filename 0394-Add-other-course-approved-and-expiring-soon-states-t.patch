@@ -1,0 +1,279 @@
+From e4b1d8088aee670b4ac99aa5aa1e98eece1c7966 Mon Sep 17 00:00:00 2001
+From: Bianca Severino <bseverino@edx.org>
+Date: Tue, 2 Mar 2021 09:11:12 -0500
+Subject: [PATCH 0394/1021] Add "other course approved" and "expiring soon"
+ states to proctoring info panel (#373)
+
+---
+ package.json                                  |  1 +
+ .../outline-tab/OutlineTab.test.jsx           | 66 +++++++++++++++++--
+ src/course-home/outline-tab/messages.js       | 16 +++++
+ .../widgets/ProctoringInfoPanel.jsx           | 49 ++++++++++----
+ 4 files changed, 115 insertions(+), 17 deletions(-)
+
+diff --git a/package.json b/package.json
+index 2c6e2c0..5d2327e 100644
+--- a/package.json
++++ b/package.json
+@@ -47,6 +47,7 @@
+     "@reduxjs/toolkit": "1.3.6",
+     "classnames": "2.2.6",
+     "core-js": "3.6.5",
++    "lodash.camelcase": "^4.3.0",
+     "prop-types": "15.7.2",
+     "react": "16.13.1",
+     "react-break": "1.3.2",
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index b8849a2..40ad5ba 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -55,7 +55,11 @@ describe('Outline Tab', () => {
+     axiosMock.onPost(enrollmentUrl).reply(200, {});
+     axiosMock.onPost(goalUrl).reply(200, { header: 'Success' });
+     axiosMock.onGet(outlineUrl).reply(200, defaultTabData);
+-    axiosMock.onGet(proctoringInfoUrl).reply(200, { onboarding_status: 'created', onboarding_link: 'test' });
++    axiosMock.onGet(proctoringInfoUrl).reply(200, {
++      onboarding_status: 'created',
++      onboarding_link: 'test',
++      expiration_date: null,
++    });
+ 
+     logUnhandledRequests(axiosMock);
+   });
+@@ -513,7 +517,11 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('appears for verified', async () => {
+-      axiosMock.onGet(proctoringInfoUrl).reply(200, { onboarding_status: 'verified', onboarding_link: 'test' });
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: 'verified',
++        onboarding_link: 'test',
++        expiration_date: null,
++      });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).not.toBeInTheDocument();
+@@ -523,7 +531,11 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('appears for rejected', async () => {
+-      axiosMock.onGet(proctoringInfoUrl).reply(200, { onboarding_status: 'rejected', onboarding_link: 'test' });
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: 'rejected',
++        onboarding_link: 'test',
++        expiration_date: null,
++      });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).toBeInTheDocument();
+@@ -533,7 +545,11 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('appears for submitted', async () => {
+-      axiosMock.onGet(proctoringInfoUrl).reply(200, { onboarding_status: 'submitted', onboarding_link: 'test' });
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: 'submitted',
++        onboarding_link: 'test',
++        expiration_date: null,
++      });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByText('Your submitted profile is in review.')).toBeInTheDocument();
+@@ -541,15 +557,53 @@ describe('Outline Tab', () => {
+     });
+ 
+     it('appears for second_review_required', async () => {
+-      axiosMock.onGet(proctoringInfoUrl).reply(200, { onboarding_status: 'second_review_required', onboarding_link: 'test' });
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: 'second_review_required',
++        onboarding_link: 'test',
++        expiration_date: null,
++      });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByText('Your submitted profile is in review.')).toBeInTheDocument();
+       expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
+     });
+ 
++    it('appears for other_course_approved if not expiring soon', async () => {
++      const expirationDate = new Date();
++      // Set the expiration date 40 days in the future, so as not to trigger the 28 day expiration warning
++      expirationDate.setTime(expirationDate.getTime() + 3456900000);
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: 'other_course_approved',
++        onboarding_link: 'test',
++        expiration_date: expirationDate.toString(),
++      });
++      await fetchAndRender();
++      await screen.findByText('This course contains proctored exams');
++      expect(screen.queryByText('Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, it is highly recommended that you complete this course’s onboarding exam in order to ensure that your device still meets the requirements for proctoring.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).not.toBeInTheDocument();
++    });
++
++    it('displays expiration warning', async () => {
++      const expirationDate = new Date();
++      // This message will render if the expiration date is within 28 days; set the date 10 days in future
++      expirationDate.setTime(expirationDate.getTime() + 864800000);
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: 'other_course_approved',
++        onboarding_link: 'test',
++        expiration_date: expirationDate.toString(),
++      });
++      await fetchAndRender();
++      await screen.findByText('This course contains proctored exams');
++      expect(screen.queryByText('Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.')).toBeInTheDocument();
++      expect(screen.queryByText('Onboarding profile review, including identity verification, can take 2+ business days.')).toBeInTheDocument();
++    });
++
+     it('appears for no status', async () => {
+-      axiosMock.onGet(proctoringInfoUrl).reply(200, { onboarding_status: '', onboarding_link: 'test' });
++      axiosMock.onGet(proctoringInfoUrl).reply(200, {
++        onboarding_status: '',
++        onboarding_link: 'test',
++        expiration_date: null,
++      });
+       await fetchAndRender();
+       await screen.findByText('This course contains proctored exams');
+       expect(screen.queryByRole('link', { name: 'Complete Onboarding' })).toBeInTheDocument();
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index c782284..0fb24ab 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -140,6 +140,14 @@ const messages = defineMessages({
+     id: 'learning.proctoringPanel.status.error',
+     defaultMessage: 'Error',
+   },
++  otherCourseApprovedProctoringStatus: {
++    id: 'learning.proctoringPanel.status.otherCourseApproved',
++    defaultMessage: 'Approved in Another Course',
++  },
++  expiringSoonProctoringStatus: {
++    id: 'learning.proctoringPanel.status.expiringSoon',
++    defaultMessage: 'Expiring Soon',
++  },
+   proctoringCurrentStatus: {
+     id: 'learning.proctoringPanel.status',
+     defaultMessage: 'Current Onboarding Status:',
+@@ -168,6 +176,14 @@ const messages = defineMessages({
+     id: 'learning.proctoringPanel.message.error',
+     defaultMessage: 'An error has occurred during your onboarding exam. Please retry onboarding.',
+   },
++  otherCourseApprovedProctoringMessage: {
++    id: 'learning.proctoringPanel.message.otherCourseApproved',
++    defaultMessage: 'Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, it is highly recommended that you complete this course’s onboarding exam in order to ensure that your device still meets the requirements for proctoring.',
++  },
++  expiringSoonProctoringMessage: {
++    id: 'learning.proctoringPanel.message.expiringSoon',
++    defaultMessage: 'Your onboarding profile has been approved in another course, so you are eligible to take proctored exams in this course. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.',
++  },
+   proctoringPanelGeneralInfo: {
+     id: 'learning.proctoringPanel.generalInfo',
+     defaultMessage: 'You must complete the onboarding process prior to taking any proctored exam. ',
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index 0786818..3a01c91 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -1,4 +1,5 @@
+ import React, { useState, useEffect } from 'react';
++import camelCase from 'lodash.camelcase';
+ import PropTypes from 'prop-types';
+ 
+ import { getConfig } from '@edx/frontend-platform';
+@@ -13,16 +14,30 @@ function ProctoringInfoPanel({ courseId, intl }) {
+   const [link, setLink] = useState('');
+   const [readableStatus, setReadableStatus] = useState('');
+ 
++  const readableStatuses = {
++    notStarted: 'notStarted',
++    started: 'started',
++    submitted: 'submitted',
++    verified: 'verified',
++    rejected: 'rejected',
++    error: 'error',
++    otherCourseApproved: 'otherCourseApproved',
++    expiringSoon: 'expiringSoon',
++  };
++
+   function getReadableStatusClass(examStatus) {
+     let readableClass = '';
+     if (['created', 'download_software_clicked', 'ready_to_start'].includes(examStatus) || !examStatus) {
+-      readableClass = 'notStarted';
++      readableClass = readableStatuses.notStarted;
+     } else if (['started', 'ready_to_submit'].includes(examStatus)) {
+-      readableClass = 'started';
++      readableClass = readableStatuses.started;
+     } else if (['second_review_required', 'submitted'].includes(examStatus)) {
+-      readableClass = 'submitted';
+-    } else if (['verified', 'rejected', 'error'].includes(examStatus)) {
+-      readableClass = examStatus;
++      readableClass = readableStatuses.submitted;
++    } else {
++      const examStatusCamelCase = camelCase(examStatus);
++      if (examStatusCamelCase in readableStatuses) {
++        readableClass = readableStatuses[examStatusCamelCase];
++      }
+     }
+     return readableClass;
+   }
+@@ -32,16 +47,23 @@ function ProctoringInfoPanel({ courseId, intl }) {
+     return !NO_SHOW_STATES.includes(examStatus);
+   }
+ 
+-  function getBorderClass(examStatus) {
++  function getBorderClass() {
+     let borderClass = '';
+-    if (['submitted', 'second_review_required'].includes(examStatus)) {
++    if (readableStatus === readableStatuses.submitted) {
+       borderClass = 'proctoring-onboarding-submitted';
+-    } else if (examStatus === 'verified') {
++    } else if (readableStatus === readableStatuses.verified) {
+       borderClass = 'proctoring-onboarding-success';
+     }
+     return borderClass;
+   }
+ 
++  function isExpiringSoon(dateString) {
++    // Returns true if the expiration date is within 28 days
++    const today = new Date();
++    const expirationDateObject = new Date(dateString);
++    return today > expirationDateObject.getTime() - 2419200000;
++  }
++
+   useEffect(() => {
+     getProctoringInfoData(courseId)
+       .then(
+@@ -49,7 +71,12 @@ function ProctoringInfoPanel({ courseId, intl }) {
+           if (response) {
+             setStatus(response.onboarding_status);
+             setLink(response.onboarding_link);
+-            setReadableStatus(getReadableStatusClass(response.onboarding_status));
++            const expirationDate = response.expiration_date;
++            if (expirationDate && isExpiringSoon(expirationDate)) {
++              setReadableStatus(getReadableStatusClass('expiringSoon'));
++            } else {
++              setReadableStatus(getReadableStatusClass(response.onboarding_status));
++            }
+           }
+         },
+       );
+@@ -58,7 +85,7 @@ function ProctoringInfoPanel({ courseId, intl }) {
+   return (
+     <>
+       { link && (
+-        <section className={`mb-4 p-3 outline-sidebar-proctoring-panel ${getBorderClass(status)}`}>
++        <section className={`mb-4 p-3 outline-sidebar-proctoring-panel ${getBorderClass()}`}>
+           <h2 className="h4" id="outline-sidebar-upgrade-header">{intl.formatMessage(messages.proctoringInfoPanel)}</h2>
+           <div>
+             {readableStatus && (
+@@ -71,7 +98,7 @@ function ProctoringInfoPanel({ courseId, intl }) {
+                 </p>
+               </>
+             )}
+-            {(readableStatus !== 'verified') && (
++            {![readableStatuses.verified, readableStatuses.otherCourseApproved].includes(readableStatus) && (
+               <>
+                 <p>
+                   {isNotYetSubmitted(status) && (
+-- 
+2.34.1
+

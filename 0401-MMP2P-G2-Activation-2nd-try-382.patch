@@ -1,0 +1,2470 @@
+From 6e2294e279832a6a6269a7e80d9f734c27cd8f14 Mon Sep 17 00:00:00 2001
+From: Ben Warzeski <bwarzeski@edx.org>
+Date: Thu, 11 Mar 2021 11:13:38 -0500
+Subject: [PATCH 0401/1021] MMP2P G2 Activation (2nd try) (#382)
+
+* upgrade paragon
+
+* mmp2p experiment code
+
+* mmp2p courseware triggers
+
+* mmp2p course-home triggers
+
+* mmp2p load styles
+
+* mmp2p - add missed locator docstrings
+
+* mmp2p test fixes
+
+* add lazy loading for image-bearing components
+
+* mmp2p experiment README
+
+* mmp2p add lazy loading for sidecard
+
+* generalize prices for currency options
+
+* mmp2p fix flyover mobile args
+
+* mmp2p fix lock paywall border display
+
+* mmp2 - add safety-rail around verifiedmode access
+---
+ package-lock.json                             |  24 +-
+ package.json                                  |   2 +-
+ src/course-home/dates-tab/DatesTab.jsx        |  25 +-
+ src/course-home/dates-tab/Day.jsx             |  47 +++-
+ src/course-home/dates-tab/Timeline.jsx        |  16 +-
+ src/course-home/outline-tab/DateSummary.jsx   |  38 +--
+ src/course-home/outline-tab/OutlineTab.jsx    |  54 ++--
+ .../outline-tab/widgets/CourseDates.jsx       |  13 +-
+ src/courseware/course/Course.jsx              |  31 ++-
+ src/courseware/course/CourseBreadcrumbs.jsx   |  47 +++-
+ src/courseware/course/sequence/Sequence.jsx   |  39 ++-
+ .../course/sequence/SequenceContent.jsx       |  29 ++-
+ src/courseware/course/sequence/Unit.jsx       |  72 ++++--
+ .../SequenceNavigation.jsx                    |  21 +-
+ src/experiments/mm-p2p/BlockModal.jsx         |  21 ++
+ src/experiments/mm-p2p/BlockModal.scss        |  43 +++
+ src/experiments/mm-p2p/BlockModalContent.jsx  |  78 ++++++
+ src/experiments/mm-p2p/Flyover.jsx            |  83 ++++++
+ src/experiments/mm-p2p/Flyover.scss           |  38 +++
+ src/experiments/mm-p2p/FlyoverMobile.jsx      |  86 ++++++
+ src/experiments/mm-p2p/FlyoverMobile.scss     |  37 +++
+ src/experiments/mm-p2p/FlyoverTrigger.jsx     |  58 +++++
+ src/experiments/mm-p2p/FlyoverTrigger.scss    |   8 +
+ src/experiments/mm-p2p/FlyoverTriggerIcon.jsx |  48 ++++
+ .../mm-p2p/FlyoverTriggerMobile.jsx           |  54 ++++
+ .../mm-p2p/FlyoverTriggerMobile.scss          |   7 +
+ src/experiments/mm-p2p/LockPaywall.jsx        |  45 ++++
+ src/experiments/mm-p2p/LockPaywallContent.jsx |  73 ++++++
+ src/experiments/mm-p2p/README.md              |  12 +
+ src/experiments/mm-p2p/Sidecard.jsx           |  42 +++
+ src/experiments/mm-p2p/Sidecard.scss          |  53 ++++
+ src/experiments/mm-p2p/SidecardContent.jsx    | 169 ++++++++++++
+ src/experiments/mm-p2p/index.jsx              | 244 ++++++++++++++++++
+ src/experiments/mm-p2p/index.scss             |   6 +
+ src/experiments/mm-p2p/utils.jsx              |  48 ++++
+ src/index.scss                                |   3 +
+ 36 files changed, 1613 insertions(+), 101 deletions(-)
+ create mode 100644 src/experiments/mm-p2p/BlockModal.jsx
+ create mode 100644 src/experiments/mm-p2p/BlockModal.scss
+ create mode 100644 src/experiments/mm-p2p/BlockModalContent.jsx
+ create mode 100644 src/experiments/mm-p2p/Flyover.jsx
+ create mode 100644 src/experiments/mm-p2p/Flyover.scss
+ create mode 100644 src/experiments/mm-p2p/FlyoverMobile.jsx
+ create mode 100644 src/experiments/mm-p2p/FlyoverMobile.scss
+ create mode 100644 src/experiments/mm-p2p/FlyoverTrigger.jsx
+ create mode 100644 src/experiments/mm-p2p/FlyoverTrigger.scss
+ create mode 100644 src/experiments/mm-p2p/FlyoverTriggerIcon.jsx
+ create mode 100644 src/experiments/mm-p2p/FlyoverTriggerMobile.jsx
+ create mode 100644 src/experiments/mm-p2p/FlyoverTriggerMobile.scss
+ create mode 100644 src/experiments/mm-p2p/LockPaywall.jsx
+ create mode 100644 src/experiments/mm-p2p/LockPaywallContent.jsx
+ create mode 100644 src/experiments/mm-p2p/README.md
+ create mode 100644 src/experiments/mm-p2p/Sidecard.jsx
+ create mode 100644 src/experiments/mm-p2p/Sidecard.scss
+ create mode 100644 src/experiments/mm-p2p/SidecardContent.jsx
+ create mode 100644 src/experiments/mm-p2p/index.jsx
+ create mode 100644 src/experiments/mm-p2p/index.scss
+ create mode 100644 src/experiments/mm-p2p/utils.jsx
+
+diff --git a/package-lock.json b/package-lock.json
+index 0e1fa2e..cf44f4b 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1413,9 +1413,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "13.13.5",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-13.13.5.tgz",
+-      "integrity": "sha512-6q60Lj5dbzZbcXfNrpHXqn4tKQYf1KmcISOe//un0JTSQr6/LnZjHZoZfmzDaRX/2KEDaLCTqCefvKTpB26qCQ==",
++      "version": "13.16.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-13.16.0.tgz",
++      "integrity": "sha512-E1XCpiHoD0TaTUV6o5FxfkxfUhtBmSsUCmR7LSTPXpiuI7ouK2PxbRoxCT8CnHbSAeeYKN0vPHNGEd9hFRm7zg==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+@@ -2307,9 +2307,9 @@
+       }
+     },
+     "@popperjs/core": {
+-      "version": "2.9.0",
+-      "resolved": "https://registry.npmjs.org/@popperjs/core/-/core-2.9.0.tgz",
+-      "integrity": "sha512-wjtKehFAIARq2OxK8j3JrggNlEslJfNuSm2ArteIbKyRMts2g0a7KzTxfRVNUM+O0gnBJ2hNV8nWPOYBgI1sew=="
++      "version": "2.9.1",
++      "resolved": "https://registry.npmjs.org/@popperjs/core/-/core-2.9.1.tgz",
++      "integrity": "sha512-DvJbbn3dUgMxDnJLH+RZQPnXak1h4ZVYQ7CWiFWjQwBFkVajT4rfw2PdpHLTSTwxrYfnoEXkuBiwkDm6tPMQeA=="
+     },
+     "@reduxjs/toolkit": {
+       "version": "1.3.6",
+@@ -3016,11 +3016,12 @@
+       "dev": true
+     },
+     "@types/react": {
+-      "version": "17.0.2",
+-      "resolved": "https://registry.npmjs.org/@types/react/-/react-17.0.2.tgz",
+-      "integrity": "sha512-Xt40xQsrkdvjn1EyWe1Bc0dJLcil/9x2vAuW7ya+PuQip4UYUaXyhzWmAbwRsdMgwOFHpfp7/FFZebDU6Y8VHA==",
++      "version": "17.0.3",
++      "resolved": "https://registry.npmjs.org/@types/react/-/react-17.0.3.tgz",
++      "integrity": "sha512-wYOUxIgs2HZZ0ACNiIayItyluADNbONl7kt8lkLjVK8IitMH5QMyAh75Fwhmo37r1m7L2JaFj03sIfxBVDvRAg==",
+       "requires": {
+         "@types/prop-types": "*",
++        "@types/scheduler": "*",
+         "csstype": "^3.0.2"
+       }
+     },
+@@ -3032,6 +3033,11 @@
+         "@types/react": "*"
+       }
+     },
++    "@types/scheduler": {
++      "version": "0.16.1",
++      "resolved": "https://registry.npmjs.org/@types/scheduler/-/scheduler-0.16.1.tgz",
++      "integrity": "sha512-EaCxbanVeyxDRTQBkdLb3Bvl/HK7PBK6UJjsSixB0iHKoWxE5uu2Q/DgtpOhPIojN0Zl1whvOd7PoHs2P0s5eA=="
++    },
+     "@types/schema-utils": {
+       "version": "2.4.0",
+       "resolved": "https://registry.npmjs.org/@types/schema-utils/-/schema-utils-2.4.0.tgz",
+diff --git a/package.json b/package.json
+index f30783e..bc8ef5c 100644
+--- a/package.json
++++ b/package.json
+@@ -39,7 +39,7 @@
+     "@edx/frontend-component-footer": "10.1.4",
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-platform": "1.8.4",
+-    "@edx/paragon": "13.13.5",
++    "@edx/paragon": "13.16.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/course-home/dates-tab/DatesTab.jsx b/src/course-home/dates-tab/DatesTab.jsx
+index 54efc3f..7abdd01 100644
+--- a/src/course-home/dates-tab/DatesTab.jsx
++++ b/src/course-home/dates-tab/DatesTab.jsx
+@@ -9,6 +9,9 @@ import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ import { fetchDatesTab } from '../data';
+ import { useModel } from '../../generic/model-store';
+ 
++/** [MM-P2P] Experiment */
++import { initDatesMMP2P } from '../../experiments/mm-p2p';
++
+ function DatesTab({ intl }) {
+   const {
+     courseId,
+@@ -20,19 +23,25 @@ function DatesTab({ intl }) {
+     hasEnded,
+   } = useModel('dates', courseId);
+ 
++  /** [MM-P2P] Experiment */
++  const mmp2p = initDatesMMP2P(courseId);
++
+   return (
+     <>
+       <div role="heading" aria-level="1" className="h2 my-3">
+         {intl.formatMessage(messages.title)}
+       </div>
+-      <DatesBannerContainer
+-        courseDateBlocks={courseDateBlocks}
+-        datesBannerInfo={datesBannerInfo}
+-        hasEnded={hasEnded}
+-        model="dates"
+-        tabFetch={fetchDatesTab}
+-      />
+-      <Timeline />
++      { /** [MM-P2P] Experiment */ }
++      { !mmp2p.state.isEnabled && (
++        <DatesBannerContainer
++          courseDateBlocks={courseDateBlocks}
++          datesBannerInfo={datesBannerInfo}
++          hasEnded={hasEnded}
++          model="dates"
++          tabFetch={fetchDatesTab}
++        />
++      ) }
++      <Timeline mmp2p={mmp2p} />
+     </>
+   );
+ }
+diff --git a/src/course-home/dates-tab/Day.jsx b/src/course-home/dates-tab/Day.jsx
+index c01c4a1..2512634 100644
+--- a/src/course-home/dates-tab/Day.jsx
++++ b/src/course-home/dates-tab/Day.jsx
+@@ -13,7 +13,13 @@ import { getBadgeListAndColor } from './badgelist';
+ import { isLearnerAssignment } from './utils';
+ 
+ function Day({
+-  date, first, intl, items, last,
++  date,
++  first,
++  intl,
++  items,
++  last,
++  /** [MM-P2P] Example */
++  mmp2p,
+ }) {
+   const {
+     courseId,
+@@ -26,6 +32,11 @@ function Day({
+ 
+   const { color, badges } = getBadgeListAndColor(date, intl, null, items);
+ 
++  /** [MM-P2P] Experiment */
++  const mmp2pOverride = (
++    mmp2p.state.isEnabled
++    && items.some((item) => item.dateType === 'verified-upgrade-deadline')
++  );
+   return (
+     <li className="dates-day pb-4" data-testid="dates-day">
+       {/* Top Line */}
+@@ -42,7 +53,8 @@ function Day({
+         <div className="mb-1" data-testid="dates-header">
+           <p className="d-inline text-dark-500 font-weight-bold">
+             <FormattedDate
+-              value={date}
++              /** [MM-P2P] Experiment */
++              value={mmp2pOverride ? mmp2p.state.upgradeDeadline : date}
+               day="numeric"
+               month="short"
+               weekday="short"
+@@ -53,11 +65,16 @@ function Day({
+           {badges}
+         </div>
+         {items.map((item) => {
+-          const { badges: itemBadges } = getBadgeListAndColor(date, intl, item, items);
++          /** [MM-P2P] Experiment (conditional) */
++          const { badges: itemBadges } = mmp2pOverride
++            ? getBadgeListAndColor(new Date(mmp2p.state.upgradeDeadline), intl, item, items)
++            : getBadgeListAndColor(date, intl, item, items);
++
+           const showLink = item.link && isLearnerAssignment(item);
+           const title = showLink ? (<u><a href={item.link} className="text-reset">{item.title}</a></u>) : item.title;
+           const available = item.learnerHasAccess && (item.link || !isLearnerAssignment(item));
+           const textColor = available ? 'text-dark-500' : 'text-dark-200';
++
+           return (
+             <div key={item.title + item.date} className={textColor} data-testid="dates-item">
+               <div>
+@@ -76,7 +93,15 @@ function Day({
+                   </OverlayTrigger>
+                 )}
+               </div>
+-              {item.description && <div className="small mb-2">{item.description}</div>}
++              { /** [MM-P2P] Experiment (conditional) */ }
++              { mmp2pOverride
++                ? (
++                  <div className="small mb-2">
++                    You are still elligible to upgrade to a Verified Certificate!
++                    &nbsp; Unlock full course access and highlight the knowledge you&apos;ll gain.
++                  </div>
++                )
++                : (item.description && <div className="small mb-2">{item.description}</div>)}
+             </div>
+           );
+         })}
+@@ -99,11 +124,25 @@ Day.propTypes = {
+     title: PropTypes.string,
+   })).isRequired,
+   last: PropTypes.bool,
++  /** [MM-P2P] Experiment */
++  mmp2p: PropTypes.shape({
++    state: PropTypes.shape({
++      isEnabled: PropTypes.bool.isRequired,
++      upgradeDeadline: PropTypes.string,
++    }),
++  }),
+ };
+ 
+ Day.defaultProps = {
+   first: false,
+   last: false,
++  /** [MM-P2P] Experiment */
++  mmp2p: {
++    state: {
++      isEnabled: false,
++      upgradeDeadline: '',
++    },
++  },
+ };
+ 
+ export default injectIntl(Day);
+diff --git a/src/course-home/dates-tab/Timeline.jsx b/src/course-home/dates-tab/Timeline.jsx
+index 44bfc2c..8a16666 100644
+--- a/src/course-home/dates-tab/Timeline.jsx
++++ b/src/course-home/dates-tab/Timeline.jsx
+@@ -1,4 +1,6 @@
+ import React from 'react';
++/** [MM-P2P] Experiment (import) */
++import PropTypes from 'prop-types';
+ import { useSelector } from 'react-redux';
+ 
+ import { useModel } from '../../generic/model-store';
+@@ -6,7 +8,8 @@ import { useModel } from '../../generic/model-store';
+ import Day from './Day';
+ import { daycmp, isLearnerAssignment } from './utils';
+ 
+-export default function Timeline() {
++/** [MM-P2P] Experiment (argument) */
++export default function Timeline({ mmp2p }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -63,8 +66,17 @@ export default function Timeline() {
+   return (
+     <ul className="list-unstyled m-0">
+       {groupedDates.map((groupedDate) => (
+-        <Day key={groupedDate.date} {...groupedDate} />
++        <Day key={groupedDate.date} {...groupedDate} mmp2p={mmp2p} />
+       ))}
+     </ul>
+   );
+ }
++
++/** [MM-P2P] Experiment */
++Timeline.propTypes = {
++  mmp2p: PropTypes.shape({}),
++};
++
++Timeline.defaultProps = {
++  mmp2p: {},
++};
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index 43845c5..a7aadc8 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -1,7 +1,7 @@
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faCalendarAlt } from '@fortawesome/free-regular-svg-icons';
+ import { FormattedDate } from '@edx/frontend-platform/i18n';
+-import React, { useState } from 'react';
++import React from 'react';
+ import PropTypes from 'prop-types';
+ import { isLearnerAssignment } from '../dates-tab/utils';
+ import './DateSummary.scss';
+@@ -9,22 +9,14 @@ import './DateSummary.scss';
+ export default function DateSummary({
+   dateBlock,
+   userTimezone,
++  /** [MM-P2P] Experiment */
++  mmp2p,
+ }) {
+   const linkedTitle = dateBlock.link && isLearnerAssignment(dateBlock);
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+ 
+-  /** [MM-P2P experiment] */
+-  const [showMMP2P, setShowMMP2P] = useState(window.experiment__home_dates_bShowMMP2P);
+-  if (
+-    dateBlock.dateType === 'verified-upgrade-deadline'
+-    && window.experiment__home_dates_showMMP2P === undefined
+-  ) {
+-    window.experiment__home_dates_showMMP2P = (value) => {
+-      setShowMMP2P(!!value);
+-      window.experiment__home_dates_bShowMMP2P = !!value;
+-    };
+-  }
+-  const activateMMP2P = (showMMP2P && dateBlock.dateType === 'verified-upgrade-deadline');
++  /** [MM-P2P] Experiment */
++  const showMMP2P = mmp2p.state.isEnabled && (dateBlock.dateType === 'verified-upgrade-deadline');
+ 
+   return (
+     <li className="container p-0 mb-3 small text-dark-500">
+@@ -32,7 +24,8 @@ export default function DateSummary({
+         <FontAwesomeIcon icon={faCalendarAlt} className="ml-3 mt-1 mr-1" fixedWidth />
+         <div className="ml-1 font-weight-bold">
+           <FormattedDate
+-            value={dateBlock.date}
++            /** [MM-P2P] Experiment */
++            value={showMMP2P ? mmp2p.state.upgradeDeadline : dateBlock.date}
+             day="numeric"
+             month="short"
+             weekday="short"
+@@ -41,7 +34,8 @@ export default function DateSummary({
+           />
+         </div>
+       </div>
+-      {activateMMP2P ? (
++      {/** [MM-P2P] Experiment (conditional) */}
++      { showMMP2P ? (
+         <div className="row ml-4 pr-2">
+           <div className="date-summary-text">
+             <div className="font-weight-bold mt-2">
+@@ -84,8 +78,22 @@ DateSummary.propTypes = {
+     learnerHasAccess: PropTypes.bool,
+   }).isRequired,
+   userTimezone: PropTypes.string,
++  /** [MM-P2P] Experiment */
++  mmp2p: PropTypes.shape({
++    state: PropTypes.shape({
++      isEnabled: PropTypes.bool.isRequired,
++      upgradeDeadline: PropTypes.string,
++    }),
++  }),
+ };
+ 
+ DateSummary.defaultProps = {
+   userTimezone: null,
++  /** [MM-P2P] Experiment */
++  mmp2p: {
++    state: {
++      isEnabled: false,
++      upgradeDeadline: '',
++    },
++  },
+ };
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 6441673..086a372 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -28,6 +28,9 @@ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+ import ProctoringInfoPanel from './widgets/ProctoringInfoPanel';
+ 
++/** [MM-P2P] Experiment */
++import { initHomeMMP2P, MMP2PFlyover } from '../../experiments/mm-p2p';
++
+ function OutlineTab({ intl }) {
+   const {
+     courseId,
+@@ -88,6 +91,9 @@ function OutlineTab({ intl }) {
+ 
+   const courseSock = useRef(null);
+ 
++  /** [[MM-P2P] Experiment */
++  const MMP2P = initHomeMMP2P(courseId);
++
+   return (
+     <>
+       <Toast
+@@ -109,7 +115,8 @@ function OutlineTab({ intl }) {
+           </div>
+         )}
+       </div>
+-      <div className="row">
++      {/** [MM-P2P] Experiment (className for optimizely trigger) */}
++      <div className="row course-outline-tab">
+         <div className="col-12">
+           <AlertList
+             topic="outline-private-alerts"
+@@ -119,17 +126,21 @@ function OutlineTab({ intl }) {
+           />
+         </div>
+         <div className="col col-12 col-md-8">
+-          <AlertList
+-            topic="outline-course-alerts"
+-            className="mb-3"
+-            customAlerts={{
+-              ...accessExpirationAlert,
+-              ...certificateAvailableAlert,
+-              ...courseEndAlert,
+-              ...courseStartAlert,
+-              ...offerAlert,
+-            }}
+-          />
++          { /** [MM-P2P] Experiment (the conditional) */ }
++          { !MMP2P.state.isEnabled
++            && (
++            <AlertList
++              topic="outline-course-alerts"
++              className="mb-3"
++              customAlerts={{
++                ...accessExpirationAlert,
++                ...certificateAvailableAlert,
++                ...courseEndAlert,
++                ...courseStartAlert,
++                ...offerAlert,
++              }}
++            />
++            )}
+           {courseDateBlocks && (
+             <DatesBannerContainer
+               courseDateBlocks={courseDateBlocks}
+@@ -137,6 +148,8 @@ function OutlineTab({ intl }) {
+               hasEnded={hasEnded}
+               model="outline"
+               tabFetch={fetchOutlineTab}
++              /** [MM-P2P] Experiment */
++              isMMP2PEnabled={MMP2P.state.isEnabled}
+             />
+           )}
+           {!courseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
+@@ -189,12 +202,21 @@ function OutlineTab({ intl }) {
+             <CourseTools
+               courseId={courseId}
+             />
+-            <UpgradeCard
+-              courseId={courseId}
+-              onLearnMore={canShowUpgradeSock ? () => { courseSock.current.showToUser(); } : null}
+-            />
++            { /** [MM-P2P] Experiment (conditional) */ }
++            { MMP2P.state.isEnabled
++              ? <MMP2PFlyover isStatic options={MMP2P} />
++              : (
++                <UpgradeCard
++                  courseId={courseId}
++                  onLearnMore={
++                    canShowUpgradeSock ? () => { courseSock.current.showToUser(); } : null
++                  }
++                />
++              )}
+             <CourseDates
+               courseId={courseId}
++              /** [MM-P2P] Experiment */
++              mmp2p={MMP2P}
+             />
+             <CourseHandouts
+               courseId={courseId}
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index ff89d0b..afc4aa7 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -7,7 +7,12 @@ import DateSummary from '../DateSummary';
+ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function CourseDates({ courseId, intl }) {
++function CourseDates({
++  courseId,
++  intl,
++  /** [MM-P2P] Experiment */
++  mmp2p,
++}) {
+   const {
+     datesWidget: {
+       courseDateBlocks,
+@@ -29,6 +34,8 @@ function CourseDates({ courseId, intl }) {
+             key={courseDateBlock.title + courseDateBlock.date}
+             dateBlock={courseDateBlock}
+             userTimezone={userTimezone}
++            /** [MM-P2P] Experiment */
++            mmp2p={mmp2p}
+           />
+         ))}
+       </ol>
+@@ -42,10 +49,14 @@ function CourseDates({ courseId, intl }) {
+ CourseDates.propTypes = {
+   courseId: PropTypes.string,
+   intl: intlShape.isRequired,
++  /** [MM-P2P] Experiment */
++  mmp2p: PropTypes.shape({}),
+ };
+ 
+ CourseDates.defaultProps = {
+   courseId: null,
++  /** [MM-P2P] Experiment */
++  mmp2p: {},
+ };
+ 
+ export default injectIntl(CourseDates);
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 2ebadcf..afae988 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -16,6 +16,9 @@ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import CourseSock from '../../generic/course-sock';
+ import { useModel } from '../../generic/model-store';
+ 
++/** [MM-P2P] Experiment */
++import { initCoursewareMMP2P, MMP2PBlockModal } from '../../experiments/mm-p2p';
++
+ function Course({
+   courseId,
+   sequenceId,
+@@ -83,19 +86,25 @@ function Course({
+   };
+   // The above block of code should be reverted after the REV1512 experiment
+ 
++  /** [MM-P2P] Experiment */
++  const MMP2P = initCoursewareMMP2P(courseId, sequenceId, unitId);
++
+   return (
+     <>
+       <Helmet>
+         <title>{`${pageTitleBreadCrumbs.join(' | ')} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+-      <AlertList
+-        className="my-3"
+-        topic="course"
+-        customAlerts={{
+-          ...accessExpirationAlert,
+-          ...offerAlert,
+-        }}
+-      />
++      { /** This conditional is for the [MM-P2P] Experiment */}
++      { !MMP2P.state.isEnabled && (
++        <AlertList
++          className="my-3"
++          topic="course"
++          customAlerts={{
++            ...accessExpirationAlert,
++            ...offerAlert,
++          }}
++        />
++      )}
+       <CourseBreadcrumbs
+         courseId={courseId}
+         sectionId={section ? section.id : null}
+@@ -103,6 +112,8 @@ function Course({
+         toggleREV1512Flyover={toggleREV1512Flyover} /* This line should be reverted after REV1512 experiment */
+         REV1512FlyoverEnabled={REV1512FlyoverEnabled} /* This line should be reverted after REV1512 experiment */
+         isREV1512FlyoverVisible={isREV1512FlyoverVisible} /* This line should be reverted after REV1512 experiment */
++        //* * [MM-P2P] Experiment */
++        mmp2p={MMP2P}
+       />
+       <AlertList topic="sequence" />
+       <Sequence
+@@ -115,6 +126,8 @@ function Course({
+         toggleREV1512Flyover={toggleREV1512Flyover} /* This line should be reverted after REV1512 experiment */
+         isREV1512FlyoverVisible={isREV1512FlyoverVisible} /* This line should be reverted after REV1512 experiment */
+         REV1512FlyoverEnabled={REV1512FlyoverEnabled} /* This line should be reverted after REV1512 experiment */
++        //* * [MM-P2P] Experiment */
++        mmp2p={MMP2P}
+       />
+       {celebrationOpen && (
+         <CelebrationModal
+@@ -132,6 +145,8 @@ function Course({
+         />
+       )}
+       <ContentTools course={course} />
++      { /** [MM-P2P] Experiment */ }
++      { MMP2P.meta.modalLock && <MMP2PBlockModal options={MMP2P} /> }
+     </>
+   );
+ }
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index b6e7b5a..1111182 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -7,6 +7,9 @@ import { faHome } from '@fortawesome/free-solid-svg-icons';
+ import { useSelector } from 'react-redux';
+ import { useModel } from '../../generic/model-store';
+ 
++/** [MM-P2P] Experiment */
++import { MMP2PFlyoverTrigger } from '../../experiments/mm-p2p';
++
+ function CourseBreadcrumb({
+   url, children, withSeparator, ...attrs
+ }) {
+@@ -39,6 +42,8 @@ export default function CourseBreadcrumbs({
+   toggleREV1512Flyover, /* This line should be reverted after the REV1512 experiment */
+   REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
+   isREV1512FlyoverVisible, /* This line should be reverted after the REV1512 experiment */
++  /** [MM-P2P] Experiment */
++  mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+@@ -92,20 +97,24 @@ export default function CourseBreadcrumbs({
+           </CourseBreadcrumb>
+         ))}
+         {/* The below block of code should be reverted after the REV1512 experiment */}
+-        {REV1512FlyoverEnabled
+-        && !isMobile && (
+-        <div
+-          className="toggleFlyoverButton"
+-          aria-hidden="true"
+-          style={{ marginLeft: 'auto', marginTop: '-16px', borderBottom: isREV1512FlyoverVisible() ? '2px solid #00262b' : 'none' }}
+-          onClick={() => {
+-            toggleREV1512Flyover();
+-          }}
+-        >
+-          <svg width="54" height="40" viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+-            <rect x="0.5" y="0.5" width="53" height="39" rx="1.5" fill="white" stroke="#E7E8E9" /><path d="M36 20C36 15.6 32.4 12 28 12C27.7 12 27.5 12.2 27.5 12.5C27.5 12.8 27.7 13 28 13C31.85 13 35 16.15 35 20C35 23.85 31.85 27 28 27C24.15 27 21 23.85 21 20C21 19.7 20.8 19.5 20.5 19.5C20.3 19.5 20.1 19.65 20.05 19.8C20 19.85 20 19.95 20 20C20 24.4 23.6 28 28 28C32.4 28 36 24.4 36 20Z" fill="black" stroke="black" strokeWidth="0.6" /><path d="M23.1065 14.52C22.9403 14.36 22.691 14.36 22.5247 14.52C22.3585 14.68 22.3585 14.92 22.5247 15.08C22.6078 15.16 22.7325 15.2 22.8156 15.2C22.9403 15.2 23.0234 15.16 23.1065 15.08C23.2312 14.96 23.2312 14.68 23.1065 14.52Z" fill="black" stroke="black" strokeWidth="0.6" /><path d="M27.6848 15.2C27.3939 15.2 27.2 15.3973 27.2 15.6932V19.6384C27.2 19.6877 27.2 19.7863 27.2484 19.8356C27.2969 19.8849 27.2969 19.9343 27.3454 19.9836L29.5757 22.2521C29.6727 22.3507 29.8181 22.4 29.9151 22.4C30.0121 22.4 30.1575 22.3507 30.2545 22.2521C30.4484 22.0548 30.4484 21.7589 30.2545 21.5617L28.1696 19.4411V15.6932C28.1696 15.3973 27.9757 15.2 27.6848 15.2Z" fill="black" stroke="black" strokeWidth="0.6" /><circle cx="35.5" cy="14.5" r="4.5" fill="#C32D3A" />
+-          </svg>
+-        </div>
++        {/** [MM-P2P] Experiment (additional conditional) */}
++        {REV1512FlyoverEnabled && !mmp2p.state.isEnabled && !isMobile && (
++          <div
++            className="toggleFlyoverButton"
++            aria-hidden="true"
++            style={{ marginLeft: 'auto', marginTop: '-16px', borderBottom: isREV1512FlyoverVisible() ? '2px solid #00262b' : 'none' }}
++            onClick={() => {
++              toggleREV1512Flyover();
++            }}
++          >
++            <svg width="54" height="40" viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg">
++              <rect x="0.5" y="0.5" width="53" height="39" rx="1.5" fill="white" stroke="#E7E8E9" /><path d="M36 20C36 15.6 32.4 12 28 12C27.7 12 27.5 12.2 27.5 12.5C27.5 12.8 27.7 13 28 13C31.85 13 35 16.15 35 20C35 23.85 31.85 27 28 27C24.15 27 21 23.85 21 20C21 19.7 20.8 19.5 20.5 19.5C20.3 19.5 20.1 19.65 20.05 19.8C20 19.85 20 19.95 20 20C20 24.4 23.6 28 28 28C32.4 28 36 24.4 36 20Z" fill="black" stroke="black" strokeWidth="0.6" /><path d="M23.1065 14.52C22.9403 14.36 22.691 14.36 22.5247 14.52C22.3585 14.68 22.3585 14.92 22.5247 15.08C22.6078 15.16 22.7325 15.2 22.8156 15.2C22.9403 15.2 23.0234 15.16 23.1065 15.08C23.2312 14.96 23.2312 14.68 23.1065 14.52Z" fill="black" stroke="black" strokeWidth="0.6" /><path d="M27.6848 15.2C27.3939 15.2 27.2 15.3973 27.2 15.6932V19.6384C27.2 19.6877 27.2 19.7863 27.2484 19.8356C27.2969 19.8849 27.2969 19.9343 27.3454 19.9836L29.5757 22.2521C29.6727 22.3507 29.8181 22.4 29.9151 22.4C30.0121 22.4 30.1575 22.3507 30.2545 22.2521C30.4484 22.0548 30.4484 21.7589 30.2545 21.5617L28.1696 19.4411V15.6932C28.1696 15.3973 27.9757 15.2 27.6848 15.2Z" fill="black" stroke="black" strokeWidth="0.6" /><circle cx="35.5" cy="14.5" r="4.5" fill="#C32D3A" />
++            </svg>
++          </div>
++        )}
++        {/** [MM-P2P] Experiment */}
++        {mmp2p.state.isEnabled && (
++          <MMP2PFlyoverTrigger options={mmp2p} />
+         )}
+       </ol>
+     </nav>
+@@ -119,9 +128,19 @@ CourseBreadcrumbs.propTypes = {
+   toggleREV1512Flyover: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+   REV1512FlyoverEnabled: PropTypes.bool.isRequired, /* This line should be reverted after the REV1512 experiment */
+   isREV1512FlyoverVisible: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
++
++  /** [MM-P2P] Experiment */
++  mmp2p: PropTypes.shape({
++    state: PropTypes.shape({
++      isEnabled: PropTypes.bool.isRequired,
++    }),
++  }),
+ };
+ 
+ CourseBreadcrumbs.defaultProps = {
+   sectionId: null,
+   sequenceId: null,
++
++  /** [MM-P2P] Experiment */
++  mmp2p: {},
+ };
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 75ab27d..36d2106 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -24,6 +24,9 @@ import messages from './messages';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import SequenceContent from './SequenceContent';
+ 
++/** [MM-P2P] Experiment */
++import { MMP2PFlyover, MMP2PFlyoverMobile } from '../../../experiments/mm-p2p';
++
+ function REV1512Flyover({ toggleREV1512Flyover }) {
+   // This component should be reverted after the REV1512 experiment
+   return (
+@@ -192,6 +195,8 @@ function Sequence({
+   isREV1512FlyoverVisible, /* This line should be reverted after the REV1512 experiment */
+   REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
+   toggleREV1512Flyover, /* This line should be reverted after the REV1512 experiment */
++  /** [MM-P2P] Experiment */
++  mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+@@ -318,6 +323,9 @@ function Sequence({
+               toggleREV1512Flyover={toggleREV1512Flyover} /* This line should be reverted after REV1512 experiment */
+               REV1512FlyoverEnabled={REV1512FlyoverEnabled} /* This line should be reverted after REV1512 experiment */
+               isREV1512FlyoverVisible={isREV1512FlyoverVisible} /* should be reverted after REV1512 experiment */
++              /** [MM-P2P] Experiment */
++              mmp2p={mmp2p}
++
+               nextSequenceHandler={() => {
+                 logEvent('edx.ui.lms.sequence.next_selected', 'top');
+                 handleNext();
+@@ -339,6 +347,8 @@ function Sequence({
+                 sequenceId={sequenceId}
+                 unitId={unitId}
+                 unitLoadedHandler={handleUnitLoaded}
++                /** [MM-P2P] Experiment */
++                mmp2p={mmp2p}
+               />
+               {unitHasLoaded && (
+               <UnitNavigation
+@@ -358,11 +368,18 @@ function Sequence({
+             </div>
+           </div>
+           {/* This block of code should be reverted post REV1512 experiment */}
+-          {REV1512FlyoverEnabled && isREV1512FlyoverVisible() && (
++          {/** [MM-P2P] Experiment (additional conditional) */}
++          {!mmp2p.state.isEnabled && REV1512FlyoverEnabled && isREV1512FlyoverVisible() && (
+             isMobile
+               ? <REV1512FlyoverMobile toggleREV1512Flyover={toggleREV1512Flyover} />
+               : <REV1512Flyover toggleREV1512Flyover={toggleREV1512Flyover} />
+           )}
++          {/** [MM-P2P] Experiment */}
++          {(mmp2p.state.isEnabled && mmp2p.flyover.isVisible) && (
++            isMobile
++              ? <MMP2PFlyoverMobile options={mmp2p} />
++              : <MMP2PFlyover options={mmp2p} />
++          )}
+         </div>
+         <CourseLicense license={course.license || undefined} />
+       </div>
+@@ -388,11 +405,31 @@ Sequence.propTypes = {
+   toggleREV1512Flyover: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+   isREV1512FlyoverVisible: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+   REV1512FlyoverEnabled: PropTypes.bool.isRequired, /* This line should be reverted after the REV1512 experiment */
++
++  /** [MM-P2P] Experiment */
++  mmp2p: PropTypes.shape({
++    flyover: PropTypes.shape({
++      isVisible: PropTypes.bool.isRequired,
++    }),
++    meta: PropTypes.shape({
++      showLock: PropTypes.bool,
++    }),
++    state: PropTypes.shape({
++      isEnabled: PropTypes.bool.isRequired,
++    }),
++  }),
+ };
+ 
+ Sequence.defaultProps = {
+   sequenceId: null,
+   unitId: null,
++
++  /** [MM-P2P] Experiment */
++  mmp2p: {
++    flyover: { isVisible: false },
++    meta: { showLock: false },
++    state: { isEnabled: false },
++  },
+ };
+ 
+ export default injectIntl(Sequence);
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index 51b796b..d6eff20 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -10,7 +10,14 @@ import Unit from './Unit';
+ const ContentLock = React.lazy(() => import('./content-lock'));
+ 
+ function SequenceContent({
+-  gated, intl, courseId, sequenceId, unitId, unitLoadedHandler,
++  gated,
++  intl,
++  courseId,
++  sequenceId,
++  unitId,
++  unitLoadedHandler,
++  /** [MM-P2P] Experiment */
++  mmp2p,
+ }) {
+   const sequence = useModel('sequences', sequenceId);
+ 
+@@ -54,6 +61,8 @@ function SequenceContent({
+       key={unitId}
+       id={unitId}
+       onLoaded={unitLoadedHandler}
++      /** [MM-P2P] Experiment */
++      mmp2p={mmp2p}
+     />
+   );
+ }
+@@ -65,10 +74,28 @@ SequenceContent.propTypes = {
+   unitId: PropTypes.string,
+   unitLoadedHandler: PropTypes.func.isRequired,
+   intl: intlShape.isRequired,
++  /** [MM-P2P] Experiment */
++  mmp2p: PropTypes.shape({
++    flyover: PropTypes.shape({
++      isVisible: PropTypes.bool.isRequired,
++    }),
++    meta: PropTypes.shape({
++      showLock: PropTypes.bool,
++    }),
++    state: PropTypes.shape({
++      isEnabled: PropTypes.bool.isRequired,
++    }),
++  }),
+ };
+ 
+ SequenceContent.defaultProps = {
+   unitId: null,
++  /** [MM-P2P] Experiment */
++  mmp2p: {
++    flyover: { isVisible: false },
++    meta: { showLock: false },
++    state: { isEnabled: false },
++  },
+ };
+ 
+ export default injectIntl(SequenceContent);
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 78c53be..74ade1b 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -18,6 +18,8 @@ import { useModel } from '../../../generic/model-store';
+ import PageLoading from '../../../generic/PageLoading';
+ import { processEvent } from '../../../course-home/data/thunks';
+ import { fetchCourse } from '../../data/thunks';
++/** [MM-P2P] Experiment */
++import { MMP2PLockPaywall } from '../../../experiments/mm-p2p';
+ 
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
+ const LockPaywallValuePropExperiment = React.lazy(() => import('./lock-paywall-value-prop'));
+@@ -60,6 +62,8 @@ function Unit({
+   onLoaded,
+   id,
+   intl,
++  /** [MM-P2P] Experiment */
++  mmp2p,
+ }) {
+   const { authenticatedUser } = useContext(AppContext);
+   const view = authenticatedUser ? 'student_view' : 'public_view';
+@@ -130,7 +134,7 @@ function Unit({
+         isBookmarked={unit.bookmarked}
+         isProcessing={unit.bookmarkedUpdateState === 'loading'}
+       />
+-      {contentTypeGatingEnabled && unit.containsContentTypeGatedContent && (
++      { !mmp2p.state.isEnabled && contentTypeGatingEnabled && unit.containsContentTypeGatedContent && (
+         <Suspense
+           fallback={(
+             <PageLoading
+@@ -143,7 +147,12 @@ function Unit({
+             : <LockPaywall courseId={courseId} />}
+         </Suspense>
+       )}
+-      {!hasLoaded && (
++      { /** [MM-P2P] Experiment */ }
++      { mmp2p.meta.showLock && (
++        <MMP2PLockPaywall options={mmp2p} />
++      )}
++      { /** [MM-P2P] Experiment (conditional) */ }
++      {!mmp2p.meta.blockContent && !hasLoaded && (
+         <PageLoading
+           srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+         />
+@@ -173,24 +182,27 @@ function Unit({
+           dialogClassName="modal-lti"
+         />
+       )}
+-      <div className="unit-iframe-wrapper">
+-        <iframe
+-          id="unit-iframe"
+-          title={unit.title}
+-          src={iframeUrl}
+-          allowFullScreen
+-          height={iframeHeight}
+-          scrolling="no"
+-          referrerPolicy="origin"
+-          onLoad={() => {
+-            window.onmessage = function handleResetDates(e) {
+-              if (e.data.event_name) {
+-                dispatch(processEvent(e.data, fetchCourse));
+-              }
+-            };
+-          }}
+-        />
+-      </div>
++      { /** [MM-P2P] Experiment (conditional) */ }
++      { !mmp2p.meta.blockContent && (
++        <div className="unit-iframe-wrapper">
++          <iframe
++            id="unit-iframe"
++            title={unit.title}
++            src={iframeUrl}
++            allowFullScreen
++            height={iframeHeight}
++            scrolling="no"
++            referrerPolicy="origin"
++            onLoad={() => {
++              window.onmessage = function handleResetDates(e) {
++                if (e.data.event_name) {
++                  dispatch(processEvent(e.data, fetchCourse));
++                }
++              };
++            }}
++          />
++        </div>
++      )}
+     </div>
+   );
+ }
+@@ -201,11 +213,31 @@ Unit.propTypes = {
+   id: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
+   onLoaded: PropTypes.func,
++  /** [MM-P2P] Experiment */
++  mmp2p: PropTypes.shape({
++    state: PropTypes.shape({
++      isEnabled: PropTypes.bool.isRequired,
++    }),
++    meta: PropTypes.shape({
++      showLock: PropTypes.bool,
++      blockContent: PropTypes.bool,
++    }),
++  }),
+ };
+ 
+ Unit.defaultProps = {
+   format: null,
+   onLoaded: undefined,
++  /** [MM-P2P] Experiment */
++  mmp2p: {
++    state: {
++      isEnabled: false,
++    },
++    meta: {
++      showLock: false,
++      blockContent: false,
++    },
++  },
+ };
+ 
+ export default injectIntl(Unit);
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 467737c..67aa715 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -15,6 +15,8 @@ import { useModel } from '../../../../generic/model-store';
+ import { LOADED } from '../../../data/slice';
+ 
+ import messages from './messages';
++/** [MM-P2P] Experiment */
++import { MMP2PFlyoverTriggerMobile } from '../../../../experiments/mm-p2p';
+ 
+ function SequenceNavigation({
+   intl,
+@@ -28,6 +30,8 @@ function SequenceNavigation({
+   toggleREV1512Flyover, /* This line should be reverted after the REV1512 experiment */
+   REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
+   isREV1512FlyoverVisible, /* This line should be reverted after the REV1512 experiment */
++  /** [MM-P2P] Experiment */
++  mmp2p,
+ }) {
+   const sequence = useModel('sequences', sequenceId);
+   const { isFirstUnit, isLastUnit } = useSequenceNavigationMetadata(sequenceId, unitId);
+@@ -87,7 +91,8 @@ function SequenceNavigation({
+       </Button>
+       {renderUnitButtons()}
+       {renderNextButton()}
+-      {REV1512FlyoverEnabled
++      {/** [MM-P2P] Experiment (additional conditional) */}
++      {!mmp2p.state.isEnabled && REV1512FlyoverEnabled
+         && isMobile && (
+         <div
+           className="toggleFlyoverButton toggleFlyoverButtonMobile"
+@@ -102,6 +107,8 @@ function SequenceNavigation({
+           </svg>
+         </div>
+       )}
++      {/** [MM-P2P] Experiment */}
++      { mmp2p.state.isEnabled && <MMP2PFlyoverTriggerMobile options={mmp2p} /> }
+       <div className="rev1512ToggleFlyoverSequenceLocation" />
+     </nav>
+   );
+@@ -119,11 +126,23 @@ SequenceNavigation.propTypes = {
+   toggleREV1512Flyover: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+   REV1512FlyoverEnabled: PropTypes.bool.isRequired, /* This line should be reverted after the REV1512 experiment */
+   isREV1512FlyoverVisible: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
++
++  /** [MM-P2P] Experiment */
++  mmp2p: PropTypes.shape({
++    state: PropTypes.shape({
++      isEnabled: PropTypes.bool.isRequired,
++    }),
++  }),
+ };
+ 
+ SequenceNavigation.defaultProps = {
+   className: null,
+   unitId: null,
++
++  /** [MM-P2P] Experiment */
++  mmp2p: {
++    state: { isEnabled: false },
++  },
+ };
+ 
+ export default injectIntl(SequenceNavigation);
+diff --git a/src/experiments/mm-p2p/BlockModal.jsx b/src/experiments/mm-p2p/BlockModal.jsx
+new file mode 100644
+index 0000000..8fd1d8d
+--- /dev/null
++++ b/src/experiments/mm-p2p/BlockModal.jsx
+@@ -0,0 +1,21 @@
++import React, { Suspense } from 'react';
++
++import { ModalLayer } from '@edx/paragon';
++
++import PageLoading from '../../generic/PageLoading';
++
++const BlockModalContent = React.lazy(() => import('./BlockModalContent'));
++
++export const BlockModal = () => (
++  <ModalLayer
++    isOpen
++    onClose={() => {}}
++    isBlocking
++  >
++    <Suspense fallback={(<PageLoading srMessage="Loading blocked content modal" />)}>
++      <BlockModalContent />
++    </Suspense>
++  </ModalLayer>
++);
++
++export default BlockModal;
+diff --git a/src/experiments/mm-p2p/BlockModal.scss b/src/experiments/mm-p2p/BlockModal.scss
+new file mode 100644
+index 0000000..dc1f8b6
+--- /dev/null
++++ b/src/experiments/mm-p2p/BlockModal.scss
+@@ -0,0 +1,43 @@
++.mmp2p-modal-dialog.modal-content {
++  padding: 15px;
++  border-radius: 0px;
++  .mmp2p-block-modal-wrapper {
++    background-color: white;
++    text-align: left;
++    .bullet-list-item {
++      font-size: 18px;
++      line-height: 28px;
++      font-weight: 400;
++      &:not(:last-child) {
++        margin-bottom: 20px;
++      }
++      color: $gray-900;
++      .icon-container {
++        vertical-align: top;
++        display: inline-block;
++        margin-right: 7px;
++      }
++      .bullet-item-content {
++        display: inline-block;
++        width: calc(100% - 245px);
++      }
++    }
++    .subheader {
++      font-size: 18px;
++      line-height: 28px;
++      font-weight: 500;
++      margin-bottom: 15px;
++    }
++    img.certificate-image {
++      position: absolute;
++      top: 32px;
++      right: 32px;
++      width: 184px;
++    }
++    #mmp2p-modal-explore-btn {
++      float: right;
++      margin-bottom: 16px;
++      margin-right: 16px;
++    }
++  }
++}
+diff --git a/src/experiments/mm-p2p/BlockModalContent.jsx b/src/experiments/mm-p2p/BlockModalContent.jsx
+new file mode 100644
+index 0000000..6ff2f7d
+--- /dev/null
++++ b/src/experiments/mm-p2p/BlockModalContent.jsx
+@@ -0,0 +1,78 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { Button, ModalLayer } from '@edx/paragon';
++import CertImage from '../../generic/assets/edX_certificate.png';
++
++const BulletList = ({ children }) => (
++  <div className="bullet-list-item">
++    <div className="icon-container">
++      <svg
++        aria-hidden="true"
++        focusable="false"
++        data-prefix="far"
++        data-icon="check-circle"
++        className="svg-inline--fa fa-check-circle fa-w-16 mmp2p-bullet-list"
++        role="img"
++        xmlns="http://www.w3.org/2000/svg"
++        viewBox="0 0 512 512"
++      >
++        <path
++          fill="currentColor"
++          d="M256 8C119.033 8 8 119.033 8 256s111.033 248 248 248 248-111.033 248-248S392.967 8 256 8zm0 48c110.532 0 200 89.451 200 200 0 110.532-89.451 200-200 200-110.532 0-200-89.451-200-200 0-110.532 89.451-200 200-200m140.204 130.267l-22.536-22.718c-4.667-4.705-12.265-4.736-16.97-.068L215.346 303.697l-59.792-60.277c-4.667-4.705-12.265-4.736-16.97-.069l-22.719 22.536c-4.705 4.667-4.736 12.265-.068 16.971l90.781 91.516c4.667 4.705 12.265 4.736 16.97.068l172.589-171.204c4.704-4.668 4.734-12.266.067-16.971z"
++        />
++      </svg>
++    </div>
++    <div className="bullet-item-content">
++      {children}
++    </div>
++  </div>
++);
++BulletList.propTypes = {
++  children: PropTypes.node.isRequired,
++};
++
++export const BlockModal = () => (
++  <ModalLayer
++    isOpen
++    onClose={() => {}}
++    isBlocking
++  >
++    <div className="mmp2p-modal-dialog modal-content modal-xl">
++      <div className="mmp2p-block-modal-wrapper">
++        <h3>
++          Deadline to access full course has passed
++        </h3>
++        <div className="subheader">
++          What does the Verified Track get you?
++        </div>
++
++        <div>
++          <BulletList>
++            Earn a verified certificate of completion to showcase on your resume
++          </BulletList>
++          <BulletList>
++            Unlock unlimited access to all course content and activities,
++            &nbsp;including graded assignments, even after the course ends.
++          </BulletList>
++          <BulletList>
++            Support our non-profit mission at edx
++          </BulletList>
++        </div>
++
++        <img src={CertImage} className="certificate-image" alt="Example Certificate" />
++
++        <Button
++          id="mmp2p-modal-explore-btn"
++          variant="brand"
++          href="https://www.edx.org/search"
++          data-ol-has-click-handler=""
++          style={{ fontSize: '1em', fontWeight: 600 }}
++        >
++          Explore more courses
++        </Button>
++      </div>
++    </div>
++  </ModalLayer>
++);
++
++export default BlockModal;
+diff --git a/src/experiments/mm-p2p/Flyover.jsx b/src/experiments/mm-p2p/Flyover.jsx
+new file mode 100644
+index 0000000..69314ab
+--- /dev/null
++++ b/src/experiments/mm-p2p/Flyover.jsx
+@@ -0,0 +1,83 @@
++/* eslint-disable no-use-before-define */
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++
++import Sidecard from './Sidecard';
++
++const Flyover = ({
++  isStatic,
++  options,
++}) => {
++  const handleHideFlyoverKeyPress = (event) => {
++    if (event.key === 'Enter') {
++      options.flyover.toggle();
++    }
++  };
++  if (!options.access.isAudit || options.state.afterUpgradeDeadline) {
++    return null;
++  }
++  return (
++    <div className={classNames('mmp2p-flyover', { static: isStatic })}>
++      { !isStatic && (
++        <div className="mmp2p-notification-div">
++          <span>Notifications</span>
++          <span
++            onClick={options.flyover.toggle}
++            className="mmp2p-hide-flyover"
++            onKeyPress={handleHideFlyoverKeyPress}
++            role="button"
++            tabIndex={0}
++          >
++            <svg
++              className="mmp2p-flyover-icon"
++              width="14"
++              height="14"
++              viewBox="0 0 14 14"
++              fill="none"
++              xmlns="http://www.w3.org/2000/svg"
++            >
++              <path
++                d="M9.60625 7L13.5152 3.09102C13.9949 2.61133 13.9949 1.83359 13.5152 1.35352L12.6465 0.484766C12.1668 0.00507814 11.3891 0.00507814 10.909 0.484766L7 4.39375L3.09102 0.484766C2.61133 0.00507814 1.83359 0.00507814 1.35352 0.484766L0.484766 1.35352C0.00507814 1.8332 0.00507814 2.61094 0.484766 3.09102L4.39375 7L0.484766 10.909C0.00507814 11.3887 0.00507814 12.1664 0.484766 12.6465L1.35352 13.5152C1.8332 13.9949 2.61133 13.9949 3.09102 13.5152L7 9.60625L10.909 13.5152C11.3887 13.9949 12.1668 13.9949 12.6465 13.5152L13.5152 12.6465C13.9949 12.1668 13.9949 11.3891 13.5152 10.909L9.60625 7Z"
++                fill="black"
++              />
++            </svg>
++          </span>
++          <div className="mmp2p-notification-block" />
++        </div>
++      )}
++      <Sidecard options={options} />
++    </div>
++  );
++};
++Flyover.propTypes = {
++  isStatic: PropTypes.bool,
++  options: PropTypes.shape({
++    access: PropTypes.shape({
++      isAudit: PropTypes.bool.isRequired,
++    }),
++    flyover: PropTypes.shape({
++      toggle: PropTypes.func.isRequired,
++    }),
++    state: PropTypes.shape({
++      afterUpgradeDeadline: PropTypes.bool.isRequired,
++    }),
++  }),
++};
++
++Flyover.defaultProps = {
++  isStatic: false,
++  options: {
++    access: {
++      isAudit: false,
++    },
++    flyover: {
++      toggle: () => {},
++    },
++    state: {
++      afterUpgradeDeadline: false,
++    },
++  },
++};
++
++export default Flyover;
+diff --git a/src/experiments/mm-p2p/Flyover.scss b/src/experiments/mm-p2p/Flyover.scss
+new file mode 100644
+index 0000000..33b0a29
+--- /dev/null
++++ b/src/experiments/mm-p2p/Flyover.scss
+@@ -0,0 +1,38 @@
++@media only screen and (min-width: 600px) {
++  .mmp2p-flyover {
++    min-width: 315px !important;
++    h4 {
++      font-size: 16px;
++    }
++  }
++}
++.mmp2p-flyover {
++  &:not(.static) {
++    height: 100% !important;
++    height: 393px;
++  }
++  &.static {
++    margin-bottom: 20px;
++  }
++  border: solid 1px #e1dddb;
++  width: 330px;
++  vertical-align: top;
++  margin-left: 20px;
++  padding: 0 20px 20px 20px;
++  .mmp2p-notification-div {
++    margin: 0 -20px 0px;
++    padding: 9px 20px 0;
++    font-size: 16px;
++  }
++  .mmp2p-notification-block {
++    height: 9px;
++    background: #F9F9F9;
++    margin: 7px -20px 0;
++    border-top: 1px solid rgb(225, 221, 219);
++    border-bottom: 1px solid rgb(225, 221, 219);
++  }
++  svg.mmp2p-flyover-icon {
++    float: right;
++    margin-top: 5.5px;
++  }
++}
+diff --git a/src/experiments/mm-p2p/FlyoverMobile.jsx b/src/experiments/mm-p2p/FlyoverMobile.jsx
+new file mode 100644
+index 0000000..e3c3f79
+--- /dev/null
++++ b/src/experiments/mm-p2p/FlyoverMobile.jsx
+@@ -0,0 +1,86 @@
++/* eslint-disable no-use-before-define */
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
++
++import Sidecard from './Sidecard';
++
++export const FlyoverMobile = ({ options }) => {
++  const {
++    access: { isAudit },
++    flyover: { toggle },
++    state: { afterUpgradeDeadline },
++  } = options;
++
++  const handleReturnSpanKeyPress = (event) => {
++    if (event.key === 'Enter') {
++      toggle();
++    }
++  };
++
++  if (!isAudit || afterUpgradeDeadline) {
++    return null;
++  }
++
++  return (
++    <div className="mmp2p-flyover-mobile">
++      <div className="mmp2p-mobile-return-div">
++        <span
++          className="mmp2p-mobile-return-span"
++          onClick={toggle}
++          onKeyPress={handleReturnSpanKeyPress}
++          role="button"
++          tabIndex={0}
++        >
++          <FontAwesomeIcon
++            icon={faChevronLeft}
++            className="mr-2 fa-lg"
++            style={{ marginBottom: 2 }}
++          />
++          <span className="mmp2p-mobile-return-text">
++            Back to course
++          </span>
++        </span>
++      </div>
++      <div className="mmp2p-notification-div">
++        <span className="mmp2p-notification-span">
++          Notifications
++        </span>
++        <div className="mmp2p-notification-block">
++          <Sidecard options={options} />
++        </div>
++      </div>
++    </div>
++  );
++};
++FlyoverMobile.propTypes = {
++  options: PropTypes.shape({
++    access: PropTypes.shape({
++      isAudit: PropTypes.bool.isRequired,
++    }),
++    flyover: PropTypes.shape({
++      toggle: PropTypes.func.isRequired,
++    }),
++    state: PropTypes.shape({
++      afterUpgradeDeadline: PropTypes.bool.isRequired,
++    }),
++  }),
++};
++
++FlyoverMobile.defaultProps = {
++  options: {
++    access: {
++      isAudit: false,
++    },
++    flyover: {
++      toggle: () => {},
++    },
++    state: {
++      afterUpgradeDeadline: false,
++    },
++  },
++};
++
++export default FlyoverMobile;
+diff --git a/src/experiments/mm-p2p/FlyoverMobile.scss b/src/experiments/mm-p2p/FlyoverMobile.scss
+new file mode 100644
+index 0000000..78d70ce
+--- /dev/null
++++ b/src/experiments/mm-p2p/FlyoverMobile.scss
+@@ -0,0 +1,37 @@
++.mmp2p-flyover-mobile {
++  vertical-align: top;
++  padding: 0 20px 20px 20px;
++  position: fixed;
++  background-color: white;
++  z-index: 1;
++  height: 100%;
++  width: 100%;
++  top: 0;
++  left: 0;
++
++  .mmp2p-mobile-return-div {
++    margin: 0 -20px;
++    padding: 9px 20px 15px;
++    font-size: 16px;
++    border-bottom: 1px solid rgb(225, 221, 219);
++  }
++  .mmp2p-mobile-return-span {
++    color: #00262B;
++    cursor: pointer;
++  }
++  .mmp2p-notification-div {
++    margin: 0 -20px 15px;
++    padding: 9px 20px 0;
++    font-size: 16px;
++  }
++  .mmp2p-notification-span {
++    color: #00262B;
++  }
++  .mmp2p-notification-block {
++    height: 9px;
++    background: #F9F9F9;
++    margin: 7px -20px 0;
++    border-top: 1px solid rgb(225, 221, 219);
++    border-bottom: 1px solid rgb(225, 221, 219);
++  }
++}
+diff --git a/src/experiments/mm-p2p/FlyoverTrigger.jsx b/src/experiments/mm-p2p/FlyoverTrigger.jsx
+new file mode 100644
+index 0000000..dd23e57
+--- /dev/null
++++ b/src/experiments/mm-p2p/FlyoverTrigger.jsx
+@@ -0,0 +1,58 @@
++/* eslint-disable no-use-before-define */
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++
++import FlyoverTriggerIcon from './FlyoverTriggerIcon';
++import { isMobile } from './utils';
++
++export const FlyoverTrigger = ({ options }) => {
++  const { isVisible, toggle } = options.flyover;
++  if (!options.access.isAudit || options.state.afterUpgradeDeadline) {
++    return null;
++  }
++  return (!isMobile() && (
++    <div
++      className={classNames(
++        'mmp2p-toggle-flyover-button',
++        { 'flyover-visible': isVisible },
++      )}
++      aria-hidden="true"
++      onClick={toggle}
++    >
++      <FlyoverTriggerIcon />
++    </div>
++  ));
++};
++
++FlyoverTrigger.propTypes = {
++  options: PropTypes.shape({
++    access: PropTypes.shape({
++      isAudit: PropTypes.bool.isRequired,
++    }),
++    flyover: PropTypes.shape({
++      isVisible: PropTypes.bool.isRequired,
++      toggle: PropTypes.func.isRequired,
++    }),
++    state: PropTypes.shape({
++      afterUpgradeDeadline: PropTypes.bool.isRequired,
++      isEnabled: PropTypes.bool.isRequired,
++    }),
++  }),
++};
++
++FlyoverTrigger.defaultProps = {
++  options: {
++    access: { isAudit: false },
++    flyover: {
++      isVisible: false,
++      toggle: () => {},
++    },
++    state: {
++      afterUpgradeDeadline: false,
++      isEnabled: false,
++    },
++  },
++};
++
++export default FlyoverTrigger;
+diff --git a/src/experiments/mm-p2p/FlyoverTrigger.scss b/src/experiments/mm-p2p/FlyoverTrigger.scss
+new file mode 100644
+index 0000000..76f06e9
+--- /dev/null
++++ b/src/experiments/mm-p2p/FlyoverTrigger.scss
+@@ -0,0 +1,8 @@
++.mmp2p-toggle-flyover-button {
++  margin-left: auto;
++  margin-top: 0px !important;
++  border-bottom: none;
++  &.flyover-visible {
++    border-bottom: 2px solid #00262b;
++  }
++}
+diff --git a/src/experiments/mm-p2p/FlyoverTriggerIcon.jsx b/src/experiments/mm-p2p/FlyoverTriggerIcon.jsx
+new file mode 100644
+index 0000000..66ec5ac
+--- /dev/null
++++ b/src/experiments/mm-p2p/FlyoverTriggerIcon.jsx
+@@ -0,0 +1,48 @@
++/* eslint-disable no-use-before-define */
++import React from 'react';
++
++const FlyoverTriggerIcon = () => (
++  <svg
++    width="54"
++    height="40"
++    viewBox="0 0 54 40"
++    fill="none"
++    xmlns="http://www.w3.org/2000/svg"
++  >
++    <rect
++      x="0.5"
++      y="0.5"
++      width="53"
++      height="39"
++      rx="1.5"
++      fill="white"
++      stroke="#E7E8E9"
++    />
++    <path
++      d="M36 20C36 15.6 32.4 12 28 12C27.7 12 27.5 12.2 27.5 12.5C27.5 12.8 27.7 13 28 13C31.85 13 35 16.15 35 20C35 23.85 31.85 27 28 27C24.15 27 21 23.85 21 20C21 19.7 20.8 19.5 20.5 19.5C20.3 19.5 20.1 19.65 20.05 19.8C20 19.85 20 19.95 20 20C20 24.4 23.6 28 28 28C32.4 28 36 24.4 36 20Z"
++      fill="black"
++      stroke="black"
++      strokeWidth="0.6"
++    />
++    <path
++      d="M23.1065 14.52C22.9403 14.36 22.691 14.36 22.5247 14.52C22.3585 14.68 22.3585 14.92 22.5247 15.08C22.6078 15.16 22.7325 15.2 22.8156 15.2C22.9403 15.2 23.0234 15.16 23.1065 15.08C23.2312 14.96 23.2312 14.68 23.1065 14.52Z"
++      fill="black"
++      stroke="black"
++      strokeWidth="0.6"
++    />
++    <path
++      d="M27.6848 15.2C27.3939 15.2 27.2 15.3973 27.2 15.6932V19.6384C27.2 19.6877 27.2 19.7863 27.2484 19.8356C27.2969 19.8849 27.2969 19.9343 27.3454 19.9836L29.5757 22.2521C29.6727 22.3507 29.8181 22.4 29.9151 22.4C30.0121 22.4 30.1575 22.3507 30.2545 22.2521C30.4484 22.0548 30.4484 21.7589 30.2545 21.5617L28.1696 19.4411V15.6932C28.1696 15.3973 27.9757 15.2 27.6848 15.2Z"
++      fill="black"
++      stroke="black"
++      strokeWidth="0.6"
++    />
++    <circle
++      cx="35.5"
++      cy="14.5"
++      r="4.5"
++      fill="#C32D3A"
++    />
++  </svg>
++);
++
++export default FlyoverTriggerIcon;
+diff --git a/src/experiments/mm-p2p/FlyoverTriggerMobile.jsx b/src/experiments/mm-p2p/FlyoverTriggerMobile.jsx
+new file mode 100644
+index 0000000..327ff54
+--- /dev/null
++++ b/src/experiments/mm-p2p/FlyoverTriggerMobile.jsx
+@@ -0,0 +1,54 @@
++/* eslint-disable no-use-before-define */
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++
++import FlyoverTriggerIcon from './FlyoverTriggerIcon';
++import { isMobile } from './utils';
++
++const FlyoverTriggerMobile = ({ options }) => {
++  const { isVisible, toggle } = options.flyover;
++  if (!options.access.isAudit || options.state.afterUpgradeDeadline) {
++    return null;
++  }
++  return (isMobile() && (
++    <div
++      className={classNames(
++        'mmp2p-toggle-flyover-button-mobile',
++        { 'flyover-visible': isVisible },
++      )}
++      aria-hidden="true"
++      onClick={toggle}
++    >
++      <FlyoverTriggerIcon />
++    </div>
++  ));
++};
++
++FlyoverTriggerMobile.propTypes = {
++  options: PropTypes.shape({
++    access: PropTypes.shape({
++      isAudit: PropTypes.bool.isRequired,
++    }),
++    flyover: PropTypes.shape({
++      isVisible: PropTypes.bool.isRequired,
++      toggle: PropTypes.func.isRequired,
++    }),
++    state: PropTypes.shape({
++      afterUpgradeDeadline: PropTypes.bool.isRequired,
++    }),
++  }),
++};
++
++FlyoverTriggerMobile.defaultProps = {
++  options: {
++    access: { isAudit: false },
++    flyover: {
++      isVisible: true,
++      toggle: () => {},
++    },
++    state: { afterUpgradeDeadline: false },
++  },
++};
++
++export default FlyoverTriggerMobile;
+diff --git a/src/experiments/mm-p2p/FlyoverTriggerMobile.scss b/src/experiments/mm-p2p/FlyoverTriggerMobile.scss
+new file mode 100644
+index 0000000..1d07346
+--- /dev/null
++++ b/src/experiments/mm-p2p/FlyoverTriggerMobile.scss
+@@ -0,0 +1,7 @@
++.mmp2p-toggle-flyover-button-mobile {
++  border-bottom: none;
++  margin-left: 10px !important;
++  &.flyover-visible {
++    border-bottom: 2px solid #00262b;
++  }
++}
+diff --git a/src/experiments/mm-p2p/LockPaywall.jsx b/src/experiments/mm-p2p/LockPaywall.jsx
+new file mode 100644
+index 0000000..2a7af0f
+--- /dev/null
++++ b/src/experiments/mm-p2p/LockPaywall.jsx
+@@ -0,0 +1,45 @@
++import React, { Suspense } from 'react';
++import PropTypes from 'prop-types';
++
++import PageLoading from '../../generic/PageLoading';
++
++const LockPaywallContent = React.lazy(() => import('./LockPaywallContent'));
++
++const LockPaywall = ({ options }) => {
++  if (!(options.meta.gradedLock || options.meta.verifiedLock)) {
++    return null;
++  }
++  return (
++    <Suspense
++      fallback={(<PageLoading srMessage="Loading locked content messaging..." />)}
++    >
++      <LockPaywallContent options={options} />
++    </Suspense>
++  );
++};
++LockPaywall.propTypes = {
++  options: PropTypes.shape({
++    access: PropTypes.shape({
++      upgradeUrl: PropTypes.string.isRequired,
++      price: PropTypes.string.isRequired,
++    }),
++    meta: PropTypes.shape({
++      gradedLock: PropTypes.bool.isRequired,
++      verifiedLock: PropTypes.bool.isRequired,
++    }),
++  }),
++};
++
++LockPaywall.defaultProps = {
++  options: {
++    access: {
++      upgradeUrl: '',
++      price: '$23',
++    },
++    meta: {
++      gradedLock: false,
++      verifiedLock: false,
++    },
++  },
++};
++export default LockPaywall;
+diff --git a/src/experiments/mm-p2p/LockPaywallContent.jsx b/src/experiments/mm-p2p/LockPaywallContent.jsx
+new file mode 100644
+index 0000000..b4fb741
+--- /dev/null
++++ b/src/experiments/mm-p2p/LockPaywallContent.jsx
+@@ -0,0 +1,73 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faLock } from '@fortawesome/free-solid-svg-icons';
++
++import VerifiedCert from '../../generic/assets/edX_certificate.png';
++
++const LockPaywallContent = ({ options }) => (
++  <div className="border border-gray rounded d-flex justify-content-between mt-2 p-3">
++    <div>
++      <h4 className="font-weight-bold mb-2">
++        <FontAwesomeIcon
++          icon={faLock}
++          className="text-black mr-2 ml-1"
++          style={{ fontSize: '2rem' }}
++        />
++        <span>Verified Track Access</span>
++      </h4>
++      <p className="mb-0">
++        <span>
++          { options.meta.gradedLock && (
++            <>Grades assessments are available to Verified Track learners.</>
++          )}
++          { options.meta.verifiedLock && (
++            <>
++              Audit access is limited to the first two weeks of scheduled content.
++              &nbsp; To access the full course content,
++            </>
++          )}
++        </span>
++        &nbsp;
++        <a className="lock_paywall_upgrade_link" href={options.access.upgradeUrl}>
++          { options.meta.gradedLock ? 'Upgrade to unlock ' : 'upgrade to a verified certificate.' }
++          ({options.access.price})
++        </a>
++      </p>
++    </div>
++    <div>
++      <img
++        alt="Example Certificate"
++        src={VerifiedCert}
++        className="border-0"
++        style={{ height: '70px' }}
++      />
++    </div>
++  </div>
++);
++LockPaywallContent.propTypes = {
++  options: PropTypes.shape({
++    access: PropTypes.shape({
++      upgradeUrl: PropTypes.string.isRequired,
++      price: PropTypes.string.isRequired,
++    }),
++    meta: PropTypes.shape({
++      gradedLock: PropTypes.bool.isRequired,
++      verifiedLock: PropTypes.bool.isRequired,
++    }),
++  }),
++};
++
++LockPaywallContent.defaultProps = {
++  options: {
++    access: {
++      upgradeUrl: '',
++      price: '$23',
++    },
++    meta: {
++      gradedLock: false,
++      verifiedLock: false,
++    },
++  },
++};
++export default LockPaywallContent;
+diff --git a/src/experiments/mm-p2p/README.md b/src/experiments/mm-p2p/README.md
+new file mode 100644
+index 0000000..5bee8b8
+--- /dev/null
++++ b/src/experiments/mm-p2p/README.md
+@@ -0,0 +1,12 @@
++# What is this experiment?
++This is an experiment updating the audit experience for specific micromasters courses, limiting
++available access to content to the 1st 2 weeks of content, and restricting the upgrade deadline.
++
++# What is the audience?
++All students in a small number of specific Micro-Masters courses
++
++# Who owns it?
++Sapana Thomas and the Masters-Grades team
++
++# Who is responsible for cleaning up this code?
++The Masters-Grades team is on-tap for cleaning up this code at the end of the experiment
+diff --git a/src/experiments/mm-p2p/Sidecard.jsx b/src/experiments/mm-p2p/Sidecard.jsx
+new file mode 100644
+index 0000000..f991f45
+--- /dev/null
++++ b/src/experiments/mm-p2p/Sidecard.jsx
+@@ -0,0 +1,42 @@
++import React, { Suspense } from 'react';
++import PropTypes from 'prop-types';
++
++import PageLoading from '../../generic/PageLoading';
++
++const SidecardContent = React.lazy(() => import('./SidecardContent'));
++
++const Sidecard = ({ options }) => (
++  <Suspense
++    fallback={(<PageLoading srMessage="Loading upgrade messaging..." />)}
++  >
++    <SidecardContent options={options} />
++  </Suspense>
++);
++
++Sidecard.propTypes = {
++  options: PropTypes.shape({
++    state: PropTypes.shape({
++      upgradeDeadline: PropTypes.string.isRequired,
++    }),
++    access: PropTypes.shape({
++      accessExpirationDate: PropTypes.string.isRequired,
++      price: PropTypes.string.isRequired,
++      upgradeUrl: PropTypes.string.isRequired,
++    }),
++  }),
++};
++
++Sidecard.defaultProps = {
++  options: {
++    state: {
++      upgradeDeadline: 'Mar 29, 2021 11:59 PM EST',
++    },
++    access: {
++      accessDeadline: 'Mar 21, 2022 11:59 PM EST',
++      price: '$23',
++      upgradeUrl: '',
++    },
++  },
++};
++
++export default Sidecard;
+diff --git a/src/experiments/mm-p2p/Sidecard.scss b/src/experiments/mm-p2p/Sidecard.scss
+new file mode 100644
+index 0000000..a6e46e5
+--- /dev/null
++++ b/src/experiments/mm-p2p/Sidecard.scss
+@@ -0,0 +1,53 @@
++.mmp2p-sidecard-wrapper {
++  padding-top: 15px;
++  .cert-link {
++    font-weight: 600;
++    color: #00688D;
++    text-decoration: 'underline',
++  }
++  .mmp2p-bullet-list-item {
++    .icon-container {
++      vertical-align: top;
++      display: inline-block;
++      margin-right: 7px;
++    }
++    .bullet-item-content {
++      display: inline-block;
++      width: calc(100% - 26px);
++    }
++    svg {
++      font-size: 14px;
++      margin-right: 5px;
++    }
++  }
++  .mmp2p-sidecard-alert {
++    margin-left: -20px;
++    margin-right: -20px;
++    padding-top: 1rem;
++    padding-bottom: 1rem;
++    margin-top: 15px;
++    line-height: 1;
++    background-color: #fffadb;
++    color: black;
++    font-size: 14px;
++    border-radius: 0px !important;
++    &.danger {
++      background-color: #fcf1f4;
++    }
++  }
++
++  .mmp2p-coupon-code {
++    border: solid 1px #e1dddb;
++    padding: 20px;
++    margin: -21px;
++    background: #fbfaf9;
++    font-size: 14px;
++    text-align: center;
++  }
++  .verification-sock {
++    display: none;
++  }
++  .alert-info {
++    display: none;
++  }
++}
+diff --git a/src/experiments/mm-p2p/SidecardContent.jsx b/src/experiments/mm-p2p/SidecardContent.jsx
+new file mode 100644
+index 0000000..95fdd2c
+--- /dev/null
++++ b/src/experiments/mm-p2p/SidecardContent.jsx
+@@ -0,0 +1,169 @@
++/* eslint-disable no-use-before-define */
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++
++const AlertBanner = ({ color, children }) => (
++  <div
++    className={classNames(
++      'mmp2p-sidecard-alert alert',
++      { danger: color === 'red' },
++    )}
++  >
++    {children}
++  </div>
++);
++AlertBanner.propTypes = {
++  color: PropTypes.string.isRequired,
++  children: PropTypes.node.isRequired,
++};
++
++const localizeTime = (date) => date.toLocaleTimeString('en-US',
++  {
++    hour: '2-digit', minute: 'numeric', hour12: true, timeZoneName: 'short',
++  });
++const localizeDate = (date) => date.toLocaleDateString('en-US',
++  { month: 'long', day: 'numeric' });
++
++const BulletList = ({ children }) => (
++  <div style={{ marginBottom: '3px' }} className="mmp2p-bullet-list-item">
++    <div className="icon-container">
++      <svg
++        aria-hidden="true"
++        focusable="false"
++        data-prefix="far"
++        data-icon="check-circle"
++        className="svg-inline--fa fa-check-circle fa-w-16"
++        role="img"
++        xmlns="http://www.w3.org/2000/svg"
++        viewBox="0 0 512 512"
++      >
++        <path
++          fill="currentColor"
++          d="M256 8C119.033 8 8 119.033 8 256s111.033 248 248 248 248-111.033 248-248S392.967 8 256 8zm0 48c110.532 0 200 89.451 200 200 0 110.532-89.451 200-200 200-110.532 0-200-89.451-200-200 0-110.532 89.451-200 200-200m140.204 130.267l-22.536-22.718c-4.667-4.705-12.265-4.736-16.97-.068L215.346 303.697l-59.792-60.277c-4.667-4.705-12.265-4.736-16.97-.069l-22.719 22.536c-4.705 4.667-4.736 12.265-.068 16.971l90.781 91.516c4.667 4.705 12.265 4.736 16.97.068l172.589-171.204c4.704-4.668 4.734-12.266.067-16.971z"
++        />
++      </svg>
++    </div>
++    <div className="bullet-item-content">
++      {children}
++    </div>
++  </div>
++);
++BulletList.propTypes = {
++  children: PropTypes.node.isRequired,
++};
++
++const Sidecard = ({
++  options: {
++    state: { upgradeDeadline },
++    access: { accessExpirationDate, price, upgradeUrl },
++  },
++}) => {
++  const dates = {
++    upgradeDeadline: new Date(upgradeDeadline),
++    accessExpirationDate: new Date(accessExpirationDate),
++    now: new Date(),
++  };
++  const upgradeDeadlineTime = localizeTime(dates.upgradeDeadline);
++  const upgradeDeadlineDate = localizeDate(dates.upgradeDeadline);
++  const daysUntilDeadline = parseInt((dates.upgradeDeadline - dates.now) / (1000 * 60 * 60 * 24), 10);
++  const hoursUntilDeadline = parseInt((dates.upgradeDeadline - dates.now) / (1000 * 60 * 60), 10);
++
++  const accessDeadlineDate = localizeDate(dates.accessExpirationDate);
++
++  const certLink = (
++    <span className="cert-link">
++      <a
++        id="mmp2p-support-link"
++        href="https://www.edx.org/verified-certificate"
++        target="_blank"
++        rel="noopener noreferrer"
++      >
++        verified certificate
++      </a>
++    </span>
++  );
++
++  return (
++    <div className="mmp2p-sidecard-wrapper section">
++      <h5 className="hd hd-6">
++        Unlock the full course by {upgradeDeadlineDate} at {upgradeDeadlineTime}
++      </h5>
++
++      <AlertBanner color={daysUntilDeadline >= 7 ? 'yellow' : 'red'}>
++        {(daysUntilDeadline > 1) && `${daysUntilDeadline} days left`}
++        {(daysUntilDeadline === 1) && '1 day left'}
++        {(daysUntilDeadline < 1 && hoursUntilDeadline >= 1) && `${hoursUntilDeadline} hours left`}
++        {(daysUntilDeadline < 1 && hoursUntilDeadline < 1) && 'Less than one hour left'}
++      </AlertBanner>
++
++      <div style={{ fontSize: '14px' }}>
++        <BulletList>
++          Unlock your access to all course activities, including
++          &nbsp;<span style={{ fontWeight: 600 }}>graded assignments</span>
++        </BulletList>
++        <BulletList>
++          Earn a {certLink} of completion to showcase on your resume
++        </BulletList>
++        <BulletList>
++          Support our <span style={{ fontWeight: 600 }}>non-profit mission</span> at edX
++        </BulletList>
++      </div>
++
++      <div style={{ fontSize: '12px', marginTop: '10px', marginBottom: '5px' }}>
++        You will lose access to the first two weeks of scheduled content on {accessDeadlineDate}.
++      </div>
++
++      <div
++        className="upgrade-container"
++        style={{ paddingTop: '15px' }}
++      >
++        <a
++          id="green_upgrade"
++          className="btn btn-primary btn-block btn-lg"
++          href={upgradeUrl}
++          data-creative="sidebarupsell"
++          data-position="sidebar-message"
++          data-ol-has-click-handler=""
++          style={{ display: 'block', fontSize: '1em', fontWeight: 600 }}
++        >
++          Upgrade for <span className="price">{price}</span>
++        </a>
++      </div>
++    </div>
++  );
++};
++
++Sidecard.propTypes = {
++  options: PropTypes.shape({
++    state: PropTypes.shape({
++      upgradeDeadline: PropTypes.string.isRequired,
++    }),
++    access: PropTypes.shape({
++      accessExpirationDate: PropTypes.string.isRequired,
++      price: PropTypes.string.isRequired,
++      upgradeUrl: PropTypes.string.isRequired,
++    }),
++  }),
++};
++
++const futureDate = (numDays) => {
++  const defaultDate = new Date();
++  defaultDate.setDate(defaultDate.getDate() + numDays);
++  return defaultDate;
++};
++
++Sidecard.defaultProps = {
++  options: {
++    state: {
++      upgradeDeadline: new Date('Mar 29, 2021 11:59 PM EST'),
++    },
++    access: {
++      accessDeadline: futureDate(24),
++      price: '$23',
++      upgradeUrl: '',
++    },
++  },
++};
++
++export default Sidecard;
+diff --git a/src/experiments/mm-p2p/index.jsx b/src/experiments/mm-p2p/index.jsx
+new file mode 100644
+index 0000000..70437cf
+--- /dev/null
++++ b/src/experiments/mm-p2p/index.jsx
+@@ -0,0 +1,244 @@
++import { useState } from 'react';
++
++import { useModel } from '../../generic/model-store';
++
++import MMP2PBlockModal from './BlockModal';
++import MMP2PFlyover from './Flyover';
++import MMP2PFlyoverMobile from './FlyoverMobile';
++import MMP2PFlyoverTrigger from './FlyoverTrigger';
++import MMP2PFlyoverTriggerMobile from './FlyoverTriggerMobile';
++import MMP2PLockPaywall from './LockPaywall';
++import MMP2PSidecard from './Sidecard';
++
++import { isMobile, StrictDict } from './utils';
++
++const MMP2PKeys = StrictDict({
++  enableFn: 'enable',
++  flyoverVisible: 'flyoverVisible',
++  state: 'state',
++});
++
++let location;
++const windowKey = (field) => `experiment__mmp2p_${location}_${field}`;
++
++const setWindowVal = (field, val) => {
++  window[windowKey(field)] = val;
++};
++
++const windowVal = (field) => window[windowKey(field)];
++const defaultWindowVal = (field, val) => (
++  windowVal(field) === undefined ? val : windowVal(field)
++);
++
++const externalConfig = {
++  runs: [
++    {
++      upgradeDeadline: 'Mar 29 2021 11:59 PM EST',
++      courses: [
++        {
++          courseRun: 'course-v1:edX+DemoX+Demo_Course',
++          subSections: [
++            'block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction',
++            'block-v1:edX+DemoX+Demo_Course+type@sequential+block@19a30717eff543078a5d94ae9d6c18a5',
++            'block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions',
++            'block-v1:edX+DemoX+Demo_Course+type@sequential+block@simulations',
++            'block-v1:edX+DemoX+Demo_Course+type@sequential+block@graded_simulations',
++            'block-v1:edX+DemoX+Demo_Course+type@sequential+block@175e76c4951144a29d46211361266e0e',
++          ],
++        },
++      ],
++    },
++  ],
++};
++
++const initDatesMMP2P = () => {
++  location = 'dates';
++
++  const defaultState = {
++    isEnabled: false,
++    upgradeDeadline: null,
++  };
++
++  const [MMP2POptions, setMMP2POptions] = useState(
++    defaultWindowVal(MMP2PKeys.state, { ...defaultState }),
++  );
++
++  setWindowVal(MMP2PKeys.enableFn, (upgradeDeadline) => {
++    if (upgradeDeadline === undefined) {
++      setMMP2POptions({ ...defaultState });
++    } else {
++      setMMP2POptions({
++        isEnabled: true,
++        upgradeDeadline,
++      });
++    }
++  });
++
++  return {
++    state: MMP2POptions,
++  };
++};
++
++const initHomeMMP2P = (courseId) => {
++  location = 'home';
++
++  const defaultState = {
++    isEnabled: false,
++    upgradeDeadline: null,
++    afterUpgradeDeadline: false,
++  };
++
++  const [MMP2POptions, setMMP2POptions] = useState(
++    defaultWindowVal(MMP2PKeys.state, { ...defaultState }),
++  );
++
++  setWindowVal(MMP2PKeys.enableFn, (upgradeDeadline) => {
++    if (upgradeDeadline === undefined) {
++      setMMP2POptions({ ...defaultState });
++    } else {
++      setMMP2POptions({
++        isEnabled: true,
++        upgradeDeadline,
++        afterUpgradeDeadline: new Date() > new Date(upgradeDeadline),
++      });
++    }
++  });
++
++  const access = {
++    isAudit: false,
++    accessExpirationDate: null,
++    upgradeUrl: null,
++    price: null,
++  };
++
++  const { accessExpiration, verifiedMode } = useModel('outline', courseId);
++  if (
++    accessExpiration !== null
++    && accessExpiration !== undefined
++    && verifiedMode !== null
++    && verifiedMode !== undefined
++  ) {
++    access.isAudit = true;
++    access.accessExpirationDate = accessExpiration.expirationDate;
++    access.upgradeUrl = accessExpiration.upgradeUrl;
++    access.price = `${verifiedMode.currencySymbol}${verifiedMode.price}`;
++  }
++
++  return {
++    state: MMP2POptions,
++    access,
++  };
++};
++const initCoursewareMMP2P = (courseId, sequenceId, unitId) => {
++  location = 'course';
++
++  const defaultState = {
++    isEnabled: false,
++    upgradeDeadline: null,
++    afterUpgradeDeadline: false,
++    subSections: [],
++    isWhitelisted: false,
++  };
++
++  const [MMP2POptions, _setMMP2POptions] = useState(
++    defaultWindowVal(MMP2PKeys.state, { ...defaultState }),
++  );
++
++  const setMMP2POptions = (options) => {
++    _setMMP2POptions(options);
++    setWindowVal(MMP2PKeys.state, options);
++  };
++
++  const [isMMP2PFlyoverVisible, setMMP2PFlyoverVisible] = useState(
++    isMobile() ? false : defaultWindowVal(MMP2PKeys.flyoverVisible, false),
++  );
++  const flyover = {
++    isVisible: isMMP2PFlyoverVisible,
++    toggle: () => {
++      setMMP2PFlyoverVisible(!isMMP2PFlyoverVisible);
++      setWindowVal(MMP2PKeys.flyoverVisible, !isMMP2PFlyoverVisible);
++    },
++  };
++
++  setWindowVal(MMP2PKeys.enableFn,
++    (upgradeDeadline, subSections) => {
++      if (subSections.length !== undefined && subSections.length > 0) {
++        setMMP2POptions({
++          isEnabled: true,
++          upgradeDeadline,
++          afterUpgradeDeadline: new Date() > new Date(upgradeDeadline),
++          isWhitelisted: subSections.indexOf(sequenceId) > -1,
++        });
++      } else {
++        setMMP2POptions({ ...defaultState });
++        setWindowVal(MMP2PKeys.state, { ...defaultState });
++      }
++    });
++
++  const access = {
++    isAudit: false,
++    accessExpirationDate: null,
++    upgradeUrl: null,
++    price: null,
++  };
++
++  const { accessExpiration, verifiedMode } = useModel('coursewareMeta', courseId);
++  if (
++    accessExpiration !== null
++    && accessExpiration !== undefined
++    && verifiedMode !== null
++    && verifiedMode !== undefined
++  ) {
++    access.isAudit = true;
++    access.accessExpirationDate = accessExpiration.expirationDate;
++    access.upgradeUrl = accessExpiration.upgradeUrl;
++    access.price = `${verifiedMode.currencySymbol}${verifiedMode.price}`;
++  }
++
++  // testing
++  setWindowVal('externalConfig', externalConfig);
++
++  const unitModel = useModel('units', unitId);
++  const graded = unitModel !== undefined ? unitModel.graded : false;
++
++  const meta = {};
++  meta.verifiedLock = (
++    access.isAudit
++    && !MMP2POptions.isWhitelisted
++  );
++  meta.gradedLock = (
++    access.isAudit
++    && MMP2POptions.isWhitelisted
++    && graded
++  );
++  meta.modalLock = (
++    access.isAudit
++    && !MMP2POptions.isWhitelisted
++    && MMP2POptions.afterUpgradeDeadline
++  );
++  meta.showLock = (
++    MMP2POptions.isEnabled
++    && (meta.verifiedLock || meta.gradedLock)
++  );
++  meta.blockContent = (MMP2POptions.isEnabled && meta.verifiedLock);
++
++  return {
++    access,
++    flyover,
++    meta,
++    state: MMP2POptions,
++  };
++};
++
++export {
++  MMP2PBlockModal,
++  MMP2PFlyover,
++  MMP2PFlyoverMobile,
++  MMP2PFlyoverTrigger,
++  MMP2PFlyoverTriggerMobile,
++  MMP2PLockPaywall,
++  MMP2PSidecard,
++  initCoursewareMMP2P,
++  initHomeMMP2P,
++  initDatesMMP2P,
++};
+diff --git a/src/experiments/mm-p2p/index.scss b/src/experiments/mm-p2p/index.scss
+new file mode 100644
+index 0000000..0b27879
+--- /dev/null
++++ b/src/experiments/mm-p2p/index.scss
+@@ -0,0 +1,6 @@
++@import "./BlockModal.scss";
++@import "./Flyover.scss";
++@import "./FlyoverMobile.scss";
++@import "./FlyoverTrigger.scss";
++@import "./FlyoverTriggerMobile.scss";
++@import "./Sidecard.scss";
+diff --git a/src/experiments/mm-p2p/utils.jsx b/src/experiments/mm-p2p/utils.jsx
+new file mode 100644
+index 0000000..4fc097a
+--- /dev/null
++++ b/src/experiments/mm-p2p/utils.jsx
+@@ -0,0 +1,48 @@
++/* eslint-disable no-console */
++import { useContext } from 'react';
++import { AppContext } from '@edx/frontend-platform/react';
++import util from 'util';
++
++export const isMobile = () => {
++  const userAgent = typeof window.navigator === 'undefined' ? '' : navigator.userAgent;
++  return Boolean(
++    userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i),
++  );
++};
++
++export const getUser = () => useContext(AppContext).authenticatedUser;
++
++const staticReturnOptions = [
++  'dict',
++  'inspect',
++  Symbol.toStringTag,
++  util.inspect.custom,
++  Symbol.for('nodejs.util.inspect.custom'),
++];
++
++const strictGet = (target, name) => {
++  if (name === Symbol.toStringTag) {
++    return target;
++  }
++  if (name === 'length') {
++    return target.length;
++  }
++  if (staticReturnOptions.indexOf(name) >= 0) {
++    return target;
++  }
++  if (name === Symbol.iterator) {
++    return { ...target };
++  }
++
++  if (name in target || name === '_reactFragment') {
++    return target[name];
++  }
++
++  console.log(name.toString());
++  console.error({ target, name });
++  const e = Error(`invalid property "${name.toString()}"`);
++  console.error(e.stack);
++  return undefined;
++};
++
++export const StrictDict = (dict) => new Proxy(dict, { get: strictGet });
+diff --git a/src/index.scss b/src/index.scss
+index 507324c..b330fff 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -369,3 +369,6 @@
+ @import 'course-home/outline-tab/widgets/UpgradeCard.scss';
+ @import 'course-home/outline-tab/widgets/ProctoringInfoPanel.scss';
+ @import 'courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp';
++
++/** [MM-P2P] Experiment */
++@import 'experiments/mm-p2p/index.scss';
+-- 
+2.34.1
+

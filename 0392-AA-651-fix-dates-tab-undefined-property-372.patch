@@ -1,0 +1,26 @@
+From 58eb9fe23c66f23dae29d499127870444f2d0749 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Fri, 26 Feb 2021 15:59:49 -0500
+Subject: [PATCH 0392/1021] AA-651: fix dates tab undefined property (#372)
+
+---
+ src/course-home/data/api.js | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 130a6e6..84468b7 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -117,8 +117,7 @@ export async function getDatesTabData(courseId) {
+       return {};
+     }
+     if (httpErrorStatus === 401) {
+-      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`);
+-      return {};
++      global.location.replace(`${getConfig().BASE_URL}/course/${courseId}/home`);
+     }
+     throw error;
+   }
+-- 
+2.34.1
+

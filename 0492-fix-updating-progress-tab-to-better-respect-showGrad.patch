@@ -1,0 +1,608 @@
+From 6949fa82018d1d5dbbee77ca590c7fd1cc95553d Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Fri, 11 Jun 2021 09:42:06 -0400
+Subject: [PATCH 0492/1021] fix: updating progress tab to better respect
+ showGrades field (#480)
+
+---
+ .../data/__snapshots__/redux.test.js.snap     |   4 +-
+ src/course-home/data/api.js                   |  95 +++++++++++
+ .../progress-tab/ProgressTab.test.jsx         | 151 +++++++++++++++++-
+ .../course-grade/CurrentGradeTooltip.jsx      |   6 +-
+ .../grades/course-grade/GradeBar.jsx          |   4 +-
+ .../grades/grade-summary/GradeSummary.jsx     |  44 +----
+ .../grade-summary/GradeSummaryTable.jsx       |  37 +----
+ .../grade-summary/GradeSummaryTableFooter.jsx |   6 +-
+ 8 files changed, 253 insertions(+), 94 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index c80fb93..74e1699 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -548,6 +548,7 @@ Object {
+           "isPassing": true,
+           "letterGrade": "pass",
+           "percent": 1,
++          "visiblePercent": 1,
+         },
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "end": "3027-03-31T00:00:00Z",
+@@ -555,11 +556,12 @@ Object {
+         "gradingPolicy": Object {
+           "assignmentPolicies": Array [
+             Object {
++              "averageGrade": 1,
+               "numDroppable": 1,
+-              "numTotal": 2,
+               "shortLabel": "HW",
+               "type": "Homework",
+               "weight": 1,
++              "weightedGrade": 1,
+             },
+           ],
+           "gradeRange": Object {
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 2321637..e85a9ae 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -3,6 +3,81 @@ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import { logInfo } from '@edx/frontend-platform/logging';
+ import { appendBrowserTimezoneToUrl } from '../../utils';
+ 
++const calculateAssignmentTypeGrades = (points, assignmentWeight, numDroppable) => {
++  let dropCount = numDroppable;
++  // Drop the lowest grades
++  while (dropCount && points.length >= dropCount) {
++    const lowestScore = Math.min(...points);
++    const lowestScoreIndex = points.indexOf(lowestScore);
++    points.splice(lowestScoreIndex, 1);
++    dropCount--;
++  }
++  let averageGrade = 0;
++  let weightedGrade = 0;
++  if (points.length) {
++    averageGrade = points.reduce((a, b) => a + b, 0) / points.length;
++    weightedGrade = averageGrade * assignmentWeight;
++  }
++  return { averageGrade, weightedGrade };
++};
++
++function normalizeAssignmentPolicies(assignmentPolicies, sectionScores) {
++  const gradeByAssignmentType = {};
++  assignmentPolicies.forEach(assignment => {
++    // Create an array with the number of total assignments and set the scores to 0
++    // as placeholders for assignments that have not yet been released
++    gradeByAssignmentType[assignment.type] = {
++      grades: Array(assignment.numTotal).fill(0),
++      numAssignmentsCreated: 0,
++      numTotalExpectedAssignments: assignment.numTotal,
++    };
++  });
++
++  sectionScores.forEach((chapter) => {
++    chapter.subsections.forEach((subsection) => {
++      if (!(subsection.hasGradedAssignment && subsection.showGrades)) {
++        return;
++      }
++      const {
++        assignmentType,
++        numPointsEarned,
++        numPointsPossible,
++      } = subsection;
++      let {
++        numAssignmentsCreated,
++      } = gradeByAssignmentType[assignmentType];
++
++      numAssignmentsCreated++;
++      if (numAssignmentsCreated <= gradeByAssignmentType[assignmentType].numTotalExpectedAssignments) {
++        // Remove a placeholder grade so long as the number of recorded created assignments is less than the number
++        // of expected assignments
++        gradeByAssignmentType[assignmentType].grades.shift();
++      }
++      // Add the graded assignment to the list
++      gradeByAssignmentType[assignmentType].grades.push(numPointsEarned ? numPointsEarned / numPointsPossible : 0);
++      // Record the created assignment
++      gradeByAssignmentType[assignmentType].numAssignmentsCreated = numAssignmentsCreated;
++    });
++  });
++
++  return assignmentPolicies.map((assignment) => {
++    const { averageGrade, weightedGrade } = calculateAssignmentTypeGrades(
++      gradeByAssignmentType[assignment.type].grades,
++      assignment.weight,
++      assignment.numDroppable,
++    );
++
++    return {
++      averageGrade,
++      numDroppable: assignment.numDroppable,
++      shortLabel: assignment.shortLabel,
++      type: assignment.type,
++      weight: assignment.weight,
++      weightedGrade,
++    };
++  });
++}
++
+ function normalizeCourseHomeCourseMetadata(metadata) {
+   const data = camelCaseObject(metadata);
+   return {
+@@ -132,7 +207,27 @@ export async function getProgressTabData(courseId) {
+   try {
+     const { data } = await getAuthenticatedHttpClient().get(url);
+     const camelCasedData = camelCaseObject(data);
++
++    camelCasedData.gradingPolicy.assignmentPolicies = normalizeAssignmentPolicies(
++      camelCasedData.gradingPolicy.assignmentPolicies,
++      camelCasedData.sectionScores,
++    );
++
++    // Accumulate the weighted grades by assignment type to calculate the learner facing grade. The grades within
++    // assignmentPolicies have been filtered by what's visible to the learner.
++    camelCasedData.courseGrade.visiblePercent = camelCasedData.gradingPolicy.assignmentPolicies
++      ? camelCasedData.gradingPolicy.assignmentPolicies.reduce(
++        (accumulator, assignment) => accumulator + assignment.weightedGrade, 0,
++      ) : camelCasedData.courseGrade.percent;
++
++    camelCasedData.courseGrade.isPassing = camelCasedData.courseGrade.visiblePercent
++      >= Math.min(...Object.values(data.grading_policy.grade_range));
++
++    // We replace gradingPolicy.gradeRange with the original data to preserve the intended casing for the grade.
++    // For example, if a grade range key is "A", we do not want it to be camel cased (i.e. "A" would become "a")
++    // in order to preserve a course team's desired grade formatting.
+     camelCasedData.gradingPolicy.gradeRange = data.grading_policy.grade_range;
++
+     return camelCasedData;
+   } catch (error) {
+     const { httpErrorStatus } = error && error.customAttributes;
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index f6a3abc..4aae4bc 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -96,26 +96,45 @@ describe('Progress Tab', () => {
+       expect(screen.getByText('This represents your weighted grade against the grade needed to pass this course.')).toBeInTheDocument();
+     });
+ 
+-    it('renders correct copy for non-passing', async () => {
++    it('renders correct copy in CourseGradeFooter for non-passing', async () => {
+       setTabData({
+         course_grade: {
+           is_passing: false,
+           letter_grade: null,
+           percent: 0.5,
+         },
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++                display_name: 'First subsection',
++                has_graded_assignment: true,
++                num_points_earned: 1,
++                num_points_possible: 2,
++                percent_graded: 0.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++              },
++            ],
++          },
++        ],
+       });
+       await fetchAndRender();
+       expect(screen.queryByRole('button', { name: 'Grade range tooltip' })).not.toBeInTheDocument();
+       expect(screen.getByText('A weighted grade of 75% is required to pass in this course')).toBeInTheDocument();
+     });
+ 
+-    it('renders correct copy for passing with pass/fail grade range', async () => {
++    it('renders correct copy in CourseGradeFooter for passing with pass/fail grade range', async () => {
+       await fetchAndRender();
+       expect(screen.queryByRole('button', { name: 'Grade range tooltip' })).not.toBeInTheDocument();
+       expect(screen.getByText('You’re currently passing this course')).toBeInTheDocument();
+     });
+ 
+-    it('renders correct copy and tooltip for non-passing with letter grade range', async () => {
++    it('renders correct copy and tooltip in CourseGradeFooter for non-passing with letter grade range', async () => {
+       setTabData({
+         course_grade: {
+           is_passing: false,
+@@ -142,13 +161,32 @@ describe('Progress Tab', () => {
+       expect(screen.getByText('A weighted grade of 80% is required to pass in this course')).toBeInTheDocument();
+     });
+ 
+-    it('renders correct copy and tooltip for passing with letter grade range', async () => {
++    it('renders correct copy and tooltip in CourseGradeFooter for passing with letter grade range', async () => {
+       setTabData({
+         course_grade: {
+           is_passing: true,
+           letter_grade: 'B',
+-          percent: 0.85,
++          percent: 0.8,
+         },
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++                display_name: 'First subsection',
++                has_graded_assignment: true,
++                num_points_earned: 8,
++                num_points_possible: 10,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++              },
++            ],
++          },
++        ],
+         grading_policy: {
+           assignment_policies: [
+             {
+@@ -169,7 +207,7 @@ describe('Progress Tab', () => {
+       expect(await screen.findByText('You’re currently passing this course with a grade of B (80-90%)')).toBeInTheDocument();
+     });
+ 
+-    it('renders tooltip for grade range', async () => {
++    it('renders tooltip in CourseGradeFooter for grade range', async () => {
+       setTabData({
+         course_grade: {
+           percent: 0,
+@@ -199,7 +237,7 @@ describe('Progress Tab', () => {
+       expect(screen.getByText('F: <80%'));
+     });
+ 
+-    it('renders locked feature preview with upgrade button when user has locked content', async () => {
++    it('renders locked feature preview (CourseGradeHeader) with upgrade button when user has locked content', async () => {
+       setTabData({
+         completion_summary: {
+           complete_count: 1,
+@@ -221,7 +259,7 @@ describe('Progress Tab', () => {
+       expect(screen.getAllByRole('link', 'Unlock now')).toHaveLength(3);
+     });
+ 
+-    it('sends event on click of upgrade button in locked content header', async () => {
++    it('sends event on click of upgrade button in locked content header (CourseGradeHeader)', async () => {
+       sendTrackEvent.mockClear();
+       setTabData({
+         completion_summary: {
+@@ -270,6 +308,54 @@ describe('Progress Tab', () => {
+       await fetchAndRender();
+       expect(screen.queryByText('locked feature')).not.toBeInTheDocument();
+     });
++
++    it('renders correct current grade tooltip when showGrades is false', async () => {
++      // The learner has a 50% on the first assignment and a 100% on the second, making their grade a 75%
++      // The second assignment has showGrades set to false, so the grade reflected to the learner should be 50%.
++      setTabData({
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++                display_name: 'First subsection',
++                has_graded_assignment: true,
++                num_points_earned: 1,
++                num_points_possible: 2,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++              },
++            ],
++          },
++          {
++            display_name: 'Second section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                display_name: 'Second subsection',
++                has_graded_assignment: true,
++                num_points_earned: 1,
++                num_points_possible: 1,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: false,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection',
++              },
++            ],
++          },
++        ],
++      });
++
++      await fetchAndRender();
++      expect(screen.getByTestId('currentGradeTooltipContent').innerHTML).toEqual('50%');
++      // Although the learner's true grade is passing, we should expect this to reflect the grade that's
++      // visible to them, which is non-passing
++      expect(screen.getByText('A weighted grade of 75% is required to pass in this course')).toBeInTheDocument();
++    });
+   });
+ 
+   describe('Grade Summary', () => {
+@@ -282,7 +368,11 @@ describe('Progress Tab', () => {
+       setTabData({
+         grading_policy: {
+           assignment_policies: [],
++          grade_range: {
++            pass: 0.75,
++          },
+         },
++        section_scores: [],
+       });
+       await fetchAndRender();
+       expect(screen.queryByText('Grade summary')).not.toBeInTheDocument();
+@@ -412,6 +502,51 @@ describe('Progress Tab', () => {
+       expect(screen.getByRole('row', { name: 'Homework 1 50% 100% 50%' })).toBeInTheDocument();
+       expect(screen.getByRole('row', { name: 'Exam 50% 0% 0%' })).toBeInTheDocument();
+     });
++
++    it('renders correct total weighted grade when showGrades is false', async () => {
++      // The learner has a 50% on the first assignment and a 100% on the second, making their grade a 75%
++      // The second assignment has showGrades set to false, so the grade reflected to the learner should be 50%.
++      setTabData({
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++                display_name: 'First subsection',
++                has_graded_assignment: true,
++                num_points_earned: 1,
++                num_points_possible: 2,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++              },
++            ],
++          },
++          {
++            display_name: 'Second section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                display_name: 'Second subsection',
++                has_graded_assignment: true,
++                num_points_earned: 1,
++                num_points_possible: 1,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: false,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection',
++              },
++            ],
++          },
++        ],
++      });
++
++      await fetchAndRender();
++      expect(screen.getByTestId('gradeSummaryFooterTotalWeightedGrade').innerHTML).toEqual('50%');
++    });
+   });
+ 
+   describe('Detailed Grades', () => {
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index ce65126..9c35b70 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -17,11 +17,11 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+   const {
+     courseGrade: {
+       isPassing,
+-      percent,
++      visiblePercent,
+     },
+   } = useModel('progress', courseId);
+ 
+-  const currentGrade = Number((percent * 100).toFixed(0));
++  const currentGrade = Number((visiblePercent * 100).toFixed(0));
+ 
+   return (
+     <>
+@@ -30,7 +30,7 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+         placement="top"
+         overlay={(
+           <Popover id={`${isPassing ? 'passing' : 'non-passing'}-grade-tooltip`} aria-hidden="true" className={tooltipClassName}>
+-            <Popover.Content className={isPassing ? 'text-white' : 'text-dark-700'}>
++            <Popover.Content data-testid="currentGradeTooltipContent" className={isPassing ? 'text-white' : 'text-dark-700'}>
+               {currentGrade.toFixed(0)}%
+             </Popover.Content>
+           </Popover>
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index a16e212..319528c 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -20,11 +20,11 @@ function GradeBar({ intl, passingGrade }) {
+     },
+     courseGrade: {
+       isPassing,
+-      percent,
++      visiblePercent,
+     },
+   } = useModel('progress', courseId);
+ 
+-  const currentGrade = Number((percent * 100).toFixed(0));
++  const currentGrade = Number((visiblePercent * 100).toFixed(0));
+ 
+   const isLocked = lockedCount > 0;
+   const lockedTooltipClassName = isLocked ? 'locked-overlay' : '';
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+index d4dcae8..4b9d96c 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+@@ -11,7 +11,6 @@ function GradeSummary() {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+-    sectionScores,
+     gradingPolicy: {
+       assignmentPolicies,
+     },
+@@ -21,51 +20,10 @@ function GradeSummary() {
+     return null;
+   }
+ 
+-  // Accumulate grades for each assignment type
+-  const gradeByAssignmentType = {};
+-  assignmentPolicies.forEach(assignment => {
+-    // Create an array with the number of total assignments and set the scores to 0
+-    // as placeholders for assignments that have not yet been released
+-    gradeByAssignmentType[assignment.type] = {
+-      grades: Array(assignment.numTotal).fill(0),
+-      numAssignmentsCreated: 0,
+-      numTotalExpectedAssignments: assignment.numTotal,
+-    };
+-  });
+-
+-  sectionScores.forEach((chapter) => {
+-    chapter.subsections.forEach((subsection) => {
+-      if (!subsection.hasGradedAssignment) {
+-        return;
+-      }
+-      const {
+-        assignmentType,
+-        numPointsEarned,
+-        numPointsPossible,
+-      } = subsection;
+-      let {
+-        numAssignmentsCreated,
+-      } = gradeByAssignmentType[assignmentType];
+-
+-      numAssignmentsCreated++;
+-      if (numAssignmentsCreated <= gradeByAssignmentType[assignmentType].numTotalExpectedAssignments) {
+-        // Remove a placeholder grade so long as the number of recorded created assignments is less than the number
+-        // of expected assignments
+-        gradeByAssignmentType[assignmentType].grades.shift();
+-      }
+-      // Add the graded assignment to the list
+-      gradeByAssignmentType[assignmentType].grades.push(numPointsEarned ? numPointsEarned / numPointsPossible : 0);
+-      // Record the created assignment
+-      gradeByAssignmentType[assignmentType].numAssignmentsCreated = numAssignmentsCreated;
+-    });
+-  });
+-
+   return (
+     <section className="text-dark-700 mb-4">
+       <GradeSummaryHeader />
+-      <GradeSummaryTable
+-        gradeByAssignmentType={gradeByAssignmentType}
+-      />
++      <GradeSummaryTable />
+     </section>
+   );
+ }
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index 3e1e802..9e22943 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -1,6 +1,5 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+-import PropTypes from 'prop-types';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { DataTable } from '@edx/paragon';
+@@ -12,9 +11,7 @@ import GradeSummaryTableFooter from './GradeSummaryTableFooter';
+ 
+ import messages from '../messages';
+ 
+-function GradeSummaryTable({
+-  gradeByAssignmentType, intl,
+-}) {
++function GradeSummaryTable({ intl }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -27,24 +24,6 @@ function GradeSummaryTable({
+ 
+   const footnotes = [];
+ 
+-  const calculateAssignmentTypeGrades = (points, assignmentWeight, numDroppable) => {
+-    let dropCount = numDroppable;
+-    // Drop the lowest grades
+-    while (dropCount && points.length >= dropCount) {
+-      const lowestScore = Math.min(...points);
+-      const lowestScoreIndex = points.indexOf(lowestScore);
+-      points.splice(lowestScoreIndex, 1);
+-      dropCount--;
+-    }
+-    let averageGrade = 0;
+-    let weightedGrade = 0;
+-    if (points.length) {
+-      averageGrade = Number(((points.reduce((a, b) => a + b, 0) / points.length) * 100).toFixed(0));
+-      weightedGrade = (averageGrade * assignmentWeight).toFixed(0);
+-    }
+-    return { averageGrade, weightedGrade };
+-  };
+-
+   const getFootnoteId = (assignment) => {
+     const footnoteId = assignment.shortLabel ? assignment.shortLabel : assignment.type;
+     return footnoteId.replace(/[^A-Za-z0-9.-_]+/g, '-');
+@@ -65,20 +44,11 @@ function GradeSummaryTable({
+       footnoteMarker = footnotes.length;
+     }
+ 
+-    const {
+-      averageGrade,
+-      weightedGrade,
+-    } = calculateAssignmentTypeGrades(
+-      gradeByAssignmentType[assignment.type].grades,
+-      assignment.weight,
+-      assignment.numDroppable,
+-    );
+-
+     return {
+       type: { footnoteId, footnoteMarker, type: assignment.type },
+       weight: `${assignment.weight * 100}%`,
+-      grade: `${averageGrade}%`,
+-      weightedGrade: `${weightedGrade}%`,
++      grade: `${(assignment.averageGrade * 100).toFixed(0)}%`,
++      weightedGrade: `${(assignment.weightedGrade * 100).toFixed(0)}%`,
+     };
+   });
+ 
+@@ -133,7 +103,6 @@ function GradeSummaryTable({
+ }
+ 
+ GradeSummaryTable.propTypes = {
+-  gradeByAssignmentType: PropTypes.shape({}).isRequired,
+   intl: intlShape.isRequired,
+ };
+ 
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+index e14141e..91a052c 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+@@ -15,18 +15,18 @@ function GradeSummaryTableFooter({ intl }) {
+   const {
+     courseGrade: {
+       isPassing,
+-      percent,
++      visiblePercent,
+     },
+   } = useModel('progress', courseId);
+ 
+   const bgColor = isPassing ? 'bg-success-100' : 'bg-warning-100';
+-  const totalGrade = (percent * 100).toFixed(0);
++  const totalGrade = (visiblePercent * 100).toFixed(0);
+ 
+   return (
+     <DataTable.TableFooter className={`border-top border-primary ${bgColor}`}>
+       <div className="row w-100 m-0">
+         <div id="weighted-grade-summary" className="col-8 p-0 small">{intl.formatMessage(messages.weightedGradeSummary)}</div>
+-        <div aria-labelledby="weighted-grade-summary" className="col-4 p-0 text-right font-weight-bold small">{totalGrade}%</div>
++        <div data-testid="gradeSummaryFooterTotalWeightedGrade" aria-labelledby="weighted-grade-summary" className="col-4 p-0 text-right font-weight-bold small">{totalGrade}%</div>
+       </div>
+     </DataTable.TableFooter>
+   );
+-- 
+2.34.1
+

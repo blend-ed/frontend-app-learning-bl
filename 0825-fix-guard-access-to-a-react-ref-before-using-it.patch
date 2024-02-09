@@ -1,0 +1,31 @@
+From 7b945a9fcecc5f66669fca0b39af8bac5536e6c3 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 3 Mar 2022 09:48:41 -0500
+Subject: [PATCH 0825/1021] fix: guard access to a react ref before using it
+
+This was causing some errors ever since we started using the ref
+in an event handler - I'm not entirely sure why the ref stops
+being valid, unless it's a lifecycle thing. But anyway, this
+seems to stop the error in testing.
+---
+ src/course-home/outline-tab/LmsHtmlFragment.jsx | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.jsx b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+index 7ac2d78..d2db407 100644
+--- a/src/course-home/outline-tab/LmsHtmlFragment.jsx
++++ b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+@@ -28,7 +28,9 @@ export default function LmsHtmlFragment({
+ 
+   const iframe = useRef(null);
+   function resetIframeHeight() {
+-    iframe.current.height = iframe.current.contentWindow.document.body.scrollHeight;
++    if (iframe.current) {
++      iframe.current.height = iframe.current.contentWindow.document.body.scrollHeight;
++    }
+   }
+ 
+   useEffect(() => {
+-- 
+2.34.1
+

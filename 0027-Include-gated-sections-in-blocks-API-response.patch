@@ -1,0 +1,29 @@
+From 2c009b51b0df4396046f857027820c0924a049fd Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 10 Jan 2020 16:39:41 -0500
+Subject: [PATCH 0027/1021] Include gated sections in blocks API response.
+
+---
+ src/learning-sequence/data/api.js | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/src/learning-sequence/data/api.js b/src/learning-sequence/data/api.js
+index 5fd49fb..ef98947 100644
+--- a/src/learning-sequence/data/api.js
++++ b/src/learning-sequence/data/api.js
+@@ -7,10 +7,9 @@ export async function getCourseBlocks(courseId, username) {
+   url.searchParams.append('course_id', decodeURIComponent(courseId));
+   url.searchParams.append('username', username);
+   url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children');
++  url.searchParams.append('requested_fields', 'children,show_gated_sections');
+ 
+-  const { data } = await getAuthenticatedHttpClient()
+-    .get(url.href, {});
++  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+ 
+   return data;
+ }
+-- 
+2.34.1
+

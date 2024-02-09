@@ -1,0 +1,35 @@
+From 2ba94409666946c1cbb4f2adc6f382816be0b779 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 17 Nov 2020 12:19:00 -0800
+Subject: [PATCH 0322/1021] Consolidate CI test scripts in Makefile
+
+---
+ Makefile | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/Makefile b/Makefile
+index f51a0bb..9503197 100644
+--- a/Makefile
++++ b/Makefile
+@@ -52,3 +52,18 @@ pull_translations:
+ validate-no-uncommitted-package-lock-changes:
+ 	# Checking for package-lock.json changes...
+ 	git diff --exit-code package-lock.json
++
++.PHONY: validate
++validate:
++	make validate-no-uncommitted-package-lock-changes
++	npm run i18n_extract
++	npm run lint -- --max-warnings 0
++	npm run test
++	npm run build
++	npm run is-es5
++
++.PHONY: validate.ci
++validate.ci:
++	npm ci
++	make validate
++	codecov
+-- 
+2.34.1
+

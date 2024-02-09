@@ -1,0 +1,249 @@
+From fbd9d858e45fabc0736fc5458b3f3ff8dc3b8a8e Mon Sep 17 00:00:00 2001
+From: Brian Mesick <bmesick@edx.org>
+Date: Tue, 22 Jun 2021 10:01:57 -0400
+Subject: [PATCH 0504/1021] feat: Remove upsell banner on course home (#493)
+
+REV-2233: The upsell banner now duplicates the sidebar banner. Removing it in favor of the new implementation on course home, but keeping the masquerade message that shows instructors when a learner lost access to the course.
+---
+ .../AccessExpirationAlert.jsx                 | 20 +------
+ .../AccessExpirationAlertMasquerade.jsx       | 51 ++++++++++++++++++
+ src/alerts/access-expiration-alert/hooks.js   | 17 ++++++
+ src/alerts/access-expiration-alert/index.js   |  2 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |  6 +--
+ .../outline-tab/OutlineTab.test.jsx           | 53 -------------------
+ 6 files changed, 74 insertions(+), 75 deletions(-)
+ create mode 100644 src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
+
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index 450604f..db62776 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -9,6 +9,7 @@ import { Hyperlink } from '@edx/paragon';
+ import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ import messages from './messages';
+ import AccessExpirationAlertMMP2P from './AccessExpirationAlertMMP2P';
++import AccessExpirationAlertMasquerade from './AccessExpirationAlertMasquerade';
+ 
+ function AccessExpirationAlert({ intl, payload }) {
+   /** [MM-P2P] Experiment */
+@@ -42,24 +43,7 @@ function AccessExpirationAlert({ intl, payload }) {
+ 
+   if (masqueradingExpiredCourse) {
+     return (
+-      <Alert type={ALERT_TYPES.INFO}>
+-        <FormattedMessage
+-          id="learning.accessExpiration.expired"
+-          defaultMessage="This learner does not have access to this course. Their access expired on {date}."
+-          values={{
+-            date: (
+-              <FormattedDate
+-                key="accessExpirationExpiredDate"
+-                day="numeric"
+-                month="short"
+-                year="numeric"
+-                value={expirationDate}
+-                {...timezoneFormatArgs}
+-              />
+-            ),
+-          }}
+-        />
+-      </Alert>
++      <AccessExpirationAlertMasquerade payload={payload} />
+     );
+   }
+ 
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
+new file mode 100644
+index 0000000..51ee620
+--- /dev/null
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlertMasquerade.jsx
+@@ -0,0 +1,51 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FormattedMessage, FormattedDate } from '@edx/frontend-platform/i18n';
++
++import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++
++function AccessExpirationAlertMasquerade({ payload }) {
++  const {
++    accessExpiration,
++    userTimezone,
++  } = payload;
++
++  const {
++    expirationDate,
++  } = accessExpiration;
++
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  return (
++    <Alert type={ALERT_TYPES.INFO}>
++      <FormattedMessage
++        id="learning.accessExpiration.expired"
++        defaultMessage="This learner does not have access to this course. Their access expired on {date}."
++        values={{
++          date: (
++            <FormattedDate
++              key="accessExpirationExpiredDate"
++              day="numeric"
++              month="short"
++              year="numeric"
++              value={expirationDate}
++              {...timezoneFormatArgs}
++            />
++          ),
++        }}
++      />
++    </Alert>
++  );
++}
++
++AccessExpirationAlertMasquerade.propTypes = {
++  payload: PropTypes.shape({
++    accessExpiration: PropTypes.shape({
++      expirationDate: PropTypes.string.isRequired,
++      masqueradingExpiredCourse: PropTypes.bool.isRequired,
++    }).isRequired,
++    userTimezone: PropTypes.string.isRequired,
++  }).isRequired,
++};
++
++export default AccessExpirationAlertMasquerade;
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+index 4744ef3..d650f02 100644
+--- a/src/alerts/access-expiration-alert/hooks.js
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
+ import { useAlert } from '../../generic/user-messages';
+ 
+ const AccessExpirationAlert = React.lazy(() => import('./AccessExpirationAlert'));
++const AccessExpirationAlertMasquerade = React.lazy(() => import('./AccessExpirationAlertMasquerade'));
+ 
+ function useAccessExpirationAlert(accessExpiration, courseId, org, userTimezone, topic, analyticsPageName) {
+   const isVisible = !!accessExpiration; // If it exists, show it.
+@@ -22,4 +23,20 @@ function useAccessExpirationAlert(accessExpiration, courseId, org, userTimezone,
+   return { clientAccessExpirationAlert: AccessExpirationAlert };
+ }
+ 
++export function useAccessExpirationAlertMasquerade(accessExpiration, userTimezone, topic) {
++  const isVisible = !!accessExpiration; // If it exists, show it.
++  const payload = {
++    accessExpiration,
++    userTimezone,
++  };
++
++  useAlert(isVisible, {
++    code: 'clientAccessExpirationAlertMasquerade',
++    payload: useMemo(() => payload, Object.values(payload).sort()),
++    topic,
++  });
++
++  return { clientAccessExpirationAlertMasquerade: AccessExpirationAlertMasquerade };
++}
++
+ export default useAccessExpirationAlert;
+diff --git a/src/alerts/access-expiration-alert/index.js b/src/alerts/access-expiration-alert/index.js
+index ed12eb0..3b93c9f 100644
+--- a/src/alerts/access-expiration-alert/index.js
++++ b/src/alerts/access-expiration-alert/index.js
+@@ -1 +1 @@
+-export { default } from './hooks';
++export { default, useAccessExpirationAlertMasquerade } from './hooks';
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index c6435c6..500f208 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -17,7 +17,7 @@ import messages from './messages';
+ import Section from './Section';
+ import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+ import UpgradeCard from './widgets/UpgradeCard';
+-import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
++import { useAccessExpirationAlertMasquerade } from '../../alerts/access-expiration-alert';
+ import useCertificateAvailableAlert from './alerts/certificate-status-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+ import useCourseStartAlert from './alerts/course-start-alert';
+@@ -84,7 +84,7 @@ function OutlineTab({ intl }) {
+   };
+ 
+   // Below the course title alerts (appearing in the order listed here)
+-  const accessExpirationAlert = useAccessExpirationAlert(accessExpiration, courseId, org, userTimezone, 'outline-course-alerts', 'course_home');
++  const accessExpirationAlertMasquerade = useAccessExpirationAlertMasquerade(accessExpiration, userTimezone, 'outline-course-alerts');
+   const courseStartAlert = useCourseStartAlert(courseId);
+   const courseEndAlert = useCourseEndAlert(courseId);
+   const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
+@@ -145,7 +145,7 @@ function OutlineTab({ intl }) {
+               topic="outline-course-alerts"
+               className="mb-3"
+               customAlerts={{
+-                ...accessExpirationAlert,
++                ...accessExpirationAlertMasquerade,
+                 ...certificateAvailableAlert,
+                 ...courseEndAlert,
+                 ...courseStartAlert,
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index f6b45b3..f4a1b28 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -533,59 +533,6 @@ describe('Outline Tab', () => {
+         await fetchAndRender();
+         await screen.findByText('This learner does not have access to this course.', { exact: false });
+       });
+-
+-      it('shows expiration', async () => {
+-        setTabData({
+-          access_expiration: {
+-            expiration_date: '2080-01-01T12:00:00Z',
+-            masquerading_expired_course: false,
+-            upgrade_deadline: null,
+-            upgrade_url: null,
+-          },
+-        });
+-        await fetchAndRender();
+-        await screen.findByText('Audit Access Expires');
+-      });
+-
+-      it('shows upgrade prompt', async () => {
+-        setTabData({
+-          access_expiration: {
+-            expiration_date: '2080-01-01T12:00:00Z',
+-            masquerading_expired_course: false,
+-            upgrade_deadline: '2070-01-01T12:00:00Z',
+-            upgrade_url: 'https://example.com/upgrade',
+-          },
+-        });
+-        await fetchAndRender();
+-        await screen.findByText('to get unlimited access to the course as long as it exists on the site.', { exact: false });
+-      });
+-
+-      it('sends analytics event onClick of upgrade link', async () => {
+-        setTabData({
+-          access_expiration: {
+-            expiration_date: '2080-01-01T12:00:00Z',
+-            masquerading_expired_course: false,
+-            upgrade_deadline: '2070-01-01T12:00:00Z',
+-            upgrade_url: 'https://example.com/upgrade',
+-          },
+-        });
+-        await fetchAndRender();
+-
+-        // Clearing after render to remove any events sent on view (ex. 'Promotion Viewed')
+-        sendTrackEvent.mockClear();
+-        const upgradeLink = screen.getByRole('link', { name: 'Upgrade now' });
+-        fireEvent.click(upgradeLink);
+-
+-        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+-        expect(sendTrackEvent).toHaveBeenCalledWith('edx.bi.ecommerce.upsell_links_clicked', {
+-          org_key: 'edX',
+-          courserun_key: courseId,
+-          linkCategory: 'FBE_banner',
+-          linkName: 'course_home_audit_access_expires',
+-          linkType: 'link',
+-          pageName: 'course_home',
+-        });
+-      });
+     });
+ 
+     describe('Course Start Alert', () => {
+-- 
+2.34.1
+

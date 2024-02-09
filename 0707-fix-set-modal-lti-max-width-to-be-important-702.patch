@@ -1,0 +1,25 @@
+From 0b8cf06c29fdead81a85d867a29473cc450f56f8 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Thu, 21 Oct 2021 17:51:27 -0400
+Subject: [PATCH 0707/1021] fix: set modal-lti max-width to be important (#702)
+
+---
+ src/index.scss | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/index.scss b/src/index.scss
+index f383422..bde0e7a 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -346,7 +346,7 @@
+ // size like this.  Because of the hack below around react-focus-on's div, it would be better long-term to pull this into Paragon and perhaps call it "modal-full" or something like that.
+ .modal-lti {
+   height: 100%;
+-  max-width: 100%;
++  max-width: 100% !important;
+ 
+   // I don't like this.  We need to set a height of 100% on a div created by react-focus-on, a
+   // package we use in our Modal.  That div has no class name or ID, so instead we're uniquely
+-- 
+2.34.1
+

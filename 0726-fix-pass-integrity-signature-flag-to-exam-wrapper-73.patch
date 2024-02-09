@@ -1,0 +1,70 @@
+From c19f21d25782177af0185ec978a88f66eeab4ba3 Mon Sep 17 00:00:00 2001
+From: Bianca Severino <bseverino@edx.org>
+Date: Mon, 8 Nov 2021 13:36:45 -0500
+Subject: [PATCH 0726/1021] fix: pass integrity signature flag to exam wrapper
+ (#739)
+
+---
+ package-lock.json                           | 6 +++---
+ package.json                                | 2 +-
+ src/courseware/course/sequence/Sequence.jsx | 1 +
+ src/courseware/data/api.js                  | 1 +
+ 4 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 83012b9..0100949 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -3673,9 +3673,9 @@
+       }
+     },
+     "@edx/frontend-lib-special-exams": {
+-      "version": "1.13.4",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-1.13.4.tgz",
+-      "integrity": "sha512-yAN2gRF7F1gaP6ZYRx6VvvnGuhBYsp1r7g6MyoT1giQoaUqitl3t0UnpKyBvPyUFTQnyouDnOksvHtUVu6AhrQ==",
++      "version": "1.14.0",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-lib-special-exams/-/frontend-lib-special-exams-1.14.0.tgz",
++      "integrity": "sha512-Z6rsUZyc6NJO2M+wPphcm58CdU03gVH5HKQ+FqAKtZn0K+50xAp6cKlaI83UdB+t5w4Ok44UOVv7vjWjLzJDQQ==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "1.2.34",
+         "@fortawesome/free-brands-svg-icons": "5.11.2",
+diff --git a/package.json b/package.json
+index b9b5621..2ec0503 100644
+--- a/package.json
++++ b/package.json
+@@ -34,7 +34,7 @@
+     "@edx/brand": "npm:@edx/brand-openedx@1.1.0",
+     "@edx/frontend-component-footer": "10.1.6",
+     "@edx/frontend-enterprise-utils": "1.1.1",
+-    "@edx/frontend-lib-special-exams": "1.13.4",
++    "@edx/frontend-lib-special-exams": "1.14.0",
+     "@edx/frontend-platform": "1.12.7",
+     "@edx/paragon": "16.14.9",
+     "@fortawesome/fontawesome-svg-core": "1.2.36",
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 45d444d..c072e4d 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -246,6 +246,7 @@ function Sequence({
+           courseId={courseId}
+           isStaff={course.isStaff}
+           originalUserIsStaff={course.originalUserIsStaff}
++          isIntegritySignatureEnabled={course.isIntegritySignatureEnabled}
+         >
+           {defaultContent}
+         </SequenceExamWrapper>
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 717be9e..c927e4a 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -230,6 +230,7 @@ function normalizeMetadata(metadata) {
+     verificationStatus: data.verification_status,
+     linkedinAddToProfileUrl: data.linkedin_add_to_profile_url,
+     relatedPrograms: camelCaseObject(data.related_programs),
++    isIntegritySignatureEnabled: data.is_integrity_signature_enabled,
+     userNeedsIntegritySignature: data.user_needs_integrity_signature,
+     isMasquerading: data.original_user_is_staff && !data.is_staff,
+     username: data.username,
+-- 
+2.34.1
+

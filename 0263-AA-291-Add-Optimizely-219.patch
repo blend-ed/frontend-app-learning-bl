@@ -1,0 +1,34 @@
+From f91abd319fc458254509c00d82e7ecf68cf7e645 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Tue, 29 Sep 2020 11:19:22 -0400
+Subject: [PATCH 0263/1021] AA-291: Add Optimizely (#219)
+
+---
+ public/index.html | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/public/index.html b/public/index.html
+index c022b7f..ed8b3be 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -1,10 +1,13 @@
+ <!doctype html>
+ <html lang="en-us">
+   <head>
+-      <title>Course | <%= process.env.SITE_NAME %></title>
+-      <meta charset="utf-8">
+-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-      <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
++    <title>Course | <%= process.env.SITE_NAME %></title>
++    <meta charset="utf-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
++    <% if (htmlWebpackPlugin.options.OPTIMIZELY_PROJECT_ID) { %>
++      <script src="https://www.edx.org/optimizelyjs/<%= htmlWebpackPlugin.options.OPTIMIZELY_PROJECT_ID %>.js"></script>
++    <% } %>
+   </head>
+   <body>
+     <div id="root"></div>
+-- 
+2.34.1
+

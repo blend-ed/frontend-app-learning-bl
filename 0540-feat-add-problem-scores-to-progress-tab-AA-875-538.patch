@@ -1,0 +1,553 @@
+From 270c177a8302c73a29cddeda73e308c6b16c3e05 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Thu, 15 Jul 2021 13:47:51 -0400
+Subject: [PATCH 0540/1021] feat: add problem scores to progress tab (AA-875)
+ (#538)
+
+---
+ .../__factories__/progressTabData.factory.js  |  4 +-
+ .../data/__snapshots__/redux.test.js.snap     | 23 +++++-
+ src/course-home/data/api.js                   |  2 +
+ src/course-home/progress-tab/ProgressTab.jsx  | 15 +---
+ .../progress-tab/ProgressTab.test.jsx         | 14 ++++
+ .../grades/course-grade/CourseGrade.jsx       |  2 +-
+ .../grades/course-grade/GradeBar.jsx          |  2 +-
+ .../grades/course-grade/GradeRangeTooltip.jsx |  2 +-
+ .../grades/detailed-grades/DetailedGrades.jsx |  4 +-
+ .../detailed-grades/DetailedGradesTable.jsx   | 60 +++------------
+ .../detailed-grades/ProblemScoreDrawer.jsx    | 29 +++++++
+ .../detailed-grades/SubsectionTitleCell.jsx   | 75 +++++++++++++++++++
+ .../grade-summary/AssignmentTypeCell.jsx      |  6 +-
+ .../DroppableAssignmentFootnote.jsx           |  6 +-
+ .../grade-summary/GradeSummaryHeader.jsx      |  6 +-
+ .../progress-tab/grades/messages.js           |  8 ++
+ 16 files changed, 186 insertions(+), 72 deletions(-)
+ create mode 100644 src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+ create mode 100644 src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+index 6e2a198..0ed0056 100644
+--- a/src/course-home/data/__factories__/progressTabData.factory.js
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -26,8 +26,9 @@ Factory.define('progressTabData')
+             display_name: 'First subsection',
+             has_graded_assignment: true,
+             num_points_earned: 0,
+-            num_points_possible: 1,
++            num_points_possible: 3,
+             percent_graded: 0.0,
++            problem_scores: [{ earned: 0, possible: 1 }, { earned: 0, possible: 1 }, { earned: 0, possible: 1 }],
+             show_correctness: 'always',
+             show_grades: true,
+             url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
+@@ -44,6 +45,7 @@ Factory.define('progressTabData')
+             num_points_earned: 1,
+             num_points_possible: 1,
+             percent_graded: 1.0,
++            problem_scores: [{ earned: 1, possible: 1 }],
+             show_correctness: 'always',
+             show_grades: true,
+             url: 'http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection',
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 283e045..81038a9 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -564,6 +564,7 @@ Object {
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "end": "3027-03-31T00:00:00Z",
+         "enrollmentMode": "audit",
++        "gradesFeatureIsLocked": false,
+         "gradingPolicy": Object {
+           "assignmentPolicies": Array [
+             Object {
+@@ -591,8 +592,22 @@ Object {
+                 "displayName": "First subsection",
+                 "hasGradedAssignment": true,
+                 "numPointsEarned": 0,
+-                "numPointsPossible": 1,
++                "numPointsPossible": 3,
+                 "percentGraded": 0,
++                "problemScores": Array [
++                  Object {
++                    "earned": 0,
++                    "possible": 1,
++                  },
++                  Object {
++                    "earned": 0,
++                    "possible": 1,
++                  },
++                  Object {
++                    "earned": 0,
++                    "possible": 1,
++                  },
++                ],
+                 "showCorrectness": "always",
+                 "showGrades": true,
+                 "url": "http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection",
+@@ -609,6 +624,12 @@ Object {
+                 "numPointsEarned": 1,
+                 "numPointsPossible": 1,
+                 "percentGraded": 1,
++                "problemScores": Array [
++                  Object {
++                    "earned": 1,
++                    "possible": 1,
++                  },
++                ],
+                 "showCorrectness": "always",
+                 "showGrades": true,
+                 "url": "http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index f1f5906..8816ace 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -245,6 +245,8 @@ export async function getProgressTabData(courseId, targetUserId) {
+     // in order to preserve a course team's desired grade formatting.
+     camelCasedData.gradingPolicy.gradeRange = data.grading_policy.grade_range;
+ 
++    camelCasedData.gradesFeatureIsLocked = camelCasedData.completionSummary.lockedCount > 0;
++
+     return camelCasedData;
+   } catch (error) {
+     const { httpErrorStatus } = error && error.customAttributes;
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index f4f1a4a..db3935a 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -1,6 +1,6 @@
+-import React, { useEffect } from 'react';
++import React from 'react';
+ import { layoutGenerator } from 'react-break';
+-import { useDispatch, useSelector } from 'react-redux';
++import { useSelector } from 'react-redux';
+ 
+ import CertificateStatus from './certificate-status/CertificateStatus';
+ import CourseCompletion from './course-completion/CourseCompletion';
+@@ -10,7 +10,6 @@ import GradeSummary from './grades/grade-summary/GradeSummary';
+ import ProgressHeader from './ProgressHeader';
+ import RelatedLinks from './related-links/RelatedLinks';
+ 
+-import { setGradesFeatureStatus } from '../data/slice';
+ import { useModel } from '../../generic/model-store';
+ 
+ function ProgressTab() {
+@@ -19,19 +18,11 @@ function ProgressTab() {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+-    completionSummary: {
+-      lockedCount,
+-    },
++    gradesFeatureIsLocked,
+   } = useModel('progress', courseId);
+ 
+-  const gradesFeatureIsLocked = lockedCount > 0;
+   const applyLockedOverlay = gradesFeatureIsLocked ? 'locked-overlay' : '';
+ 
+-  const dispatch = useDispatch();
+-  useEffect(() => {
+-    dispatch(setGradesFeatureStatus({ gradesFeatureIsLocked }));
+-  }, []);
+-
+   const layout = layoutGenerator({
+     mobile: 0,
+     desktop: 992,
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 1b7349a..dbde50f 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -591,6 +591,20 @@ describe('Progress Tab', () => {
+       });
+     });
+ 
++    it('renders individual problem score drawer', async () => {
++      sendTrackEvent.mockClear();
++      await fetchAndRender();
++      expect(screen.getByText('Detailed grades')).toBeInTheDocument();
++
++      const problemScoreDrawerToggle = screen.getByRole('button', { name: 'Toggle individual problem scores for First subsection' });
++      expect(problemScoreDrawerToggle).toBeInTheDocument();
++
++      // Open the problem score drawer
++      fireEvent.click(problemScoreDrawerToggle);
++      expect(screen.getByText('Problem Scores:')).toBeInTheDocument();
++      expect(screen.getAllByText('0/1')).toHaveLength(3);
++    });
++
+     it('render message when section scores are not populated', async () => {
+       setTabData({
+         section_scores: [],
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+index 65b5a81..5b113dc 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -13,10 +13,10 @@ import messages from '../messages';
+ function CourseGrade({ intl }) {
+   const {
+     courseId,
+-    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    gradesFeatureIsLocked,
+     gradingPolicy: {
+       gradeRange,
+     },
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index 424c13d..6f5f2d2 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -12,7 +12,6 @@ import messages from '../messages';
+ function GradeBar({ intl, passingGrade }) {
+   const {
+     courseId,
+-    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+@@ -20,6 +19,7 @@ function GradeBar({ intl, passingGrade }) {
+       isPassing,
+       visiblePercent,
+     },
++    gradesFeatureIsLocked,
+   } = useModel('progress', courseId);
+ 
+   const currentGrade = Number((visiblePercent * 100).toFixed(0));
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+index 856fe07..e177857 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+@@ -14,10 +14,10 @@ import messages from '../messages';
+ function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+   const {
+     courseId,
+-    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    gradesFeatureIsLocked,
+     gradingPolicy: {
+       gradeRange,
+     },
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 9b579ac..7550d13 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -16,12 +16,12 @@ function DetailedGrades({ intl }) {
+   const { administrator } = getAuthenticatedUser();
+   const {
+     courseId,
+-    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+   const {
+     org,
+   } = useModel('courseHomeMeta', courseId);
+   const {
++    gradesFeatureIsLocked,
+     sectionScores,
+   } = useModel('progress', courseId);
+ 
+@@ -50,7 +50,7 @@ function DetailedGrades({ intl }) {
+     <section className="text-dark-700">
+       <h3 className="h4 mb-3">{intl.formatMessage(messages.detailedGrades)}</h3>
+       {hasSectionScores && (
+-        <DetailedGradesTable sectionScores={sectionScores} />
++        <DetailedGradesTable />
+       )}
+       {!hasSectionScores && (
+         <p className="small">{intl.formatMessage(messages.detailedGradesEmpty)}</p>
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index fe8b673..f83c618 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -1,32 +1,21 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+-import PropTypes from 'prop-types';
+ 
+-import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+-import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { DataTable } from '@edx/paragon';
+ 
+-import messages from '../messages';
+ import { useModel } from '../../../../generic/model-store';
++import messages from '../messages';
++import SubsectionTitleCell from './SubsectionTitleCell';
+ 
+-function DetailedGradesTable({ intl, sectionScores }) {
++function DetailedGradesTable({ intl }) {
+   const {
+     courseId,
+-    gradesFeatureIsLocked,
+   } = useSelector(state => state.courseHome);
+   const {
+-    org,
+-  } = useModel('courseHomeMeta', courseId);
+-  const { administrator } = getAuthenticatedUser();
+-  const logSubsectionClicked = (blockKey) => {
+-    sendTrackEvent('edx.ui.lms.course_progress.detailed_grades_assignment.clicked', {
+-      org_key: org,
+-      courserun_key: courseId,
+-      is_staff: administrator,
+-      assignment_block_key: blockKey,
+-    });
+-  };
++    sectionScores,
++  } = useModel('progress', courseId);
++
+   return (
+     sectionScores.map((chapter) => {
+       const subsectionScores = chapter.subsections.filter(
+@@ -40,24 +29,10 @@ function DetailedGradesTable({ intl, sectionScores }) {
+         return null;
+       }
+ 
+-      const detailedGradesData = subsectionScores.map((subsection) => {
+-        const title = (
+-          <a
+-            href={subsection.url}
+-            className="muted-link small"
+-            onClick={() => {
+-              logSubsectionClicked(subsection.blockKey);
+-            }}
+-            tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
+-          >
+-            {subsection.displayName}
+-          </a>
+-        );
+-        return {
+-          subsectionTitle: title,
+-          score: `${subsection.numPointsEarned}/${subsection.numPointsPossible}`,
+-        };
+-      });
++      const detailedGradesData = subsectionScores.map((subsection) => ({
++        subsectionTitle: <SubsectionTitleCell subsection={subsection} />,
++        score: `${subsection.numPointsEarned}/${subsection.numPointsPossible}`,
++      }));
+ 
+       return (
+         <div className="my-3" key={`${chapter.displayName}-grades-table`}>
+@@ -89,21 +64,6 @@ function DetailedGradesTable({ intl, sectionScores }) {
+ 
+ DetailedGradesTable.propTypes = {
+   intl: intlShape.isRequired,
+-  sectionScores: PropTypes.arrayOf(PropTypes.shape({
+-    displayName: PropTypes.string.isRequired,
+-    subsections: PropTypes.arrayOf(PropTypes.shape({
+-      displayName: PropTypes.string.isRequired,
+-      numPointsEarned: PropTypes.number.isRequired,
+-      numPointsPossible: PropTypes.number.isRequired,
+-      url: PropTypes.string.isRequired,
+-    })),
+-  })).isRequired,
+-};
+-
+-DetailedGradesTable.defaultProps = {
+-  sectionScores: {
+-    subsections: [],
+-  },
+ };
+ 
+ export default injectIntl(DetailedGradesTable);
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+new file mode 100644
+index 0000000..3667d93
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+@@ -0,0 +1,29 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from '../messages';
++
++function ProblemScoreDrawer({ intl, problemScores }) {
++  return (
++    <span className="row w-100 m-0 x-small ml-4 pt-2 pl-1 text-gray-700">
++      <span id="problem-score-label">{intl.formatMessage(messages.problemScoreLabel)}</span>
++      <ul className="list-unstyled row m-0" aria-labelledby="problem-score-label">
++        {problemScores.map(problemScore => (
++          <li className="ml-3.5">{problemScore.earned}/{problemScore.possible}</li>
++        ))}
++      </ul>
++    </span>
++  );
++}
++
++ProblemScoreDrawer.propTypes = {
++  intl: intlShape.isRequired,
++  problemScores: PropTypes.arrayOf(PropTypes.shape({
++    earned: PropTypes.number.isRequired,
++    possible: PropTypes.number.isRequired,
++  })).isRequired,
++};
++
++export default injectIntl(ProblemScoreDrawer);
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+new file mode 100644
+index 0000000..4cf780e
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+@@ -0,0 +1,75 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import PropTypes from 'prop-types';
++
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Collapsible, Icon, Row } from '@edx/paragon';
++import { ArrowDropDown, ArrowDropUp } from '@edx/paragon/icons';
++
++import messages from '../messages';
++import { useModel } from '../../../../generic/model-store';
++import ProblemScoreDrawer from './ProblemScoreDrawer';
++
++function SubsectionTitleCell({ intl, subsection }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++  const {
++    org,
++  } = useModel('courseHomeMeta', courseId);
++  const {
++    gradesFeatureIsLocked,
++  } = useModel('progress', courseId);
++
++  const {
++    blockKey,
++    displayName,
++    problemScores,
++    url,
++  } = subsection;
++
++  const { administrator } = getAuthenticatedUser();
++  const logSubsectionClicked = () => {
++    sendTrackEvent('edx.ui.lms.course_progress.detailed_grades_assignment.clicked', {
++      org_key: org,
++      courserun_key: courseId,
++      is_staff: administrator,
++      assignment_block_key: blockKey,
++    });
++  };
++
++  return (
++    <Collapsible.Advanced>
++      <Row className="w-100 m-0">
++        <Collapsible.Trigger
++          className="mr-1"
++          aria-label={intl.formatMessage(messages.problemScoreToggleAltText, { subsectionTitle: displayName })}
++          tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
++        >
++          <Collapsible.Visible whenClosed><Icon src={ArrowDropDown} /></Collapsible.Visible>
++          <Collapsible.Visible whenOpen><Icon src={ArrowDropUp} /></Collapsible.Visible>
++        </Collapsible.Trigger>
++        <a
++          href={url}
++          className="muted-link small"
++          onClick={logSubsectionClicked}
++          tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
++        >
++          {displayName}
++        </a>
++      </Row>
++      <Collapsible.Body>
++        <ProblemScoreDrawer problemScores={problemScores} />
++      </Collapsible.Body>
++    </Collapsible.Advanced>
++  );
++}
++
++SubsectionTitleCell.propTypes = {
++  intl: intlShape.isRequired,
++  subsection: PropTypes.shape.isRequired,
++};
++
++export default injectIntl(SubsectionTitleCell);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+index 2ffaa3a..064248e 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -1,11 +1,15 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
++import { useModel } from '../../../../generic/model-store';
+ 
+ function AssignmentTypeCell({ assignmentType, footnoteMarker, footnoteId }) {
+   const {
+-    gradesFeatureIsLocked,
++    courseId,
+   } = useSelector(state => state.courseHome);
++  const {
++    gradesFeatureIsLocked,
++  } = useModel('progress', courseId);
+   return (
+     <div className="small">
+       {assignmentType}
+diff --git a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+index 4d114fc..660d548 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+@@ -5,11 +5,15 @@ import PropTypes from 'prop-types';
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from '../messages';
++import { useModel } from '../../../../generic/model-store';
+ 
+ function DroppableAssignmentFootnote({ footnotes, intl }) {
+   const {
+-    gradesFeatureIsLocked,
++    courseId,
+   } = useSelector(state => state.courseHome);
++  const {
++    gradesFeatureIsLocked,
++  } = useModel('progress', courseId);
+   return (
+     <>
+       <span id="grade-summary-footnote-label" className="sr-only">{intl.formatMessage(messages.footnotesTitle)}</span>
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+index 8ee6292..4c021a1 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+@@ -8,11 +8,15 @@ import {
+ import { InfoOutline } from '@edx/paragon/icons';
+ 
+ import messages from '../messages';
++import { useModel } from '../../../../generic/model-store';
+ 
+ function GradeSummaryHeader({ intl }) {
+   const {
+-    gradesFeatureIsLocked,
++    courseId,
+   } = useSelector(state => state.courseHome);
++  const {
++    gradesFeatureIsLocked,
++  } = useModel('progress', courseId);
+   const [showTooltip, setShowTooltip] = useState(false);
+   return (
+     <div className="row w-100 m-0 align-items-center">
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 3fb2443..37b581a 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -103,6 +103,14 @@ const messages = defineMessages({
+     id: 'progress.courseGrade.label.passingGrade',
+     defaultMessage: 'Passing grade',
+   },
++  problemScoreLabel: {
++    id: 'progress.detailedGrades.problemScore.label',
++    defaultMessage: 'Problem Scores:',
++  },
++  problemScoreToggleAltText: {
++    id: 'progress.detailedGrades.problemScore.toggleButton',
++    defaultMessage: 'Toggle individual problem scores for {subsectionTitle}',
++  },
+   score: {
+     id: 'progress.score',
+     defaultMessage: 'Score',
+-- 
+2.34.1
+

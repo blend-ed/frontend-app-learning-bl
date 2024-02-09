@@ -1,0 +1,184 @@
+From c8be4c401fca54cdf7bf9677e1da5978c4732348 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Mon, 23 Mar 2020 16:40:50 -0400
+Subject: [PATCH 0085/1021] Allow loading with no unit, and of sequences with
+ no unitIds. (#34)
+
+This requires some defensive programming here and there to let things load in a minimal state.
+---
+ src/courseware/course/sequence/Sequence.jsx   |  6 +--
+ .../SequenceNavigation.jsx                    | 39 +++++++++++++------
+ src/data/api.js                               |  6 +--
+ src/data/thunks.js                            |  7 ++--
+ 4 files changed, 37 insertions(+), 21 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index e34283d..14a62ff 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -55,7 +55,7 @@ function Sequence({
+   const logEvent = (eventName, widgetPlacement, targetUnitId) => {
+     // Note: tabs are tracked with a 1-indexed position
+     // as opposed to a 0-index used throughout this MFE
+-    const currentIndex = sequence.unitIds.indexOf(unitId);
++    const currentIndex = sequence.unitIds.length > 0 ? sequence.unitIds.indexOf(unitId) : 0;
+     const payload = {
+       current_tab: currentIndex + 1,
+       id: unitId,
+@@ -110,7 +110,7 @@ function Sequence({
+ 
+   const gated = sequence.gatedContent !== undefined && sequence.gatedContent.gated;
+ 
+-  if (sequenceStatus === 'loaded' && unit) {
++  if (sequenceStatus === 'loaded') {
+     return (
+       <div className="sequence">
+         <SequenceNavigation
+@@ -147,7 +147,7 @@ function Sequence({
+               />
+             </Suspense>
+           )}
+-          {!gated && (
++          {!gated && unitId !== null && (
+             <Unit
+               key={unitId}
+               id={unitId}
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 8408628..a8ca9f3 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ 
++import { useSelector } from 'react-redux';
+ import UnitButton from './UnitButton';
+ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import { useSequenceNavigationMetadata } from './hooks';
+@@ -22,8 +23,30 @@ export default function SequenceNavigation({
+   const sequence = useModel('sequences', sequenceId);
+   const { isFirstUnit, isLastUnit } = useSequenceNavigationMetadata(sequenceId, unitId);
+   const isLocked = sequence.gatedContent !== undefined && sequence.gatedContent.gated;
++  const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+ 
+-  return (
++  const renderUnitButtons = () => {
++    if (isLocked) {
++      return (
++        <UnitButton unitId={unitId} title="" contentType="lock" isActive onClick={() => {}} />
++      );
++    }
++    if (sequence.unitIds.length === 0 || unitId === null) {
++      return (
++        <div style={{ flexBasis: '100%', minWidth: 0, borderBottom: 'solid 1px #EAEAEA' }} />
++      );
++    }
++    return (
++      <SequenceNavigationTabs
++        unitIds={sequence.unitIds}
++        unitId={unitId}
++        showCompletion={sequence.showCompletion}
++        onNavigate={onNavigate}
++      />
++    );
++  };
++
++  return sequenceStatus === 'loaded' && (
+     <nav className={classNames('sequence-navigation', className)}>
+       <Button className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit}>
+         <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
+@@ -33,16 +56,7 @@ export default function SequenceNavigation({
+           description="The Previous button in the sequence nav"
+         />
+       </Button>
+-
+-      {isLocked ? <UnitButton unitId={unitId} title="" contentType="lock" isActive onClick={() => {}} /> : (
+-        <SequenceNavigationTabs
+-          unitIds={sequence.unitIds}
+-          unitId={unitId}
+-          showCompletion={sequence.showCompletion}
+-          onNavigate={onNavigate}
+-        />
+-      )}
+-
++      {renderUnitButtons()}
+       <Button className="next-btn" onClick={nextSequenceHandler} disabled={isLastUnit}>
+         <FormattedMessage
+           defaultMessage="Next"
+@@ -56,8 +70,8 @@ export default function SequenceNavigation({
+ }
+ 
+ SequenceNavigation.propTypes = {
+-  unitId: PropTypes.string.isRequired,
+   sequenceId: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
+   className: PropTypes.string,
+   onNavigate: PropTypes.func.isRequired,
+   nextSequenceHandler: PropTypes.func.isRequired,
+@@ -66,4 +80,5 @@ SequenceNavigation.propTypes = {
+ 
+ SequenceNavigation.defaultProps = {
+   className: null,
++  unitId: null,
+ };
+diff --git a/src/data/api.js b/src/data/api.js
+index 4c63f80..f4137e3 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -41,14 +41,14 @@ function normalizeBlocks(courseUsageKey, blocks) {
+         models.courses[block.id] = {
+           id: courseUsageKey,
+           title: block.display_name,
+-          sectionIds: block.children,
++          sectionIds: block.children || [],
+         };
+         break;
+       case 'chapter':
+         models.sections[block.id] = {
+           id: block.id,
+           title: block.display_name,
+-          sequenceIds: block.children,
++          sequenceIds: block.children || [],
+         };
+         break;
+ 
+@@ -57,7 +57,7 @@ function normalizeBlocks(courseUsageKey, blocks) {
+           id: block.id,
+           title: block.display_name,
+           lmsWebUrl: block.lms_web_url,
+-          unitIds: block.children,
++          unitIds: block.children || [],
+         };
+         break;
+       case 'vertical':
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index 375f7f9..f8ae61f 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -5,7 +5,7 @@ import {
+   getSequenceMetadata,
+ } from './api';
+ import {
+-  addModelsMap, updateModel, updateModels,
++  addModelsMap, updateModel, updateModels, updateModelsMap,
+ } from '../model-store';
+ import {
+   fetchCourseRequest,
+@@ -40,11 +40,12 @@ export function fetchCourse(courseUsageKey) {
+         modelType: 'sections',
+         modelsMap: sections,
+       }));
+-      dispatch(addModelsMap({
++      // We update for sequences and units because the sequence metadata may have come back first.
++      dispatch(updateModelsMap({
+         modelType: 'sequences',
+         modelsMap: sequences,
+       }));
+-      dispatch(addModelsMap({
++      dispatch(updateModelsMap({
+         modelType: 'units',
+         modelsMap: units,
+       }));
+-- 
+2.34.1
+

@@ -1,0 +1,44 @@
+From e5e73e40bad9667b8bf14317d53bd577015fc915 Mon Sep 17 00:00:00 2001
+From: Kshitij Sobti <kshitij@sobti.in>
+Date: Wed, 12 Oct 2022 12:57:42 +0000
+Subject: [PATCH 0932/1021] feat: update discussion sidebar url to allow
+ grouping by subsection (#968)
+
+To enable grouping by subsection in the discussions MFE, this PR updates
+the embed URL to the one that supports grouping.
+
+ref: https://github.com/openedx/frontend-app-discussions/pull/281
+---
+ .../course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx  | 2 +-
+ .../sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+index 13f4e97..ef463a7 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -19,7 +19,7 @@ function DiscussionsSidebar({ intl }) {
+   if (!topic?.id) {
+     return null;
+   }
+-  const discussionsUrl = `${getConfig().DISCUSSIONS_MFE_BASE_URL}/${courseId}/topics/${topic.id}`;
++  const discussionsUrl = `${getConfig().DISCUSSIONS_MFE_BASE_URL}/${courseId}/category/${unitId}`;
+   return (
+     <SidebarBase
+       title={intl.formatMessage(messages.discussionsTitle)}
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+index bb1d934..133c9e2 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+@@ -59,7 +59,7 @@ describe('Discussions Trigger', () => {
+     renderWithProvider();
+     expect(screen.queryByTitle('Discussions')).toBeInTheDocument();
+     expect(screen.queryByTitle('Discussions'))
+-      .toHaveAttribute('src', `http://localhost:2002/${courseId}/topics/topic-1?inContext`);
++      .toHaveAttribute('src', `http://localhost:2002/${courseId}/category/${unitId}?inContext`);
+   });
+ 
+   it('should show nothing if unit has no discussions associated with it', async () => {
+-- 
+2.34.1
+

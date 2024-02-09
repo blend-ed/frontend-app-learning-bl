@@ -1,0 +1,36 @@
+From c5ada7e97480c8fbaeaad789e6a161c50efd2dcb Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 25 Aug 2020 09:04:06 -0400
+Subject: [PATCH 0240/1021] AA-326: hide dates banner if the upgrade link is
+ null (#195)
+
+This will prevent a pointless & broken button when the upgrade
+deadline has passed for the course.
+---
+ src/course-home/dates-banner/DatesBannerContainer.jsx | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index ce7c6da..3df02df 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -45,12 +45,14 @@ function DatesBannerContainer(props) {
+     },
+     {
+       name: 'upgradeToCompleteGradedBanner',
+-      shouldDisplay: upgradeToCompleteGraded,
++      // verifiedUpgradeLink can be null if we've passed the upgrade deadline
++      shouldDisplay: upgradeToCompleteGraded && verifiedUpgradeLink,
+       clickHandler: () => global.location.replace(verifiedUpgradeLink),
+     },
+     {
+       name: 'upgradeToResetBanner',
+-      shouldDisplay: upgradeToReset,
++      // verifiedUpgradeLink can be null if we've passed the upgrade deadline
++      shouldDisplay: upgradeToReset && verifiedUpgradeLink,
+       clickHandler: () => global.location.replace(verifiedUpgradeLink),
+     },
+     {
+-- 
+2.34.1
+

@@ -1,0 +1,1692 @@
+From 46cd511e15315b5723d63545c1cf6dc2345dc82f Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Fri, 14 Feb 2020 09:10:43 -0700
+Subject: [PATCH 0057/1021] feat: add bookmarking for units (#11)
+
+* feat: add bookmarking for units
+
+* refactor: add redux for state management
+---
+ package-lock.json                             |  53 +++++-
+ package.json                                  |   3 +-
+ src/courseware/CourseContainer.jsx            | 113 ++++++------
+ src/courseware/course/Course.jsx              |   2 +-
+ src/courseware/course/SequenceContainer.jsx   | 170 +++++++++---------
+ src/courseware/index.scss                     |   4 -
+ src/courseware/sequence/Sequence.jsx          | 101 ++++-------
+ .../sequence/SequenceNavigation.jsx           |  21 ++-
+ src/courseware/sequence/Unit.jsx              |  70 ++++++--
+ src/courseware/sequence/UnitButton.jsx        |  56 ++++--
+ src/courseware/sequence/api.js                |  49 -----
+ .../sequence/bookmark/BookmarkButton.jsx      |  54 ++++++
+ .../sequence/bookmark/BookmarkFilledIcon.jsx  |   7 +
+ .../sequence/bookmark/BookmarkOutlineIcon.jsx |   7 +
+ src/data/course-blocks/api.js                 | 109 +++++++++++
+ src/data/course-blocks/slice.js               | 134 ++++++++++++++
+ src/data/course-blocks/thunks.js              | 124 +++++++++++++
+ src/data/course-meta/api.js                   |  57 ++++++
+ src/data/course-meta/slice.js                 |  32 ++++
+ src/data/course-meta/thunks.js                |  21 +++
+ src/index.jsx                                 |   4 +-
+ src/index.scss                                |   2 -
+ src/store.js                                  |  12 ++
+ 23 files changed, 898 insertions(+), 307 deletions(-)
+ delete mode 100644 src/courseware/index.scss
+ delete mode 100644 src/courseware/sequence/api.js
+ create mode 100644 src/courseware/sequence/bookmark/BookmarkButton.jsx
+ create mode 100644 src/courseware/sequence/bookmark/BookmarkFilledIcon.jsx
+ create mode 100644 src/courseware/sequence/bookmark/BookmarkOutlineIcon.jsx
+ create mode 100644 src/data/course-blocks/api.js
+ create mode 100644 src/data/course-blocks/slice.js
+ create mode 100644 src/data/course-blocks/thunks.js
+ create mode 100644 src/data/course-meta/api.js
+ create mode 100644 src/data/course-meta/slice.js
+ create mode 100644 src/data/course-meta/thunks.js
+ create mode 100644 src/store.js
+
+diff --git a/package-lock.json b/package-lock.json
+index 82c7981..9eccf0d 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -3186,6 +3186,26 @@
+       "integrity": "sha512-shAmDyaQC4H92APFoIaVDHCx5bStIocgvbwQyxPRrbUY20V1EYTbSDchWbuwlMG3V17cprZhA6+78JfB+3DTPw==",
+       "dev": true
+     },
++    "@reduxjs/toolkit": {
++      "version": "1.2.3",
++      "resolved": "https://registry.npmjs.org/@reduxjs/toolkit/-/toolkit-1.2.3.tgz",
++      "integrity": "sha512-CgeZl41Bmz1rFkASt5gA9egCy9YWXzy485EsEXoGd2Xm1o63UQCxfuCLTH+XlTs25WqtGjSmn5H4xu7n86ytYw==",
++      "requires": {
++        "immer": "^4.0.1",
++        "redux": "^4.0.0",
++        "redux-devtools-extension": "^2.13.8",
++        "redux-immutable-state-invariant": "^2.1.0",
++        "redux-thunk": "^2.3.0",
++        "reselect": "^4.0.0"
++      },
++      "dependencies": {
++        "immer": {
++          "version": "4.0.2",
++          "resolved": "https://registry.npmjs.org/immer/-/immer-4.0.2.tgz",
++          "integrity": "sha512-Q/tm+yKqnKy4RIBmmtISBlhXuSDrB69e9EKTYiIenIKQkXBQir43w+kN/eGiax3wt1J0O1b2fYcNqLSbEcXA7w=="
++        }
++      }
++    },
+     "@sindresorhus/is": {
+       "version": "0.7.0",
+       "resolved": "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz",
+@@ -12159,8 +12179,7 @@
+     "json-stringify-safe": {
+       "version": "5.0.1",
+       "resolved": "https://registry.npmjs.org/json-stringify-safe/-/json-stringify-safe-5.0.1.tgz",
+-      "integrity": "sha1-Epai1Y/UXxmg9s4B1lcB4sc1tus=",
+-      "dev": true
++      "integrity": "sha1-Epai1Y/UXxmg9s4B1lcB4sc1tus="
+     },
+     "json3": {
+       "version": "3.3.3",
+@@ -15799,14 +15818,33 @@
+       }
+     },
+     "redux": {
+-      "version": "4.0.4",
+-      "resolved": "https://registry.npmjs.org/redux/-/redux-4.0.4.tgz",
+-      "integrity": "sha512-vKv4WdiJxOWKxK0yRoaK3Y4pxxB0ilzVx6dszU2W8wLxlb2yikRph4iV/ymtdJ6ZxpBLFbyrxklnT5yBbQSl3Q==",
++      "version": "4.0.5",
++      "resolved": "https://registry.npmjs.org/redux/-/redux-4.0.5.tgz",
++      "integrity": "sha512-VSz1uMAH24DM6MF72vcojpYPtrTUu3ByVWfPL1nPfVRb5mZVTve5GnNCUV53QM/BZ66xfWrm0CTWoM+Xlz8V1w==",
+       "requires": {
+         "loose-envify": "^1.4.0",
+         "symbol-observable": "^1.2.0"
+       }
+     },
++    "redux-devtools-extension": {
++      "version": "2.13.8",
++      "resolved": "https://registry.npmjs.org/redux-devtools-extension/-/redux-devtools-extension-2.13.8.tgz",
++      "integrity": "sha512-8qlpooP2QqPtZHQZRhx3x3OP5skEV1py/zUdMY28WNAocbafxdG2tRD1MWE7sp8obGMNYuLWanhhQ7EQvT1FBg=="
++    },
++    "redux-immutable-state-invariant": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/redux-immutable-state-invariant/-/redux-immutable-state-invariant-2.1.0.tgz",
++      "integrity": "sha512-3czbDKs35FwiBRsx/3KabUk5zSOoTXC+cgVofGkpBNv3jQcqIe5JrHcF5AmVt7B/4hyJ8MijBIpCJ8cife6yJg==",
++      "requires": {
++        "invariant": "^2.1.0",
++        "json-stringify-safe": "^5.0.1"
++      }
++    },
++    "redux-thunk": {
++      "version": "2.3.0",
++      "resolved": "https://registry.npmjs.org/redux-thunk/-/redux-thunk-2.3.0.tgz",
++      "integrity": "sha512-km6dclyFnmcvxhAcrQV2AkZmPQjzPDjgVlQtR0EQjxZPyJ0BnMf3in1ryuR8A2qU0HldVRfxYXbFSKlI3N7Slw=="
++    },
+     "reflect.ownkeys": {
+       "version": "0.2.0",
+       "resolved": "https://registry.npmjs.org/reflect.ownkeys/-/reflect.ownkeys-0.2.0.tgz",
+@@ -16147,6 +16185,11 @@
+       "integrity": "sha1-kl0mAdOaxIXgkc8NpcbmlNw9yv8=",
+       "dev": true
+     },
++    "reselect": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/reselect/-/reselect-4.0.0.tgz",
++      "integrity": "sha512-qUgANli03jjAyGlnbYVAV5vvnOmJnODyABz51RdBN7M4WaVu8mecZWgyQNkG8Yqe3KRGRt0l4K4B3XVEULC4CA=="
++    },
+     "resolve": {
+       "version": "1.13.1",
+       "resolved": "https://registry.npmjs.org/resolve/-/resolve-1.13.1.tgz",
+diff --git a/package.json b/package.json
+index 5938377..0f7afd4 100644
+--- a/package.json
++++ b/package.json
+@@ -43,6 +43,7 @@
+     "@fortawesome/free-regular-svg-icons": "^5.12.0",
+     "@fortawesome/free-solid-svg-icons": "^5.12.0",
+     "@fortawesome/react-fontawesome": "^0.1.8",
++    "@reduxjs/toolkit": "^1.2.3",
+     "classnames": "^2.2.6",
+     "core-js": "^3.6.2",
+     "prop-types": "^15.7.2",
+@@ -51,7 +52,7 @@
+     "react-redux": "^7.1.3",
+     "react-router": "^5.1.2",
+     "react-router-dom": "^5.1.2",
+-    "redux": "^4.0.4",
++    "redux": "^4.0.5",
+     "regenerator-runtime": "^0.13.3"
+   },
+   "devDependencies": {
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index 7bcde8d..0fd3348 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -1,64 +1,35 @@
+-import React, { useEffect, useContext, useState } from 'react';
++import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
++import { connect } from 'react-redux';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { history, getConfig, camelCaseObject } from '@edx/frontend-platform';
+-import { AppContext } from '@edx/frontend-platform/react';
+-import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { history } from '@edx/frontend-platform';
++import { fetchCourseMetadata } from '../data/course-meta/thunks';
++import { fetchCourseBlocks } from '../data/course-blocks/thunks';
+ 
+ import messages from './messages';
+ import PageLoading from './PageLoading';
+ import Course from './course/Course';
+-import { createBlocksMap } from './utils';
+-
+-export async function getCourseBlocks(courseUsageKey, username) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+-  url.searchParams.append('course_id', courseUsageKey);
+-  url.searchParams.append('username', username);
+-  url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children,show_gated_sections');
+-
+-  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+-
+-  return data;
+-}
+-
+-export async function getCourse(courseUsageKey) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseUsageKey}`;
+-  const { data } = await getAuthenticatedHttpClient().get(url);
+-
+-  return data;
+-}
+-
+-function useLoadCourse(courseUsageKey) {
+-  const { authenticatedUser } = useContext(AppContext);
+-
+-  const [models, setModels] = useState(null);
+-  const [courseId, setCourseId] = useState();
+-  const [metadata, setMetadata] = useState(null);
+-
+-  useEffect(() => {
+-    getCourseBlocks(courseUsageKey, authenticatedUser.username).then((blocksData) => {
+-      setModels(createBlocksMap(blocksData.blocks));
+-      setCourseId(blocksData.root);
+-    });
+-    getCourse(courseUsageKey).then((data) => {
+-      setMetadata(camelCaseObject(data));
+-    });
+-  }, [courseUsageKey]);
+-
+-  return {
+-    models, courseId, metadata,
+-  };
+-}
+ 
+ function CourseContainer(props) {
+-  const { intl, match } = props;
++  const {
++    intl,
++    match,
++    courseId,
++    blocks: models,
++    metadata,
++  } = props;
+   const {
+     courseUsageKey,
+     sequenceId,
+     unitId,
+   } = match.params;
+-  const { models, courseId, metadata } = useLoadCourse(courseUsageKey);
++
++  const metadataLoaded = metadata.fetchState === 'loaded';
++
++  useEffect(() => {
++    props.fetchCourseMetadata(courseUsageKey);
++    props.fetchCourseBlocks(courseUsageKey);
++  }, [courseUsageKey]);
+ 
+   useEffect(() => {
+     if (courseId && !sequenceId) {
+@@ -78,23 +49,42 @@ function CourseContainer(props) {
+     );
+   }
+ 
+-  return metadata && (
++  return metadataLoaded && (
+     <Course
+-      courseOrg={metadata.org}
+-      courseNumber={metadata.number}
+-      courseName={metadata.name}
++      courseOrg={props.metadata.org}
++      courseNumber={props.metadata.number}
++      courseName={props.metadata.name}
+       courseUsageKey={courseUsageKey}
+       courseId={courseId}
+       sequenceId={sequenceId}
+       unitId={unitId}
+       models={models}
+-      tabs={metadata.tabs}
++      tabs={props.metadata.tabs}
+     />
+   );
+ }
+ 
+ CourseContainer.propTypes = {
+   intl: intlShape.isRequired,
++  courseId: PropTypes.string,
++  blocks: PropTypes.objectOf(PropTypes.shape({
++    id: PropTypes.string,
++  })),
++  metadata: PropTypes.shape({
++    fetchState: PropTypes.string,
++    org: PropTypes.string,
++    number: PropTypes.string,
++    name: PropTypes.string,
++    tabs: PropTypes.arrayOf(PropTypes.shape({
++      priority: PropTypes.number,
++      slug: PropTypes.string,
++      title: PropTypes.string,
++      type: PropTypes.string,
++      url: PropTypes.string,
++    })),
++  }),
++  fetchCourseMetadata: PropTypes.func.isRequired,
++  fetchCourseBlocks: PropTypes.func.isRequired,
+   match: PropTypes.shape({
+     params: PropTypes.shape({
+       courseUsageKey: PropTypes.string.isRequired,
+@@ -104,4 +94,19 @@ CourseContainer.propTypes = {
+   }).isRequired,
+ };
+ 
+-export default injectIntl(CourseContainer);
++CourseContainer.defaultProps = {
++  blocks: {},
++  metadata: undefined,
++  courseId: undefined,
++};
++
++const mapStateToProps = state => ({
++  courseId: state.courseBlocks.root,
++  metadata: state.courseMeta,
++  blocks: state.courseBlocks.blocks,
++});
++
++export default connect(mapStateToProps, {
++  fetchCourseMetadata,
++  fetchCourseBlocks,
++})(injectIntl(CourseContainer));
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 37b4d22..57fc0db 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -92,5 +92,5 @@ Course.propTypes = {
+ };
+ 
+ Course.defaultProps = {
+-  unitId: null,
++  unitId: undefined,
+ };
+diff --git a/src/courseware/course/SequenceContainer.jsx b/src/courseware/course/SequenceContainer.jsx
+index 614beb6..a639e00 100644
+--- a/src/courseware/course/SequenceContainer.jsx
++++ b/src/courseware/course/SequenceContainer.jsx
+@@ -1,99 +1,72 @@
+ /* eslint-disable no-plusplus */
+-import React, {
+-  useEffect, useState, useContext, useCallback,
+-} from 'react';
++import React, { useEffect, useCallback, useMemo } from 'react';
+ import PropTypes from 'prop-types';
++import { connect } from 'react-redux';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { history, camelCaseObject, getConfig } from '@edx/frontend-platform';
+-import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { history } from '@edx/frontend-platform';
+ 
+ import messages from '../messages';
+ import PageLoading from '../PageLoading';
+ import Sequence from '../sequence/Sequence';
+-import UserMessagesContext from '../../user-messages/UserMessagesContext';
++import { fetchSequenceMetadata, checkBlockCompletion, saveSequencePosition } from '../../data/course-blocks/thunks';
+ 
+-export async function getSequenceMetadata(courseUsageKey, sequenceId) {
+-  const { data } = await getAuthenticatedHttpClient()
+-    .get(`${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceId}`, {});
+-
+-  return data;
+-}
++function SequenceContainer(props) {
++  const {
++    courseUsageKey,
++    courseId,
++    sequenceId,
++    unitId,
++    intl,
++    onNext,
++    onPrevious,
++    fetchState,
++    displayName,
++    showCompletion,
++    isTimeLimited,
++    savePosition,
++    bannerText,
++    gatedContent,
++    position,
++    items,
++    lmsWebUrl,
++  } = props;
++  const loaded = fetchState === 'loaded';
+ 
+-function useLoadSequence(courseUsageKey, sequenceId) {
+-  const [metadata, setMetadata] = useState(null);
+-  const [units, setUnits] = useState(null);
+-  const [loaded, setLoaded] = useState(false);
++  const unitIds = useMemo(() => items.map(({ id }) => id), [items]);
+ 
+   useEffect(() => {
+-    setLoaded(false);
+-    setMetadata(null);
+-    getSequenceMetadata(courseUsageKey, sequenceId).then((data) => {
+-      const unitsMap = {};
+-      for (let i = 0; i < data.items.length; i++) {
+-        const item = data.items[i];
+-        unitsMap[item.id] = camelCaseObject(item);
+-      }
+-
+-      setMetadata(camelCaseObject(data));
+-      setUnits(unitsMap);
+-      setLoaded(true);
+-    });
+-  }, [courseUsageKey, sequenceId]);
+-
+-  return {
+-    metadata,
+-    units,
+-    loaded,
+-  };
+-}
++    props.fetchSequenceMetadata(sequenceId);
++  }, [sequenceId]);
+ 
+-function SequenceContainer({
+-  courseUsageKey, courseId, sequenceId, unitId, models, intl, onNext, onPrevious,
+-}) {
+-  const { metadata, loaded, units } = useLoadSequence(courseUsageKey, sequenceId);
++  useEffect(() => {
++    if (savePosition) {
++      const activeUnitIndex = unitIds.indexOf(unitId);
++      props.saveSequencePosition(courseUsageKey, sequenceId, activeUnitIndex);
++    }
++  }, [unitId]);
+ 
+   useEffect(() => {
+     if (loaded && !unitId) {
+       // The position may be null, in which case we'll just assume 0.
+-      const position = metadata.position !== null ? metadata.position - 1 : 0;
+-      const nextUnitId = metadata.items[position].id;
++      const unitIndex = position || 0;
++      const nextUnitId = unitIds[unitIndex];
+       history.push(`/course/${courseUsageKey}/${sequenceId}/${nextUnitId}`);
+     }
+-  }, [loaded, metadata, unitId]);
++  }, [loaded, unitId]);
+ 
+   const handleUnitNavigation = useCallback((nextUnitId) => {
++    props.checkBlockCompletion(courseUsageKey, sequenceId, unitId);
+     history.push(`/course/${courseUsageKey}/${sequenceId}/${nextUnitId}`);
+   }, [courseUsageKey, sequenceId]);
+ 
+-  const { add, remove } = useContext(UserMessagesContext);
+-  useEffect(() => {
+-    let id = null;
+-    if (metadata && metadata.bannerText) {
+-      id = add({
+-        code: null,
+-        dismissible: false,
+-        text: metadata.bannerText,
+-        type: 'info',
+-        topic: 'sequence',
+-      });
+-    }
+-    return () => {
+-      if (id) {
+-        remove(id);
+-      }
+-    };
+-  }, [metadata]);
+-
+   // Exam redirect
+   useEffect(() => {
+-    if (metadata && models) {
+-      if (metadata.isTimeLimited) {
+-        global.location.href = models[sequenceId].lmsWebUrl;
+-      }
++    if (isTimeLimited) {
++      global.location.href = lmsWebUrl;
+     }
+-  }, [metadata, models]);
++  }, [isTimeLimited]);
+ 
+-  if (!loaded || !unitId || (metadata && metadata.isTimeLimited)) {
++  if (!loaded || !unitId || isTimeLimited) {
+     return (
+       <PageLoading
+         srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+@@ -101,15 +74,6 @@ function SequenceContainer({
+     );
+   }
+ 
+-  const {
+-    displayName,
+-    showCompletion,
+-    isTimeLimited,
+-    savePosition,
+-    bannerText,
+-    gatedContent,
+-  } = metadata;
+-
+   const prerequisite = {
+     id: gatedContent.prereqId,
+     name: gatedContent.gatedSectionName,
+@@ -120,8 +84,7 @@ function SequenceContainer({
+       id={sequenceId}
+       courseUsageKey={courseUsageKey}
+       courseId={courseId}
+-      unitIds={metadata.items.map((item) => item.id)}
+-      units={units}
++      unitIds={unitIds}
+       displayName={displayName}
+       activeUnitId={unitId}
+       showCompletion={showCompletion}
+@@ -141,17 +104,52 @@ SequenceContainer.propTypes = {
+   onNext: PropTypes.func.isRequired,
+   onPrevious: PropTypes.func.isRequired,
+   courseUsageKey: PropTypes.string.isRequired,
+-  models: PropTypes.objectOf(PropTypes.shape({
+-    id: PropTypes.string.isRequired,
+-    lmsWebUrl: PropTypes.string.isRequired,
+-  })).isRequired,
+   courseId: PropTypes.string.isRequired,
+   sequenceId: PropTypes.string.isRequired,
+   unitId: PropTypes.string,
+   intl: intlShape.isRequired,
++  items: PropTypes.arrayOf(PropTypes.shape({
++    id: PropTypes.string,
++  })),
++  gatedContent: PropTypes.shape({
++    gated: PropTypes.bool,
++    gatedSectionName: PropTypes.string,
++    prereqId: PropTypes.string,
++  }),
++  checkBlockCompletion: PropTypes.func.isRequired,
++  fetchSequenceMetadata: PropTypes.func.isRequired,
++  saveSequencePosition: PropTypes.func.isRequired,
++  savePosition: PropTypes.bool,
++  lmsWebUrl: PropTypes.string,
++  position: PropTypes.number,
++  fetchState: PropTypes.string,
++  displayName: PropTypes.string,
++  showCompletion: PropTypes.bool,
++  isTimeLimited: PropTypes.bool,
++  bannerText: PropTypes.string,
+ };
+ 
+ SequenceContainer.defaultProps = {
+-  unitId: null,
++  unitId: undefined,
++  gatedContent: undefined,
++  showCompletion: false,
++  lmsWebUrl: undefined,
++  position: undefined,
++  fetchState: undefined,
++  displayName: undefined,
++  isTimeLimited: undefined,
++  bannerText: undefined,
++  savePosition: undefined,
++  items: [],
+ };
+-export default injectIntl(SequenceContainer);
++
++export default connect(
++  (state, props) => ({
++    ...state.courseBlocks.blocks[props.sequenceId],
++  }),
++  {
++    fetchSequenceMetadata,
++    checkBlockCompletion,
++    saveSequencePosition,
++  },
++)(injectIntl(SequenceContainer));
+diff --git a/src/courseware/index.scss b/src/courseware/index.scss
+deleted file mode 100644
+index 97c9813..0000000
+--- a/src/courseware/index.scss
++++ /dev/null
+@@ -1,4 +0,0 @@
+-iframe {
+-  border: 0;
+-  width: 100%;
+-}
+diff --git a/src/courseware/sequence/Sequence.jsx b/src/courseware/sequence/Sequence.jsx
+index 7000709..e9e657c 100644
+--- a/src/courseware/sequence/Sequence.jsx
++++ b/src/courseware/sequence/Sequence.jsx
+@@ -1,22 +1,20 @@
+ /* eslint-disable no-use-before-define */
+-import React, { useState, useEffect, Suspense } from 'react';
++import React, { useEffect, useContext, Suspense } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import Unit from './Unit';
+ import SequenceNavigation from './SequenceNavigation';
+ import PageLoading from '../PageLoading';
+-import { getBlockCompletion, saveSequencePosition } from './api';
+ import messages from './messages';
+ import AlertList from '../../user-messages/AlertList';
++import UserMessagesContext from '../../user-messages/UserMessagesContext';
+ 
+ const ContentLock = React.lazy(() => import('./content-lock'));
+ 
+ function Sequence({
+   courseUsageKey,
+-  id,
+   unitIds,
+-  units: initialUnits,
+   displayName,
+   showCompletion,
+   onNext,
+@@ -24,70 +22,53 @@ function Sequence({
+   onNavigateUnit,
+   isGated,
+   prerequisite,
+-  savePosition,
+-  activeUnitId: initialActiveUnitId,
++  activeUnitId,
++  bannerText,
+   intl,
+ }) {
+-  const [units, setUnits] = useState(initialUnits);
+-  const [activeUnitId, setActiveUnitId] = useState(initialActiveUnitId);
+-
+-  const activeUnitIndex = unitIds.indexOf(activeUnitId);
+-  const activeUnit = units[activeUnitId];
+-  const unitsArr = unitIds.map(unitId => ({
+-    ...units[unitId],
+-    id: unitId,
+-    isActive: unitId === activeUnitId,
+-  }));
+-
+-  // TODO: Use callback
+-  const updateUnitCompletion = (unitId) => {
+-    // If the unit is already complete, don't check.
+-    if (units[unitId].complete) {
+-      return;
+-    }
+-
+-    getBlockCompletion(courseUsageKey, id, unitId).then((isComplete) => {
+-      if (isComplete) {
+-        setUnits({
+-          ...units,
+-          [unitId]: { ...units[unitId], complete: isComplete },
+-        });
+-      }
+-    });
+-  };
+-
+   const handleNext = () => {
+-    if (activeUnitIndex < unitIds.length - 1) {
+-      handleNavigate(activeUnitIndex + 1);
++    const nextIndex = unitIds.indexOf(activeUnitId) + 1;
++    if (nextIndex < unitIds.length) {
++      const newUnitId = unitIds[nextIndex];
++      handleNavigate(newUnitId);
+     } else {
+       onNext();
+     }
+   };
+ 
+   const handlePrevious = () => {
+-    if (activeUnitIndex > 0) {
+-      handleNavigate(activeUnitIndex - 1);
++    const previousIndex = unitIds.indexOf(activeUnitId) - 1;
++    if (previousIndex >= 0) {
++      const newUnitId = unitIds[previousIndex];
++      handleNavigate(newUnitId);
+     } else {
+       onPrevious();
+     }
+   };
+ 
+-  const handleNavigate = (unitIndex) => {
+-    const newUnitId = unitIds[unitIndex];
+-    if (showCompletion) {
+-      updateUnitCompletion(activeUnitId);
+-    }
+-    setActiveUnitId(newUnitId);
+-    if (onNavigateUnit !== null) {
+-      onNavigateUnit(newUnitId, units[newUnitId]);
+-    }
++  const handleNavigate = (unitId) => {
++    onNavigateUnit(unitId);
+   };
+ 
++  const { add, remove } = useContext(UserMessagesContext);
+   useEffect(() => {
+-    if (savePosition) {
+-      saveSequencePosition(courseUsageKey, id, activeUnitIndex);
++    let id = null;
++    if (bannerText) {
++      id = add({
++        code: null,
++        dismissible: false,
++        text: bannerText,
++        type: 'info',
++        topic: 'sequence',
++      });
+     }
+-  }, [activeUnitId]);
++    return () => {
++      if (id) {
++        remove(id);
++      }
++    };
++  }, [bannerText]);
++
+ 
+   return (
+     <div className="flex-grow-1">
+@@ -98,7 +79,8 @@ function Sequence({
+           onNext={handleNext}
+           onNavigate={handleNavigate}
+           onPrevious={handlePrevious}
+-          units={unitsArr}
++          unitIds={unitIds}
++          activeUnitId={activeUnitId}
+           isLocked={isGated}
+           showCompletion={showCompletion}
+         />
+@@ -120,7 +102,10 @@ function Sequence({
+         )}
+       </div>
+       {!isGated && (
+-        <Unit key={activeUnitId} {...activeUnit} />
++        <Unit
++          key={activeUnitId}
++          id={activeUnitId}
++        />
+       )}
+     </div>
+   );
+@@ -128,33 +113,25 @@ function Sequence({
+ 
+ Sequence.propTypes = {
+   activeUnitId: PropTypes.string.isRequired,
+-  bannerText: PropTypes.string,
+   courseUsageKey: PropTypes.string.isRequired,
+   displayName: PropTypes.string.isRequired,
+-  id: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
+   isGated: PropTypes.bool.isRequired,
+-  isTimeLimited: PropTypes.bool.isRequired,
+   onNavigateUnit: PropTypes.func,
+   onNext: PropTypes.func.isRequired,
+   onPrevious: PropTypes.func.isRequired,
+-  savePosition: PropTypes.bool.isRequired,
+   showCompletion: PropTypes.bool.isRequired,
+   prerequisite: PropTypes.shape({
+     name: PropTypes.string,
+     id: PropTypes.string,
+   }).isRequired,
+   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+-  units: PropTypes.objectOf(PropTypes.shape({
+-    id: PropTypes.string.isRequired,
+-    complete: PropTypes.bool,
+-    pageTitle: PropTypes.string.isRequired,
+-  })).isRequired,
++  bannerText: PropTypes.string,
+ };
+ 
+ Sequence.defaultProps = {
+-  bannerText: null,
+   onNavigateUnit: null,
++  bannerText: undefined,
+ };
+ 
+ export default injectIntl(Sequence);
+diff --git a/src/courseware/sequence/SequenceNavigation.jsx b/src/courseware/sequence/SequenceNavigation.jsx
+index f20f8e2..044dd80 100644
+--- a/src/courseware/sequence/SequenceNavigation.jsx
++++ b/src/courseware/sequence/SequenceNavigation.jsx
+@@ -9,18 +9,19 @@ export default function SequenceNavigation({
+   onNext,
+   onPrevious,
+   onNavigate,
+-  units,
++  unitIds,
+   isLocked,
+   showCompletion,
++  activeUnitId,
+   className,
+ }) {
+-  const unitButtons = units.map((unit, index) => (
++  const unitButtons = unitIds.map(unitId => (
+     <UnitButton
+-      key={unit.id}
+-      {...unit}
+-      isComplete={showCompletion && unit.complete}
+-      index={index}
+-      clickHandler={onNavigate}
++      key={unitId}
++      unitId={unitId}
++      isActive={activeUnitId === unitId}
++      showCompletion={showCompletion}
++      onClick={onNavigate}
+     />
+   ));
+ 
+@@ -44,12 +45,10 @@ SequenceNavigation.propTypes = {
+   onNext: PropTypes.func.isRequired,
+   onPrevious: PropTypes.func.isRequired,
+   onNavigate: PropTypes.func.isRequired,
+-  units: PropTypes.arrayOf(PropTypes.shape({
+-    id: PropTypes.string.isRequired,
+-    complete: PropTypes.bool,
+-  })).isRequired,
+   isLocked: PropTypes.bool.isRequired,
+   showCompletion: PropTypes.bool.isRequired,
++  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++  activeUnitId: PropTypes.string.isRequired,
+ };
+ 
+ SequenceNavigation.defaultProps = {
+diff --git a/src/courseware/sequence/Unit.jsx b/src/courseware/sequence/Unit.jsx
+index 95c415e..9fae383 100644
+--- a/src/courseware/sequence/Unit.jsx
++++ b/src/courseware/sequence/Unit.jsx
+@@ -1,10 +1,19 @@
+ import React, { useRef, useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
++import { connect } from 'react-redux';
++import BookmarkButton from './bookmark/BookmarkButton';
++import { addBookmark, removeBookmark } from '../../data/course-blocks/thunks';
+ 
+-export default function Unit({ id, pageTitle }) {
++function Unit({
++  bookmarked,
++  bookmarkedUpdateState,
++  displayName,
++  id,
++  ...props
++}) {
+   const iframeRef = useRef(null);
+-  const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}`;
++  const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0`;
+ 
+   const [iframeHeight, setIframeHeight] = useState(0);
+   useEffect(() => {
+@@ -17,21 +26,56 @@ export default function Unit({ id, pageTitle }) {
+     };
+   }, []);
+ 
++  const toggleBookmark = () => {
++    if (bookmarked) {
++      props.removeBookmark(id);
++    } else {
++      props.addBookmark(id);
++    }
++  };
++
+   return (
+-    <iframe
+-      title={pageTitle}
+-      ref={iframeRef}
+-      src={iframeUrl}
+-      allowFullScreen
+-      className="d-block container-fluid px-0"
+-      height={iframeHeight}
+-      scrolling="no"
+-      referrerPolicy="origin"
+-    />
++    <div>
++      <div className="container-fluid mb-2">
++        <h2 className="mb-0">{displayName}</h2>
++        <BookmarkButton
++          onClick={toggleBookmark}
++          isBookmarked={bookmarked}
++          isProcessing={bookmarkedUpdateState === 'loading'}
++        />
++      </div>
++      <iframe
++        title={displayName}
++        ref={iframeRef}
++        src={iframeUrl}
++        allowFullScreen
++        className="d-block container-fluid px-0"
++        height={iframeHeight}
++        scrolling="no"
++        referrerPolicy="origin"
++        style={{ border: 0, width: '100%' }}
++      />
++    </div>
+   );
+ }
+ 
+ Unit.propTypes = {
++  addBookmark: PropTypes.func.isRequired,
++  bookmarked: PropTypes.bool,
++  bookmarkedUpdateState: PropTypes.string,
++  displayName: PropTypes.string.isRequired,
+   id: PropTypes.string.isRequired,
+-  pageTitle: PropTypes.string.isRequired,
++  removeBookmark: PropTypes.func.isRequired,
++};
++
++Unit.defaultProps = {
++  bookmarked: false,
++  bookmarkedUpdateState: undefined,
+ };
++
++const mapStateToProps = (state, props) => state.courseBlocks.blocks[props.id] || {};
++
++export default connect(mapStateToProps, {
++  addBookmark,
++  removeBookmark,
++})(Unit);
+diff --git a/src/courseware/sequence/UnitButton.jsx b/src/courseware/sequence/UnitButton.jsx
+index 2fb67f5..6a9dae0 100644
+--- a/src/courseware/sequence/UnitButton.jsx
++++ b/src/courseware/sequence/UnitButton.jsx
+@@ -1,21 +1,25 @@
+ import React, { useCallback } from 'react';
+ import PropTypes from 'prop-types';
++import { connect } from 'react-redux';
+ import classNames from 'classnames';
+ import { Button } from '@edx/paragon';
+ 
+ import UnitIcon from './UnitIcon';
+ import CompleteIcon from './CompleteIcon';
++import BookmarkFilledIcon from './bookmark/BookmarkFilledIcon';
+ 
+-export default function UnitButton({
+-  clickHandler,
+-  pageTitle,
+-  type,
++function UnitButton({
++  onClick,
++  displayName,
++  contentType,
+   isActive,
+-  isComplete,
+-  index,
++  bookmarked,
++  complete,
++  showCompletion,
++  unitId,
+ }) {
+-  const onClick = useCallback(() => {
+-    clickHandler(index);
++  const handleClick = useCallback(() => {
++    onClick(unitId);
+   });
+ 
+   return (
+@@ -26,25 +30,41 @@ export default function UnitButton({
+         'btn-outline-secondary': isActive,
+       })}
+ 
+-      onClick={onClick}
+-      title={pageTitle}
++      onClick={handleClick}
++      title={displayName}
+     >
+-      <UnitIcon type={type} />
+-      {isComplete ? <CompleteIcon className="text-success ml-2" /> : null}
++      <UnitIcon type={contentType} />
++      {showCompletion && complete ? <CompleteIcon className="text-success ml-2" /> : null}
++      {bookmarked ? (
++        <BookmarkFilledIcon
++          className="text-primary small position-absolute"
++          style={{ top: '-3px', right: '5px' }}
++        />
++      ) : null}
+     </Button>
+   );
+ }
+ 
+ UnitButton.propTypes = {
+-  index: PropTypes.number.isRequired,
++  unitId: PropTypes.string.isRequired,
+   isActive: PropTypes.bool,
+-  isComplete: PropTypes.bool,
+-  clickHandler: PropTypes.func.isRequired,
+-  pageTitle: PropTypes.string.isRequired,
+-  type: PropTypes.string.isRequired,
++  bookmarked: PropTypes.bool,
++  complete: PropTypes.bool,
++  showCompletion: PropTypes.bool,
++  onClick: PropTypes.func.isRequired,
++  displayName: PropTypes.string.isRequired,
++  contentType: PropTypes.string.isRequired,
+ };
+ 
+ UnitButton.defaultProps = {
+   isActive: false,
+-  isComplete: false,
++  bookmarked: false,
++  complete: false,
++  showCompletion: true,
+ };
++
++const mapStateToProps = (state, props) => ({
++  ...state.courseBlocks.blocks[props.unitId],
++});
++
++export default connect(mapStateToProps)(UnitButton);
+diff --git a/src/courseware/sequence/api.js b/src/courseware/sequence/api.js
+deleted file mode 100644
+index fd20327..0000000
+--- a/src/courseware/sequence/api.js
++++ /dev/null
+@@ -1,49 +0,0 @@
+-import { getConfig } from '@edx/frontend-platform';
+-import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+-
+-/* eslint-disable import/prefer-default-export */
+-
+-const getSequenceXModuleHandlerUrl = (courseUsageKey, sequenceId) => `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/xblock/${sequenceId}/handler/xmodule_handler`;
+-
+-
+-export async function saveSequencePosition(courseUsageKey, sequenceId, position) {
+-  // Post data sent to this endpoint must be url encoded
+-  // TODO: Remove the need for this to be the case.
+-  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+-  const urlEncoded = new URLSearchParams();
+-  urlEncoded.append('position', position + 1);
+-  const requestConfig = {
+-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+-  };
+-
+-  const { data } = await getAuthenticatedHttpClient().post(
+-    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/goto_position`,
+-    urlEncoded.toString(),
+-    requestConfig,
+-  );
+-
+-  return data;
+-}
+-
+-export async function getBlockCompletion(courseUsageKey, sequenceId, usageKey) {
+-  // Post data sent to this endpoint must be url encoded
+-  // TODO: Remove the need for this to be the case.
+-  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+-  const urlEncoded = new URLSearchParams();
+-  urlEncoded.append('usage_key', usageKey);
+-  const requestConfig = {
+-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+-  };
+-
+-  const { data } = await getAuthenticatedHttpClient().post(
+-    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/get_completion`,
+-    urlEncoded.toString(),
+-    requestConfig,
+-  );
+-
+-  if (data.complete) {
+-    return true;
+-  }
+-
+-  return false;
+-}
+diff --git a/src/courseware/sequence/bookmark/BookmarkButton.jsx b/src/courseware/sequence/bookmark/BookmarkButton.jsx
+new file mode 100644
+index 0000000..18d6629
+--- /dev/null
++++ b/src/courseware/sequence/bookmark/BookmarkButton.jsx
+@@ -0,0 +1,54 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { StatefulButton } from '@edx/paragon';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++import BookmarkOutlineIcon from './BookmarkOutlineIcon';
++import BookmarkFilledIcon from './BookmarkFilledIcon';
++
++const addBookmarkLabel = (
++  <FormattedMessage
++    id="unit.bookmark.button.add.bookmark"
++    defaultMessage="Bookmark this page"
++    description="The button to bookmark a page"
++  />
++);
++
++const hasBookmarkLabel = (
++  <FormattedMessage
++    id="unit.bookmark.button.remove.bookmark"
++    defaultMessage="Bookmarked"
++    description="The button to show a page is bookmarked and the button to remove that bookmark"
++  />
++);
++
++export default function BookmarkButton({ onClick, isBookmarked, isProcessing }) {
++  const bookmarkState = isBookmarked ? 'bookmarked' : 'default';
++  const state = isProcessing ? `${bookmarkState}Processing` : bookmarkState;
++
++  return (
++    <StatefulButton
++      className="btn-link px-1 ml-n1"
++      onClick={onClick}
++      state={state}
++      disabledStates={['defaultProcessing', 'bookmarkedProcessing']}
++      labels={{
++        default: addBookmarkLabel,
++        defaultProcessing: addBookmarkLabel,
++        bookmarked: hasBookmarkLabel,
++        bookmarkedProcessing: hasBookmarkLabel,
++      }}
++      icons={{
++        default: <BookmarkOutlineIcon className="text-primary" />,
++        defaultProcessing: <BookmarkOutlineIcon className="text-primary" />,
++        bookmarked: <BookmarkFilledIcon className="text-primary" />,
++        bookmarkedProcessing: <BookmarkFilledIcon className="text-primary" />,
++      }}
++    />
++  );
++}
++
++BookmarkButton.propTypes = {
++  onClick: PropTypes.func.isRequired,
++  isBookmarked: PropTypes.bool.isRequired,
++  isProcessing: PropTypes.bool.isRequired,
++};
+diff --git a/src/courseware/sequence/bookmark/BookmarkFilledIcon.jsx b/src/courseware/sequence/bookmark/BookmarkFilledIcon.jsx
+new file mode 100644
+index 0000000..cb2a661
+--- /dev/null
++++ b/src/courseware/sequence/bookmark/BookmarkFilledIcon.jsx
+@@ -0,0 +1,7 @@
++import React from 'react';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faBookmark } from '@fortawesome/free-solid-svg-icons';
++
++export default function BookmarkFilledIcon(props) {
++  return <FontAwesomeIcon icon={faBookmark} {...props} />;
++}
+diff --git a/src/courseware/sequence/bookmark/BookmarkOutlineIcon.jsx b/src/courseware/sequence/bookmark/BookmarkOutlineIcon.jsx
+new file mode 100644
+index 0000000..eed786a
+--- /dev/null
++++ b/src/courseware/sequence/bookmark/BookmarkOutlineIcon.jsx
+@@ -0,0 +1,7 @@
++import React from 'react';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faBookmark } from '@fortawesome/free-regular-svg-icons';
++
++export default function BookmarkOutlineIcon(props) {
++  return <FontAwesomeIcon icon={faBookmark} {...props} />;
++}
+diff --git a/src/data/course-blocks/api.js b/src/data/course-blocks/api.js
+new file mode 100644
+index 0000000..1a8a7fc
+--- /dev/null
++++ b/src/data/course-blocks/api.js
+@@ -0,0 +1,109 @@
++import { getConfig, camelCaseObject } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
++
++export async function getCourseBlocks(courseUsageKey) {
++  const { username } = getAuthenticatedUser();
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
++  url.searchParams.append('course_id', courseUsageKey);
++  url.searchParams.append('username', username);
++  url.searchParams.append('depth', 3);
++  url.searchParams.append('requested_fields', 'children,show_gated_sections');
++
++  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
++  // Camelcase block objects (leave blockId keys alone)
++  const blocks = Object.entries(data.blocks).reduce((acc, [key, value]) => {
++    acc[key] = camelCaseObject(value);
++    return acc;
++  }, {});
++
++  // Next go through the blocksList again - now that we've added them all to the blocks map - and
++  // append a parent ID to every child found in every `children` list, using the blocks map to find
++  // them.
++  Object.values(blocks).forEach((block) => {
++    if (Array.isArray(block.children)) {
++      const parentId = block.id;
++      block.children.forEach((childBlockId) => {
++        blocks[childBlockId].parentId = parentId;
++      });
++    }
++  });
++
++  const processedData = camelCaseObject(data);
++  processedData.blocks = blocks;
++
++  return processedData;
++}
++
++export async function getSequenceMetadata(sequenceId) {
++  const { data } = await getAuthenticatedHttpClient()
++    .get(`${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceId}`, {});
++  const camelCasedData = camelCaseObject(data);
++
++  camelCasedData.items = camelCasedData.items.map((item) => {
++    const processedItem = camelCaseObject(item);
++    processedItem.contentType = processedItem.type;
++    delete processedItem.type;
++    return processedItem;
++  });
++
++  // Position comes back from the server 1-indexed. Adjust here.
++  camelCasedData.position = camelCasedData.position ? camelCasedData.position - 1 : 0;
++
++  return camelCasedData;
++}
++
++const getSequenceXModuleHandlerUrl = (courseUsageKey, sequenceId) => `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/xblock/${sequenceId}/handler/xmodule_handler`;
++
++export async function updateSequencePosition(courseUsageKey, sequenceId, position) {
++  // Post data sent to this endpoint must be url encoded
++  // TODO: Remove the need for this to be the case.
++  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
++  const urlEncoded = new URLSearchParams();
++  // Position is 1-indexed on the server and 0-indexed in this app. Adjust here.
++  urlEncoded.append('position', position + 1);
++  const requestConfig = {
++    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
++  };
++
++  const { data } = await getAuthenticatedHttpClient().post(
++    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/goto_position`,
++    urlEncoded.toString(),
++    requestConfig,
++  );
++
++  return data;
++}
++
++export async function getBlockCompletion(courseUsageKey, sequenceId, usageKey) {
++  // Post data sent to this endpoint must be url encoded
++  // TODO: Remove the need for this to be the case.
++  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
++  const urlEncoded = new URLSearchParams();
++  urlEncoded.append('usage_key', usageKey);
++  const requestConfig = {
++    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
++  };
++
++  const { data } = await getAuthenticatedHttpClient().post(
++    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/get_completion`,
++    urlEncoded.toString(),
++    requestConfig,
++  );
++
++  if (data.complete) {
++    return true;
++  }
++
++  return false;
++}
++
++const bookmarksBaseUrl = `${getConfig().LMS_BASE_URL}/api/bookmarks/v1/bookmarks/`;
++
++export async function createBookmark(usageId) {
++  return getAuthenticatedHttpClient().post(bookmarksBaseUrl, { usage_id: usageId });
++}
++
++export async function deleteBookmark(usageId) {
++  const { username } = getAuthenticatedUser();
++  return getAuthenticatedHttpClient().delete(`${bookmarksBaseUrl}${username},${usageId}/`);
++}
+diff --git a/src/data/course-blocks/slice.js b/src/data/course-blocks/slice.js
+new file mode 100644
+index 0000000..2f72a01
+--- /dev/null
++++ b/src/data/course-blocks/slice.js
+@@ -0,0 +1,134 @@
++/* eslint-disable no-param-reassign */
++import { createSlice } from '@reduxjs/toolkit';
++
++const blocksSlice = createSlice({
++  name: 'blocks',
++  initialState: {
++    fetchState: null,
++    root: null,
++    blocks: {},
++  },
++  reducers: {
++    /**
++     * fetchCourseBlocks
++     * This routine is responsible for fetching all blocks in a course.
++     */
++    fetchCourseBlocksRequest: (draftState) => {
++      draftState.fetchState = 'loading';
++    },
++    fetchCourseBlocksSuccess: (draftState, { payload }) => ({
++      ...payload,
++      fetchState: 'loaded',
++      loaded: true,
++    }),
++    fetchCourseBlocksFailure: (draftState) => {
++      draftState.fetchState = 'failed';
++    },
++
++    /**
++     * fetchBlockMetadata
++     * This routine is responsible for fetching metadata for any kind of
++     * block (sequential, vertical or any other block) and merging that
++     * data with what is in the store. Currently used for:
++     *
++     *  - fetchSequenceMetadata
++     *  - checkBlockCompletion (Vertical blocks)
++     */
++    fetchBlockMetadataRequest: (draftState, action) => {
++      const { blockId } = action.payload;
++      if (!draftState.blocks[blockId]) {
++        draftState.blocks[blockId] = {};
++      }
++      draftState.blocks[blockId].fetchState = 'loading';
++    },
++    fetchBlockMetadataSuccess: (draftState, action) => {
++      const { blockId, metadata, relatedBlocksMetadata } = action.payload;
++      if (!draftState.blocks[blockId]) {
++        draftState.blocks[blockId] = {};
++      }
++      draftState.blocks[blockId] = {
++        ...draftState.blocks[blockId],
++        ...metadata,
++        fetchState: 'loaded',
++        loaded: true,
++      };
++      if (relatedBlocksMetadata) {
++        relatedBlocksMetadata.forEach((blockMetadata) => {
++          if (draftState.blocks[blockMetadata.id] === undefined) {
++            draftState.blocks[blockMetadata.id] = {};
++          }
++          draftState.blocks[blockMetadata.id] = {
++            ...draftState.blocks[blockMetadata.id],
++            ...blockMetadata,
++          };
++        });
++      }
++    },
++    fetchBlockMetadataFailure: (draftState, action) => {
++      const { blockId } = action.payload;
++      if (!draftState.blocks[blockId]) {
++        draftState.blocks[blockId] = {};
++      }
++      draftState.blocks[blockId].fetchState = 'failure';
++    },
++
++    /**
++     * updateBlock
++     * This routine is responsible for CRUD operations on block properties.
++     * Updates to blocks are handled in an optimistic way – applying the update
++     * to the store at request time and then reverting it if the update fails.
++     *
++     * TODO: It may be helpful to add a flag to be optimistic or not.
++     *
++     * The update state of a property is added to the block in the store with
++     * a dynamic property name: ${propertyToUpdate}UpdateState.
++     * (e.g. bookmarkedUpdateState)
++     *
++     * Used in:
++     *  - saveSequencePosition
++     *  - addBookmark
++     *  - removeBookmark
++     */
++    updateBlockRequest: (draftState, action) => {
++      const { blockId, propertyToUpdate, updateValue } = action.payload;
++      const updateStateKey = `${propertyToUpdate}UpdateState`;
++      if (!draftState.blocks[blockId]) {
++        draftState.blocks[blockId] = {};
++      }
++      draftState.blocks[blockId][updateStateKey] = 'loading';
++      draftState.blocks[blockId][propertyToUpdate] = updateValue;
++    },
++    updateBlockSuccess: (draftState, action) => {
++      const { blockId, propertyToUpdate, updateValue } = action.payload;
++      const updateStateKey = `${propertyToUpdate}UpdateState`;
++      if (!draftState.blocks[blockId]) {
++        draftState.blocks[blockId] = {};
++      }
++      draftState.blocks[blockId][updateStateKey] = 'updated';
++      draftState.blocks[blockId][propertyToUpdate] = updateValue;
++    },
++    updateBlockFailure: (draftState, action) => {
++      const { blockId, propertyToUpdate, initialValue } = action.payload;
++      const updateStateKey = `${propertyToUpdate}UpdateState`;
++      if (!draftState.blocks[blockId]) {
++        draftState.blocks[blockId] = {};
++      }
++      draftState.blocks[blockId][updateStateKey] = 'failed';
++      draftState.blocks[blockId][propertyToUpdate] = initialValue;
++    },
++  },
++});
++
++export const {
++  fetchCourseBlocksRequest,
++  fetchCourseBlocksSuccess,
++  fetchCourseBlocksFailure,
++  fetchBlockMetadataRequest,
++  fetchBlockMetadataSuccess,
++  fetchBlockMetadataFailure,
++  updateBlockRequest,
++  updateBlockSuccess,
++  updateBlockFailure,
++} = blocksSlice.actions;
++
++export const { reducer } = blocksSlice;
+diff --git a/src/data/course-blocks/thunks.js b/src/data/course-blocks/thunks.js
+new file mode 100644
+index 0000000..57c8538
+--- /dev/null
++++ b/src/data/course-blocks/thunks.js
+@@ -0,0 +1,124 @@
++import {
++  fetchCourseBlocksRequest,
++  fetchCourseBlocksSuccess,
++  fetchCourseBlocksFailure,
++  fetchBlockMetadataRequest,
++  fetchBlockMetadataSuccess,
++  fetchBlockMetadataFailure,
++  updateBlockRequest,
++  updateBlockSuccess,
++  updateBlockFailure,
++} from './slice';
++import {
++  getCourseBlocks,
++  getSequenceMetadata,
++  getBlockCompletion,
++  updateSequencePosition,
++  createBookmark,
++  deleteBookmark,
++} from './api';
++
++export function fetchCourseBlocks(courseUsageKey) {
++  return async (dispatch) => {
++    dispatch(fetchCourseBlocksRequest(courseUsageKey));
++    try {
++      const courseBlocks = await getCourseBlocks(courseUsageKey);
++      dispatch(fetchCourseBlocksSuccess(courseBlocks));
++    } catch (error) {
++      dispatch(fetchCourseBlocksFailure(error));
++    }
++  };
++}
++
++export function fetchSequenceMetadata(sequenceBlockId) {
++  return async (dispatch) => {
++    dispatch(fetchBlockMetadataRequest({ blockId: sequenceBlockId }));
++    try {
++      const sequenceMetadata = await getSequenceMetadata(sequenceBlockId);
++      dispatch(fetchBlockMetadataSuccess({
++        blockId: sequenceBlockId,
++        metadata: sequenceMetadata,
++        relatedBlocksMetadata: sequenceMetadata.items,
++      }));
++    } catch (error) {
++      dispatch(fetchBlockMetadataFailure({ blockId: sequenceBlockId }, error));
++    }
++  };
++}
++
++export function checkBlockCompletion(courseUsageKey, sequenceId, unitId) {
++  return async (dispatch, getState) => {
++    const { courseBlocks } = getState();
++    if (courseBlocks.blocks[unitId].complete) {
++      return; // do nothing. Things don't get uncompleted after they are completed.
++    }
++    const commonPayload = { blockId: unitId, fetchType: 'completion' };
++    dispatch(fetchBlockMetadataRequest(commonPayload));
++    try {
++      const isComplete = await getBlockCompletion(courseUsageKey, sequenceId, unitId);
++      dispatch(fetchBlockMetadataSuccess({
++        ...commonPayload,
++        metadata: {
++          complete: isComplete,
++        },
++      }));
++    } catch (error) {
++      dispatch(fetchBlockMetadataFailure(commonPayload, error));
++    }
++  };
++}
++
++export function saveSequencePosition(courseUsageKey, sequenceId, position) {
++  return async (dispatch, getState) => {
++    const { courseBlocks } = getState();
++    const actionPayload = {
++      blockId: sequenceId,
++      propertyToUpdate: 'position',
++      updateValue: position,
++      initialValue: courseBlocks.blocks[sequenceId].position,
++    };
++    dispatch(updateBlockRequest(actionPayload));
++    try {
++      await updateSequencePosition(courseUsageKey, sequenceId, position);
++      dispatch(updateBlockSuccess(actionPayload));
++    } catch (error) {
++      dispatch(updateBlockFailure(actionPayload));
++    }
++  };
++}
++
++export function addBookmark(unitId) {
++  return async (dispatch) => {
++    const actionPayload = {
++      blockId: unitId,
++      propertyToUpdate: 'bookmarked',
++      updateValue: true,
++      initialValue: false,
++    };
++    dispatch(updateBlockRequest(actionPayload));
++    try {
++      await createBookmark(unitId);
++      dispatch(updateBlockSuccess(actionPayload));
++    } catch (error) {
++      dispatch(updateBlockFailure(actionPayload));
++    }
++  };
++}
++
++export function removeBookmark(unitId) {
++  return async (dispatch) => {
++    const actionPayload = {
++      blockId: unitId,
++      propertyToUpdate: 'bookmarked',
++      updateValue: false,
++      initialValue: true,
++    };
++    dispatch(updateBlockRequest(actionPayload));
++    try {
++      await deleteBookmark(unitId);
++      dispatch(updateBlockSuccess(actionPayload));
++    } catch (error) {
++      dispatch(updateBlockFailure(actionPayload));
++    }
++  };
++}
+diff --git a/src/data/course-meta/api.js b/src/data/course-meta/api.js
+new file mode 100644
+index 0000000..3f6ec42
+--- /dev/null
++++ b/src/data/course-meta/api.js
+@@ -0,0 +1,57 @@
++import { getConfig, camelCaseObject } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
++
++export async function getCourseBlocks(courseUsageKey) {
++  const { username } = getAuthenticatedUser();
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
++  url.searchParams.append('course_id', courseUsageKey);
++  url.searchParams.append('username', username);
++  url.searchParams.append('depth', 3);
++  url.searchParams.append('requested_fields', 'children,show_gated_sections');
++
++  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
++  // Camelcase block objects (leave blockId keys alone)
++  const blocks = Object.entries(data.blocks).reduce((acc, [key, value]) => {
++    acc[key] = camelCaseObject(value);
++    return acc;
++  }, {});
++
++  // Next go through the blocksList again - now that we've added them all to the blocks map - and
++  // append a parent ID to every child found in every `children` list, using the blocks map to find
++  // them.
++  Object.values(blocks).forEach((block) => {
++    if (Array.isArray(block.children)) {
++      const parentId = block.id;
++      block.children.forEach((childBlockId) => {
++        blocks[childBlockId].parentId = parentId;
++      });
++    }
++  });
++
++  const processedData = camelCaseObject(data);
++  processedData.blocks = blocks;
++
++  return processedData;
++}
++
++export async function getCourseMetadata(courseUsageKey) {
++  const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseUsageKey}`;
++  const { data } = await getAuthenticatedHttpClient().get(url);
++  const processedData = camelCaseObject(data);
++  return processedData;
++}
++
++export async function getSequenceMetadata(sequenceId) {
++  const { data } = await getAuthenticatedHttpClient()
++    .get(`${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceId}`, {});
++  const camelCasedData = camelCaseObject(data);
++
++  camelCasedData.items = camelCasedData.items.map((item) => {
++    const processedItem = camelCaseObject(item);
++    processedItem.contentType = processedItem.type;
++    delete processedItem.type;
++    return processedItem;
++  });
++
++  return camelCasedData;
++}
+diff --git a/src/data/course-meta/slice.js b/src/data/course-meta/slice.js
+new file mode 100644
+index 0000000..79b138b
+--- /dev/null
++++ b/src/data/course-meta/slice.js
+@@ -0,0 +1,32 @@
++/* eslint-disable no-param-reassign */
++import { createSlice } from '@reduxjs/toolkit';
++
++const courseMetaSlice = createSlice({
++  name: 'course-meta',
++  initialState: {
++    fetchState: null,
++  },
++  reducers: {
++    fetchCourseMetadataRequest: (draftState) => {
++      draftState.fetchState = 'loading';
++    },
++    fetchCourseMetadataSuccess: (draftState, { payload }) => ({
++      fetchState: 'loaded',
++      name: payload.name,
++      number: payload.number,
++      org: payload.org,
++      tabs: payload.tabs,
++    }),
++    fetchCourseMetadataFailure: (draftState) => {
++      draftState.fetchState = 'failed';
++    },
++  },
++});
++
++export const {
++  fetchCourseMetadataRequest,
++  fetchCourseMetadataSuccess,
++  fetchCourseMetadataFailure,
++} = courseMetaSlice.actions;
++
++export const { reducer } = courseMetaSlice;
+diff --git a/src/data/course-meta/thunks.js b/src/data/course-meta/thunks.js
+new file mode 100644
+index 0000000..6301e4e
+--- /dev/null
++++ b/src/data/course-meta/thunks.js
+@@ -0,0 +1,21 @@
++/* eslint-disable import/prefer-default-export */
++import {
++  fetchCourseMetadataRequest,
++  fetchCourseMetadataSuccess,
++  fetchCourseMetadataFailure,
++} from './slice';
++import {
++  getCourseMetadata,
++} from './api';
++
++export function fetchCourseMetadata(courseUsageKey) {
++  return async (dispatch) => {
++    dispatch(fetchCourseMetadataRequest({ courseUsageKey }));
++    try {
++      const courseMetadata = await getCourseMetadata(courseUsageKey);
++      dispatch(fetchCourseMetadataSuccess(courseMetadata));
++    } catch (error) {
++      dispatch(fetchCourseMetadataFailure(error));
++    }
++  };
++}
+diff --git a/src/index.jsx b/src/index.jsx
+index 6591da1..41ce2dd 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -19,6 +19,8 @@ import './index.scss';
+ import './assets/favicon.ico';
+ import CourseContainer from './courseware/CourseContainer';
+ 
++import store from './store';
++
+ function courseLinks() {
+   return (
+     <main className="m-3">
+@@ -32,7 +34,7 @@ function courseLinks() {
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+-    <AppProvider>
++    <AppProvider store={store}>
+       <UserMessagesProvider>
+         <Switch>
+           <Route exact path="/" render={courseLinks} />
+diff --git a/src/index.scss b/src/index.scss
+index 04c5dce..608ed57 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -1,7 +1,5 @@
+ @import '~@edx/paragon/scss/edx/theme.scss';
+ 
+-@import './courseware/index';
+-
+ @import "~@edx/frontend-component-header/dist/index";
+ @import "~@edx/frontend-component-footer/dist/footer";
+ 
+diff --git a/src/store.js b/src/store.js
+new file mode 100644
+index 0000000..0f7dd26
+--- /dev/null
++++ b/src/store.js
+@@ -0,0 +1,12 @@
++import { configureStore } from '@reduxjs/toolkit';
++import { reducer as courseReducer } from './data/course-meta/slice';
++import { reducer as courseBlocksReducer } from './data/course-blocks/slice';
++
++const store = configureStore({
++  reducer: {
++    courseMeta: courseReducer,
++    courseBlocks: courseBlocksReducer,
++  },
++});
++
++export default store;
+-- 
+2.34.1
+

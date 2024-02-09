@@ -1,0 +1,38 @@
+From 36f8dd81cdd1b8194500a8c69d520f95f2cac7e7 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Tue, 6 Oct 2020 11:57:18 -0700
+Subject: [PATCH 0274/1021] Quick fix to add slice to other routes using
+ TabContainer (#235)
+
+---
+ src/index.jsx | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/index.jsx b/src/index.jsx
+index de7b7bc..3d43420 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -37,17 +37,17 @@ subscribe(APP_READY, () => {
+         <Switch>
+           <Route path="/redirect" component={CoursewareRedirectLandingPage} />
+           <Route path="/course/:courseId/home">
+-            <TabContainer tab="outline" fetch={fetchOutlineTab}>
++            <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
+               <OutlineTab />
+             </TabContainer>
+           </Route>
+           <Route path="/course/:courseId/dates">
+-            <TabContainer tab="dates" fetch={fetchDatesTab}>
++            <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
+               <DatesTab />
+             </TabContainer>
+           </Route>
+           <Route path="/course/:courseId/progress">
+-            <TabContainer tab="progress" fetch={fetchProgressTab}>
++            <TabContainer tab="progress" fetch={fetchProgressTab} slice="courseHome">
+               <ProgressTab />
+             </TabContainer>
+           </Route>
+-- 
+2.34.1
+

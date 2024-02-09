@@ -1,0 +1,208 @@
+From b98a87c1f57d346e3c256f121e9d472dc4650370 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 3 Dec 2020 12:44:52 -0500
+Subject: [PATCH 0313/1021] AA-476: Send org_key with tracking events (#286)
+
+Also convert the course tool click event from accidentally being
+a segment event into a log event, like it is on the LMS.
+---
+ src/course-home/outline-tab/widgets/CourseTools.jsx  |  9 ++++++---
+ .../course/celebration/CelebrationModal.jsx          |  5 ++++-
+ src/courseware/course/celebration/utils.jsx          |  6 ++++--
+ .../course/course-exit/CourseCelebration.jsx         |  3 ++-
+ .../course/course-exit/CourseNonPassing.jsx          |  4 ++--
+ src/courseware/course/course-exit/utils.js           | 12 +++++++-----
+ src/courseware/social-share/SocialIcons.jsx          |  5 ++++-
+ 7 files changed, 29 insertions(+), 15 deletions(-)
+
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 66ea020..2012dab 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+@@ -14,6 +14,7 @@ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+ function CourseTools({ courseId, intl }) {
++  const { org } = useModel('courses', courseId);
+   const {
+     courseTools,
+   } = useModel('outline', courseId);
+@@ -24,8 +25,10 @@ function CourseTools({ courseId, intl }) {
+ 
+   const logClick = (analyticsId) => {
+     const { administrator } = getAuthenticatedUser();
+-    sendTrackEvent('edx.course.tool.accessed', {
+-      course_id: courseId,
++    sendTrackingLogEvent('edx.course.tool.accessed', {
++      org_key: org,
++      courserun_key: courseId,
++      course_id: courseId, // should only be courserun_key, but left as-is for historical reasons
+       is_staff: administrator,
+       tool_name: analyticsId,
+     });
+diff --git a/src/courseware/course/celebration/CelebrationModal.jsx b/src/courseware/course/celebration/CelebrationModal.jsx
+index 927cbda..309a9cb 100644
+--- a/src/courseware/course/celebration/CelebrationModal.jsx
++++ b/src/courseware/course/celebration/CelebrationModal.jsx
+@@ -9,10 +9,13 @@ import ClapsTablet from './assets/claps_456x328.gif';
+ import messages from './messages';
+ import SocialIcons from '../../social-share/SocialIcons';
+ import { recordFirstSectionCelebration } from './utils';
++import { useModel } from '../../../generic/model-store';
+ 
+ function CelebrationModal({
+   courseId, intl, open, ...rest
+ }) {
++  const { org } = useModel('courses', courseId);
++
+   const layout = layoutGenerator({
+     mobile: 0,
+     tablet: 400,
+@@ -23,7 +26,7 @@ function CelebrationModal({
+ 
+   useEffect(() => {
+     if (open) {
+-      recordFirstSectionCelebration(courseId);
++      recordFirstSectionCelebration(org, courseId);
+     }
+   }, [open]);
+ 
+diff --git a/src/courseware/course/celebration/utils.jsx b/src/courseware/course/celebration/utils.jsx
+index 9fdebf3..295f947 100644
+--- a/src/courseware/course/celebration/utils.jsx
++++ b/src/courseware/course/celebration/utils.jsx
+@@ -16,14 +16,16 @@ function handleNextSectionCelebration(sequenceId, nextSequenceId, nextUnitId) {
+   });
+ }
+ 
+-function recordFirstSectionCelebration(courseId) {
++function recordFirstSectionCelebration(org, courseId) {
+   // Tell the LMS
+   postFirstSectionCelebrationComplete(courseId);
+ 
+   // Tell our analytics
+   const { administrator } = getAuthenticatedUser();
+   sendTrackEvent('edx.ui.lms.celebration.first_section.opened', {
+-    course_id: courseId,
++    org_key: org,
++    courserun_key: courseId,
++    course_id: courseId, // should only be courserun_key, but left as-is for historical reasons
+     is_staff: administrator,
+   });
+ }
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 5be1162..7ec8815 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -41,6 +41,7 @@ function CourseCelebration({ intl }) {
+     certificateData,
+     end,
+     linkedinAddToProfileUrl,
++    org,
+     relatedPrograms,
+     verifiedMode,
+     verifyIdentityUrl,
+@@ -218,7 +219,7 @@ function CourseCelebration({ intl }) {
+       break;
+   }
+ 
+-  useEffect(() => logVisit(courseId, administrator, visitEvent), [courseId, administrator, visitEvent]);
++  useEffect(() => logVisit(org, courseId, administrator, visitEvent), [org, courseId, administrator, visitEvent]);
+ 
+   return (
+     <>
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index dd63b33..3de29b6 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -15,14 +15,14 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseNonPassing({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { tabs } = useModel('courses', courseId);
++  const { org, tabs } = useModel('courses', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get progress tab link for 'view grades' button
+   const progressTab = tabs.find(tab => tab.slug === 'progress');
+   const progressLink = progressTab && progressTab.url;
+ 
+-  useEffect(() => logVisit(courseId, administrator, 'nonpassing'), [courseId, administrator]);
++  useEffect(() => logVisit(org, courseId, administrator, 'nonpassing'), [org, courseId, administrator]);
+ 
+   return (
+     <>
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index ba8f7cb..d76b05b 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -72,27 +72,29 @@ function getCourseExitText(courseId, intl) {
+ 
+ // Meant to be used as part of a button's onClick handler.
+ // For convenience, you can pass a falsy event and it will be ignored.
+-const logClick = (courseId, administrator, event) => {
++const logClick = (org, courseId, administrator, event) => {
+   if (!event) {
+     return;
+   }
+ 
+   sendTrackEvent(`edx.ui.lms.course_exit.${event}.clicked`, {
+-    course_id: courseId,
++    org_key: org,
++    courserun_key: courseId,
+     is_staff: administrator,
+   });
+ };
+ 
+ // Use like the following to call this only once on initial page load:
+-// useEffect(() => logVisit(courseId, administrator, variant), [courseId, administrator, variant]);
++// useEffect(() => logVisit(org, courseId, administrator, variant), [org, courseId, administrator, variant]);
+ // For convenience, you can pass a falsy variant and it will be ignored.
+-const logVisit = (courseId, administrator, variant) => {
++const logVisit = (org, courseId, administrator, variant) => {
+   if (!variant) {
+     return;
+   }
+ 
+   sendTrackEvent('edx.ui.lms.course_exit.visited', {
+-    course_id: courseId,
++    org_key: org,
++    courserun_key: courseId,
+     is_staff: administrator,
+     variant,
+   });
+diff --git a/src/courseware/social-share/SocialIcons.jsx b/src/courseware/social-share/SocialIcons.jsx
+index 72ebdd2..2ea7f22 100644
+--- a/src/courseware/social-share/SocialIcons.jsx
++++ b/src/courseware/social-share/SocialIcons.jsx
+@@ -31,6 +31,7 @@ function SocialIcons({
+ }) {
+   const {
+     marketingUrl,
++    org,
+     title,
+   } = useModel('courses', courseId);
+ 
+@@ -48,7 +49,9 @@ function SocialIcons({
+ 
+     const { administrator } = getAuthenticatedUser();
+     sendTrackEvent(analyticsId, {
+-      course_id: courseId,
++      org_key: org,
++      courserun_key: courseId,
++      course_id: courseId, // should only be courserun_key, but left as-is for historical reasons
+       is_staff: administrator,
+       service,
+     });
+-- 
+2.34.1
+

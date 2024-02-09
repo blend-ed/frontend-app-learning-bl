@@ -1,0 +1,376 @@
+From 253836fa9fbe9d62f36ae119fbac62cddf2f9a44 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <ciduarte@wpi.edu>
+Date: Mon, 15 Jun 2020 15:19:13 -0400
+Subject: [PATCH 0138/1021] AA-181: Outline Tab Refactor (#80)
+
+- Updated the Outline Tab to fetch course blocks from the Outline API.
+- Changed naming conventions to more accurately portray the tab naming scheme
+(ex. Outline Tab, Dates Tab, etc.)
+- Removed logic from `fetchCourses` that was specific to the Outline Tab
+---
+ src/course-home/Section.jsx                   | 14 +++++---
+ src/course-home/SequenceLink.jsx              |  7 ++--
+ src/course-home/index.js                      |  2 +-
+ .../OutlineTab.jsx}                           | 30 ++++++++++------
+ src/data/api.js                               | 35 ++++++++++++-------
+ src/data/index.js                             |  1 +
+ src/data/thunks.js                            | 30 ++++++----------
+ src/dates-tab/fakeData.js                     |  4 +--
+ src/index.jsx                                 | 10 +++---
+ 9 files changed, 75 insertions(+), 58 deletions(-)
+ rename src/course-home/{CourseHome.jsx => outline-tab/OutlineTab.jsx} (72%)
+
+diff --git a/src/course-home/Section.jsx b/src/course-home/Section.jsx
+index 43d7f3f..b862623 100644
+--- a/src/course-home/Section.jsx
++++ b/src/course-home/Section.jsx
+@@ -6,9 +6,13 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import SequenceLink from './SequenceLink';
+ import { useModel } from '../model-store';
+ 
+-export default function Section({ id, courseId }) {
+-  const section = useModel('sections', id);
+-  const { title, sequenceIds } = section;
++export default function Section({ courseId, title, sequenceIds }) {
++  const {
++    courseBlocks: {
++      sequences,
++    },
++  } = useModel('outline', courseId);
++
+   return (
+     <Collapsible.Advanced className="collapsible-card mb-2">
+       <Collapsible.Trigger className="collapsible-trigger d-flex align-items-start">
+@@ -31,6 +35,7 @@ export default function Section({ id, courseId }) {
+             key={sequenceId}
+             id={sequenceId}
+             courseId={courseId}
++            title={sequences[sequenceId].title}
+           />
+         ))}
+       </Collapsible.Body>
+@@ -39,6 +44,7 @@ export default function Section({ id, courseId }) {
+ }
+ 
+ Section.propTypes = {
+-  id: PropTypes.string.isRequired,
+   courseId: PropTypes.string.isRequired,
++  title: PropTypes.string.isRequired,
++  sequenceIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+ };
+diff --git a/src/course-home/SequenceLink.jsx b/src/course-home/SequenceLink.jsx
+index b8a5fdb..73e72da 100644
+--- a/src/course-home/SequenceLink.jsx
++++ b/src/course-home/SequenceLink.jsx
+@@ -1,13 +1,11 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { Link } from 'react-router-dom';
+-import { useModel } from '../model-store';
+ 
+-export default function SequenceLink({ id, courseId }) {
+-  const sequence = useModel('sequences', id);
++export default function SequenceLink({ id, courseId, title }) {
+   return (
+     <div className="ml-4">
+-      <Link to={`/course/${courseId}/${id}`}>{sequence.title}</Link>
++      <Link to={`/course/${courseId}/${id}`}>{title}</Link>
+     </div>
+   );
+ }
+@@ -15,4 +13,5 @@ export default function SequenceLink({ id, courseId }) {
+ SequenceLink.propTypes = {
+   id: PropTypes.string.isRequired,
+   courseId: PropTypes.string.isRequired,
++  title: PropTypes.string.isRequired,
+ };
+diff --git a/src/course-home/index.js b/src/course-home/index.js
+index a5b1f5a..7893520 100644
+--- a/src/course-home/index.js
++++ b/src/course-home/index.js
+@@ -1 +1 @@
+-export { default } from './CourseHome';
++export { default } from './outline-tab/OutlineTab';
+diff --git a/src/course-home/CourseHome.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+similarity index 72%
+rename from src/course-home/CourseHome.jsx
+rename to src/course-home/outline-tab/OutlineTab.jsx
+index ce981c1..2be2a3d 100644
+--- a/src/course-home/CourseHome.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -2,21 +2,21 @@ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import { Button } from '@edx/paragon';
+ 
+-import { AlertList } from '../user-messages';
++import { AlertList } from '../../user-messages';
+ 
+-import CourseDates from './CourseDates';
+-import CourseTools from './CourseTools';
+-import Section from './Section';
+-import { useModel } from '../model-store';
++import CourseDates from '../CourseDates';
++import CourseTools from '../CourseTools';
++import Section from '../Section';
++import { useModel } from '../../model-store';
+ 
+ // Note that we import from the component files themselves in the enrollment-alert package.
+ // This is because React.lazy() requires that we import() from a file with a Component as its
+ // default export.
+ // See React.lazy docs here: https://reactjs.org/docs/code-splitting.html#reactlazy
+-const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../alerts/enrollment-alert'));
+-const LogistrationAlert = React.lazy(() => import('../alerts/logistration-alert'));
++const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../../alerts/enrollment-alert'));
++const LogistrationAlert = React.lazy(() => import('../../alerts/logistration-alert'));
+ 
+-export default function CourseHome() {
++export default function OutlineTab() {
+   const {
+     courseId,
+   } = useSelector(state => state.courseware);
+@@ -29,9 +29,18 @@ export default function CourseHome() {
+     enrollmentEnd,
+     enrollmentMode,
+     isEnrolled,
+-    sectionIds,
+   } = useModel('courses', courseId);
+ 
++  const {
++    courseBlocks: {
++      courses,
++      sections,
++    },
++  } = useModel('outline', courseId);
++
++  const rootCourseId = Object.keys(courses)[0];
++  const { sectionIds } = courses[rootCourseId];
++
+   return (
+     <>
+       <AlertList
+@@ -52,8 +61,9 @@ export default function CourseHome() {
+           {sectionIds.map((sectionId) => (
+             <Section
+               key={sectionId}
+-              id={sectionId}
+               courseId={courseId}
++              title={sections[sectionId].title}
++              sequenceIds={sections[sectionId].sequenceIds}
+             />
+           ))}
+         </div>
+diff --git a/src/data/api.js b/src/data/api.js
+index 9653caf..8fb6cf5 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -46,8 +46,8 @@ export async function getCourseMetadata(courseId) {
+   return normalizeMetadata(data);
+ }
+ 
+-export async function getTabData(courseId, tab, version) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/course_home/${version}/${tab}/${courseId}`;
++export async function getDatesTabData(courseId, version) {
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/${version}/dates/${courseId}`;
+   try {
+     const { data } = await getAuthenticatedHttpClient().get(url);
+     return camelCaseObject(data);
+@@ -63,17 +63,6 @@ export async function getTabData(courseId, tab, version) {
+   }
+ }
+ 
+-function normalizeOutlineTabData(courseId, courseToolData) {
+-  const courseTools = camelCaseObject(courseToolData);
+-  return { id: courseId, courseTools };
+-}
+-
+-export async function getOutlineTabData(courseId) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline/${courseId}`;
+-  const { data } = await getAuthenticatedHttpClient().get(url, {});
+-  return normalizeOutlineTabData(courseId, data.course_tools);
+-}
+-
+ function normalizeBlocks(courseId, blocks) {
+   const models = {
+     courses: {},
+@@ -161,6 +150,26 @@ export async function getCourseBlocks(courseId) {
+   return normalizeBlocks(courseId, data.blocks);
+ }
+ 
++export async function getOutlineTabData(courseId, version) {
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/${version}/outline/${courseId}`;
++  let { tabData } = {};
++  try {
++    tabData = await getAuthenticatedHttpClient().get(url);
++  } catch (error) {
++    const { httpErrorStatus } = error && error.customAttributes;
++    if (httpErrorStatus === 404) {
++      return window.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/home`);
++    }
++  }
++
++  const {
++    data,
++  } = tabData;
++  const courseBlocks = normalizeBlocks(courseId, data.course_blocks.blocks);
++  const courseTools = camelCaseObject(data.course_tools);
++
++  return { courseTools, courseBlocks };
++}
+ 
+ function normalizeSequenceMetadata(sequence) {
+   return {
+diff --git a/src/data/index.js b/src/data/index.js
+index 9317a00..b3cb86f 100644
+--- a/src/data/index.js
++++ b/src/data/index.js
+@@ -1,6 +1,7 @@
+ export {
+   fetchCourse,
+   fetchDatesTab,
++  fetchOutlineTab,
+   fetchSequence,
+ } from './thunks';
+ 
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index c2aa3e2..5139647 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -3,7 +3,7 @@ import {
+   getCourseMetadata,
+   getCourseBlocks,
+   getSequenceMetadata,
+-  getTabData,
++  getDatesTabData,
+   getOutlineTabData,
+ } from './api';
+ import {
+@@ -28,8 +28,7 @@ export function fetchCourse(courseId) {
+     Promise.allSettled([
+       getCourseMetadata(courseId),
+       getCourseBlocks(courseId),
+-      getOutlineTabData(courseId),
+-    ]).then(([courseMetadataResult, courseBlocksResult, outlineTabResult]) => {
++    ]).then(([courseMetadataResult, courseBlocksResult]) => {
+       if (courseMetadataResult.status === 'fulfilled') {
+         dispatch(addModel({
+           modelType: 'courses',
+@@ -62,16 +61,8 @@ export function fetchCourse(courseId) {
+         }));
+       }
+ 
+-      if (outlineTabResult.status === 'fulfilled') {
+-        dispatch(addModel({
+-          modelType: 'outline',
+-          model: outlineTabResult.value,
+-        }));
+-      }
+-
+       const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
+       const fetchedBlocks = courseBlocksResult.status === 'fulfilled';
+-      const fetchedOutline = outlineTabResult.status === 'fulfilled';
+ 
+       // Log errors for each request if needed. Course block failures may occur
+       // even if the course metadata request is successful
+@@ -81,18 +72,15 @@ export function fetchCourse(courseId) {
+       if (!fetchedMetadata) {
+         logError(courseMetadataResult.reason);
+       }
+-      if (!fetchedOutline) {
+-        logError(outlineTabResult.reason);
+-      }
+ 
+       if (fetchedMetadata) {
+-        if (courseMetadataResult.value.canLoadCourseware.hasAccess && fetchedBlocks && fetchedOutline) {
++        if (courseMetadataResult.value.canLoadCourseware.hasAccess && fetchedBlocks) {
+           // User has access
+           dispatch(fetchCourseSuccess({ courseId }));
+           return;
+         }
+         // User either doesn't have access or only has partial access
+-        // (can't access course blocks or course outline)
++        // (can't access course blocks)
+         dispatch(fetchCourseDenied({ courseId }));
+         return;
+       }
+@@ -103,12 +91,12 @@ export function fetchCourse(courseId) {
+   };
+ }
+ 
+-export function fetchTab(courseId, tab, version) {
++export function fetchTab(courseId, tab, version, getTabData) {
+   return async (dispatch) => {
+     dispatch(fetchTabRequest({ courseId }));
+     Promise.allSettled([
+       getCourseMetadata(courseId),
+-      getTabData(courseId, tab, version),
++      getTabData(courseId, version),
+     ]).then(([courseMetadataResult, tabDataResult]) => {
+       const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
+       const fetchedTabData = tabDataResult.status === 'fulfilled';
+@@ -149,7 +137,11 @@ export function fetchTab(courseId, tab, version) {
+ }
+ 
+ export function fetchDatesTab(courseId) {
+-  return fetchTab(courseId, 'dates', 'v1');
++  return fetchTab(courseId, 'dates', 'v1', getDatesTabData);
++}
++
++export function fetchOutlineTab(courseId) {
++  return fetchTab(courseId, 'outline', 'v1', getOutlineTabData);
+ }
+ 
+ export function fetchSequence(sequenceId) {
+diff --git a/src/dates-tab/fakeData.js b/src/dates-tab/fakeData.js
+index d8854c3..305d351 100644
+--- a/src/dates-tab/fakeData.js
++++ b/src/dates-tab/fakeData.js
+@@ -1,10 +1,10 @@
+ // Sample data helpful when developing, to see a variety of configurations.
+ // This set of data is not realistic (mix of having access and not), but it
+ // is intended to demonstrate many UI results.
+-// To use, have getTabData in api.js return the result of this call instead:
++// To use, have getDatesTabData in api.js return the result of this call instead:
+ /*
+ import fakeDatesData from '../dates-tab/fakeData';
+-export async function getTabData(courseId, tab, version) {
++export async function getDatesTabData(courseId, version) {
+   if (tab === 'dates') { return camelCaseObject(fakeDatesData()); }
+   ...
+ }
+diff --git a/src/index.jsx b/src/index.jsx
+index 3e73874..1eb6233 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -18,14 +18,14 @@ import { UserMessagesProvider } from './user-messages';
+ 
+ import './index.scss';
+ import './assets/favicon.ico';
+-import CourseHome from './course-home';
++import OutlineTab from './course-home';
+ import CoursewareContainer from './courseware';
+ import CoursewareRedirect from './CoursewareRedirect';
+ import DatesTab from './dates-tab';
+ import { TabContainer } from './tab-page';
+ 
+ import store from './store';
+-import { fetchCourse, fetchDatesTab } from './data';
++import { fetchDatesTab, fetchOutlineTab } from './data';
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+@@ -33,9 +33,9 @@ subscribe(APP_READY, () => {
+       <UserMessagesProvider>
+         <Switch>
+           <Route path="/redirect" component={CoursewareRedirect} />
+-          <Route path="/course/:courseId/home">
+-            <TabContainer tab="courseware" fetch={fetchCourse}>
+-              <CourseHome />
++          <Route path="/course/:courseId/outline">
++            <TabContainer tab="outline" fetch={fetchOutlineTab}>
++              <OutlineTab />
+             </TabContainer>
+           </Route>
+           <Route path="/course/:courseId/dates">
+-- 
+2.34.1
+

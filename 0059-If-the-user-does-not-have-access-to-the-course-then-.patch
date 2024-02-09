@@ -1,0 +1,57 @@
+From 2f90b7881492467de8eedcc254855fb02cb7c003 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Fri, 28 Feb 2020 12:25:03 -0500
+Subject: [PATCH 0059/1021] If the user does not have access to the course,
+ then redirect to the course outline. (#13)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* If the user does not have access to the course, then redirect to the course outline.
+
+In a subsequent PR, if this API call is made on the course outline page in the MFE, we’ll need to be able to prevent the redirect.  But that view of the MFE doesn’t exist yet.
+
+* Moving course outline redirect logic into CourseContainer.
+
+This way, depending on the page calling fetchCourseMetadata, we can make an intelligent choice about whether we want to redirect, show a message, etc.  By redirecting in the API call handler, then we took that choice away from ourselves.
+---
+ src/courseware/CourseContainer.jsx | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index 0fd3348..a3c7069 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ import { connect } from 'react-redux';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { history } from '@edx/frontend-platform';
++import { history, getConfig } from '@edx/frontend-platform';
+ import { fetchCourseMetadata } from '../data/course-meta/thunks';
+ import { fetchCourseBlocks } from '../data/course-blocks/thunks';
+ 
+@@ -41,6 +41,12 @@ function CourseContainer(props) {
+     }
+   }, [courseUsageKey, courseId, sequenceId]);
+ 
++  useEffect(() => {
++    if (metadataLoaded && !metadata.userHasAccess) {
++      global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/`);
++    }
++  }, [metadataLoaded]);
++
+   if (!courseId || !sequenceId) {
+     return (
+       <PageLoading
+@@ -75,6 +81,7 @@ CourseContainer.propTypes = {
+     org: PropTypes.string,
+     number: PropTypes.string,
+     name: PropTypes.string,
++    userHasAccess: PropTypes.bool,
+     tabs: PropTypes.arrayOf(PropTypes.shape({
+       priority: PropTypes.number,
+       slug: PropTypes.string,
+-- 
+2.34.1
+

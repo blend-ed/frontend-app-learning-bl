@@ -1,0 +1,5280 @@
+From b3d33667d4862856a63673690bbb919ff852f02c Mon Sep 17 00:00:00 2001
+From: Bilal Qamar <59555732+BilalQamar95@users.noreply.github.com>
+Date: Mon, 30 Jan 2023 22:20:07 +0500
+Subject: [PATCH 0984/1021] Updated frontend-build to v12 (#962)
+
+* feat: rebase previous frontend-build upgrade
+
+* chore: make welcome message to default to empty
+---
+ .eslintrc.js                                  |  6 +-
+ .../AccessExpirationAlert.jsx                 |  4 +-
+ .../AccessExpirationMasqueradeBanner.jsx      |  4 +-
+ src/alerts/access-expiration-alert/hooks.js   | 12 +--
+ .../ActiveEnterpriseAlert.jsx                 |  4 +-
+ src/alerts/active-enteprise-alert/hooks.js    |  6 +-
+ .../course-start-alert/CourseStartAlert.jsx   |  4 +-
+ .../CourseStartMasqueradeBanner.jsx           |  4 +-
+ src/alerts/course-start-alert/hooks.js        | 18 ++--
+ .../enrollment-alert/EnrollmentAlert.jsx      |  4 +-
+ src/alerts/enrollment-alert/clickHook.js      |  2 +-
+ src/alerts/enrollment-alert/hooks.js          |  6 +-
+ .../AccountActivationAlert.jsx                |  6 +-
+ .../logistration-alert/LogistrationAlert.jsx  |  4 +-
+ src/course-home/data/api.js                   |  2 +-
+ src/course-home/dates-tab/DatesTab.jsx        |  4 +-
+ src/course-home/dates-tab/timeline/Day.jsx    |  6 +-
+ .../dates-tab/timeline/Timeline.jsx           |  6 +-
+ .../discussion-tab/DiscussionTab.jsx          |  4 +-
+ .../goal-unsubscribe/GoalUnsubscribe.jsx      |  5 +-
+ .../goal-unsubscribe/ResultPage.jsx           |  4 +-
+ src/course-home/live-tab/LiveTab.jsx          |  4 +-
+ src/course-home/outline-tab/DateSummary.jsx   |  8 +-
+ .../outline-tab/LmsHtmlFragment.jsx           |  8 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |  4 +-
+ src/course-home/outline-tab/Section.jsx       |  7 +-
+ src/course-home/outline-tab/SequenceLink.jsx  |  6 +-
+ .../CertificateStatusAlert.jsx                |  4 +-
+ .../alerts/certificate-status-alert/hooks.js  |  7 +-
+ .../course-end-alert/CourseEndAlert.jsx       |  4 +-
+ .../alerts/course-end-alert/hooks.js          |  6 +-
+ .../PrivateCourseAlert.jsx                    |  4 +-
+ .../alerts/private-course-alert/hooks.js      |  6 +-
+ .../ScheduledCotentAlert.jsx                  |  4 +-
+ .../alerts/scheduled-content-alert/hooks.js   |  6 +-
+ .../outline-tab/widgets/CourseDates.jsx       |  6 +-
+ .../outline-tab/widgets/CourseHandouts.jsx    |  4 +-
+ .../outline-tab/widgets/CourseTools.jsx       |  4 +-
+ .../outline-tab/widgets/FlagButton.jsx        | 50 +++++-----
+ .../widgets/LearningGoalButton.jsx            |  6 +-
+ .../widgets/ProctoringInfoPanel.jsx           |  6 +-
+ .../widgets/StartOrResumeCourseCard.jsx       |  5 +-
+ .../widgets/WeeklyLearningGoalCard.jsx        | 11 ++-
+ .../outline-tab/widgets/WelcomeMessage.jsx    | 13 +--
+ .../progress-tab/ProgressHeader.jsx           |  4 +-
+ src/course-home/progress-tab/ProgressTab.jsx  |  4 +-
+ .../certificate-status/CertificateStatus.jsx  |  5 +-
+ .../CompleteDonutSegment.jsx                  |  8 +-
+ .../CompletionDonutChart.jsx                  |  4 +-
+ .../course-completion/CourseCompletion.jsx    | 30 +++---
+ .../IncompleteDonutSegment.jsx                |  8 +-
+ .../course-completion/LockedDonutSegment.jsx  |  4 +-
+ .../credit-information/CreditInformation.jsx  |  4 +-
+ .../grades/course-grade/CourseGrade.jsx       |  4 +-
+ .../grades/course-grade/CourseGradeFooter.jsx |  4 +-
+ .../grades/course-grade/CourseGradeHeader.jsx |  4 +-
+ .../course-grade/CurrentGradeTooltip.jsx      |  4 +-
+ .../grades/course-grade/GradeBar.jsx          |  4 +-
+ .../grades/course-grade/GradeRangeTooltip.jsx |  4 +-
+ .../course-grade/PassingGradeTooltip.jsx      |  4 +-
+ .../grades/detailed-grades/DetailedGrades.jsx |  4 +-
+ .../detailed-grades/DetailedGradesTable.jsx   |  4 +-
+ .../detailed-grades/ProblemScoreDrawer.jsx    |  4 +-
+ .../detailed-grades/SubsectionTitleCell.jsx   |  4 +-
+ .../grade-summary/AssignmentTypeCell.jsx      |  6 +-
+ .../DroppableAssignmentFootnote.jsx           |  4 +-
+ .../grades/grade-summary/GradeSummary.jsx     |  4 +-
+ .../grade-summary/GradeSummaryHeader.jsx      |  4 +-
+ .../grade-summary/GradeSummaryTable.jsx       | 39 ++++----
+ .../grade-summary/GradeSummaryTableFooter.jsx |  4 +-
+ .../related-links/RelatedLinks.jsx            |  4 +-
+ .../ShiftDatesAlert.jsx                       |  8 +-
+ .../SuggestedScheduleHeader.jsx               | 12 +--
+ .../UpgradeToCompleteAlert.jsx                |  4 +-
+ .../UpgradeToShiftDatesAlert.jsx              |  4 +-
+ src/course-tabs/CourseTabsNavigation.jsx      | 42 ++++----
+ src/courseware/CoursewareContainer.test.jsx   | 10 +-
+ .../CoursewareRedirectLandingPage.jsx         |  4 +-
+ src/courseware/course/Course.jsx              | 10 +-
+ src/courseware/course/CourseBreadcrumbs.jsx   | 14 +--
+ src/courseware/course/JumpNavMenuItem.jsx     |  8 +-
+ .../course/bookmark/BookmarkButton.jsx        |  9 +-
+ .../course/bookmark/BookmarkFilledIcon.jsx    |  6 +-
+ .../course/bookmark/BookmarkOutlineIcon.jsx   |  6 +-
+ .../course/celebration/CelebrationModal.jsx   |  7 +-
+ .../WeeklyGoalCelebrationModal.jsx            |  7 +-
+ .../course/content-tools/ContentTools.jsx     | 28 +++---
+ .../content-tools/ContentTools.test.jsx       |  8 +-
+ .../course/course-exit/CatalogSuggestion.jsx  |  4 +-
+ .../course/course-exit/CourseCelebration.jsx  |  4 +-
+ .../course/course-exit/CourseExit.jsx         |  4 +-
+ .../course/course-exit/CourseInProgress.jsx   |  4 +-
+ .../course/course-exit/CourseNonPassing.jsx   |  4 +-
+ .../course-exit/CourseRecommendations.jsx     | 12 ++-
+ .../course/course-exit/DashboardFootnote.jsx  |  4 +-
+ .../course/course-exit/Footnote.jsx           | 18 ++--
+ .../course/course-exit/ProgramCompletion.jsx  |  6 +-
+ .../course/course-exit/UpgradeFootnote.jsx    |  4 +-
+ src/courseware/course/course-exit/index.js    |  4 +-
+ src/courseware/course/course-exit/utils.js    |  4 +-
+ .../course/course-license/CourseLicense.jsx   |  6 +-
+ src/courseware/course/sequence/Sequence.jsx   |  6 +-
+ .../course/sequence/Sequence.test.jsx         | 27 +++---
+ .../course/sequence/SequenceContent.jsx       |  6 +-
+ src/courseware/course/sequence/Unit.jsx       |  6 +-
+ .../sequence/content-lock/ContentLock.jsx     |  8 +-
+ .../hidden-after-due/HiddenAfterDue.jsx       |  4 +-
+ .../course/sequence/honor-code/HonorCode.jsx  |  4 +-
+ .../sequence/lock-paywall/LockPaywall.jsx     |  6 +-
+ .../sequence-navigation/CompleteIcon.jsx      |  6 +-
+ .../SequenceNavigation.jsx                    | 10 +-
+ .../SequenceNavigationDropdown.jsx            | 62 ++++++------
+ .../SequenceNavigationTabs.jsx                |  8 +-
+ .../sequence-navigation/UnitButton.jsx        |  8 +-
+ .../sequence/sequence-navigation/UnitIcon.jsx |  6 +-
+ .../sequence-navigation/UnitNavigation.jsx    | 10 +-
+ .../UnitNavigationEffortEstimate.jsx          |  6 +-
+ src/courseware/course/share/ShareButton.jsx   |  4 +-
+ src/courseware/course/sidebar/Sidebar.jsx     |  4 +-
+ .../course/sidebar/SidebarContextProvider.jsx | 51 +++++-----
+ .../course/sidebar/SidebarTriggers.jsx        |  4 +-
+ .../course/sidebar/common/SidebarBase.jsx     |  7 +-
+ .../course/sidebar/common/TriggerBase.jsx     | 28 +++---
+ .../discussions/DiscussionsSidebar.jsx        |  4 +-
+ .../discussions/DiscussionsSidebar.test.jsx   |  1 +
+ .../discussions/DiscussionsTrigger.jsx        |  7 +-
+ .../discussions/DiscussionsTrigger.test.jsx   | 18 +++-
+ .../notifications/NotificationIcon.jsx        | 38 ++++----
+ .../notifications/NotificationTray.jsx        |  5 +-
+ .../notifications/NotificationTray.test.jsx   |  1 +
+ .../notifications/NotificationTrigger.jsx     |  6 +-
+ .../NotificationTrigger.test.jsx              | 18 +++-
+ src/courseware/social-share/SocialIcons.jsx   |  6 +-
+ src/generic/CourseAccessErrorPage.jsx         |  5 +-
+ src/generic/CourseAccessErrorPage.test.jsx    |  4 +-
+ src/generic/notices/NoticesProvider.jsx       |  1 +
+ src/generic/tabs/Tabs.jsx                     |  8 +-
+ .../tabs/useIndexOfLastVisibleChild.js        |  1 +
+ .../upgrade-button/FormattedPricing.jsx       |  4 +-
+ src/generic/upgrade-button/UpgradeButton.jsx  |  4 +-
+ .../upgrade-button/UpgradeNowButton.jsx       |  4 +-
+ .../UpgradeNotification.jsx                   | 95 +++++++++----------
+ src/generic/upsell-bullets/UpsellBullets.jsx  | 24 +++--
+ src/generic/user-messages/Alert.jsx           | 28 +++---
+ src/generic/user-messages/AlertList.jsx       |  8 +-
+ .../user-messages/UserMessagesProvider.jsx    | 14 ++-
+ src/generic/user-messages/hooks.js            |  1 +
+ src/i18n/messages/es_419.json                 | 16 ++--
+ src/instructor-toolbar/InstructorToolbar.jsx  |  7 +-
+ .../GenericTourFormattedMessages.jsx          | 48 ++++------
+ src/product-tours/ProductTours.jsx            | 15 +--
+ src/product-tours/ProductTours.test.jsx       | 11 +--
+ .../LaunchCourseHomeTourButton.jsx            |  5 +-
+ .../NewUserCourseHomeTourModal.jsx            | 94 +++++++++---------
+ src/setupTest.js                              | 22 ++---
+ src/shared/effort-estimate/EffortEstimate.jsx |  4 +-
+ src/shared/links.jsx                          | 28 +++---
+ .../StreakCelebrationModal.jsx                | 29 +++---
+ src/tab-page/LoadedTabPage.jsx                |  6 +-
+ src/tab-page/LoadedTabPage.test.jsx           | 16 +++-
+ src/tab-page/TabContainer.jsx                 |  7 +-
+ src/tab-page/TabContainer.test.jsx            |  4 +-
+ src/tab-page/TabPage.jsx                      |  4 +-
+ src/tab-page/TabPage.test.jsx                 |  4 +-
+ 164 files changed, 849 insertions(+), 800 deletions(-)
+
+diff --git a/.eslintrc.js b/.eslintrc.js
+index 8b13869..18330d5 100644
+--- a/.eslintrc.js
++++ b/.eslintrc.js
+@@ -1,3 +1,4 @@
++// eslint-disable-next-line import/no-extraneous-dependencies
+ const { createConfig } = require('@edx/frontend-build');
+ 
+ const config = createConfig('eslint', {
+@@ -5,14 +6,11 @@ const config = createConfig('eslint', {
+     // TODO: all these rules should be renabled/addressed. temporarily turned off to unblock a release.
+     'react-hooks/rules-of-hooks': 'off',
+     'react-hooks/exhaustive-deps': 'off',
+-    'react/function-component-definition': 'off',
+     'import/no-extraneous-dependencies': 'off',
+     'no-restricted-exports': 'off',
+     'react/jsx-no-useless-fragment': 'off',
+-    'react/jsx-no-bind': 'off',
+     'react/no-unknown-property': 'off',
+-    'react/no-unstable-nested-components': 'off',
+-    'react/jsx-no-constructed-context-values': 'off',
++    'func-names': 'off',
+   },
+ });
+ 
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index 0f47df9..9f71b6c 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -8,7 +8,7 @@ import { Info } from '@edx/paragon/icons';
+ 
+ import messages from './messages';
+ 
+-function AccessExpirationAlert({ intl, payload }) {
++const AccessExpirationAlert = ({ intl, payload }) => {
+   const {
+     accessExpiration,
+     courseId,
+@@ -116,7 +116,7 @@ function AccessExpirationAlert({ intl, payload }) {
+       {deadlineMessage}
+     </Alert>
+   );
+-}
++};
+ 
+ AccessExpirationAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx b/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
+index 2ad9b6d..c426615 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationMasqueradeBanner.jsx
+@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
+ import { FormattedMessage, FormattedDate } from '@edx/frontend-platform/i18n';
+ import { PageBanner } from '@edx/paragon';
+ 
+-function AccessExpirationMasqueradeBanner({ payload }) {
++const AccessExpirationMasqueradeBanner = ({ payload }) => {
+   const {
+     expirationDate,
+     userTimezone,
+@@ -27,7 +27,7 @@ function AccessExpirationMasqueradeBanner({ payload }) {
+       />
+     </PageBanner>
+   );
+-}
++};
+ 
+ AccessExpirationMasqueradeBanner.propTypes = {
+   payload: PropTypes.shape({
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+index 3dfebc6..2afdddd 100644
+--- a/src/alerts/access-expiration-alert/hooks.js
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -7,17 +7,17 @@ const AccessExpirationMasqueradeBanner = React.lazy(() => import('./AccessExpira
+ 
+ function useAccessExpirationAlert(accessExpiration, courseId, org, userTimezone, topic, analyticsPageName) {
+   const isVisible = accessExpiration && !accessExpiration.masqueradingExpiredCourse; // If it exists, show it.
+-  const payload = {
++  const payload = useMemo(() => ({
+     accessExpiration,
+     courseId,
+     org,
+     userTimezone,
+     analyticsPageName,
+-  };
++  }), [accessExpiration, analyticsPageName, courseId, org, userTimezone]);
+ 
+   useAlert(isVisible, {
+     code: 'clientAccessExpirationAlert',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic,
+   });
+ 
+@@ -34,14 +34,14 @@ export function useAccessExpirationMasqueradeBanner(courseId, tab) {
+ 
+   const isVisible = accessExpiration && accessExpiration.masqueradingExpiredCourse;
+   const expirationDate = accessExpiration && accessExpiration.expirationDate;
+-  const payload = {
++  const payload = useMemo(() => ({
+     expirationDate,
+     userTimezone,
+-  };
++  }), [expirationDate, userTimezone]);
+ 
+   useAlert(isVisible, {
+     code: 'clientAccessExpirationMasqueradeBanner',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic: 'instructor-toolbar-alerts',
+   });
+ 
+diff --git a/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
+index cb64f09..5e142e9 100644
+--- a/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
++++ b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
+@@ -7,7 +7,7 @@ import { WarningFilled } from '@edx/paragon/icons';
+ import { getConfig } from '@edx/frontend-platform';
+ import genericMessages from './messages';
+ 
+-function ActiveEnterpriseAlert({ intl, payload }) {
++const ActiveEnterpriseAlert = ({ intl, payload }) => {
+   const { text, courseId } = payload;
+   const changeActiveEnterprise = (
+     <Hyperlink
+@@ -35,7 +35,7 @@ function ActiveEnterpriseAlert({ intl, payload }) {
+       />
+     </Alert>
+   );
+-}
++};
+ 
+ ActiveEnterpriseAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/alerts/active-enteprise-alert/hooks.js b/src/alerts/active-enteprise-alert/hooks.js
+index 7fcaf67..5bf07ff 100644
+--- a/src/alerts/active-enteprise-alert/hooks.js
++++ b/src/alerts/active-enteprise-alert/hooks.js
+@@ -12,16 +12,16 @@ export default function useActiveEnterpriseAlert(courseId) {
+    */
+   const isVisible = courseAccess && !courseAccess.hasAccess && courseAccess.errorCode === 'incorrect_active_enterprise';
+ 
+-  const payload = {
++  const payload = useMemo(() => ({
+     text: courseAccess && courseAccess.userMessage,
+     courseId,
+-  };
++  }), [courseAccess, courseId]);
+   useAlert(isVisible, {
+     code: 'clientActiveEnterpriseAlert',
+     topic: 'outline',
+     dismissible: false,
+     type: ALERT_TYPES.ERROR,
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+   });
+ 
+   return { clientActiveEnterpriseAlert: ActiveEnterpriseAlert };
+diff --git a/src/alerts/course-start-alert/CourseStartAlert.jsx b/src/alerts/course-start-alert/CourseStartAlert.jsx
+index bcd6836..f24e328 100644
+--- a/src/alerts/course-start-alert/CourseStartAlert.jsx
++++ b/src/alerts/course-start-alert/CourseStartAlert.jsx
+@@ -15,7 +15,7 @@ const DAY_SEC = 24 * 60 * 60; // in seconds
+ const DAY_MS = DAY_SEC * 1000; // in ms
+ const YEAR_SEC = 365 * DAY_SEC; // in seconds
+ 
+-function CourseStartAlert({ payload }) {
++const CourseStartAlert = ({ payload }) => {
+   const {
+     courseId,
+   } = payload;
+@@ -94,7 +94,7 @@ function CourseStartAlert({ payload }) {
+       />
+     </Alert>
+   );
+-}
++};
+ 
+ CourseStartAlert.propTypes = {
+   payload: PropTypes.shape({
+diff --git a/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx b/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
+index ad85a07..8df0d69 100644
+--- a/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
++++ b/src/alerts/course-start-alert/CourseStartMasqueradeBanner.jsx
+@@ -5,7 +5,7 @@ import { PageBanner } from '@edx/paragon';
+ 
+ import { useModel } from '../../generic/model-store';
+ 
+-function CourseStartMasqueradeBanner({ payload }) {
++const CourseStartMasqueradeBanner = ({ payload }) => {
+   const {
+     courseId,
+   } = payload;
+@@ -33,7 +33,7 @@ function CourseStartMasqueradeBanner({ payload }) {
+       />
+     </PageBanner>
+   );
+-}
++};
+ 
+ CourseStartMasqueradeBanner.propTypes = {
+   payload: PropTypes.shape({
+diff --git a/src/alerts/course-start-alert/hooks.js b/src/alerts/course-start-alert/hooks.js
+index f8ab567..0389aac 100644
+--- a/src/alerts/course-start-alert/hooks.js
++++ b/src/alerts/course-start-alert/hooks.js
+@@ -5,7 +5,7 @@ import { useModel } from '../../generic/model-store';
+ const CourseStartAlert = React.lazy(() => import('./CourseStartAlert'));
+ const CourseStartMasqueradeBanner = React.lazy(() => import('./CourseStartMasqueradeBanner'));
+ 
+-function isStartDateInFuture(courseId) {
++function IsStartDateInFuture(courseId) {
+   const {
+     start,
+   } = useModel('courseHomeMeta', courseId);
+@@ -20,15 +20,15 @@ function useCourseStartAlert(courseId) {
+     isEnrolled,
+   } = useModel('courseHomeMeta', courseId);
+ 
+-  const isVisible = isEnrolled && isStartDateInFuture(courseId);
++  const isVisible = isEnrolled && IsStartDateInFuture(courseId);
+ 
+-  const payload = {
++  const payload = useMemo(() => ({
+     courseId,
+-  };
++  }), [courseId]);
+ 
+   useAlert(isVisible, {
+     code: 'clientCourseStartAlert',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic: 'outline-course-alerts',
+   });
+ 
+@@ -42,15 +42,15 @@ export function useCourseStartMasqueradeBanner(courseId, tab) {
+     isMasquerading,
+   } = useModel('courseHomeMeta', courseId);
+ 
+-  const isVisible = isMasquerading && tab === 'progress' && isStartDateInFuture(courseId);
++  const isVisible = isMasquerading && tab === 'progress' && IsStartDateInFuture(courseId);
+ 
+-  const payload = {
++  const payload = useMemo(() => ({
+     courseId,
+-  };
++  }), [courseId]);
+ 
+   useAlert(isVisible, {
+     code: 'clientCourseStartMasqueradeBanner',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic: 'instructor-toolbar-alerts',
+   });
+ 
+diff --git a/src/alerts/enrollment-alert/EnrollmentAlert.jsx b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+index de659d7..e8489e5 100644
+--- a/src/alerts/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+@@ -11,7 +11,7 @@ import { useModel } from '../../generic/model-store';
+ import messages from './messages';
+ import useEnrollClickHandler from './clickHook';
+ 
+-function EnrollmentAlert({ intl, payload }) {
++const EnrollmentAlert = ({ intl, payload }) => {
+   const {
+     canEnroll,
+     courseId,
+@@ -55,7 +55,7 @@ function EnrollmentAlert({ intl, payload }) {
+       </div>
+     </Alert>
+   );
+-}
++};
+ 
+ EnrollmentAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/alerts/enrollment-alert/clickHook.js b/src/alerts/enrollment-alert/clickHook.js
+index 225e4fa..76ab52f 100644
+--- a/src/alerts/enrollment-alert/clickHook.js
++++ b/src/alerts/enrollment-alert/clickHook.js
+@@ -27,7 +27,7 @@ function useEnrollClickHandler(courseId, orgId, successText) {
+       });
+       global.location.reload();
+     });
+-  }, [courseId]);
++  }, [addFlash, courseId, orgId, successText]);
+ 
+   return { enrollClickHandler, loading };
+ }
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index 03df8b6..f3da187 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -22,16 +22,16 @@ export function useEnrollmentAlert(courseId) {
+    *    3. the course is private.
+    */
+   const isVisible = !enrolledUser && authenticatedUser !== null && privateOutline;
+-  const payload = {
++  const payload = useMemo(() => ({
+     canEnroll: outline && outline.enrollAlert ? outline.enrollAlert.canEnroll : false,
+     courseId,
+     extraText: outline && outline.enrollAlert ? outline.enrollAlert.extraText : '',
+     isStaff: course && course.isStaff,
+-  };
++  }), [course, courseId, outline]);
+ 
+   useAlert(isVisible, {
+     code: 'clientEnrollmentAlert',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic: 'outline',
+   });
+ 
+diff --git a/src/alerts/logistration-alert/AccountActivationAlert.jsx b/src/alerts/logistration-alert/AccountActivationAlert.jsx
+index dcdd06d..8455e2d 100644
+--- a/src/alerts/logistration-alert/AccountActivationAlert.jsx
++++ b/src/alerts/logistration-alert/AccountActivationAlert.jsx
+@@ -13,9 +13,9 @@ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/
+ import { sendActivationEmail } from '../../courseware/data';
+ import messages from './messages';
+ 
+-function AccountActivationAlert({
++const AccountActivationAlert = ({
+   intl,
+-}) {
++}) => {
+   const [showModal, setShowModal] = useState(false);
+   const [showSpinner, setShowSpinner] = useState(false);
+   const [showCheck, setShowCheck] = useState(false);
+@@ -123,7 +123,7 @@ function AccountActivationAlert({
+       {children()}
+     </AlertModal>
+   );
+-}
++};
+ 
+ AccountActivationAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/alerts/logistration-alert/LogistrationAlert.jsx b/src/alerts/logistration-alert/LogistrationAlert.jsx
+index be72180..5ab8ff6 100644
+--- a/src/alerts/logistration-alert/LogistrationAlert.jsx
++++ b/src/alerts/logistration-alert/LogistrationAlert.jsx
+@@ -7,7 +7,7 @@ import { WarningFilled } from '@edx/paragon/icons';
+ 
+ import genericMessages from '../../generic/messages';
+ 
+-function LogistrationAlert({ intl }) {
++const LogistrationAlert = ({ intl }) => {
+   const signIn = (
+     <Hyperlink
+       style={{ textDecoration: 'underline' }}
+@@ -41,7 +41,7 @@ function LogistrationAlert({ intl }) {
+       />
+     </Alert>
+   );
+-}
++};
+ 
+ LogistrationAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index eac84f1..3265d8a 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -349,7 +349,7 @@ export async function getOutlineTabData(courseId) {
+   const timeOffsetMillis = getTimeOffsetMillis(headers && headers.date, requestTime, responseTime);
+   const userHasPassingGrade = data.user_has_passing_grade;
+   const verifiedMode = camelCaseObject(data.verified_mode);
+-  const welcomeMessageHtml = data.welcome_message_html;
++  const welcomeMessageHtml = data.welcome_message_html || '';
+ 
+   return {
+     accessExpiration,
+diff --git a/src/course-home/dates-tab/DatesTab.jsx b/src/course-home/dates-tab/DatesTab.jsx
+index 23e157c..71b4389 100644
+--- a/src/course-home/dates-tab/DatesTab.jsx
++++ b/src/course-home/dates-tab/DatesTab.jsx
+@@ -14,7 +14,7 @@ import ShiftDatesAlert from '../suggested-schedule-messaging/ShiftDatesAlert';
+ import UpgradeToCompleteAlert from '../suggested-schedule-messaging/UpgradeToCompleteAlert';
+ import UpgradeToShiftDatesAlert from '../suggested-schedule-messaging/UpgradeToShiftDatesAlert';
+ 
+-function DatesTab({ intl }) {
++const DatesTab = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -57,7 +57,7 @@ function DatesTab({ intl }) {
+       <Timeline />
+     </>
+   );
+-}
++};
+ 
+ DatesTab.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/dates-tab/timeline/Day.jsx b/src/course-home/dates-tab/timeline/Day.jsx
+index ad89316..125ce1e 100644
+--- a/src/course-home/dates-tab/timeline/Day.jsx
++++ b/src/course-home/dates-tab/timeline/Day.jsx
+@@ -17,13 +17,13 @@ import { useModel } from '../../../generic/model-store';
+ import { getBadgeListAndColor } from './badgelist';
+ import { isLearnerAssignment } from '../utils';
+ 
+-function Day({
++const Day = ({
+   date,
+   first,
+   intl,
+   items,
+   last,
+-}) {
++}) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -103,7 +103,7 @@ function Day({
+       </div>
+     </li>
+   );
+-}
++};
+ 
+ Day.propTypes = {
+   date: PropTypes.objectOf(Date).isRequired,
+diff --git a/src/course-home/dates-tab/timeline/Timeline.jsx b/src/course-home/dates-tab/timeline/Timeline.jsx
+index e9f6868..09073d6 100644
+--- a/src/course-home/dates-tab/timeline/Timeline.jsx
++++ b/src/course-home/dates-tab/timeline/Timeline.jsx
+@@ -6,7 +6,7 @@ import { useModel } from '../../../generic/model-store';
+ import Day from './Day';
+ import { daycmp, isLearnerAssignment } from '../utils';
+ 
+-export default function Timeline() {
++const Timeline = () => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -67,4 +67,6 @@ export default function Timeline() {
+       ))}
+     </ul>
+   );
+-}
++};
++
++export default Timeline;
+diff --git a/src/course-home/discussion-tab/DiscussionTab.jsx b/src/course-home/discussion-tab/DiscussionTab.jsx
+index d4d2d6e..0bbae8b 100644
+--- a/src/course-home/discussion-tab/DiscussionTab.jsx
++++ b/src/course-home/discussion-tab/DiscussionTab.jsx
+@@ -6,7 +6,7 @@ import { generatePath, useHistory } from 'react-router';
+ import { useParams } from 'react-router-dom';
+ import { useIFrameHeight, useIFramePluginEvents } from '../../generic/hooks';
+ 
+-function DiscussionTab() {
++const DiscussionTab = () => {
+   const { courseId } = useSelector(state => state.courseHome);
+   const { path } = useParams();
+   const [originalPath] = useState(path);
+@@ -29,7 +29,7 @@ function DiscussionTab() {
+       title="discussion"
+     />
+   );
+-}
++};
+ 
+ DiscussionTab.propTypes = {};
+ 
+diff --git a/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx b/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+index 24fddde..3a6922e 100644
+--- a/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
++++ b/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+@@ -10,7 +10,7 @@ import { unsubscribeFromCourseGoal } from '../data/api';
+ import messages from './messages';
+ import ResultPage from './ResultPage';
+ 
+-function GoalUnsubscribe({ intl }) {
++const GoalUnsubscribe = ({ intl }) => {
+   const { token } = useParams();
+   const [error, setError] = useState(false);
+   const [isLoading, setIsLoading] = useState(true);
+@@ -33,6 +33,7 @@ function GoalUnsubscribe({ intl }) {
+     // as visiting this page is allowed to be done anonymously and without the context of the course.
+     // The token can be used to connect a user and course, it will just require some post-processing
+     sendTrackEvent('edx.ui.lms.goal.unsubscribe', { token });
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []); // deps=[] to only run once
+ 
+   return (
+@@ -48,7 +49,7 @@ function GoalUnsubscribe({ intl }) {
+       </main>
+     </>
+   );
+-}
++};
+ 
+ GoalUnsubscribe.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/goal-unsubscribe/ResultPage.jsx b/src/course-home/goal-unsubscribe/ResultPage.jsx
+index edeadc0..ba6b36f 100644
+--- a/src/course-home/goal-unsubscribe/ResultPage.jsx
++++ b/src/course-home/goal-unsubscribe/ResultPage.jsx
+@@ -6,7 +6,7 @@ import { Button, Hyperlink } from '@edx/paragon';
+ import messages from './messages';
+ import { ReactComponent as UnsubscribeIcon } from './unsubscribe.svg';
+ 
+-function ResultPage({ courseTitle, error, intl }) {
++const ResultPage = ({ courseTitle, error, intl }) => {
+   const errorDescription = (
+     <FormattedMessage
+       id="learning.goals.unsubscribe.errorDescription"
+@@ -44,7 +44,7 @@ function ResultPage({ courseTitle, error, intl }) {
+       </Button>
+     </>
+   );
+-}
++};
+ 
+ ResultPage.defaultProps = {
+   courseTitle: null,
+diff --git a/src/course-home/live-tab/LiveTab.jsx b/src/course-home/live-tab/LiveTab.jsx
+index 960d66e..05a470e 100644
+--- a/src/course-home/live-tab/LiveTab.jsx
++++ b/src/course-home/live-tab/LiveTab.jsx
+@@ -1,7 +1,7 @@
+ import React, { useEffect } from 'react';
+ import { useSelector } from 'react-redux';
+ 
+-function LiveTab() {
++const LiveTab = () => {
+   const { courseId } = useSelector(state => state.courseHome);
+   const liveModel = useSelector(state => state.models.live);
+   useEffect(() => {
+@@ -17,6 +17,6 @@ function LiveTab() {
+       dangerouslySetInnerHTML={{ __html: liveModel[courseId]?.iframe }}
+     />
+   );
+-}
++};
+ 
+ export default LiveTab;
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+index abf5be0..edff43a 100644
+--- a/src/course-home/outline-tab/DateSummary.jsx
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -9,10 +9,10 @@ import { useModel } from '../../generic/model-store';
+ import { isLearnerAssignment } from '../dates-tab/utils';
+ import './DateSummary.scss';
+ 
+-export default function DateSummary({
++const DateSummary = ({
+   dateBlock,
+   userTimezone,
+-}) {
++}) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -75,7 +75,7 @@ export default function DateSummary({
+       </div>
+     </li>
+   );
+-}
++};
+ 
+ DateSummary.propTypes = {
+   dateBlock: PropTypes.shape({
+@@ -93,3 +93,5 @@ DateSummary.propTypes = {
+ DateSummary.defaultProps = {
+   userTimezone: null,
+ };
++
++export default DateSummary;
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.jsx b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+index 0a525f2..1916635 100644
+--- a/src/course-home/outline-tab/LmsHtmlFragment.jsx
++++ b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+@@ -3,12 +3,12 @@ import PropTypes from 'prop-types';
+ 
+ import { getConfig } from '@edx/frontend-platform';
+ 
+-export default function LmsHtmlFragment({
++const LmsHtmlFragment = ({
+   className,
+   html,
+   title,
+   ...rest
+-}) {
++}) => {
+   const wholePage = `
+     <html>
+       <head>
+@@ -55,7 +55,7 @@ export default function LmsHtmlFragment({
+       {...rest}
+     />
+   );
+-}
++};
+ 
+ LmsHtmlFragment.defaultProps = {
+   className: '',
+@@ -66,3 +66,5 @@ LmsHtmlFragment.propTypes = {
+   html: PropTypes.string.isRequired,
+   title: PropTypes.string.isRequired,
+ };
++
++export default LmsHtmlFragment;
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 1c75f73..072f0d0 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -29,7 +29,7 @@ import WelcomeMessage from './widgets/WelcomeMessage';
+ import ProctoringInfoPanel from './widgets/ProctoringInfoPanel';
+ import AccountActivationAlert from '../../alerts/logistration-alert/AccountActivationAlert';
+ 
+-function OutlineTab({ intl }) {
++const OutlineTab = ({ intl }) => {
+   const {
+     courseId,
+     proctoringPanelStatus,
+@@ -212,7 +212,7 @@ function OutlineTab({ intl }) {
+       </div>
+     </>
+   );
+-}
++};
+ 
+ OutlineTab.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index b507812..3de888a 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -12,13 +12,13 @@ import { useModel } from '../../generic/model-store';
+ import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ 
+-function Section({
++const Section = ({
+   courseId,
+   defaultOpen,
+   expand,
+   intl,
+   section,
+-}) {
++}) => {
+   const {
+     complete,
+     sequenceIds,
+@@ -38,6 +38,7 @@ function Section({
+ 
+   useEffect(() => {
+     setOpen(defaultOpen);
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+ 
+   const sectionTitle = (
+@@ -109,7 +110,7 @@ function Section({
+       </Collapsible>
+     </li>
+   );
+-}
++};
+ 
+ Section.propTypes = {
+   courseId: PropTypes.string.isRequired,
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index 794cdc2..5a02c7f 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -16,13 +16,13 @@ import EffortEstimate from '../../shared/effort-estimate';
+ import { useModel } from '../../generic/model-store';
+ import messages from './messages';
+ 
+-function SequenceLink({
++const SequenceLink = ({
+   id,
+   intl,
+   courseId,
+   first,
+   sequence,
+-}) {
++}) => {
+   const {
+     complete,
+     description,
+@@ -98,7 +98,7 @@ function SequenceLink({
+       </div>
+     </li>
+   );
+-}
++};
+ 
+ SequenceLink.propTypes = {
+   id: PropTypes.string.isRequired,
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+index b650b36..5b191cf 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+@@ -25,7 +25,7 @@ export const CERT_STATUS_TYPE = {
+   UNVERIFIED: 'unverified',
+ };
+ 
+-function CertificateStatusAlert({ intl, payload }) {
++const CertificateStatusAlert = ({ intl, payload }) => {
+   const dispatch = useDispatch();
+   const {
+     certificateAvailableDate,
+@@ -189,7 +189,7 @@ function CertificateStatusAlert({ intl, payload }) {
+       )}
+     </AlertWrapper>
+   );
+-}
++};
+ 
+ CertificateStatusAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+index 86445e3..9cae444 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+@@ -75,7 +75,7 @@ function useCertificateStatusAlert(courseId) {
+     && hasEnded
+     && !userHasPassingGrade
+   );
+-  const payload = {
++  const payload = useMemo(() => ({
+     certificateAvailableDate,
+     certURL,
+     certStatus,
+@@ -85,11 +85,12 @@ function useCertificateStatusAlert(courseId) {
+     org,
+     notPassingCourseEnded,
+     tabs,
+-  };
++  }), [certStatus, certURL, certificateAvailableDate, courseId,
++    endBlock, notPassingCourseEnded, org, tabs, userTimezone]);
+ 
+   useAlert(isVisible || notPassingCourseEnded, {
+     code: 'clientCertificateStatusAlert',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic: 'outline-course-alerts',
+   });
+ 
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+index 52287fb..f08e738 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+@@ -13,7 +13,7 @@ const DAY_SEC = 24 * 60 * 60; // in seconds
+ const DAY_MS = DAY_SEC * 1000; // in ms
+ const YEAR_SEC = 365 * DAY_SEC; // in seconds
+ 
+-function CourseEndAlert({ payload }) {
++const CourseEndAlert = ({ payload }) => {
+   const {
+     description,
+     endDate,
+@@ -88,7 +88,7 @@ function CourseEndAlert({ payload }) {
+       {description}
+     </Alert>
+   );
+-}
++};
+ 
+ CourseEndAlert.propTypes = {
+   payload: PropTypes.shape({
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/hooks.js b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+index c39e6da..147649e 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+@@ -23,15 +23,15 @@ export function useCourseEndAlert(courseId) {
+   const endDate = endBlock ? new Date(endBlock.date) : null;
+   const delta = endBlock ? endDate - new Date() : 0;
+   const isVisible = isEnrolled && endBlock && delta > 0 && delta < WARNING_PERIOD_MS;
+-  const payload = {
++  const payload = useMemo(() => ({
+     description: endBlock && endBlock.description,
+     endDate: endBlock && endBlock.date,
+     userTimezone,
+-  };
++  }), [endBlock, userTimezone]);
+ 
+   useAlert(isVisible, {
+     code: 'clientCourseEndAlert',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic: 'outline-course-alerts',
+   });
+ 
+diff --git a/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx b/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+index 19e07be..5c520d6 100644
+--- a/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
++++ b/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+@@ -14,7 +14,7 @@ import outlineMessages from '../../messages';
+ import useEnrollClickHandler from '../../../../alerts/enrollment-alert/clickHook';
+ import { useModel } from '../../../../generic/model-store';
+ 
+-function PrivateCourseAlert({ intl, payload }) {
++const PrivateCourseAlert = ({ intl, payload }) => {
+   const {
+     anonymousUser,
+     canEnroll,
+@@ -100,7 +100,7 @@ function PrivateCourseAlert({ intl, payload }) {
+       )}
+     </Alert>
+   );
+-}
++};
+ 
+ PrivateCourseAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/outline-tab/alerts/private-course-alert/hooks.js b/src/course-home/outline-tab/alerts/private-course-alert/hooks.js
+index ec5efc5..c3e2b37 100644
+--- a/src/course-home/outline-tab/alerts/private-course-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/private-course-alert/hooks.js
+@@ -18,16 +18,16 @@ export function usePrivateCourseAlert(courseId) {
+    *    2. the user is authenticated.
+    * */
+   const isVisible = !enrolledUser && (privateOutline || authenticatedUser !== null);
+-  const payload = {
++  const payload = useMemo(() => ({
+     anonymousUser: authenticatedUser === null,
+     canEnroll: outline && outline.enrollAlert ? outline.enrollAlert.canEnroll : false,
+     courseId,
+-  };
++  }), [authenticatedUser, courseId, outline]);
+ 
+   useAlert(isVisible, {
+     code: 'clientPrivateCourseAlert',
+     dismissible: false,
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic: 'outline-private-alerts',
+     type: ALERT_TYPES.WELCOME,
+   });
+diff --git a/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx b/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
+index 4f0dddb..fadb0a3 100644
+--- a/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
++++ b/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
+@@ -3,7 +3,7 @@ import { Alert, Button } from '@edx/paragon';
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-function ScheduledContentAlert({ payload }) {
++const ScheduledContentAlert = ({ payload }) => {
+   const {
+     datesTabLink,
+   } = payload;
+@@ -38,7 +38,7 @@ function ScheduledContentAlert({ payload }) {
+       </div>
+     </Alert>
+   );
+-}
++};
+ 
+ ScheduledContentAlert.propTypes = {
+   payload: PropTypes.shape({
+diff --git a/src/course-home/outline-tab/alerts/scheduled-content-alert/hooks.js b/src/course-home/outline-tab/alerts/scheduled-content-alert/hooks.js
+index fe29a22..58e7d72 100644
+--- a/src/course-home/outline-tab/alerts/scheduled-content-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/scheduled-content-alert/hooks.js
+@@ -20,12 +20,12 @@ const useScheduledContentAlert = (courseId) => {
+     && !!Object.values(courses).find(course => course.hasScheduledContent === true)
+   );
+   const { isEnrolled } = useModel('courseHomeMeta', courseId);
+-  const payload = {
++  const payload = useMemo(() => ({
+     datesTabLink,
+-  };
++  }), [datesTabLink]);
+   useAlert(hasScheduledContent && isEnrolled, {
+     code: 'ScheduledContentAlert',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
++    payload,
+     topic: 'outline-course-alerts',
+   });
+ 
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index 5604e00..0db9e2e 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -7,9 +7,9 @@ import DateSummary from '../DateSummary';
+ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function CourseDates({
++const CourseDates = ({
+   intl,
+-}) {
++}) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -46,7 +46,7 @@ function CourseDates({
+       </div>
+     </section>
+   );
+-}
++};
+ 
+ CourseDates.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/outline-tab/widgets/CourseHandouts.jsx b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+index 7a07175..ac90ada 100644
+--- a/src/course-home/outline-tab/widgets/CourseHandouts.jsx
++++ b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+@@ -7,7 +7,7 @@ import LmsHtmlFragment from '../LmsHtmlFragment';
+ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function CourseHandouts({ intl }) {
++const CourseHandouts = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -29,7 +29,7 @@ function CourseHandouts({ intl }) {
+       />
+     </section>
+   );
+-}
++};
+ 
+ CourseHandouts.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 0847dea..62ef499 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -14,7 +14,7 @@ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ import LaunchCourseHomeTourButton from '../../../product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton';
+ 
+-function CourseTools({ intl }) {
++const CourseTools = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -79,7 +79,7 @@ function CourseTools({ intl }) {
+       </ul>
+     </section>
+   );
+-}
++};
+ 
+ CourseTools.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/outline-tab/widgets/FlagButton.jsx b/src/course-home/outline-tab/widgets/FlagButton.jsx
+index 48375cb..40848a2 100644
+--- a/src/course-home/outline-tab/widgets/FlagButton.jsx
++++ b/src/course-home/outline-tab/widgets/FlagButton.jsx
+@@ -2,37 +2,35 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classnames from 'classnames';
+ 
+-function FlagButton({
++const FlagButton = ({
+   buttonIcon,
+   title,
+   text,
+   handleSelect,
+   isSelected,
+-}) {
+-  return (
+-    <button
+-      type="button"
+-      className={classnames(
+-        'flag-button row w-100 align-content-between m-1.5 py-3.5',
+-        isSelected ? 'flag-button-selected' : '',
+-      )}
+-      aria-checked={isSelected}
+-      role="radio"
+-      onClick={() => handleSelect()}
+-      data-testid={`weekly-learning-goal-input-${title}`}
+-    >
+-      <div className="row w-100 m-0 justify-content-center pb-1">
+-        {buttonIcon}
+-      </div>
+-      <div className={classnames('row w-100 m-0 justify-content-center small text-gray-700 pb-1', isSelected ? 'font-weight-bold' : '')}>
+-        {title}
+-      </div>
+-      <div className={classnames('row w-100 m-0 justify-content-center micro text-gray-500', isSelected ? 'font-weight-bold' : '')}>
+-        {text}
+-      </div>
+-    </button>
+-  );
+-}
++}) => (
++  <button
++    type="button"
++    className={classnames(
++      'flag-button row w-100 align-content-between m-1.5 py-3.5',
++      isSelected ? 'flag-button-selected' : '',
++    )}
++    aria-checked={isSelected}
++    role="radio"
++    onClick={() => handleSelect()}
++    data-testid={`weekly-learning-goal-input-${title}`}
++  >
++    <div className="row w-100 m-0 justify-content-center pb-1">
++      {buttonIcon}
++    </div>
++    <div className={classnames('row w-100 m-0 justify-content-center small text-gray-700 pb-1', isSelected ? 'font-weight-bold' : '')}>
++      {title}
++    </div>
++    <div className={classnames('row w-100 m-0 justify-content-center micro text-gray-500', isSelected ? 'font-weight-bold' : '')}>
++      {text}
++    </div>
++  </button>
++);
+ 
+ FlagButton.propTypes = {
+   buttonIcon: PropTypes.element.isRequired,
+diff --git a/src/course-home/outline-tab/widgets/LearningGoalButton.jsx b/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+index 35f87ee..c477ea9 100644
+--- a/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
++++ b/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+@@ -9,12 +9,12 @@ import { ReactComponent as FlagRegularIcon } from './flag_gray.svg';
+ import FlagButton from './FlagButton';
+ import messages from '../messages';
+ 
+-function LearningGoalButton({
++const LearningGoalButton = ({
+   level,
+   isSelected,
+   handleSelect,
+   intl,
+-}) {
++}) => {
+   const buttonDetails = {
+     casual: {
+       daysPerWeek: 1,
+@@ -47,7 +47,7 @@ function LearningGoalButton({
+       isSelected={isSelected}
+     />
+   );
+-}
++};
+ 
+ LearningGoalButton.propTypes = {
+   level: PropTypes.string.isRequired,
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index 37d90bf..0159d66 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -10,7 +10,7 @@ import { getProctoringInfoData } from '../../data/api';
+ import { fetchProctoringInfoResolved } from '../../data/slice';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function ProctoringInfoPanel({ intl }) {
++const ProctoringInfoPanel = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -128,6 +128,7 @@ function ProctoringInfoPanel({ intl }) {
+       .finally(() => {
+         dispatch(fetchProctoringInfoResolved());
+       });
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+ 
+   let onboardingExamButton = null;
+@@ -170,6 +171,7 @@ function ProctoringInfoPanel({ intl }) {
+   }
+ 
+   return (
++    // eslint-disable-next-line react/jsx-no-useless-fragment
+     <>
+       { showInfoPanel && (
+         <section className={`mb-4 p-3 outline-sidebar-proctoring-panel ${getBorderClass()}`}>
+@@ -212,7 +214,7 @@ function ProctoringInfoPanel({ intl }) {
+       )}
+     </>
+   );
+-}
++};
+ 
+ ProctoringInfoPanel.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+index a668cff..5b1f033 100644
+--- a/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
++++ b/src/course-home/outline-tab/widgets/StartOrResumeCourseCard.jsx
+@@ -7,7 +7,7 @@ import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function StartOrResumeCourseCard({ intl }) {
++const StartOrResumeCourseCard = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -56,10 +56,11 @@ function StartOrResumeCourseCard({ intl }) {
+         )}
+       />
+       {/* Footer is needed for internal vertical spacing to work out. If you can remove, be my guest */}
++      {/* eslint-disable-next-line react/jsx-no-useless-fragment */}
+       <Card.Footer><></></Card.Footer>
+     </Card>
+   );
+-}
++};
+ 
+ StartOrResumeCourseCard.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index 1d8a0ad..00def35 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -15,11 +15,11 @@ import { saveWeeklyLearningGoal } from '../../data';
+ import { useModel } from '../../../generic/model-store';
+ import './FlagButton.scss';
+ 
+-function WeeklyLearningGoalCard({
++const WeeklyLearningGoalCard = ({
+   daysPerWeek,
+   subscribedToReminders,
+   intl,
+-}) {
++}) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -36,7 +36,7 @@ function WeeklyLearningGoalCard({
+   const [isGetReminderSelected, setGetReminderSelected] = useState(subscribedToReminders);
+   const location = useLocation();
+ 
+-  function handleSelect(days, triggeredFromEmail = false) {
++  const handleSelect = (days, triggeredFromEmail = false) => {
+     // Set the subscription button if this is the first time selecting a goal
+     const selectReminders = daysPerWeekGoal === null ? true : isGetReminderSelected;
+     setGetReminderSelected(selectReminders);
+@@ -54,7 +54,7 @@ function WeeklyLearningGoalCard({
+         sendTrackEvent('enrollment.email.clicked.setgoal', {});
+       }
+     }
+-  }
++  };
+ 
+   function handleSubscribeToReminders(event) {
+     const isGetReminderChecked = event.target.checked;
+@@ -84,6 +84,7 @@ function WeeklyLearningGoalCard({
+         search: currentParams.toString(),
+       });
+     }
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [location.search]);
+ 
+   return (
+@@ -146,7 +147,7 @@ function WeeklyLearningGoalCard({
+       )}
+     </Card>
+   );
+-}
++};
+ 
+ WeeklyLearningGoalCard.propTypes = {
+   daysPerWeek: PropTypes.number,
+diff --git a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+index b2f93ca..ed64b1b 100644
+--- a/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
++++ b/src/course-home/outline-tab/widgets/WelcomeMessage.jsx
+@@ -11,21 +11,22 @@ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ import { dismissWelcomeMessage } from '../../data/thunks';
+ 
+-function WelcomeMessage({ courseId, intl }) {
++const WelcomeMessage = ({ courseId, intl }) => {
+   const {
+     welcomeMessageHtml,
+   } = useModel('outline', courseId);
+ 
+-  if (!welcomeMessageHtml) {
+-    return null;
+-  }
+-
+   const [display, setDisplay] = useState(true);
+ 
+   const shortWelcomeMessageHtml = truncate(welcomeMessageHtml, 100, { byWords: true, keepWhitespaces: true });
+   const messageCanBeShortened = shortWelcomeMessageHtml.length < welcomeMessageHtml.length;
+   const [showShortMessage, setShowShortMessage] = useState(messageCanBeShortened);
+   const dispatch = useDispatch();
++
++  if (!welcomeMessageHtml) {
++    return null;
++  }
++
+   return (
+     <Alert
+       data-testid="alert-container-welcome"
+@@ -69,7 +70,7 @@ function WelcomeMessage({ courseId, intl }) {
+       </TransitionReplace>
+     </Alert>
+   );
+-}
++};
+ 
+ WelcomeMessage.propTypes = {
+   courseId: PropTypes.string.isRequired,
+diff --git a/src/course-home/progress-tab/ProgressHeader.jsx b/src/course-home/progress-tab/ProgressHeader.jsx
+index ece2c81..40b31d5 100644
+--- a/src/course-home/progress-tab/ProgressHeader.jsx
++++ b/src/course-home/progress-tab/ProgressHeader.jsx
+@@ -9,7 +9,7 @@ import { useModel } from '../../generic/model-store';
+ 
+ import messages from './messages';
+ 
+-function ProgressHeader({ intl }) {
++const ProgressHeader = ({ intl }) => {
+   const {
+     courseId,
+     targetUserId,
+@@ -35,7 +35,7 @@ function ProgressHeader({ intl }) {
+       )}
+     </div>
+   );
+-}
++};
+ 
+ ProgressHeader.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index 7954927..3413d38 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -12,7 +12,7 @@ import RelatedLinks from './related-links/RelatedLinks';
+ 
+ import { useModel } from '../../generic/model-store';
+ 
+-function ProgressTab() {
++const ProgressTab = () => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -55,6 +55,6 @@ function ProgressTab() {
+       </div>
+     </>
+   );
+-}
++};
+ 
+ export default ProgressTab;
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index 5e187d4..496feb4 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -14,7 +14,7 @@ import { DashboardLink, IdVerificationSupportLink, ProfileLink } from '../../../
+ import { requestCert } from '../../data/thunks';
+ import messages from './messages';
+ 
+-function CertificateStatus({ intl }) {
++const CertificateStatus = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -206,6 +206,7 @@ function CertificateStatus({ intl }) {
+       grade_variant: gradeEventName,
+       certificate_status_variant: certEventName,
+     });
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+ 
+   if (!certCase) {
+@@ -257,7 +258,7 @@ function CertificateStatus({ intl }) {
+       </Card>
+     </section>
+   );
+-}
++};
+ 
+ CertificateStatus.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx b/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
+index 2615b27..b604ddb 100644
+--- a/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
++++ b/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
+@@ -6,13 +6,13 @@ import { OverlayTrigger, Popover } from '@edx/paragon';
+ 
+ import messages from './messages';
+ 
+-function CompleteDonutSegment({ completePercentage, intl, lockedPercentage }) {
++const CompleteDonutSegment = ({ completePercentage, intl, lockedPercentage }) => {
++  const [showCompletePopover, setShowCompletePopover] = useState(false);
++
+   if (!completePercentage) {
+     return null;
+   }
+ 
+-  const [showCompletePopover, setShowCompletePopover] = useState(false);
+-
+   const completeSegmentOffset = (3.6 * completePercentage) / 8;
+   let completeTooltipDegree = completePercentage < 100 ? -completeSegmentOffset : 0;
+ 
+@@ -78,7 +78,7 @@ function CompleteDonutSegment({ completePercentage, intl, lockedPercentage }) {
+       )}
+     </g>
+   );
+-}
++};
+ 
+ CompleteDonutSegment.propTypes = {
+   completePercentage: PropTypes.number.isRequired,
+diff --git a/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx b/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+index fe62189..54b6caa 100644
+--- a/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
++++ b/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+@@ -10,7 +10,7 @@ import IncompleteDonutSegment from './IncompleteDonutSegment';
+ import LockedDonutSegment from './LockedDonutSegment';
+ import messages from './messages';
+ 
+-function CompletionDonutChart({ intl }) {
++const CompletionDonutChart = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -60,7 +60,7 @@ function CompletionDonutChart({ intl }) {
+       </div>
+     </>
+   );
+-}
++};
+ 
+ CompletionDonutChart.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/course-completion/CourseCompletion.jsx b/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+index 5b4abc2..1fc7dfa 100644
+--- a/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
++++ b/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+@@ -4,23 +4,21 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import CompletionDonutChart from './CompletionDonutChart';
+ import messages from './messages';
+ 
+-function CourseCompletion({ intl }) {
+-  return (
+-    <section className="text-dark-700 mb-4 rounded raised-card p-4">
+-      <div className="row w-100 m-0">
+-        <div className="col-12 col-sm-6 col-md-7 p-0">
+-          <h2>{intl.formatMessage(messages.courseCompletion)}</h2>
+-          <p className="small">
+-            {intl.formatMessage(messages.completionBody)}
+-          </p>
+-        </div>
+-        <div className="col-12 col-sm-6 col-md-5 mt-sm-n3 p-0 text-center">
+-          <CompletionDonutChart />
+-        </div>
++const CourseCompletion = ({ intl }) => (
++  <section className="text-dark-700 mb-4 rounded raised-card p-4">
++    <div className="row w-100 m-0">
++      <div className="col-12 col-sm-6 col-md-7 p-0">
++        <h2>{intl.formatMessage(messages.courseCompletion)}</h2>
++        <p className="small">
++          {intl.formatMessage(messages.completionBody)}
++        </p>
+       </div>
+-    </section>
+-  );
+-}
++      <div className="col-12 col-sm-6 col-md-5 mt-sm-n3 p-0 text-center">
++        <CompletionDonutChart />
++      </div>
++    </div>
++  </section>
++);
+ 
+ CourseCompletion.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx b/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
+index e1bcc3d..9f2d16e 100644
+--- a/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
++++ b/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
+@@ -6,13 +6,13 @@ import { OverlayTrigger, Popover } from '@edx/paragon';
+ 
+ import messages from './messages';
+ 
+-function IncompleteDonutSegment({ incompletePercentage, intl }) {
++const IncompleteDonutSegment = ({ incompletePercentage, intl }) => {
++  const [showIncompletePopover, setShowIncompletePopover] = useState(false);
++
+   if (!incompletePercentage) {
+     return null;
+   }
+ 
+-  const [showIncompletePopover, setShowIncompletePopover] = useState(false);
+-
+   const incompleteSegmentOffset = (3.6 * incompletePercentage) / 16;
+   const incompleteTooltipDegree = incompletePercentage < 100 ? incompleteSegmentOffset : 0;
+ 
+@@ -49,7 +49,7 @@ function IncompleteDonutSegment({ incompletePercentage, intl }) {
+       </OverlayTrigger>
+     </g>
+   );
+-}
++};
+ 
+ IncompleteDonutSegment.propTypes = {
+   incompletePercentage: PropTypes.number.isRequired,
+diff --git a/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx b/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
+index 0ad8b02..9ab5b4d 100644
+--- a/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
++++ b/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
+@@ -6,7 +6,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from './messages';
+ 
+-function LockedDonutSegment({ intl, lockedPercentage }) {
++const LockedDonutSegment = ({ intl, lockedPercentage }) => {
+   const [showLockedPopover, setShowLockedPopover] = useState(false);
+ 
+   if (!lockedPercentage) {
+@@ -62,7 +62,7 @@ function LockedDonutSegment({ intl, lockedPercentage }) {
+       </OverlayTrigger>
+     </g>
+   );
+-}
++};
+ 
+ LockedDonutSegment.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/credit-information/CreditInformation.jsx b/src/course-home/progress-tab/credit-information/CreditInformation.jsx
+index 8683fb2..24198be 100644
+--- a/src/course-home/progress-tab/credit-information/CreditInformation.jsx
++++ b/src/course-home/progress-tab/credit-information/CreditInformation.jsx
+@@ -10,7 +10,7 @@ import { DashboardLink } from '../../../shared/links';
+ 
+ import messages from './messages';
+ 
+-function CreditInformation({ intl }) {
++const CreditInformation = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -106,7 +106,7 @@ function CreditInformation({ intl }) {
+       {requirements}
+     </>
+   );
+-}
++};
+ 
+ CreditInformation.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+index 2d2677e..6aabdc0 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -11,7 +11,7 @@ import CreditInformation from '../../credit-information/CreditInformation';
+ 
+ import messages from '../messages';
+ 
+-function CourseGrade({ intl }) {
++const CourseGrade = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -52,7 +52,7 @@ function CourseGrade({ intl }) {
+       </div>
+     </section>
+   );
+-}
++};
+ 
+ CourseGrade.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+index 39443a0..7710de3 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+@@ -10,7 +10,7 @@ import { useModel } from '../../../../generic/model-store';
+ import GradeRangeTooltip from './GradeRangeTooltip';
+ import messages from '../messages';
+ 
+-function CourseGradeFooter({ intl, passingGrade }) {
++const CourseGradeFooter = ({ intl, passingGrade }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -83,7 +83,7 @@ function CourseGradeFooter({ intl, passingGrade }) {
+       </div>
+     </div>
+   );
+-}
++};
+ 
+ CourseGradeFooter.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+index 4a485b1..498788e 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+@@ -10,7 +10,7 @@ import { Button, Icon } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+ import messages from '../messages';
+ 
+-function CourseGradeHeader({ intl }) {
++const CourseGradeHeader = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -81,7 +81,7 @@ function CourseGradeHeader({ intl }) {
+       )}
+     </div>
+   );
+-}
++};
+ 
+ CourseGradeHeader.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index c778bb3..2941dc6 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -11,7 +11,7 @@ import { useModel } from '../../../../generic/model-store';
+ 
+ import messages from '../messages';
+ 
+-function CurrentGradeTooltip({ intl, tooltipClassName }) {
++const CurrentGradeTooltip = ({ intl, tooltipClassName }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -62,7 +62,7 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+       </text>
+     </>
+   );
+-}
++};
+ 
+ CurrentGradeTooltip.defaultProps = {
+   tooltipClassName: '',
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index a0f72eb..3cbbe5b 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -11,7 +11,7 @@ import PassingGradeTooltip from './PassingGradeTooltip';
+ 
+ import messages from '../messages';
+ 
+-function GradeBar({ intl, passingGrade }) {
++const GradeBar = ({ intl, passingGrade }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -49,7 +49,7 @@ function GradeBar({ intl, passingGrade }) {
+       </svg>
+     </div>
+   );
+-}
++};
+ 
+ GradeBar.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+index e983d96..760c6e3 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+@@ -11,7 +11,7 @@ import { useModel } from '../../../../generic/model-store';
+ 
+ import messages from '../messages';
+ 
+-function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
++const GradeRangeTooltip = ({ intl, iconButtonClassName, passingGrade }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -72,7 +72,7 @@ function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+       />
+     </OverlayTrigger>
+   );
+-}
++};
+ 
+ GradeRangeTooltip.defaultProps = {
+   iconButtonClassName: '',
+diff --git a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+index 3b5cabe..0c4eb0f 100644
+--- a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+@@ -8,7 +8,7 @@ import { OverlayTrigger, Popover } from '@edx/paragon';
+ 
+ import messages from '../messages';
+ 
+-function PassingGradeTooltip({ intl, passingGrade, tooltipClassName }) {
++const PassingGradeTooltip = ({ intl, passingGrade, tooltipClassName }) => {
+   const isLocaleRtl = isRtl(getLocale());
+ 
+   let passingGradeDirection = passingGrade < 50 ? '' : '-';
+@@ -47,7 +47,7 @@ function PassingGradeTooltip({ intl, passingGrade, tooltipClassName }) {
+       </text>
+     </>
+   );
+-}
++};
+ 
+ PassingGradeTooltip.defaultProps = {
+   tooltipClassName: '',
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 62c0e1d..c7f2b11 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -12,7 +12,7 @@ import DetailedGradesTable from './DetailedGradesTable';
+ 
+ import messages from '../messages';
+ 
+-function DetailedGrades({ intl }) {
++const DetailedGrades = ({ intl }) => {
+   const { administrator } = getAuthenticatedUser();
+   const {
+     courseId,
+@@ -79,7 +79,7 @@ function DetailedGrades({ intl }) {
+       )}
+     </section>
+   );
+-}
++};
+ 
+ DetailedGrades.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index 0e34907..8f84423 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -10,7 +10,7 @@ import { useModel } from '../../../../generic/model-store';
+ import messages from '../messages';
+ import SubsectionTitleCell from './SubsectionTitleCell';
+ 
+-function DetailedGradesTable({ intl }) {
++const DetailedGradesTable = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -64,7 +64,7 @@ function DetailedGradesTable({ intl }) {
+       );
+     })
+   );
+-}
++};
+ 
+ DetailedGradesTable.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+index 7f64aa8..855f3df 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+@@ -8,7 +8,7 @@ import {
+ 
+ import messages from '../messages';
+ 
+-function ProblemScoreDrawer({ intl, problemScores, subsection }) {
++const ProblemScoreDrawer = ({ intl, problemScores, subsection }) => {
+   const isLocaleRtl = isRtl(getLocale());
+   return (
+     <span className="row w-100 m-0 x-small ml-4 pt-2 pl-1 text-gray-700 flex-nowrap">
+@@ -22,7 +22,7 @@ function ProblemScoreDrawer({ intl, problemScores, subsection }) {
+       </div>
+     </span>
+   );
+-}
++};
+ 
+ ProblemScoreDrawer.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+index 0b086e3..e60d2be 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+@@ -14,7 +14,7 @@ import messages from '../messages';
+ import { useModel } from '../../../../generic/model-store';
+ import ProblemScoreDrawer from './ProblemScoreDrawer';
+ 
+-function SubsectionTitleCell({ intl, subsection }) {
++const SubsectionTitleCell = ({ intl, subsection }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -99,7 +99,7 @@ function SubsectionTitleCell({ intl, subsection }) {
+       </Collapsible.Body>
+     </Collapsible.Advanced>
+   );
+-}
++};
+ 
+ SubsectionTitleCell.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+index 11633e2..0a1218a 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -7,9 +7,9 @@ import { Icon } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+ import messages from '../messages';
+ 
+-function AssignmentTypeCell({
++const AssignmentTypeCell = ({
+   intl, assignmentType, footnoteMarker, footnoteId, locked,
+-}) {
++}) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -42,7 +42,7 @@ function AssignmentTypeCell({
+       </div>
+     </div>
+   );
+-}
++};
+ 
+ AssignmentTypeCell.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+index 56d1a73..14f6b2c 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+@@ -7,7 +7,7 @@ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/
+ import messages from '../messages';
+ import { useModel } from '../../../../generic/model-store';
+ 
+-function DroppableAssignmentFootnote({ footnotes, intl }) {
++const DroppableAssignmentFootnote = ({ footnotes, intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -37,7 +37,7 @@ function DroppableAssignmentFootnote({ footnotes, intl }) {
+       </ul>
+     </>
+   );
+-}
++};
+ 
+ DroppableAssignmentFootnote.propTypes = {
+   footnotes: PropTypes.arrayOf(PropTypes.shape({
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+index b937652..e6c6b9a 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+@@ -5,7 +5,7 @@ import { useModel } from '../../../../generic/model-store';
+ import GradeSummaryHeader from './GradeSummaryHeader';
+ import GradeSummaryTable from './GradeSummaryTable';
+ 
+-function GradeSummary() {
++const GradeSummary = () => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -28,6 +28,6 @@ function GradeSummary() {
+       <GradeSummaryTable setAllOfSomeAssignmentTypeIsLocked={setAllOfSomeAssignmentTypeIsLocked} />
+     </section>
+   );
+-}
++};
+ 
+ export default GradeSummary;
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+index 230d205..cff58e2 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+@@ -11,7 +11,7 @@ import { Blocked, InfoOutline } from '@edx/paragon/icons';
+ import messages from '../messages';
+ import { useModel } from '../../../../generic/model-store';
+ 
+-function GradeSummaryHeader({ intl, allOfSomeAssignmentTypeIsLocked }) {
++const GradeSummaryHeader = ({ intl, allOfSomeAssignmentTypeIsLocked }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -54,7 +54,7 @@ function GradeSummaryHeader({ intl, allOfSomeAssignmentTypeIsLocked }) {
+       )}
+     </div>
+   );
+-}
++};
+ 
+ GradeSummaryHeader.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index e9cf260..ae44d15 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -14,7 +14,7 @@ import GradeSummaryTableFooter from './GradeSummaryTableFooter';
+ 
+ import messages from '../messages';
+ 
+-function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
++const GradeSummaryTable = ({ intl, setAllOfSomeAssignmentTypeIsLocked }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -79,6 +79,16 @@ function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+       weightedGrade: { weightedGrade: `${(assignment.weightedGrade * 100).toFixed(0)}${isLocaleRtl ? '\u200f' : ''}%`, locked },
+     };
+   });
++  const getAssignmentTypeCell = (value) => (
++    <AssignmentTypeCell
++      assignmentType={value.type} // eslint-disable-line react/prop-types
++      footnoteId={value.footnoteId} // eslint-disable-line react/prop-types
++      footnoteMarker={value.footnoteMarker} // eslint-disable-line react/prop-types
++      locked={value.locked} // eslint-disable-line react/prop-types
++    />
++  );
++
++  const getCell = (locked, value) => <span className={locked ? 'greyed-out' : ''}>{value}</span>;
+ 
+   return (
+     <>
+@@ -89,45 +99,28 @@ function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+           {
+             Header: `${intl.formatMessage(messages.assignmentType)}`,
+             accessor: 'type',
+-            // eslint-disable-next-line react/prop-types
+-            Cell: ({ value }) => (
+-              <AssignmentTypeCell
+-                assignmentType={value.type} // eslint-disable-line react/prop-types
+-                footnoteId={value.footnoteId} // eslint-disable-line react/prop-types
+-                footnoteMarker={value.footnoteMarker} // eslint-disable-line react/prop-types
+-                locked={value.locked} // eslint-disable-line react/prop-types
+-              />
+-            ),
++            Cell: ({ value }) => getAssignmentTypeCell(value),
+             headerClassName: 'h5 mb-0',
+           },
+           {
+             Header: `${intl.formatMessage(messages.weight)}`,
+             accessor: 'weight',
+             headerClassName: 'justify-content-end h5 mb-0',
+-            // eslint-disable-next-line react/prop-types
+-            Cell: ({ value }) => (
+-              <span className={value.locked ? 'greyed-out' : ''}>{value.weight}</span> // eslint-disable-line react/prop-types
+-            ),
++            Cell: ({ value }) => getCell(value.locked, value.weight),
+             cellClassName: 'text-right small',
+           },
+           {
+             Header: `${intl.formatMessage(messages.grade)}`,
+             accessor: 'grade',
+             headerClassName: 'justify-content-end h5 mb-0',
+-            // eslint-disable-next-line react/prop-types
+-            Cell: ({ value }) => (
+-              <span className={value.locked ? 'greyed-out' : ''}>{value.grade}</span> // eslint-disable-line react/prop-types
+-            ),
++            Cell: ({ value }) => getCell(value.locked, value.grade),
+             cellClassName: 'text-right small',
+           },
+           {
+             Header: `${intl.formatMessage(messages.weightedGrade)}`,
+             accessor: 'weightedGrade',
+             headerClassName: 'justify-content-end h5 mb-0 text-right',
+-            // eslint-disable-next-line react/prop-types
+-            Cell: ({ value }) => (
+-              <span className={value.locked ? 'greyed-out' : ''}>{value.weightedGrade}</span> // eslint-disable-line react/prop-types
+-            ),
++            Cell: ({ value }) => getCell(value.locked, value.weightedGrade),
+             cellClassName: 'text-right font-weight-bold small',
+           },
+         ]}
+@@ -141,7 +134,7 @@ function GradeSummaryTable({ intl, setAllOfSomeAssignmentTypeIsLocked }) {
+       )}
+     </>
+   );
+-}
++};
+ 
+ GradeSummaryTable.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+index d30dde0..a3d380e 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+@@ -9,7 +9,7 @@ import { useModel } from '../../../../generic/model-store';
+ 
+ import messages from '../messages';
+ 
+-function GradeSummaryTableFooter({ intl }) {
++const GradeSummaryTableFooter = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -34,7 +34,7 @@ function GradeSummaryTableFooter({ intl }) {
+       </div>
+     </DataTable.TableFooter>
+   );
+-}
++};
+ 
+ GradeSummaryTableFooter.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/progress-tab/related-links/RelatedLinks.jsx b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+index 2392e9e..fe5e341 100644
+--- a/src/course-home/progress-tab/related-links/RelatedLinks.jsx
++++ b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+@@ -9,7 +9,7 @@ import { Hyperlink } from '@edx/paragon';
+ import messages from './messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function RelatedLinks({ intl }) {
++const RelatedLinks = ({ intl }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -56,7 +56,7 @@ function RelatedLinks({ intl }) {
+       </ul>
+     </section>
+   );
+-}
++};
+ 
+ RelatedLinks.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/suggested-schedule-messaging/ShiftDatesAlert.jsx b/src/course-home/suggested-schedule-messaging/ShiftDatesAlert.jsx
+index 37b918f..e3e4450 100644
+--- a/src/course-home/suggested-schedule-messaging/ShiftDatesAlert.jsx
++++ b/src/course-home/suggested-schedule-messaging/ShiftDatesAlert.jsx
+@@ -14,7 +14,7 @@ import { resetDeadlines } from '../data';
+ import { useModel } from '../../generic/model-store';
+ import messages from './messages';
+ 
+-function ShiftDatesAlert({ fetch, intl, model }) {
++const ShiftDatesAlert = ({ fetch, intl, model }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -29,12 +29,12 @@ function ShiftDatesAlert({ fetch, intl, model }) {
+     missedGatedContent,
+   } = datesBannerInfo;
+ 
++  const dispatch = useDispatch();
++
+   if (!missedDeadlines || missedGatedContent || hasEnded) {
+     return null;
+   }
+ 
+-  const dispatch = useDispatch();
+-
+   return (
+     <Alert variant="warning">
+       <Row className="w-100 m-0">
+@@ -55,7 +55,7 @@ function ShiftDatesAlert({ fetch, intl, model }) {
+       </Row>
+     </Alert>
+   );
+-}
++};
+ 
+ ShiftDatesAlert.propTypes = {
+   fetch: PropTypes.func.isRequired,
+diff --git a/src/course-home/suggested-schedule-messaging/SuggestedScheduleHeader.jsx b/src/course-home/suggested-schedule-messaging/SuggestedScheduleHeader.jsx
+index 2e9b1a7..7953929 100644
+--- a/src/course-home/suggested-schedule-messaging/SuggestedScheduleHeader.jsx
++++ b/src/course-home/suggested-schedule-messaging/SuggestedScheduleHeader.jsx
+@@ -3,13 +3,11 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from './messages';
+ 
+-function SuggestedScheduleHeader({ intl }) {
+-  return (
+-    <p className="large">
+-      {intl.formatMessage(messages.suggestedSchedule)}
+-    </p>
+-  );
+-}
++const SuggestedScheduleHeader = ({ intl }) => (
++  <p className="large">
++    {intl.formatMessage(messages.suggestedSchedule)}
++  </p>
++);
+ 
+ SuggestedScheduleHeader.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/suggested-schedule-messaging/UpgradeToCompleteAlert.jsx b/src/course-home/suggested-schedule-messaging/UpgradeToCompleteAlert.jsx
+index d01c21d..e2e7353 100644
+--- a/src/course-home/suggested-schedule-messaging/UpgradeToCompleteAlert.jsx
++++ b/src/course-home/suggested-schedule-messaging/UpgradeToCompleteAlert.jsx
+@@ -12,7 +12,7 @@ import {
+ import { useModel } from '../../generic/model-store';
+ import messages from './messages';
+ 
+-function UpgradeToCompleteAlert({ intl, logUpgradeLinkClick }) {
++const UpgradeToCompleteAlert = ({ intl, logUpgradeLinkClick }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -55,7 +55,7 @@ function UpgradeToCompleteAlert({ intl, logUpgradeLinkClick }) {
+       </Row>
+     </Alert>
+   );
+-}
++};
+ 
+ UpgradeToCompleteAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-home/suggested-schedule-messaging/UpgradeToShiftDatesAlert.jsx b/src/course-home/suggested-schedule-messaging/UpgradeToShiftDatesAlert.jsx
+index 70f818e..1592d80 100644
+--- a/src/course-home/suggested-schedule-messaging/UpgradeToShiftDatesAlert.jsx
++++ b/src/course-home/suggested-schedule-messaging/UpgradeToShiftDatesAlert.jsx
+@@ -13,7 +13,7 @@ import {
+ import { useModel } from '../../generic/model-store';
+ import messages from './messages';
+ 
+-function UpgradeToShiftDatesAlert({ intl, logUpgradeLinkClick, model }) {
++const UpgradeToShiftDatesAlert = ({ intl, logUpgradeLinkClick, model }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -57,7 +57,7 @@ function UpgradeToShiftDatesAlert({ intl, logUpgradeLinkClick, model }) {
+       </Row>
+     </Alert>
+   );
+-}
++};
+ 
+ UpgradeToShiftDatesAlert.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/course-tabs/CourseTabsNavigation.jsx b/src/course-tabs/CourseTabsNavigation.jsx
+index ec84ce0..838a558 100644
+--- a/src/course-tabs/CourseTabsNavigation.jsx
++++ b/src/course-tabs/CourseTabsNavigation.jsx
+@@ -6,30 +6,28 @@ import classNames from 'classnames';
+ import messages from './messages';
+ import Tabs from '../generic/tabs/Tabs';
+ 
+-function CourseTabsNavigation({
++const CourseTabsNavigation = ({
+   activeTabSlug, className, tabs, intl,
+-}) {
+-  return (
+-    <div id="courseTabsNavigation" className={classNames('course-tabs-navigation', className)}>
+-      <div className="container-xl">
+-        <Tabs
+-          className="nav-underline-tabs"
+-          aria-label={intl.formatMessage(messages.courseMaterial)}
+-        >
+-          {tabs.map(({ url, title, slug }) => (
+-            <a
+-              key={slug}
+-              className={classNames('nav-item flex-shrink-0 nav-link', { active: slug === activeTabSlug })}
+-              href={url}
+-            >
+-              {title}
+-            </a>
+-          ))}
+-        </Tabs>
+-      </div>
++}) => (
++  <div id="courseTabsNavigation" className={classNames('course-tabs-navigation', className)}>
++    <div className="container-xl">
++      <Tabs
++        className="nav-underline-tabs"
++        aria-label={intl.formatMessage(messages.courseMaterial)}
++      >
++        {tabs.map(({ url, title, slug }) => (
++          <a
++            key={slug}
++            className={classNames('nav-item flex-shrink-0 nav-link', { active: slug === activeTabSlug })}
++            href={url}
++          >
++            {title}
++          </a>
++        ))}
++      </Tabs>
+     </div>
+-  );
+-}
++  </div>
++);
+ 
+ CourseTabsNavigation.propTypes = {
+   activeTabSlug: PropTypes.string,
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 83e5926..7b02f61 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -24,15 +24,13 @@ import { buildOutlineFromBlocks } from './data/__factories__/learningSequencesOu
+ // to have been passed into the component.  Separate tests can handle unit rendering, but this
+ // proves that the component is rendered and receives the correct props.  We probably COULD render
+ // Unit.jsx and its iframe in this test, but it's already complex enough.
+-function MockUnit({ courseId, id }) { // eslint-disable-line react/prop-types
+-  return (
+-    <div className="fake-unit">Unit Contents {courseId} {id}</div>
+-  );
+-}
+ 
+ jest.mock(
+   './course/sequence/Unit',
+-  () => MockUnit,
++  // eslint-disable-next-line react/prop-types
++  () => function ({ courseId, id }) {
++    return <div className="fake-unit">Unit Contents {courseId} {id}</div>;
++  },
+ );
+ 
+ jest.mock('@edx/frontend-platform/analytics');
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index 5be31f9..0597a7b 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -7,7 +7,7 @@ import { PageRoute } from '@edx/frontend-platform/react';
+ import queryString from 'query-string';
+ import PageLoading from '../generic/PageLoading';
+ 
+-export default () => {
++const CoursewareRedirectLandingPage = () => {
+   const { path } = useRouteMatch();
+   return (
+     <div className="flex-grow-1">
+@@ -50,3 +50,5 @@ export default () => {
+     </div>
+   );
+ };
++
++export default CoursewareRedirectLandingPage;
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 480bf8a..4bc56f1 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -18,7 +18,7 @@ import SidebarTriggers from './sidebar/SidebarTriggers';
+ import { useModel } from '../../generic/model-store';
+ import { getSessionStorage, setSessionStorage } from '../../data/sessionStorage';
+ 
+-function Course({
++const Course = ({
+   courseId,
+   sequenceId,
+   unitId,
+@@ -26,7 +26,7 @@ function Course({
+   previousSequenceHandler,
+   unitNavigationHandler,
+   windowWidth,
+-}) {
++}) => {
+   const course = useModel('coursewareMeta', courseId);
+   const {
+     celebrations,
+@@ -109,7 +109,7 @@ function Course({
+       <ContentTools course={course} />
+     </SidebarProvider>
+   );
+-}
++};
+ 
+ Course.propTypes = {
+   courseId: PropTypes.string,
+@@ -127,7 +127,7 @@ Course.defaultProps = {
+   unitId: null,
+ };
+ 
+-function CourseWrapper(props) {
++const CourseWrapper = (props) => {
+   // useWindowSize initially returns an undefined width intentionally at first.
+   // See https://www.joshwcomeau.com/react/the-perils-of-rehydration/ for why.
+   // But <Course> has some tricky window-size-dependent, session-storage-setting logic and React would yell at us if
+@@ -139,6 +139,6 @@ function CourseWrapper(props) {
+   }
+ 
+   return <Course {...props} windowWidth={windowWidth} />;
+-}
++};
+ 
+ export default CourseWrapper;
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index a90aff5..0a1e734 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -10,9 +10,9 @@ import { Link } from 'react-router-dom';
+ import { useModel, useModels } from '../../generic/model-store';
+ import JumpNavMenuItem from './JumpNavMenuItem';
+ 
+-function CourseBreadcrumb({
++const CourseBreadcrumb = ({
+   content, withSeparator, courseId, sequenceId, unitId, isStaff,
+-}) {
++}) => {
+   const defaultContent = content.filter(destination => destination.default)[0] || { id: courseId, label: '', sequences: [] };
+   return (
+     <>
+@@ -55,7 +55,7 @@ function CourseBreadcrumb({
+       </li>
+     </>
+   );
+-}
++};
+ CourseBreadcrumb.propTypes = {
+   content: PropTypes.arrayOf(
+     PropTypes.shape({
+@@ -79,13 +79,13 @@ CourseBreadcrumb.defaultProps = {
+   isStaff: null,
+ };
+ 
+-export default function CourseBreadcrumbs({
++const CourseBreadcrumbs = ({
+   courseId,
+   sectionId,
+   sequenceId,
+   unitId,
+   isStaff,
+-}) {
++}) => {
+   const course = useModel('coursewareMeta', courseId);
+   const courseStatus = useSelector(state => state.courseware.courseStatus);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+@@ -151,7 +151,7 @@ export default function CourseBreadcrumbs({
+       </ol>
+     </nav>
+   );
+-}
++};
+ 
+ CourseBreadcrumbs.propTypes = {
+   courseId: PropTypes.string.isRequired,
+@@ -167,3 +167,5 @@ CourseBreadcrumbs.defaultProps = {
+   unitId: null,
+   isStaff: null,
+ };
++
++export default CourseBreadcrumbs;
+diff --git a/src/courseware/course/JumpNavMenuItem.jsx b/src/courseware/course/JumpNavMenuItem.jsx
+index 37077f2..4bfe74b 100644
+--- a/src/courseware/course/JumpNavMenuItem.jsx
++++ b/src/courseware/course/JumpNavMenuItem.jsx
+@@ -8,14 +8,14 @@ import {
+   sendTrackEvent,
+ } from '@edx/frontend-platform/analytics';
+ 
+-export default function JumpNavMenuItem({
++const JumpNavMenuItem = ({
+   title,
+   courseId,
+   currentSequence,
+   currentUnit,
+   sequences,
+   isDefault,
+-}) {
++}) => {
+   function logEvent(targetUrl) {
+     const eventName = 'edx.ui.lms.jump_nav.selected';
+     const payload = {
+@@ -48,7 +48,7 @@ export default function JumpNavMenuItem({
+       {title}
+     </MenuItem>
+   );
+-}
++};
+ 
+ const sequenceShape = PropTypes.shape({
+   id: PropTypes.string.isRequired,
+@@ -62,3 +62,5 @@ JumpNavMenuItem.propTypes = {
+   currentSequence: PropTypes.string.isRequired,
+   currentUnit: PropTypes.string.isRequired,
+ };
++
++export default JumpNavMenuItem;
+diff --git a/src/courseware/course/bookmark/BookmarkButton.jsx b/src/courseware/course/bookmark/BookmarkButton.jsx
+index 29e9d9b..0f105a9 100644
+--- a/src/courseware/course/bookmark/BookmarkButton.jsx
++++ b/src/courseware/course/bookmark/BookmarkButton.jsx
+@@ -23,9 +23,9 @@ const hasBookmarkLabel = (
+   />
+ );
+ 
+-export default function BookmarkButton({
++const BookmarkButton = ({
+   isBookmarked, isProcessing, unitId,
+-}) {
++}) => {
+   const bookmarkState = isBookmarked ? 'bookmarked' : 'default';
+   const state = isProcessing ? `${bookmarkState}Processing` : bookmarkState;
+ 
+@@ -36,6 +36,7 @@ export default function BookmarkButton({
+     } else {
+       dispatch(addBookmark(unitId));
+     }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isBookmarked, unitId]);
+ 
+   return (
+@@ -59,7 +60,7 @@ export default function BookmarkButton({
+       }}
+     />
+   );
+-}
++};
+ 
+ BookmarkButton.propTypes = {
+   unitId: PropTypes.string.isRequired,
+@@ -70,3 +71,5 @@ BookmarkButton.propTypes = {
+ BookmarkButton.defaultProps = {
+   isBookmarked: false,
+ };
++
++export default BookmarkButton;
+diff --git a/src/courseware/course/bookmark/BookmarkFilledIcon.jsx b/src/courseware/course/bookmark/BookmarkFilledIcon.jsx
+index cb2a661..af6efe7 100644
+--- a/src/courseware/course/bookmark/BookmarkFilledIcon.jsx
++++ b/src/courseware/course/bookmark/BookmarkFilledIcon.jsx
+@@ -2,6 +2,6 @@ import React from 'react';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faBookmark } from '@fortawesome/free-solid-svg-icons';
+ 
+-export default function BookmarkFilledIcon(props) {
+-  return <FontAwesomeIcon icon={faBookmark} {...props} />;
+-}
++const BookmarkFilledIcon = (props) => <FontAwesomeIcon icon={faBookmark} {...props} />;
++
++export default BookmarkFilledIcon;
+diff --git a/src/courseware/course/bookmark/BookmarkOutlineIcon.jsx b/src/courseware/course/bookmark/BookmarkOutlineIcon.jsx
+index eed786a..2153625 100644
+--- a/src/courseware/course/bookmark/BookmarkOutlineIcon.jsx
++++ b/src/courseware/course/bookmark/BookmarkOutlineIcon.jsx
+@@ -2,6 +2,6 @@ import React from 'react';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faBookmark } from '@fortawesome/free-regular-svg-icons';
+ 
+-export default function BookmarkOutlineIcon(props) {
+-  return <FontAwesomeIcon icon={faBookmark} {...props} />;
+-}
++const BookmarkOutlineIcon = (props) => <FontAwesomeIcon icon={faBookmark} {...props} />;
++
++export default BookmarkOutlineIcon;
+diff --git a/src/courseware/course/celebration/CelebrationModal.jsx b/src/courseware/course/celebration/CelebrationModal.jsx
+index 768bc1f..6b0f2e7 100644
+--- a/src/courseware/course/celebration/CelebrationModal.jsx
++++ b/src/courseware/course/celebration/CelebrationModal.jsx
+@@ -16,9 +16,9 @@ import SocialIcons from '../../social-share/SocialIcons';
+ import { recordFirstSectionCelebration } from './utils';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function CelebrationModal({
++const CelebrationModal = ({
+   courseId, intl, isOpen, onClose, ...rest
+-}) {
++}) => {
+   const { org } = useModel('courseHomeMeta', courseId);
+   const wideScreen = useWindowSize().width >= breakpoints.small.minWidth;
+ 
+@@ -26,6 +26,7 @@ function CelebrationModal({
+     if (isOpen) {
+       recordFirstSectionCelebration(org, courseId);
+     }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isOpen]);
+ 
+   return (
+@@ -59,7 +60,7 @@ function CelebrationModal({
+       </>
+     </StandardModal>
+   );
+-}
++};
+ 
+ CelebrationModal.propTypes = {
+   courseId: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx b/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
+index 4d04f16..19dafc9 100644
+--- a/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
++++ b/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
+@@ -11,15 +11,16 @@ import messages from './messages';
+ import { recordWeeklyGoalCelebration } from './utils';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function WeeklyGoalCelebrationModal({
++const WeeklyGoalCelebrationModal = ({
+   courseId, daysPerWeek, intl, isOpen, onClose, ...rest
+-}) {
++}) => {
+   const { org } = useModel('courseHomeMeta', courseId);
+ 
+   useEffect(() => {
+     if (isOpen) {
+       recordWeeklyGoalCelebration(org, courseId);
+     }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isOpen]);
+ 
+   return (
+@@ -71,7 +72,7 @@ function WeeklyGoalCelebrationModal({
+       </>
+     </StandardModal>
+   );
+-}
++};
+ 
+ WeeklyGoalCelebrationModal.propTypes = {
+   courseId: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/content-tools/ContentTools.jsx b/src/courseware/course/content-tools/ContentTools.jsx
+index 095dc2e..871bf62 100644
+--- a/src/courseware/course/content-tools/ContentTools.jsx
++++ b/src/courseware/course/content-tools/ContentTools.jsx
+@@ -4,22 +4,20 @@ import PropTypes from 'prop-types';
+ import Calculator from './calculator';
+ import NotesVisibility from './notes-visibility';
+ 
+-export default function ContentTools({
++const ContentTools = ({
+   course,
+-}) {
+-  return (
+-    <div className="content-tools">
+-      <div className="d-flex justify-content-end align-items-end m-0">
+-        {course.showCalculator && (
+-          <Calculator />
+-        )}
+-        {course.notes.enabled && (
+-          <NotesVisibility course={course} />
+-        )}
+-      </div>
++}) => (
++  <div className="content-tools">
++    <div className="d-flex justify-content-end align-items-end m-0">
++      {course.showCalculator && (
++      <Calculator />
++      )}
++      {course.notes.enabled && (
++      <NotesVisibility course={course} />
++      )}
+     </div>
+-  );
+-}
++  </div>
++);
+ 
+ ContentTools.propTypes = {
+   course: PropTypes.shape({
+@@ -29,3 +27,5 @@ ContentTools.propTypes = {
+     showCalculator: PropTypes.bool,
+   }).isRequired,
+ };
++
++export default ContentTools;
+diff --git a/src/courseware/course/content-tools/ContentTools.test.jsx b/src/courseware/course/content-tools/ContentTools.test.jsx
+index 08cadff..152acac 100644
+--- a/src/courseware/course/content-tools/ContentTools.test.jsx
++++ b/src/courseware/course/content-tools/ContentTools.test.jsx
+@@ -2,8 +2,12 @@ import React from 'react';
+ import { initializeTestStore, render, screen } from '../../../setupTest';
+ import ContentTools from './ContentTools';
+ 
+-jest.mock('./calculator/Calculator', () => () => <div data-testid="Calculator" />);
+-jest.mock('./notes-visibility/NotesVisibility', () => () => <div data-testid="NotesVisibility" />);
++jest.mock('./calculator/Calculator', () => function () {
++  return <div data-testid="Calculator" />;
++});
++jest.mock('./notes-visibility/NotesVisibility', () => function () {
++  return <div data-testid="NotesVisibility" />;
++});
+ 
+ describe('Content Tools', () => {
+   const mockData = {
+diff --git a/src/courseware/course/course-exit/CatalogSuggestion.jsx b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+index ededa14..f0287d9 100644
+--- a/src/courseware/course/course-exit/CatalogSuggestion.jsx
++++ b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+@@ -16,7 +16,7 @@ import { useModel } from '../../../generic/model-store';
+ import messages from './messages';
+ import { logClick } from './utils';
+ 
+-function CatalogSuggestion({ intl, variant }) {
++const CatalogSuggestion = ({ intl, variant }) => {
+   const { courseId } = useSelector(state => state.courseware);
+   const { org } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+@@ -45,7 +45,7 @@ function CatalogSuggestion({ intl, variant }) {
+       </div>
+     </div>
+   );
+-}
++};
+ 
+ CatalogSuggestion.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index c9c5a2b..fd18b35 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -36,7 +36,7 @@ import CourseRecommendations from './CourseRecommendations';
+ 
+ const LINKEDIN_BLUE = '#2867B2';
+ 
+-function CourseCelebration({ intl }) {
++const CourseCelebration = ({ intl }) => {
+   const wideScreen = useWindowSize().width >= breakpoints.medium.minWidth;
+   const { courseId } = useSelector(state => state.courseware);
+   const dispatch = useDispatch();
+@@ -362,7 +362,7 @@ function CourseCelebration({ intl }) {
+       </div>
+     </>
+   );
+-}
++};
+ 
+ CourseCelebration.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/course-exit/CourseExit.jsx b/src/courseware/course/course-exit/CourseExit.jsx
+index 6bd80b8..d6bff40 100644
+--- a/src/courseware/course/course-exit/CourseExit.jsx
++++ b/src/courseware/course/course-exit/CourseExit.jsx
+@@ -15,7 +15,7 @@ import { unsubscribeFromGoalReminders } from './data/thunks';
+ 
+ import { useModel } from '../../../generic/model-store';
+ 
+-function CourseExit({ intl }) {
++const CourseExit = ({ intl }) => {
+   const { courseId } = useSelector(state => state.courseware);
+   const {
+     certificateData,
+@@ -74,7 +74,7 @@ function CourseExit({ intl }) {
+       {body}
+     </>
+   );
+-}
++};
+ 
+ CourseExit.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/course-exit/CourseInProgress.jsx b/src/courseware/course/course-exit/CourseInProgress.jsx
+index 7c230d4..a6b2909 100644
+--- a/src/courseware/course/course-exit/CourseInProgress.jsx
++++ b/src/courseware/course/course-exit/CourseInProgress.jsx
+@@ -14,7 +14,7 @@ import DashboardFootnote from './DashboardFootnote';
+ import messages from './messages';
+ import { logClick, logVisit } from './utils';
+ 
+-function CourseInProgress({ intl }) {
++const CourseInProgress = ({ intl }) => {
+   const { courseId } = useSelector(state => state.courseware);
+   const {
+     org,
+@@ -58,7 +58,7 @@ function CourseInProgress({ intl }) {
+       </div>
+     </>
+   );
+-}
++};
+ 
+ CourseInProgress.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index a39d35b..e63b9a7 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -14,7 +14,7 @@ import DashboardFootnote from './DashboardFootnote';
+ import messages from './messages';
+ import { logClick, logVisit } from './utils';
+ 
+-function CourseNonPassing({ intl }) {
++const CourseNonPassing = ({ intl }) => {
+   const { courseId } = useSelector(state => state.courseware);
+   const {
+     org,
+@@ -58,7 +58,7 @@ function CourseNonPassing({ intl }) {
+       </div>
+     </>
+   );
+-}
++};
+ 
+ CourseNonPassing.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/course-exit/CourseRecommendations.jsx b/src/courseware/course/course-exit/CourseRecommendations.jsx
+index 53dff1b..d4cc344 100644
+--- a/src/courseware/course/course-exit/CourseRecommendations.jsx
++++ b/src/courseware/course/course-exit/CourseRecommendations.jsx
+@@ -1,3 +1,4 @@
++/* eslint-disable react/jsx-no-useless-fragment */
+ import React, { useEffect } from 'react';
+ import { getConfig } from '@edx/frontend-platform';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+@@ -55,7 +56,7 @@ const ListStyles = {
+   conjunction: 'conjunction',
+ };
+ 
+-function CourseCard({
++const CourseCard = ({
+   original: {
+     title,
+     image,
+@@ -64,7 +65,7 @@ function CourseCard({
+     onClick,
+   },
+   intl,
+-}) {
++}) => {
+   const formatList = (items, style) => (
+     items.join(intl.formatMessage(
+       messages.listJoin,
+@@ -112,7 +113,7 @@ function CourseCard({
+       </Hyperlink>
+     </div>
+   );
+-}
++};
+ 
+ CourseCard.propTypes = {
+   original: PropTypes.shape({
+@@ -131,7 +132,7 @@ CourseCard.propTypes = {
+ 
+ const IntlCard = injectIntl(CourseCard);
+ 
+-function CourseRecommendations({ intl, variant }) {
++const CourseRecommendations = ({ intl, variant }) => {
+   const { courseId, recommendationsStatus } = useSelector(state => ({ ...state.recommendations, ...state.courseware }));
+   const { recommendations } = useModel('coursewareMeta', courseId);
+   const { org, number } = useModel('courseHomeMeta', courseId);
+@@ -142,6 +143,7 @@ function CourseRecommendations({ intl, variant }) {
+ 
+   useEffect(() => {
+     dispatch(fetchCourseRecommendations(courseKey, courseId));
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [dispatch]);
+ 
+   const recommendationsLength = recommendations ? recommendations.length : 0;
+@@ -200,7 +202,7 @@ function CourseRecommendations({ intl, variant }) {
+       </Hyperlink>
+     </div>
+   );
+-}
++};
+ 
+ CourseRecommendations.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/course-exit/DashboardFootnote.jsx b/src/courseware/course/course-exit/DashboardFootnote.jsx
+index 5a52542..132d46f 100644
+--- a/src/courseware/course/course-exit/DashboardFootnote.jsx
++++ b/src/courseware/course/course-exit/DashboardFootnote.jsx
+@@ -16,7 +16,7 @@ import Footnote from './Footnote';
+ import messages from './messages';
+ import { logClick } from './utils';
+ 
+-function DashboardFootnote({ intl, variant }) {
++const DashboardFootnote = ({ intl, variant }) => {
+   const { courseId } = useSelector(state => state.courseware);
+   const { org } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+@@ -45,7 +45,7 @@ function DashboardFootnote({ intl, variant }) {
+       )}
+     />
+   );
+-}
++};
+ 
+ DashboardFootnote.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/course-exit/Footnote.jsx b/src/courseware/course/course-exit/Footnote.jsx
+index b405edb..8531754 100644
+--- a/src/courseware/course/course-exit/Footnote.jsx
++++ b/src/courseware/course/course-exit/Footnote.jsx
+@@ -2,16 +2,14 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ 
+-function Footnote({ icon, text }) {
+-  return (
+-    <div className="row w-100 mx-0 my-4 justify-content-center">
+-      <p className="text-gray-700">
+-        <FontAwesomeIcon icon={icon} style={{ width: '20px' }} />&nbsp;
+-        {text}
+-      </p>
+-    </div>
+-  );
+-}
++const Footnote = ({ icon, text }) => (
++  <div className="row w-100 mx-0 my-4 justify-content-center">
++    <p className="text-gray-700">
++      <FontAwesomeIcon icon={icon} style={{ width: '20px' }} />&nbsp;
++      {text}
++    </p>
++  </div>
++);
+ 
+ Footnote.propTypes = {
+   icon: PropTypes.shape({}).isRequired,
+diff --git a/src/courseware/course/course-exit/ProgramCompletion.jsx b/src/courseware/course/course-exit/ProgramCompletion.jsx
+index 0114f65..f9e5635 100644
+--- a/src/courseware/course/course-exit/ProgramCompletion.jsx
++++ b/src/courseware/course/course-exit/ProgramCompletion.jsx
+@@ -19,13 +19,13 @@ import messages from './messages';
+ 
+ const programTypes = ['microbachelors', 'micromasters', 'professional-certificate', 'xseries'];
+ 
+-function ProgramCompletion({
++const ProgramCompletion = ({
+   intl,
+   progress,
+   title,
+   type,
+   url,
+-}) {
++}) => {
+   if (!programTypes.includes(type) || progress.notStarted !== 0 || progress.inProgress !== 0) {
+     return null;
+   }
+@@ -95,7 +95,7 @@ function ProgramCompletion({
+       </div>
+     </Alert>
+   );
+-}
++};
+ 
+ ProgramCompletion.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/course-exit/UpgradeFootnote.jsx b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+index d417334..0f2cf72 100644
+--- a/src/courseware/course/course-exit/UpgradeFootnote.jsx
++++ b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+@@ -14,7 +14,7 @@ import { logClick } from './utils';
+ import messages from './messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+-function UpgradeFootnote({ deadline, href, intl }) {
++const UpgradeFootnote = ({ deadline, href, intl }) => {
+   const { courseId } = useSelector(state => state.courseware);
+   const { org } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+@@ -55,7 +55,7 @@ function UpgradeFootnote({ deadline, href, intl }) {
+       )}
+     />
+   );
+-}
++};
+ 
+ UpgradeFootnote.propTypes = {
+   deadline: PropTypes.instanceOf(Date).isRequired,
+diff --git a/src/courseware/course/course-exit/index.js b/src/courseware/course/course-exit/index.js
+index 2252238..2f74d88 100644
+--- a/src/courseware/course/course-exit/index.js
++++ b/src/courseware/course/course-exit/index.js
+@@ -1,4 +1,4 @@
+ import CourseExit from './CourseExit';
+-import { getCourseExitNavigation } from './utils';
++import { GetCourseExitNavigation } from './utils';
+ 
+-export { CourseExit, getCourseExitNavigation };
++export { CourseExit, GetCourseExitNavigation };
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index 5da8356..da1d353 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -66,7 +66,7 @@ function getCourseExitMode(
+ }
+ 
+ // Returns null in order to render the default navigation text
+-function getCourseExitNavigation(courseId, intl) {
++function GetCourseExitNavigation(courseId, intl) {
+   const {
+     certificateData,
+     hasScheduledContent,
+@@ -133,7 +133,7 @@ const logVisit = (org, courseId, administrator, variant) => {
+ export {
+   COURSE_EXIT_MODES,
+   getCourseExitMode,
+-  getCourseExitNavigation,
++  GetCourseExitNavigation,
+   logClick,
+   logVisit,
+ };
+diff --git a/src/courseware/course/course-license/CourseLicense.jsx b/src/courseware/course/course-license/CourseLicense.jsx
+index 3d3cf51..870d7be 100644
+--- a/src/courseware/course/course-license/CourseLicense.jsx
++++ b/src/courseware/course/course-license/CourseLicense.jsx
+@@ -103,10 +103,10 @@ function parseLicense(license) {
+   return [licenseType, options, version];
+ }
+ 
+-function CourseLicense({
++const CourseLicense = ({
+   license,
+   intl,
+-}) {
++}) => {
+   const renderAllRightsReservedLicense = () => (
+     <div className="text-gray-500">
+       <FontAwesomeIcon aria-hidden="true" className="mr-1" icon={faCopyright} />
+@@ -148,7 +148,7 @@ function CourseLicense({
+       )}
+     </div>
+   );
+-}
++};
+ 
+ CourseLicense.propTypes = {
+   license: PropTypes.string,
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 7373825..faa58c9 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -26,7 +26,7 @@ import HiddenAfterDue from './hidden-after-due';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import SequenceContent from './SequenceContent';
+ 
+-function Sequence({
++const Sequence = ({
+   unitId,
+   sequenceId,
+   courseId,
+@@ -34,7 +34,7 @@ function Sequence({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   intl,
+-}) {
++}) => {
+   const course = useModel('coursewareMeta', courseId);
+   const {
+     isStaff,
+@@ -218,7 +218,7 @@ function Sequence({
+       {intl.formatMessage(messages.loadFailure)}
+     </p>
+   );
+-}
++};
+ 
+ Sequence.propTypes = {
+   unitId: PropTypes.string,
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 55d6513..d771d97 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import PropTypes from 'prop-types';
+ import { Factory } from 'rosie';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { breakpoints } from '@edx/paragon';
+@@ -381,27 +382,25 @@ describe('Sequence', () => {
+     });
+   });
+ 
++  const SidebarWrapper = ({ contextValue }) => (
++    <SidebarContext.Provider value={contextValue}>
++      <Sequence {...mockData} />
++    </SidebarContext.Provider>
++  );
++
++  SidebarWrapper.propTypes = {
++    contextValue: PropTypes.shape({}).isRequired,
++  };
++
+   describe('notification feature', () => {
+     it('renders notification tray in sequence', async () => {
+-      render(
+-        <SidebarContext.Provider
+-          value={{ courseId: mockData.courseId, currentSidebar: 'NOTIFICATIONS', toggleSidebar: () => null }}
+-        >
+-          <Sequence {...mockData} />
+-        </SidebarContext.Provider>,
+-      );
++      render(<SidebarWrapper contextValue={{ courseId: mockData.courseId, currentSidebar: 'NOTIFICATIONS', toggleSidebar: () => null }} />);
+       expect(await screen.findByText('Notifications')).toBeInTheDocument();
+     });
+ 
+     it('handles click on notification tray close button', async () => {
+       const toggleNotificationTray = jest.fn();
+-      render(
+-        <SidebarContext.Provider
+-          value={{ courseId: mockData.courseId, currentSidebar: 'NOTIFICATIONS', toggleSidebar: toggleNotificationTray }}
+-        >
+-          <Sequence {...mockData} />
+-        </SidebarContext.Provider>,
+-      );
++      render(<SidebarWrapper contextValue={{ courseId: mockData.courseId, currentSidebar: 'NOTIFICATIONS', toggleSidebar: toggleNotificationTray }} />);
+       const notificationCloseIconButton = await screen.findByRole('button', { name: /Close notification tray/i });
+       fireEvent.click(notificationCloseIconButton);
+       expect(toggleNotificationTray).toHaveBeenCalledTimes(1);
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index 9f78d59..35a9a27 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -9,14 +9,14 @@ import Unit from './Unit';
+ 
+ const ContentLock = React.lazy(() => import('./content-lock'));
+ 
+-function SequenceContent({
++const SequenceContent = ({
+   gated,
+   intl,
+   courseId,
+   sequenceId,
+   unitId,
+   unitLoadedHandler,
+-}) {
++}) => {
+   const sequence = useModel('sequences', sequenceId);
+ 
+   // Go back to the top of the page whenever the unit or sequence changes.
+@@ -61,7 +61,7 @@ function SequenceContent({
+       onLoaded={unitLoadedHandler}
+     />
+   );
+-}
++};
+ 
+ SequenceContent.propTypes = {
+   gated: PropTypes.bool.isRequired,
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 41fe9d8..274bc68 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -74,13 +74,13 @@ export function sendUrlHashToFrame(frame) {
+   }
+ }
+ 
+-function Unit({
++const Unit = ({
+   courseId,
+   format,
+   onLoaded,
+   id,
+   intl,
+-}) {
++}) => {
+   const { authenticatedUser } = useContext(AppContext);
+   const view = authenticatedUser ? 'student_view' : 'public_view';
+   let iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0&recheck_access=1&view=${view}`;
+@@ -239,7 +239,7 @@ function Unit({
+       )}
+     </div>
+   );
+-}
++};
+ 
+ Unit.propTypes = {
+   courseId: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/sequence/content-lock/ContentLock.jsx b/src/courseware/course/sequence/content-lock/ContentLock.jsx
+index 2ec0f00..26393fe 100644
+--- a/src/courseware/course/sequence/content-lock/ContentLock.jsx
++++ b/src/courseware/course/sequence/content-lock/ContentLock.jsx
+@@ -8,12 +8,12 @@ import { Button } from '@edx/paragon';
+ 
+ import messages from './messages';
+ 
+-function ContentLock({
++const ContentLock = ({
+   intl, courseId, prereqSectionName, prereqId, sequenceTitle,
+-}) {
++}) => {
+   const handleClick = useCallback(() => {
+     history.push(`/course/${courseId}/${prereqId}`);
+-  });
++  }, [courseId, prereqId]);
+ 
+   return (
+     <>
+@@ -33,7 +33,7 @@ function ContentLock({
+       </p>
+     </>
+   );
+-}
++};
+ ContentLock.propTypes = {
+   intl: intlShape.isRequired,
+   courseId: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx b/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
+index 01f50b5..13f6d89 100644
+--- a/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
++++ b/src/courseware/course/sequence/hidden-after-due/HiddenAfterDue.jsx
+@@ -8,7 +8,7 @@ import { useModel } from '../../../../generic/model-store';
+ 
+ import messages from './messages';
+ 
+-function HiddenAfterDue({ courseId, intl }) {
++const HiddenAfterDue = ({ courseId, intl }) => {
+   const { tabs } = useModel('courseHomeMeta', courseId);
+ 
+   const progressTab = tabs.find(tab => tab.slug === 'progress');
+@@ -42,7 +42,7 @@ function HiddenAfterDue({ courseId, intl }) {
+       </p>
+     </Alert>
+   );
+-}
++};
+ 
+ HiddenAfterDue.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.jsx b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+index 4525482..11e7d59 100644
+--- a/src/courseware/course/sequence/honor-code/HonorCode.jsx
++++ b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+@@ -10,7 +10,7 @@ import { useModel } from '../../../../generic/model-store';
+ import { saveIntegritySignature } from '../../../data';
+ import messages from './messages';
+ 
+-function HonorCode({ intl, courseId }) {
++const HonorCode = ({ intl, courseId }) => {
+   const dispatch = useDispatch();
+   const {
+     isMasquerading,
+@@ -63,7 +63,7 @@ function HonorCode({ intl, courseId }) {
+       </ActionRow>
+     </Alert>
+   );
+-}
++};
+ 
+ HonorCode.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index b128eab..90af888 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -19,10 +19,10 @@ import {
+   SupportMissionBullet,
+ } from '../../../../generic/upsell-bullets/UpsellBullets';
+ 
+-function LockPaywall({
++const LockPaywall = ({
+   intl,
+   courseId,
+-}) {
++}) => {
+   const { notificationTrayVisible } = useContext(SidebarContext);
+   const course = useModel('coursewareMeta', courseId);
+   const {
+@@ -141,7 +141,7 @@ function LockPaywall({
+       </div>
+     </Alert>
+   );
+-}
++};
+ LockPaywall.propTypes = {
+   intl: intlShape.isRequired,
+   courseId: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/sequence/sequence-navigation/CompleteIcon.jsx b/src/courseware/course/sequence/sequence-navigation/CompleteIcon.jsx
+index bfddccd..31dea65 100644
+--- a/src/courseware/course/sequence/sequence-navigation/CompleteIcon.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/CompleteIcon.jsx
+@@ -2,6 +2,6 @@ import React from 'react';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faCheck } from '@fortawesome/free-solid-svg-icons';
+ 
+-export default function CompleteIcon(props) {
+-  return <FontAwesomeIcon icon={faCheck} {...props} />;
+-}
++const CompleteIcon = (props) => <FontAwesomeIcon icon={faCheck} {...props} />;
++
++export default CompleteIcon;
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 0cc975c..76bbaf3 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -11,7 +11,7 @@ import {
+ } from '@edx/frontend-platform/i18n';
+ 
+ import { useSelector } from 'react-redux';
+-import { getCourseExitNavigation } from '../../course-exit';
++import { GetCourseExitNavigation } from '../../course-exit';
+ import UnitButton from './UnitButton';
+ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import { useSequenceNavigationMetadata } from './hooks';
+@@ -20,7 +20,7 @@ import { LOADED } from '../../../data/slice';
+ 
+ import messages from './messages';
+ 
+-function SequenceNavigation({
++const SequenceNavigation = ({
+   intl,
+   unitId,
+   sequenceId,
+@@ -29,7 +29,7 @@ function SequenceNavigation({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   goToCourseExitPage,
+-}) {
++}) => {
+   const sequence = useModel('sequences', sequenceId);
+   const { isFirstUnit, isLastUnit } = useSequenceNavigationMetadata(sequenceId, unitId);
+   const {
+@@ -64,7 +64,7 @@ function SequenceNavigation({
+   };
+ 
+   const renderNextButton = () => {
+-    const { exitActive, exitText } = getCourseExitNavigation(courseId, intl);
++    const { exitActive, exitText } = GetCourseExitNavigation(courseId, intl);
+     const buttonOnClick = isLastUnit ? goToCourseExitPage : nextSequenceHandler;
+     const buttonText = (isLastUnit && exitText) ? exitText : intl.formatMessage(messages.nextButton);
+     const disabled = isLastUnit && !exitActive;
+@@ -89,7 +89,7 @@ function SequenceNavigation({
+ 
+     </nav>
+   );
+-}
++};
+ 
+ SequenceNavigation.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.jsx
+index e880173..8898ff3 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.jsx
+@@ -5,42 +5,40 @@ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ 
+ import UnitButton from './UnitButton';
+ 
+-export default function SequenceNavigationDropdown({
++const SequenceNavigationDropdown = ({
+   unitId,
+   onNavigate,
+   showCompletion,
+   unitIds,
+-}) {
+-  return (
+-    <Dropdown className="sequence-navigation-dropdown">
+-      <Dropdown.Toggle variant="link" className="font-weight-normal w-100 border-right-0">
+-        <FormattedMessage
+-          defaultMessage="{current} of {total}"
+-          description="The title of the mobile menu for sequence navigation of units"
+-          id="learn.course.sequence.navigation.mobile.menu"
+-          values={{
+-            current: unitIds.indexOf(unitId) + 1,
+-            total: unitIds.length,
+-          }}
++}) => (
++  <Dropdown className="sequence-navigation-dropdown">
++    <Dropdown.Toggle variant="link" className="font-weight-normal w-100 border-right-0">
++      <FormattedMessage
++        defaultMessage="{current} of {total}"
++        description="The title of the mobile menu for sequence navigation of units"
++        id="learn.course.sequence.navigation.mobile.menu"
++        values={{
++          current: unitIds.indexOf(unitId) + 1,
++          total: unitIds.length,
++        }}
++      />
++    </Dropdown.Toggle>
++    <Dropdown.Menu className="w-100">
++      {unitIds.map(buttonUnitId => (
++        <Dropdown.Item
++          as={UnitButton}
++          className="w-100"
++          isActive={unitId === buttonUnitId}
++          key={buttonUnitId}
++          onClick={onNavigate}
++          showCompletion={showCompletion}
++          showTitle
++          unitId={buttonUnitId}
+         />
+-      </Dropdown.Toggle>
+-      <Dropdown.Menu className="w-100">
+-        {unitIds.map(buttonUnitId => (
+-          <Dropdown.Item
+-            as={UnitButton}
+-            className="w-100"
+-            isActive={unitId === buttonUnitId}
+-            key={buttonUnitId}
+-            onClick={onNavigate}
+-            showCompletion={showCompletion}
+-            showTitle
+-            unitId={buttonUnitId}
+-          />
+-        ))}
+-      </Dropdown.Menu>
+-    </Dropdown>
+-  );
+-}
++      ))}
++    </Dropdown.Menu>
++  </Dropdown>
++);
+ 
+ SequenceNavigationDropdown.propTypes = {
+   unitId: PropTypes.string.isRequired,
+@@ -48,3 +46,5 @@ SequenceNavigationDropdown.propTypes = {
+   showCompletion: PropTypes.bool.isRequired,
+   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+ };
++
++export default SequenceNavigationDropdown;
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.jsx
+index 6275548..6e1e84d 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.jsx
+@@ -5,9 +5,9 @@ import UnitButton from './UnitButton';
+ import SequenceNavigationDropdown from './SequenceNavigationDropdown';
+ import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastVisibleChild';
+ 
+-export default function SequenceNavigationTabs({
++const SequenceNavigationTabs = ({
+   unitIds, unitId, showCompletion, onNavigate,
+-}) {
++}) => {
+   const [
+     indexOfLastVisibleChild,
+     containerRef,
+@@ -43,7 +43,7 @@ export default function SequenceNavigationTabs({
+       )}
+     </div>
+   );
+-}
++};
+ 
+ SequenceNavigationTabs.propTypes = {
+   unitId: PropTypes.string.isRequired,
+@@ -51,3 +51,5 @@ SequenceNavigationTabs.propTypes = {
+   showCompletion: PropTypes.bool.isRequired,
+   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+ };
++
++export default SequenceNavigationTabs;
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx b/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
+index ed55e1a..393a299 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitButton.jsx
+@@ -8,7 +8,7 @@ import UnitIcon from './UnitIcon';
+ import CompleteIcon from './CompleteIcon';
+ import BookmarkFilledIcon from '../../bookmark/BookmarkFilledIcon';
+ 
+-function UnitButton({
++const UnitButton = ({
+   onClick,
+   title,
+   contentType,
+@@ -19,10 +19,10 @@ function UnitButton({
+   unitId,
+   className,
+   showTitle,
+-}) {
++}) => {
+   const handleClick = useCallback(() => {
+     onClick(unitId);
+-  });
++  }, [onClick, unitId]);
+ 
+   return (
+     <Button
+@@ -45,7 +45,7 @@ function UnitButton({
+       ) : null}
+     </Button>
+   );
+-}
++};
+ 
+ UnitButton.propTypes = {
+   bookmarked: PropTypes.bool,
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx b/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
+index 27ade70..a0ea769 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
+@@ -5,7 +5,7 @@ import {
+   faVideo, faBook, faEdit, faTasks, faLock,
+ } from '@fortawesome/free-solid-svg-icons';
+ 
+-export default function UnitIcon({ type }) {
++const UnitIcon = ({ type }) => {
+   let icon = null;
+   switch (type) {
+     case 'video':
+@@ -30,8 +30,10 @@ export default function UnitIcon({ type }) {
+   return (
+     <FontAwesomeIcon className="unit-icon" icon={icon} />
+   );
+-}
++};
+ 
+ UnitIcon.propTypes = {
+   type: PropTypes.oneOf(['video', 'other', 'vertical', 'problem', 'lock']).isRequired,
+ };
++
++export default UnitIcon;
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+index b6aa1ef..7558724 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+@@ -8,25 +8,25 @@ import {
+ } from '@edx/frontend-platform/i18n';
+ import { useSelector } from 'react-redux';
+ 
+-import { getCourseExitNavigation } from '../../course-exit';
++import { GetCourseExitNavigation } from '../../course-exit';
+ 
+ import UnitNavigationEffortEstimate from './UnitNavigationEffortEstimate';
+ import { useSequenceNavigationMetadata } from './hooks';
+ import messages from './messages';
+ 
+-function UnitNavigation({
++const UnitNavigation = ({
+   intl,
+   sequenceId,
+   unitId,
+   onClickPrevious,
+   onClickNext,
+   goToCourseExitPage,
+-}) {
++}) => {
+   const { isFirstUnit, isLastUnit } = useSequenceNavigationMetadata(sequenceId, unitId);
+   const { courseId } = useSelector(state => state.courseware);
+ 
+   const renderNextButton = () => {
+-    const { exitActive, exitText } = getCourseExitNavigation(courseId, intl);
++    const { exitActive, exitText } = GetCourseExitNavigation(courseId, intl);
+     const buttonOnClick = isLastUnit ? goToCourseExitPage : onClickNext;
+     const buttonText = (isLastUnit && exitText) ? exitText : intl.formatMessage(messages.nextButton);
+     const disabled = isLastUnit && !exitActive;
+@@ -61,7 +61,7 @@ function UnitNavigation({
+       {renderNextButton()}
+     </div>
+   );
+-}
++};
+ 
+ UnitNavigation.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+index a110a38..4c0c709 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+@@ -22,12 +22,12 @@ import messages from './messages';
+  * modulestore, which would allow us to revive the usefulness of this component again.
+  */
+ 
+-function UnitNavigationEffortEstimate({
++const UnitNavigationEffortEstimate = ({
+   children,
+   intl,
+   sequenceId,
+   unitId,
+-}) {
++}) => {
+   const sequenceIds = useSelector(sequenceIdsSelector);
+   const sequenceIndex = sequenceIds.indexOf(sequenceId);
+   const nextSequenceId = sequenceIndex < sequenceIds.length - 1 ? sequenceIds[sequenceIndex + 1] : null;
+@@ -55,7 +55,7 @@ function UnitNavigationEffortEstimate({
+       <EffortEstimate className="d-block mt-1" block={nextSequence} />
+     </div>
+   );
+-}
++};
+ 
+ UnitNavigationEffortEstimate.propTypes = {
+   children: PropTypes.node,
+diff --git a/src/courseware/course/share/ShareButton.jsx b/src/courseware/course/share/ShareButton.jsx
+index 73473f3..5304245 100644
+--- a/src/courseware/course/share/ShareButton.jsx
++++ b/src/courseware/course/share/ShareButton.jsx
+@@ -17,7 +17,7 @@ const ShareTwitterIcon = () => (
+   />
+ );
+ 
+-function ShareButton({ url }) {
++const ShareButton = ({ url }) => {
+   const { formatMessage } = useIntl();
+ 
+   const twitterUrl = stringifyUrl({
+@@ -40,7 +40,7 @@ function ShareButton({ url }) {
+       {formatMessage(messages.shareButton)}
+     </TwitterShareButton>
+   );
+-}
++};
+ 
+ ShareButton.propTypes = {
+   url: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/sidebar/Sidebar.jsx b/src/courseware/course/sidebar/Sidebar.jsx
+index efec70a..7acfa52 100644
+--- a/src/courseware/course/sidebar/Sidebar.jsx
++++ b/src/courseware/course/sidebar/Sidebar.jsx
+@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
+ import SidebarContext from './SidebarContext';
+ import { SIDEBARS } from './sidebars';
+ 
+-function Sidebar() {
++const Sidebar = () => {
+   const {
+     currentSidebar,
+   } = useContext(SidebarContext);
+@@ -13,6 +13,6 @@ function Sidebar() {
+   return (
+     <CurrentSidebar />
+   );
+-}
++};
+ 
+ export default Sidebar;
+diff --git a/src/courseware/course/sidebar/SidebarContextProvider.jsx b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+index 9159a13..a2cde92 100644
+--- a/src/courseware/course/sidebar/SidebarContextProvider.jsx
++++ b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+@@ -1,6 +1,8 @@
+ import { breakpoints, useWindowSize } from '@edx/paragon';
+ import PropTypes from 'prop-types';
+-import React, { useEffect, useState } from 'react';
++import React, {
++  useEffect, useState, useMemo, useCallback,
++} from 'react';
+ 
+ import { getLocalStorage, setLocalStorage } from '../../../data/localStorage';
+ import { getSessionStorage } from '../../../data/sessionStorage';
+@@ -8,11 +10,11 @@ import { useModel } from '../../../generic/model-store';
+ import SidebarContext from './SidebarContext';
+ import { SIDEBARS } from './sidebars';
+ 
+-export default function SidebarProvider({
++const SidebarProvider = ({
+   courseId,
+   unitId,
+   children,
+-}) {
++}) => {
+   const { verifiedMode } = useModel('courseHomeMeta', courseId);
+   const shouldDisplayFullScreen = useWindowSize().width < breakpoints.large.minWidth;
+   const shouldDisplaySidebarOpen = useWindowSize().width > breakpoints.medium.minWidth;
+@@ -29,37 +31,40 @@ export default function SidebarProvider({
+     if (verifiedMode && currentSidebar === null && initialSidebar) {
+       setCurrentSidebar(initialSidebar);
+     }
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [initialSidebar, verifiedMode]);
+ 
+-  const onNotificationSeen = () => {
++  const onNotificationSeen = useCallback(() => {
+     setNotificationStatus('inactive');
+     setLocalStorage(`notificationStatus.${courseId}`, 'inactive');
+-  };
++  }, [courseId]);
+ 
+-  const toggleSidebar = (sidebarId) => {
++  const toggleSidebar = useCallback((sidebarId) => {
+     // Switch to new sidebar or hide the current sidebar
+     setCurrentSidebar(sidebarId === currentSidebar ? null : sidebarId);
+-  };
++  }, [currentSidebar]);
++
++  const contextValue = useMemo(() => ({
++    toggleSidebar,
++    onNotificationSeen,
++    setNotificationStatus,
++    currentSidebar,
++    notificationStatus,
++    upgradeNotificationCurrentState,
++    setUpgradeNotificationCurrentState,
++    shouldDisplaySidebarOpen,
++    shouldDisplayFullScreen,
++    courseId,
++    unitId,
++  }), [courseId, currentSidebar, notificationStatus, onNotificationSeen, shouldDisplayFullScreen,
++    shouldDisplaySidebarOpen, toggleSidebar, unitId, upgradeNotificationCurrentState]);
+ 
+   return (
+-    <SidebarContext.Provider value={{
+-      toggleSidebar,
+-      onNotificationSeen,
+-      setNotificationStatus,
+-      currentSidebar,
+-      notificationStatus,
+-      upgradeNotificationCurrentState,
+-      setUpgradeNotificationCurrentState,
+-      shouldDisplaySidebarOpen,
+-      shouldDisplayFullScreen,
+-      courseId,
+-      unitId,
+-    }}
+-    >
++    <SidebarContext.Provider value={contextValue}>
+       {children}
+     </SidebarContext.Provider>
+   );
+-}
++};
+ 
+ SidebarProvider.propTypes = {
+   courseId: PropTypes.string.isRequired,
+@@ -70,3 +75,5 @@ SidebarProvider.propTypes = {
+ SidebarProvider.defaultProps = {
+   children: null,
+ };
++
++export default SidebarProvider;
+diff --git a/src/courseware/course/sidebar/SidebarTriggers.jsx b/src/courseware/course/sidebar/SidebarTriggers.jsx
+index b578f41..9ef7b72 100644
+--- a/src/courseware/course/sidebar/SidebarTriggers.jsx
++++ b/src/courseware/course/sidebar/SidebarTriggers.jsx
+@@ -3,7 +3,7 @@ import React, { useContext } from 'react';
+ import SidebarContext from './SidebarContext';
+ import { SIDEBAR_ORDER, SIDEBARS } from './sidebars';
+ 
+-function SidebarTriggers() {
++const SidebarTriggers = () => {
+   const {
+     toggleSidebar,
+     currentSidebar,
+@@ -25,7 +25,7 @@ function SidebarTriggers() {
+       })}
+     </div>
+   );
+-}
++};
+ 
+ SidebarTriggers.propTypes = {};
+ 
+diff --git a/src/courseware/course/sidebar/common/SidebarBase.jsx b/src/courseware/course/sidebar/common/SidebarBase.jsx
+index 50d8ada..a1c6651 100644
+--- a/src/courseware/course/sidebar/common/SidebarBase.jsx
++++ b/src/courseware/course/sidebar/common/SidebarBase.jsx
+@@ -8,7 +8,7 @@ import { useEventListener } from '../../../../generic/hooks';
+ import messages from '../../messages';
+ import SidebarContext from '../SidebarContext';
+ 
+-function SidebarBase({
++const SidebarBase = ({
+   intl,
+   title,
+   ariaLabel,
+@@ -17,7 +17,7 @@ function SidebarBase({
+   children,
+   showTitleBar,
+   width,
+-}) {
++}) => {
+   const {
+     toggleSidebar,
+     shouldDisplayFullScreen,
+@@ -29,6 +29,7 @@ function SidebarBase({
+     if (type === 'learning.events.sidebar.close') {
+       toggleSidebar(null);
+     }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [sidebarId, toggleSidebar]);
+ 
+   useEventListener('message', receiveMessage);
+@@ -82,7 +83,7 @@ function SidebarBase({
+       {children}
+     </section>
+   );
+-}
++};
+ 
+ SidebarBase.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sidebar/common/TriggerBase.jsx b/src/courseware/course/sidebar/common/TriggerBase.jsx
+index bf1e9b6..16c2845 100644
+--- a/src/courseware/course/sidebar/common/TriggerBase.jsx
++++ b/src/courseware/course/sidebar/common/TriggerBase.jsx
+@@ -2,24 +2,22 @@ import { injectIntl } from '@edx/frontend-platform/i18n';
+ import PropTypes from 'prop-types';
+ import React from 'react';
+ 
+-function SidebarTriggerBase({
++const SidebarTriggerBase = ({
+   onClick,
+   ariaLabel,
+   children,
+-}) {
+-  return (
+-    <button
+-      className="border border-light-400 bg-transparent align-items-center align-content-center d-flex"
+-      type="button"
+-      onClick={onClick}
+-      aria-label={ariaLabel}
+-    >
+-      <div className="icon-container d-flex position-relative align-items-center">
+-        {children}
+-      </div>
+-    </button>
+-  );
+-}
++}) => (
++  <button
++    className="border border-light-400 bg-transparent align-items-center align-content-center d-flex"
++    type="button"
++    onClick={onClick}
++    aria-label={ariaLabel}
++  >
++    <div className="icon-container d-flex position-relative align-items-center">
++      {children}
++    </div>
++  </button>
++);
+ 
+ SidebarTriggerBase.propTypes = {
+   onClick: PropTypes.func.isRequired,
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+index 918a3a9..c3dc90b 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -10,7 +10,7 @@ import messages from './messages';
+ 
+ ensureConfig(['DISCUSSIONS_MFE_BASE_URL']);
+ 
+-function DiscussionsSidebar({ intl }) {
++const DiscussionsSidebar = ({ intl }) => {
+   const {
+     unitId,
+     courseId,
+@@ -37,7 +37,7 @@ function DiscussionsSidebar({ intl }) {
+       />
+     </SidebarBase>
+   );
+-}
++};
+ 
+ DiscussionsSidebar.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+index 40c7032..59c31b1 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+@@ -1,3 +1,4 @@
++/* eslint-disable react/jsx-no-constructed-context-values */
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import MockAdapter from 'axios-mock-adapter';
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
+index 5f8dc4a..ef4b994 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
+@@ -14,10 +14,10 @@ import messages from './messages';
+ ensureConfig(['DISCUSSIONS_MFE_BASE_URL']);
+ export const ID = 'DISCUSSIONS';
+ 
+-function DiscussionsTrigger({
++const DiscussionsTrigger = ({
+   intl,
+   onClick,
+-}) {
++}) => {
+   const {
+     unitId,
+     courseId,
+@@ -31,6 +31,7 @@ function DiscussionsTrigger({
+     if (baseUrl) {
+       dispatch(getCourseDiscussionTopics(courseId));
+     }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [courseId, baseUrl]);
+ 
+   if (!topic?.id || !topic?.enabledInContext) {
+@@ -42,7 +43,7 @@ function DiscussionsTrigger({
+       <Icon src={QuestionAnswer} className="m-0 m-auto" />
+     </SidebarTriggerBase>
+   );
+-}
++};
+ 
+ DiscussionsTrigger.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.test.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.test.jsx
+index 18d4677..f907cff 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.test.jsx
+@@ -2,6 +2,7 @@ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import MockAdapter from 'axios-mock-adapter';
+ import React from 'react';
++import PropTypes from 'prop-types';
+ import {
+   fireEvent, initializeMockApp, initializeTestStore, render, screen,
+ } from '../../../../../setupTest';
+@@ -42,12 +43,19 @@ describe('Discussions Trigger', () => {
+       .reply(200, buildTopicsFromUnits(state.models.units));
+   });
+ 
++  const SidebarWrapper = ({ contextValue, onClick }) => (
++    <SidebarContext.Provider value={contextValue}>
++      <DiscussionsTrigger onClick={onClick} />
++    </SidebarContext.Provider>
++  );
++
++  SidebarWrapper.propTypes = {
++    contextValue: PropTypes.shape({}).isRequired,
++    onClick: PropTypes.func.isRequired,
++  };
++
+   function renderWithProvider(testData = {}, onClick = () => null) {
+-    const { container } = render(
+-      <SidebarContext.Provider value={{ ...mockData, ...testData }}>
+-        <DiscussionsTrigger onClick={onClick} />
+-      </SidebarContext.Provider>,
+-    );
++    const { container } = render(<SidebarWrapper contextValue={{ ...mockData, ...testData }} onClick={onClick} />);
+     return container;
+   }
+ 
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.jsx
+index d8ea403..d7fbc7d 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationIcon.jsx
+@@ -7,29 +7,27 @@ import React from 'react';
+ 
+ import messages from '../../../messages';
+ 
+-function NotificationIcon({
++const NotificationIcon = ({
+   intl,
+   status,
+   notificationColor,
+-}) {
+-  return (
+-    <>
+-      <Icon src={WatchOutline} className="m-0 m-auto" alt={intl.formatMessage(messages.openNotificationTrigger)} />
+-      {status === 'active'
+-        ? (
+-          <span
+-            className={classNames(notificationColor, 'rounded-circle p-1 position-absolute')}
+-            data-testid="notification-dot"
+-            style={{
+-              top: '0.3rem',
+-              right: '0.55rem',
+-            }}
+-          />
+-        )
+-        : null}
+-    </>
+-  );
+-}
++}) => (
++  <>
++    <Icon src={WatchOutline} className="m-0 m-auto" alt={intl.formatMessage(messages.openNotificationTrigger)} />
++    {status === 'active'
++      ? (
++        <span
++          className={classNames(notificationColor, 'rounded-circle p-1 position-absolute')}
++          data-testid="notification-dot"
++          style={{
++            top: '0.3rem',
++            right: '0.55rem',
++          }}
++        />
++      )
++      : null}
++  </>
++);
+ 
+ NotificationIcon.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
+index bce9c89..3cef46a 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
+@@ -9,7 +9,7 @@ import SidebarBase from '../../common/SidebarBase';
+ import SidebarContext from '../../SidebarContext';
+ import NotificationTrigger, { ID } from './NotificationTrigger';
+ 
+-function NotificationTray({ intl }) {
++const NotificationTray = ({ intl }) => {
+   const {
+     courseId,
+     onNotificationSeen,
+@@ -34,6 +34,7 @@ function NotificationTray({ intl }) {
+   } = useModel('courseHomeMeta', courseId);
+ 
+   // After three seconds, update notificationSeen (to hide red dot)
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   useEffect(() => { setTimeout(onNotificationSeen, 3000); }, []);
+ 
+   return (
+@@ -66,7 +67,7 @@ function NotificationTray({ intl }) {
+       </div>
+     </SidebarBase>
+   );
+-}
++};
+ 
+ NotificationTray.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+index 9028bdf..d7ba582 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+@@ -1,3 +1,4 @@
++/* eslint-disable react/jsx-no-constructed-context-values */
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import { breakpoints } from '@edx/paragon';
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.jsx
+index 73c667b..6819e06 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.jsx
+@@ -11,10 +11,10 @@ import NotificationIcon from './NotificationIcon';
+ 
+ export const ID = 'NOTIFICATIONS';
+ 
+-function NotificationTrigger({
++const NotificationTrigger = ({
+   intl,
+   onClick,
+-}) {
++}) => {
+   const {
+     courseId,
+     notificationStatus,
+@@ -61,7 +61,7 @@ function NotificationTrigger({
+       <NotificationIcon status={notificationStatus} notificationColor="bg-danger-500" />
+     </SidebarTriggerBase>
+   );
+-}
++};
+ 
+ NotificationTrigger.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
+index 92b8684..c6c264b 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import PropTypes from 'prop-types';
+ import { Factory } from 'rosie';
+ import {
+   fireEvent, initializeTestStore, render, screen,
+@@ -36,13 +37,20 @@ describe('Notification Trigger', () => {
+     setItemSpy.mockRestore();
+   });
+ 
++  const SidebarWrapper = ({ contextValue, onClick }) => (
++    <SidebarContext.Provider value={contextValue}>
++      <NotificationTrigger onClick={onClick} />
++    </SidebarContext.Provider>
++  );
++
++  SidebarWrapper.propTypes = {
++    contextValue: PropTypes.shape({}).isRequired,
++    onClick: PropTypes.func.isRequired,
++  };
++
+   function renderWithProvider(data, onClick = () => {
+   }) {
+-    const { container } = render(
+-      <SidebarContext.Provider value={{ ...mockData, ...data }}>
+-        <NotificationTrigger onClick={onClick} />
+-      </SidebarContext.Provider>,
+-    );
++    const { container } = render(<SidebarWrapper contextValue={{ ...mockData, ...data }} onClick={onClick} />);
+     return container;
+   }
+ 
+diff --git a/src/courseware/social-share/SocialIcons.jsx b/src/courseware/social-share/SocialIcons.jsx
+index 1752166..6b6bfd2 100644
+--- a/src/courseware/social-share/SocialIcons.jsx
++++ b/src/courseware/social-share/SocialIcons.jsx
+@@ -19,7 +19,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import messages from './messages';
+ import { useModel } from '../../generic/model-store';
+ 
+-function SocialIcons({
++const SocialIcons = ({
+   analyticsId,
+   className,
+   courseId,
+@@ -28,7 +28,7 @@ function SocialIcons({
+   hashtags,
+   intl,
+   socialMessage,
+-}) {
++}) => {
+   const { marketingUrl } = useModel('coursewareMeta', courseId);
+ 
+   const {
+@@ -104,7 +104,7 @@ function SocialIcons({
+       </EmailShareButton>
+     </div>
+   );
+-}
++};
+ 
+ SocialIcons.defaultProps = {
+   analyticsId: '',
+diff --git a/src/generic/CourseAccessErrorPage.jsx b/src/generic/CourseAccessErrorPage.jsx
+index a88f723..3440382 100644
+--- a/src/generic/CourseAccessErrorPage.jsx
++++ b/src/generic/CourseAccessErrorPage.jsx
+@@ -12,13 +12,14 @@ import { LOADED, LOADING } from '../course-home/data/slice';
+ import PageLoading from './PageLoading';
+ import messages from '../tab-page/messages';
+ 
+-function CourseAccessErrorPage({ intl }) {
++const CourseAccessErrorPage = ({ intl }) => {
+   const { courseId } = useParams();
+ 
+   const dispatch = useDispatch();
+   const activeEnterpriseAlert = useActiveEnterpriseAlert(courseId);
+   useEffect(() => {
+     dispatch(fetchDiscussionTab(courseId));
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [courseId]);
+ 
+   const {
+@@ -54,7 +55,7 @@ function CourseAccessErrorPage({ intl }) {
+       <Footer />
+     </>
+   );
+-}
++};
+ 
+ CourseAccessErrorPage.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/generic/CourseAccessErrorPage.test.jsx b/src/generic/CourseAccessErrorPage.test.jsx
+index 375466b..1361c39 100644
+--- a/src/generic/CourseAccessErrorPage.test.jsx
++++ b/src/generic/CourseAccessErrorPage.test.jsx
+@@ -11,7 +11,9 @@ jest.mock('react-redux', () => ({
+   useDispatch: () => mockDispatch,
+   useSelector: () => ({ courseStatus: mockCourseStatus }),
+ }));
+-jest.mock('./PageLoading', () => () => <div data-testid="page-loading" />);
++jest.mock('./PageLoading', () => function () {
++  return <div data-testid="page-loading" />;
++});
+ 
+ describe('CourseAccessErrorPage', () => {
+   let courseId;
+diff --git a/src/generic/notices/NoticesProvider.jsx b/src/generic/notices/NoticesProvider.jsx
+index e3066b7..6e28f60 100644
+--- a/src/generic/notices/NoticesProvider.jsx
++++ b/src/generic/notices/NoticesProvider.jsx
+@@ -10,6 +10,7 @@ import { getNotices } from './api';
+  */
+ const NoticesProvider = ({ children }) => {
+   const [isRedirected, setIsRedirected] = useState();
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   useEffect(async () => {
+     if (getConfig().ENABLE_NOTICES) {
+       const data = await getNotices();
+diff --git a/src/generic/tabs/Tabs.jsx b/src/generic/tabs/Tabs.jsx
+index 86f08d2..b1a0348 100644
+--- a/src/generic/tabs/Tabs.jsx
++++ b/src/generic/tabs/Tabs.jsx
+@@ -6,7 +6,7 @@ import classNames from 'classnames';
+ 
+ import useIndexOfLastVisibleChild from './useIndexOfLastVisibleChild';
+ 
+-export default function Tabs({ children, className, ...attrs }) {
++const Tabs = ({ children, className, ...attrs }) => {
+   const [
+     indexOfLastVisibleChild,
+     containerElementRef,
+@@ -52,7 +52,7 @@ export default function Tabs({ children, className, ...attrs }) {
+       ),
+     );
+     return wrappedChildren;
+-  }, [children, indexOfLastVisibleChild]);
++  }, [children, indexOfLastVisibleChild, invisibleStyle, overflowElementRef]);
+ 
+   return (
+     <nav
+@@ -63,7 +63,7 @@ export default function Tabs({ children, className, ...attrs }) {
+       {tabChildren}
+     </nav>
+   );
+-}
++};
+ 
+ Tabs.propTypes = {
+   children: PropTypes.node,
+@@ -74,3 +74,5 @@ Tabs.defaultProps = {
+   children: null,
+   className: undefined,
+ };
++
++export default Tabs;
+diff --git a/src/generic/tabs/useIndexOfLastVisibleChild.js b/src/generic/tabs/useIndexOfLastVisibleChild.js
+index de76589..f538e12 100644
+--- a/src/generic/tabs/useIndexOfLastVisibleChild.js
++++ b/src/generic/tabs/useIndexOfLastVisibleChild.js
+@@ -70,6 +70,7 @@ export default function useIndexOfLastVisibleChild() {
+       });
+ 
+     setIndexOfLastVisibleChild(nextIndexOfLastVisibleChild);
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [windowSize, containerElementRef.current]);
+ 
+   return [indexOfLastVisibleChild, containerElementRef, invisibleStyle, overflowElementRef];
+diff --git a/src/generic/upgrade-button/FormattedPricing.jsx b/src/generic/upgrade-button/FormattedPricing.jsx
+index 960e9c4..2e67666 100644
+--- a/src/generic/upgrade-button/FormattedPricing.jsx
++++ b/src/generic/upgrade-button/FormattedPricing.jsx
+@@ -4,7 +4,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from './messages';
+ 
+-function FormattedPricing(props) {
++const FormattedPricing = (props) => {
+   const {
+     inline,
+     intl,
+@@ -57,7 +57,7 @@ function FormattedPricing(props) {
+       </span>
+     </>
+   );
+-}
++};
+ 
+ FormattedPricing.defaultProps = {
+   inline: false,
+diff --git a/src/generic/upgrade-button/UpgradeButton.jsx b/src/generic/upgrade-button/UpgradeButton.jsx
+index dea6aa3..1e97094 100644
+--- a/src/generic/upgrade-button/UpgradeButton.jsx
++++ b/src/generic/upgrade-button/UpgradeButton.jsx
+@@ -5,7 +5,7 @@ import { Button } from '@edx/paragon';
+ 
+ import FormattedPricing from './FormattedPricing';
+ 
+-function UpgradeButton(props) {
++const UpgradeButton = (props) => {
+   const {
+     intl,
+     offer,
+@@ -41,7 +41,7 @@ function UpgradeButton(props) {
+       </div>
+     </Button>
+   );
+-}
++};
+ 
+ UpgradeButton.defaultProps = {
+   offer: null,
+diff --git a/src/generic/upgrade-button/UpgradeNowButton.jsx b/src/generic/upgrade-button/UpgradeNowButton.jsx
+index 127e437..6d39023 100644
+--- a/src/generic/upgrade-button/UpgradeNowButton.jsx
++++ b/src/generic/upgrade-button/UpgradeNowButton.jsx
+@@ -5,7 +5,7 @@ import { Button } from '@edx/paragon';
+ 
+ import FormattedPricing from './FormattedPricing';
+ 
+-function UpgradeNowButton(props) {
++const UpgradeNowButton = (props) => {
+   const {
+     intl,
+     offer,
+@@ -39,7 +39,7 @@ function UpgradeNowButton(props) {
+       />
+     </Button>
+   );
+-}
++};
+ 
+ UpgradeNowButton.defaultProps = {
+   offer: null,
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+index 0ab756c..c60f09b 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -13,27 +13,23 @@ import {
+   SupportMissionBullet,
+ } from '../upsell-bullets/UpsellBullets';
+ 
+-function UpsellNoFBECardContent() {
+-  return (
+-    <ul className="fa-ul upgrade-notification-ul pt-0">
+-      <VerifiedCertBullet />
+-      <SupportMissionBullet />
+-    </ul>
+-  );
+-}
+-
+-function UpsellFBEFarAwayCardContent() {
+-  return (
+-    <ul className="fa-ul upgrade-notification-ul">
+-      <VerifiedCertBullet />
+-      <UnlockGradedBullet />
+-      <FullAccessBullet />
+-      <SupportMissionBullet />
+-    </ul>
+-  );
+-}
+-
+-function UpsellFBESoonCardContent({ accessExpirationDate, timezoneFormatArgs }) {
++const UpsellNoFBECardContent = () => (
++  <ul className="fa-ul upgrade-notification-ul pt-0">
++    <VerifiedCertBullet />
++    <SupportMissionBullet />
++  </ul>
++);
++
++const UpsellFBEFarAwayCardContent = () => (
++  <ul className="fa-ul upgrade-notification-ul">
++    <VerifiedCertBullet />
++    <UnlockGradedBullet />
++    <FullAccessBullet />
++    <SupportMissionBullet />
++  </ul>
++);
++
++const UpsellFBESoonCardContent = ({ accessExpirationDate, timezoneFormatArgs }) => {
+   const includingAnyProgress = (
+     <span className="font-weight-bold">
+       <FormattedMessage
+@@ -83,7 +79,7 @@ function UpsellFBESoonCardContent({ accessExpirationDate, timezoneFormatArgs })
+       </p>
+     </div>
+   );
+-}
++};
+ 
+ UpsellFBESoonCardContent.propTypes = {
+   accessExpirationDate: PropTypes.PropTypes.instanceOf(Date).isRequired,
+@@ -96,22 +92,20 @@ UpsellFBESoonCardContent.defaultProps = {
+   timezoneFormatArgs: {},
+ };
+ 
+-function PastExpirationCardContent() {
+-  return (
+-    <div className="upgrade-notification-text">
+-      <p>
+-        <FormattedMessage
+-          id="learning.generic.upgradeNotification.pastExpiration.content"
+-          defaultMessage="The upgrade deadline for this course passed. To upgrade, enroll in the next available session."
+-        />
+-      </p>
+-    </div>
+-  );
+-}
++const PastExpirationCardContent = () => (
++  <div className="upgrade-notification-text">
++    <p>
++      <FormattedMessage
++        id="learning.generic.upgradeNotification.pastExpiration.content"
++        defaultMessage="The upgrade deadline for this course passed. To upgrade, enroll in the next available session."
++      />
++    </p>
++  </div>
++);
+ 
+-function ExpirationCountdown({
++const ExpirationCountdown = ({
+   courseId, hoursToExpiration, setupgradeNotificationCurrentState, type,
+-}) {
++}) => {
+   let expirationText;
+   if (hoursToExpiration >= 24) { // More than 1 day left
+     // setupgradeNotificationCurrentState is available in NotificationTray (not course home)
+@@ -179,7 +173,7 @@ function ExpirationCountdown({
+     );
+   }
+   return (<div className="upsell-warning">{expirationText}</div>);
+-}
++};
+ 
+ ExpirationCountdown.propTypes = {
+   courseId: PropTypes.string.isRequired,
+@@ -192,9 +186,9 @@ ExpirationCountdown.defaultProps = {
+   type: null,
+ };
+ 
+-function AccessExpirationDateBanner({
++const AccessExpirationDateBanner = ({
+   courseId, accessExpirationDate, timezoneFormatArgs, setupgradeNotificationCurrentState,
+-}) {
++}) => {
+   if (setupgradeNotificationCurrentState) {
+     setupgradeNotificationCurrentState('accessDateView');
+     setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'accessDateView');
+@@ -218,7 +212,7 @@ function AccessExpirationDateBanner({
+       />
+     </div>
+   );
+-}
++};
+ 
+ AccessExpirationDateBanner.propTypes = {
+   courseId: PropTypes.string.isRequired,
+@@ -234,9 +228,9 @@ AccessExpirationDateBanner.defaultProps = {
+   setupgradeNotificationCurrentState: null,
+ };
+ 
+-function PastExpirationDateBanner({
++const PastExpirationDateBanner = ({
+   courseId, accessExpirationDate, timezoneFormatArgs, setupgradeNotificationCurrentState,
+-}) {
++}) => {
+   if (setupgradeNotificationCurrentState) {
+     setupgradeNotificationCurrentState('PastExpirationDate');
+     setLocalStorage(`upgradeNotificationCurrentState.${courseId}`, 'PastExpirationDate');
+@@ -260,7 +254,7 @@ function PastExpirationDateBanner({
+       />
+     </div>
+   );
+-}
++};
+ 
+ PastExpirationDateBanner.propTypes = {
+   courseId: PropTypes.string.isRequired,
+@@ -276,7 +270,7 @@ PastExpirationDateBanner.defaultProps = {
+   setupgradeNotificationCurrentState: null,
+ };
+ 
+-function UpgradeNotification({
++const UpgradeNotification = ({
+   accessExpiration,
+   contentTypeGatingEnabled,
+   marketingUrl,
+@@ -289,17 +283,13 @@ function UpgradeNotification({
+   upsellPageName,
+   userTimezone,
+   verifiedMode,
+-}) {
++}) => {
+   const dateNow = Date.now();
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+   const correctedTime = new Date(dateNow + timeOffsetMillis);
+   const accessExpirationDate = accessExpiration ? new Date(accessExpiration.expirationDate) : null;
+   const pastExpirationDeadline = accessExpiration ? new Date(dateNow) > accessExpirationDate : false;
+ 
+-  if (!verifiedMode) {
+-    return null;
+-  }
+-
+   const eventProperties = {
+     org_key: org,
+     courserun_key: courseId,
+@@ -316,8 +306,13 @@ function UpgradeNotification({
+   useEffect(() => {
+     sendTrackingLogEvent('edx.bi.course.upgrade.sidebarupsell.displayed', eventProperties);
+     sendTrackEvent('Promotion Viewed', promotionEventProperties);
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+ 
++  if (!verifiedMode) {
++    return null;
++  }
++
+   const logClick = () => {
+     sendTrackingLogEvent('edx.bi.course.upgrade.sidebarupsell.clicked', eventProperties);
+     sendTrackingLogEvent('edx.course.enrollment.upgrade.clicked', {
+@@ -502,7 +497,7 @@ function UpgradeNotification({
+       </div>
+     </section>
+   );
+-}
++};
+ 
+ UpgradeNotification.propTypes = {
+   courseId: PropTypes.string.isRequired,
+diff --git a/src/generic/upsell-bullets/UpsellBullets.jsx b/src/generic/upsell-bullets/UpsellBullets.jsx
+index 5557993..e631eba 100644
+--- a/src/generic/upsell-bullets/UpsellBullets.jsx
++++ b/src/generic/upsell-bullets/UpsellBullets.jsx
+@@ -4,14 +4,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+-function CheckmarkBullet() {
+-  return (
+-    <span className="fa-li"><FontAwesomeIcon icon={faCheck} /></span>
+-  );
+-}
++const CheckmarkBullet = () => (
++  <span className="fa-li"><FontAwesomeIcon icon={faCheck} /></span>
++);
+ 
+ // Must be child of a <ul className="fa-ul">
+-export function VerifiedCertBullet() {
++export const VerifiedCertBullet = () => {
+   const verifiedCertLink = (
+     <a className="inline-link-underline font-weight-bold" rel="noopener noreferrer" target="_blank" href={`${getConfig().MARKETING_SITE_BASE_URL}/verified-certificate`}>
+       <FormattedMessage
+@@ -32,10 +30,10 @@ export function VerifiedCertBullet() {
+       />
+     </li>
+   );
+-}
++};
+ 
+ // Must be child of a <ul className="fa-ul">
+-export function UnlockGradedBullet() {
++export const UnlockGradedBullet = () => {
+   const gradedAssignmentsInBoldText = (
+     <span className="font-weight-bold">
+       <FormattedMessage
+@@ -56,10 +54,10 @@ export function UnlockGradedBullet() {
+       />
+     </li>
+   );
+-}
++};
+ 
+ // Must be child of a <ul className="fa-ul">
+-export function FullAccessBullet() {
++export const FullAccessBullet = () => {
+   const fullAccessInBoldText = (
+     <span className="font-weight-bold">
+       <FormattedMessage
+@@ -80,10 +78,10 @@ export function FullAccessBullet() {
+       />
+     </li>
+   );
+-}
++};
+ 
+ // Must be child of a <ul className="fa-ul">
+-export function SupportMissionBullet() {
++export const SupportMissionBullet = () => {
+   const missionInBoldText = (
+     <span className="font-weight-bold">
+       <FormattedMessage
+@@ -104,4 +102,4 @@ export function SupportMissionBullet() {
+       />
+     </li>
+   );
+-}
++};
+diff --git a/src/generic/user-messages/Alert.jsx b/src/generic/user-messages/Alert.jsx
+index b43026d..01c5f79 100644
+--- a/src/generic/user-messages/Alert.jsx
++++ b/src/generic/user-messages/Alert.jsx
+@@ -29,22 +29,20 @@ function getAlertIcon(type) {
+   }
+ }
+ 
+-function Alert({
++const Alert = ({
+   type, dismissible, children, onDismiss, stacked,
+-}) {
+-  return (
+-    <ParagonAlert
+-      data-testid={`alert-container-${type}`}
+-      variant={getAlertVariant(type)}
+-      icon={getAlertIcon(type)}
+-      dismissible={dismissible}
+-      onClose={onDismiss}
+-      stacked={stacked}
+-    >
+-      {children}
+-    </ParagonAlert>
+-  );
+-}
++}) => (
++  <ParagonAlert
++    data-testid={`alert-container-${type}`}
++    variant={getAlertVariant(type)}
++    icon={getAlertIcon(type)}
++    dismissible={dismissible}
++    onClose={onDismiss}
++    stacked={stacked}
++  >
++    {children}
++  </ParagonAlert>
++);
+ 
+ Alert.propTypes = {
+   type: PropTypes.oneOf([
+diff --git a/src/generic/user-messages/AlertList.jsx b/src/generic/user-messages/AlertList.jsx
+index 6fdb662..dd95f69 100644
+--- a/src/generic/user-messages/AlertList.jsx
++++ b/src/generic/user-messages/AlertList.jsx
+@@ -4,9 +4,9 @@ import PropTypes from 'prop-types';
+ import UserMessagesContext from './UserMessagesContext';
+ import Alert from './Alert';
+ 
+-export default function AlertList({
++const AlertList = ({
+   topic, className, customAlerts, customProps,
+-}) {
++}) => {
+   const { remove, messages } = useContext(UserMessagesContext);
+   const getAlertComponent = useCallback(
+     (code) => (customAlerts[code] !== undefined ? customAlerts[code] : Alert),
+@@ -38,7 +38,7 @@ export default function AlertList({
+       })}
+     </div>
+   );
+-}
++};
+ 
+ AlertList.propTypes = {
+   className: PropTypes.string,
+@@ -60,3 +60,5 @@ AlertList.defaultProps = {
+   customAlerts: {},
+   customProps: {},
+ };
++
++export default AlertList;
+diff --git a/src/generic/user-messages/UserMessagesProvider.jsx b/src/generic/user-messages/UserMessagesProvider.jsx
+index c504d31..1fa3905 100644
+--- a/src/generic/user-messages/UserMessagesProvider.jsx
++++ b/src/generic/user-messages/UserMessagesProvider.jsx
+@@ -1,4 +1,6 @@
+-import React, { useState, useRef, useEffect } from 'react';
++import React, {
++  useState, useRef, useEffect, useMemo,
++} from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import UserMessagesContext from './UserMessagesContext';
+@@ -27,7 +29,7 @@ function popFlashMessages() {
+   return popLocalStorage(FLASH_MESSAGES_LOCAL_STORAGE_KEY) || [];
+ }
+ 
+-export default function UserMessagesProvider({ children }) {
++const UserMessagesProvider = ({ children }) => {
+   // Note: The callbacks (add, remove, clear) below interact with useState in very subtle ways.
+   // When we call setMessages, we always do so with the function-based form of the handler, making
+   // use of the "current" state and not relying on lexical scoping to access the state exposed
+@@ -81,20 +83,20 @@ export default function UserMessagesProvider({ children }) {
+     flashMessages.forEach(flashMessage => add(flashMessage));
+   }, []);
+ 
+-  const value = {
++  const value = useMemo(() => ({
+     add,
+     addFlash,
+     remove,
+     clear,
+     messages,
+-  };
++  }), [messages]);
+ 
+   return (
+     <UserMessagesContext.Provider value={value}>
+       {children}
+     </UserMessagesContext.Provider>
+   );
+-}
++};
+ 
+ UserMessagesProvider.propTypes = {
+   children: PropTypes.node,
+@@ -103,3 +105,5 @@ UserMessagesProvider.propTypes = {
+ UserMessagesProvider.defaultProps = {
+   children: null,
+ };
++
++export default UserMessagesProvider;
+diff --git a/src/generic/user-messages/hooks.js b/src/generic/user-messages/hooks.js
+index 64d320f..144638a 100644
+--- a/src/generic/user-messages/hooks.js
++++ b/src/generic/user-messages/hooks.js
+@@ -31,5 +31,6 @@ export function useAlert(isVisible, {
+     return () => {
+       remove(cleanupId);
+     };
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isVisible, code, text, topic, type, payload, dismissible]);
+ }
+diff --git a/src/i18n/messages/es_419.json b/src/i18n/messages/es_419.json
+index 8bd797a..8ae3341 100644
+--- a/src/i18n/messages/es_419.json
++++ b/src/i18n/messages/es_419.json
+@@ -94,7 +94,7 @@
+   "learning.proctoringPanel.status.error": "Error",
+   "learning.proctoringPanel.status.otherCourseApproved": "Aprobado en otro curso",
+   "learning.proctoringPanel.status.expiringSoon": "Expira pronto",
+-  "learning.proctoringPanel.status.expired": "Venció",
++  "learning.proctoringPanel.status.expired": "Expired",
+   "learning.proctoringPanel.status": "Estado actual de la integración:",
+   "learning.proctoringPanel.message.notStarted": "No has comenzado tu examen de integración.",
+   "learning.proctoringPanel.message.started": "Has comenzado tu examen de integración.",
+@@ -104,8 +104,8 @@
+   "learning.proctoringPanel.message.error": "Se ha producido un error durante tu examen de integración. Vuelve a intentar la integración.",
+   "learning.proctoringPanel.message.otherCourseApproved": "Tu examen de ingreso ha sido aprobado en otro curso.",
+   "learning.proctoringPanel.detail.otherCourseApproved": "Si tu dispositivo ha cambiado, te recomendamos que realices el examen de ingreso de este curso para asegurarte de que tu configuración sigue cumpliendo los requisitos para el examen supervisado.",
+-  "learning.proctoringPanel.message.expiringSoon": "Su perfil de incorporación ha sido aprobado. Sin embargo, su estado de incorporación expirará pronto. Vuelva a completar la incorporación para asegurarse de que podrá seguir realizando los exámenes supervisados.",
+-  "learning.proctoringPanel.message.expired": "Su estado de incorporación ha caducado. Complete la incorporación nuevamente para continuar realizando los exámenes supervisados.",
++  "learning.proctoringPanel.message.expiringSoon": "Your onboarding profile has been approved. However, your onboarding status is expiring soon. Please complete onboarding again to ensure that you will be able to continue taking proctored exams.",
++  "learning.proctoringPanel.message.expired": "Your onboarding status has expired. Please complete onboarding again to continue taking proctored exams.",
+   "learning.proctoringPanel.generalInfo": "Debes completar el proceso de integración antes de realizar cualquier examen supervisado. ",
+   "learning.proctoringPanel.generalInfoSubmitted": "Tu perfil enviado está en revisión.",
+   "learning.proctoringPanel.generalTime": "La revisión del perfil de ingreso puede tardar más de 2 días laborables.",
+@@ -335,7 +335,7 @@
+   "notification.tray.title": "Notificaciones",
+   "notification.tray.no.message": "No tienes notificaciones nuevas en este momento.",
+   "learn.contentLock.content.locked": "Contenido Bloqueado",
+-  "learn.contentLock.complete.prerequisite": "Se debe completar el siguiente prerequisito: ''{prereqSectionName}'' para acceder al contenido.",
++  "learn.contentLock.complete.prerequisite": "You must complete the prerequisite: ''{prereqSectionName}'' to access this content.",
+   "learn.contentLock.goToSection": "Ir a la Sección de Prerrequisitos",
+   "learn.hiddenAfterDue.gradeAvailable": "Si has completado esta tarea, tu calificación estará disponible en {progressPage}.",
+   "learn.hiddenAfterDue.header": "La fecha límite para esta tarea ha pasado.",
+@@ -361,10 +361,10 @@
+   "learn.sequence.navigation.next.up.button": "Siguiente: {title}",
+   "learn.sequence.navigation.previous.button": "Anterior",
+   "learn.course.sequence.navigation.mobile.menu": "{current} de {total}",
+-  "learn.sequence.share.button": "Compartir este contenido",
+-  "learn.sequence.share.modal.title": "Título",
+-  "learn.sequence.share.modal.body": "Copiar el enlace a continuación para compartir este contenido.",
+-  "learn.sequence.share.quote": "Aquí hay un clip divertido de una clase que estoy tomando en @edXonline.",
++  "learn.sequence.share.button": "Share this content",
++  "learn.sequence.share.modal.title": "Title",
++  "learn.sequence.share.modal.body": "Copy the link below to share this content.",
++  "learn.sequence.share.quote": "Here's a fun clip from a class I'm taking on @edXonline.\n",
+   "discussions.sidebar.title": "Debates",
+   "discussions.sidebar.open.button": "Mostrar bandeja de discusiones",
+   "learn.redirect.interstitial.message": "Redirigiendo...",
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 80eb3f5..71d968c 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -36,7 +36,7 @@ function getStudioUrl(courseId, unitId) {
+   return urlFull;
+ }
+ 
+-export default function InstructorToolbar(props) {
++const InstructorToolbar = (props) => {
+   // This didMount logic became necessary once we had a page that does a redirect on a quick exit.
+   // As a result, it unmounts the InstructorToolbar (which will be remounted by the new component),
+   // but the InstructorToolbar's MasqueradeWidget has an outgoing request. Since it is unmounted
+@@ -45,6 +45,7 @@ export default function InstructorToolbar(props) {
+   // NOTE: This was originally added because of the CourseExit page redirect. Once that page stops
+   //   doing a redirect because a CourseExit experience exists for all learners, this could be removed
+   const [didMount, setDidMount] = useState(false);
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   useEffect(() => {
+     setDidMount(true);
+     // Returning this function here will run setDidMount(false) when this component is unmounted
+@@ -108,7 +109,7 @@ export default function InstructorToolbar(props) {
+       />
+     </div>
+   ));
+-}
++};
+ 
+ InstructorToolbar.propTypes = {
+   courseId: PropTypes.string,
+@@ -121,3 +122,5 @@ InstructorToolbar.defaultProps = {
+   unitId: undefined,
+   tab: '',
+ };
++
++export default InstructorToolbar;
+diff --git a/src/product-tours/GenericTourFormattedMessages.jsx b/src/product-tours/GenericTourFormattedMessages.jsx
+index 3515491..ce6008f 100644
+--- a/src/product-tours/GenericTourFormattedMessages.jsx
++++ b/src/product-tours/GenericTourFormattedMessages.jsx
+@@ -1,32 +1,26 @@
+ import React from 'react';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ 
+-export function DismissButtonFormattedMessage() {
+-  return (
+-    <FormattedMessage
+-      id="tours.button.dismiss"
+-      defaultMessage="Dismiss"
+-      description="A button used to close the tour of the website"
+-    />
+-  );
+-}
++export const DismissButtonFormattedMessage = () => (
++  <FormattedMessage
++    id="tours.button.dismiss"
++    defaultMessage="Dismiss"
++    description="A button used to close the tour of the website"
++  />
++);
+ 
+-export function NextButtonFormattedMessage() {
+-  return (
+-    <FormattedMessage
+-      id="tours.button.next"
+-      defaultMessage="Next"
+-      description="A button used within a tour of the website to advance to the next piece of information"
+-    />
+-  );
+-}
++export const NextButtonFormattedMessage = () => (
++  <FormattedMessage
++    id="tours.button.next"
++    defaultMessage="Next"
++    description="A button used within a tour of the website to advance to the next piece of information"
++  />
++);
+ 
+-export function OkayButtonFormattedMessage() {
+-  return (
+-    <FormattedMessage
+-      id="tours.button.okay"
+-      defaultMessage="Okay"
+-      description="A button used to end the tour of the website"
+-    />
+-  );
+-}
++export const OkayButtonFormattedMessage = () => (
++  <FormattedMessage
++    id="tours.button.okay"
++    defaultMessage="Okay"
++    description="A button used to end the tour of the website"
++  />
++);
+diff --git a/src/product-tours/ProductTours.jsx b/src/product-tours/ProductTours.jsx
+index 89a1f98..e0d4b73 100644
+--- a/src/product-tours/ProductTours.jsx
++++ b/src/product-tours/ProductTours.jsx
+@@ -1,3 +1,4 @@
++/* eslint-disable react-hooks/exhaustive-deps */
+ import React, { useEffect, useState } from 'react';
+ import { useDispatch, useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+@@ -17,16 +18,12 @@ import {
+   fetchTourData,
+ } from './data';
+ 
+-function ProductTours({
++const ProductTours = ({
+   activeTab,
+   courseId,
+   isStreakCelebrationOpen,
+   org,
+-}) {
+-  if (isStreakCelebrationOpen) {
+-    return null;
+-  }
+-
++}) => {
+   const {
+     proctoringPanelStatus,
+   } = useSelector(state => state.courseHome);
+@@ -81,6 +78,10 @@ function ProductTours({
+     }
+   }, [showNewUserCourseHomeTour]);
+ 
++  if (isStreakCelebrationOpen) {
++    return null;
++  }
++
+   // The <ProductTour /> component cannot handle rendering multiple enabled tours at once.
+   // I.e. when adding new tours, beware that if multiple tours are enabled,
+   // the first enabled tour in the following array will be the only one that renders.
+@@ -168,7 +169,7 @@ function ProductTours({
+       />
+     </>
+   );
+-}
++};
+ 
+ ProductTours.propTypes = {
+   activeTab: PropTypes.string.isRequired,
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+index ea24023..da2979b 100644
+--- a/src/product-tours/ProductTours.test.jsx
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -1,3 +1,4 @@
++/* eslint-disable react/prop-types */
+ /**
+  * @jest-environment jsdom
+  */
+@@ -158,15 +159,11 @@ describe('Course Home Tours', () => {
+   );
+ });
+ 
+-function MockUnit({ courseId, id }) { // eslint-disable-line react/prop-types
+-  return (
+-    <div id="courseware-sequenceNavigation" className="fake-unit">Unit Contents {courseId} {id}</div>
+-  );
+-}
+-
+ jest.mock(
+   '../courseware/course/sequence/Unit',
+-  () => MockUnit,
++  () => function ({ courseId, id }) {
++    return <div id="courseware-sequenceNavigation" className="fake-unit">Unit Contents {courseId} {id}</div>;
++  },
+ );
+ 
+ describe('Courseware Tour', () => {
+diff --git a/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx b/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
+index 1414b36..cf86fb8 100644
+--- a/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
++++ b/src/product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton.jsx
+@@ -12,7 +12,7 @@ import { useModel } from '../../generic/model-store';
+ import { launchCourseHomeTour } from '../data/slice';
+ import messages from '../messages';
+ 
+-function LaunchCourseHomeTourButton({ intl, srOnly }) {
++const LaunchCourseHomeTourButton = ({ intl, srOnly }) => {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -40,6 +40,7 @@ function LaunchCourseHomeTourButton({ intl, srOnly }) {
+   };
+ 
+   return (
++    // eslint-disable-next-line react/jsx-no-useless-fragment
+     <>
+       {toursEnabled && (
+         <Button variant="link" size="inline" className={`p-0 ${srOnly && 'sr-only sr-only-focusable'}`} onClick={handleClick}>
+@@ -55,7 +56,7 @@ function LaunchCourseHomeTourButton({ intl, srOnly }) {
+       )}
+     </>
+   );
+-}
++};
+ 
+ LaunchCourseHomeTourButton.defaultProps = {
+   srOnly: false,
+diff --git a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+index 6a3df70..c91ca41 100644
+--- a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
++++ b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+@@ -9,60 +9,58 @@ import {
+ import heroImage from './course_home_tour_modal_hero.png';
+ import messages from '../messages';
+ 
+-function NewUserCourseHomeTourModal({
++const NewUserCourseHomeTourModal = ({
+   intl,
+   isOpen,
+   onDismiss,
+   onStartTour,
+-}) {
+-  return (
+-    <MarketingModal
+-      isOpen={isOpen}
+-      title="New user course home prompt"
+-      className="new-user-tour-dialog"
+-      heroIsDark
+-      hasCloseButton={false}
+-      heroNode={(
+-        <ModalDialog.Hero>
+-          <ModalDialog.Hero.Background
+-            backgroundSrc={heroImage}
+-          />
+-          <ModalDialog.Hero.Content style={{ maxWidth: '20rem' }}>
+-            <ModalDialog.Title as="h2">
+-              <FormattedMessage
+-                id="tours.newUserModal.title"
+-                defaultMessage="{welcome} {siteName} course!"
+-                values={{
+-                  siteName: getConfig().SITE_NAME,
+-                  welcome: <span className="text-accent-b">{intl.formatMessage(messages.newUserModalTitleWelcome)}</span>,
+-                }}
+-              />
+-            </ModalDialog.Title>
+-          </ModalDialog.Hero.Content>
+-        </ModalDialog.Hero>
++}) => (
++  <MarketingModal
++    isOpen={isOpen}
++    title="New user course home prompt"
++    className="new-user-tour-dialog"
++    heroIsDark
++    hasCloseButton={false}
++    heroNode={(
++      <ModalDialog.Hero>
++        <ModalDialog.Hero.Background
++          backgroundSrc={heroImage}
++        />
++        <ModalDialog.Hero.Content style={{ maxWidth: '20rem' }}>
++          <ModalDialog.Title as="h2">
++            <FormattedMessage
++              id="tours.newUserModal.title"
++              defaultMessage="{welcome} {siteName} course!"
++              values={{
++                siteName: getConfig().SITE_NAME,
++                welcome: <span className="text-accent-b">{intl.formatMessage(messages.newUserModalTitleWelcome)}</span>,
++              }}
++            />
++          </ModalDialog.Title>
++        </ModalDialog.Hero.Content>
++      </ModalDialog.Hero>
+       )}
+-      footerNode={(
+-        <ActionRow>
+-          <Button
+-            variant="tertiary"
+-            onClick={onDismiss}
+-          >
+-            {intl.formatMessage(messages.skipForNow)}
+-          </Button>
+-          <Button
+-            variant="brand"
+-            onClick={onStartTour}
+-          >
+-            {intl.formatMessage(messages.beginTour)}
+-          </Button>
+-        </ActionRow>
++    footerNode={(
++      <ActionRow>
++        <Button
++          variant="tertiary"
++          onClick={onDismiss}
++        >
++          {intl.formatMessage(messages.skipForNow)}
++        </Button>
++        <Button
++          variant="brand"
++          onClick={onStartTour}
++        >
++          {intl.formatMessage(messages.beginTour)}
++        </Button>
++      </ActionRow>
+       )}
+-      onClose={onDismiss}
+-    >
+-      <p className="text-dark-900">{intl.formatMessage(messages.newUserModalBody, { siteName: getConfig().SITE_NAME })}</p>
+-    </MarketingModal>
+-  );
+-}
++    onClose={onDismiss}
++  >
++    <p className="text-dark-900">{intl.formatMessage(messages.newUserModalBody, { siteName: getConfig().SITE_NAME })}</p>
++  </MarketingModal>
++);
+ 
+ NewUserCourseHomeTourModal.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/setupTest.js b/src/setupTest.js
+index c706e94..955440b 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -168,18 +168,16 @@ function render(
+     ...renderOptions
+   } = {},
+ ) {
+-  function Wrapper({ children }) {
+-    return (
+-      // eslint-disable-next-line react/jsx-filename-extension
+-      <IntlProvider locale="en">
+-        <AppProvider store={store || globalStore}>
+-          <UserMessagesProvider>
+-            {children}
+-          </UserMessagesProvider>
+-        </AppProvider>
+-      </IntlProvider>
+-    );
+-  }
++  const Wrapper = ({ children }) => (
++    // eslint-disable-next-line react/jsx-filename-extension
++    <IntlProvider locale="en">
++      <AppProvider store={store || globalStore}>
++        <UserMessagesProvider>
++          {children}
++        </UserMessagesProvider>
++      </AppProvider>
++    </IntlProvider>
++  );
+ 
+   Wrapper.propTypes = {
+     children: PropTypes.node.isRequired,
+diff --git a/src/shared/effort-estimate/EffortEstimate.jsx b/src/shared/effort-estimate/EffortEstimate.jsx
+index 3a0fae4..b747ff1 100644
+--- a/src/shared/effort-estimate/EffortEstimate.jsx
++++ b/src/shared/effort-estimate/EffortEstimate.jsx
+@@ -7,7 +7,7 @@ import messages from './messages';
+ 
+ // This component shows an effort estimate provided by the backend block data. Either time, activities, or both.
+ 
+-function EffortEstimate(props) {
++const EffortEstimate = (props) => {
+   const {
+     block: {
+       effortActivities,
+@@ -54,7 +54,7 @@ function EffortEstimate(props) {
+       {content}
+     </span>
+   );
+-}
++};
+ 
+ EffortEstimate.defaultProps = {
+   className: null,
+diff --git a/src/shared/links.jsx b/src/shared/links.jsx
+index cabdcb7..01713de 100644
+--- a/src/shared/links.jsx
++++ b/src/shared/links.jsx
+@@ -6,23 +6,21 @@ import { Hyperlink } from '@edx/paragon';
+ 
+ import messages from '../courseware/course/course-exit/messages';
+ 
+-function IntlDashboardLink({ intl }) {
+-  return (
+-    <Hyperlink
+-      variant="muted"
+-      isInline
+-      destination={`${getConfig().LMS_BASE_URL}/dashboard`}
+-    >
+-      {intl.formatMessage(messages.dashboardLink)}
+-    </Hyperlink>
+-  );
+-}
++const IntlDashboardLink = ({ intl }) => (
++  <Hyperlink
++    variant="muted"
++    isInline
++    destination={`${getConfig().LMS_BASE_URL}/dashboard`}
++  >
++    {intl.formatMessage(messages.dashboardLink)}
++  </Hyperlink>
++);
+ 
+ IntlDashboardLink.propTypes = {
+   intl: intlShape.isRequired,
+ };
+ 
+-function IntlIdVerificationSupportLink({ intl }) {
++const IntlIdVerificationSupportLink = ({ intl }) => {
+   if (!getConfig().SUPPORT_URL_ID_VERIFICATION) {
+     return null;
+   }
+@@ -35,13 +33,13 @@ function IntlIdVerificationSupportLink({ intl }) {
+       {intl.formatMessage(messages.idVerificationSupportLink)}
+     </Hyperlink>
+   );
+-}
++};
+ 
+ IntlIdVerificationSupportLink.propTypes = {
+   intl: intlShape.isRequired,
+ };
+ 
+-function IntlProfileLink({ intl }) {
++const IntlProfileLink = ({ intl }) => {
+   const { username } = getAuthenticatedUser();
+ 
+   return (
+@@ -53,7 +51,7 @@ function IntlProfileLink({ intl }) {
+       {intl.formatMessage(messages.profileLink)}
+     </Hyperlink>
+   );
+-}
++};
+ 
+ IntlProfileLink.propTypes = {
+   intl: intlShape.isRequired,
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index a47ffa3..febadc9 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -1,3 +1,4 @@
++/* eslint-disable react/prop-types */
+ import React, { useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
+ import { camelCaseObject, getConfig } from '@edx/frontend-platform';
+@@ -50,13 +51,17 @@ async function calculateVoucherDiscount(voucher, sku, username) {
+     .then(res => camelCaseObject(res));
+ }
+ 
+-function StreakModal({
++const CloseText = ({ intl }) => (
++  <span>
++    {intl.formatMessage(messages.streakButton)}
++    <span className="sr-only">. {intl.formatMessage(messages.streakButtonSrOnly)}</span>
++  </span>
++);
++
++const StreakModal = ({
+   courseId, metadataModel, streakLengthToCelebrate, intl, isStreakCelebrationOpen,
+   closeStreakCelebration, streakDiscountCouponEnabled, verifiedMode, ...rest
+-}) {
+-  if (!isStreakCelebrationOpen) {
+-    return null;
+-  }
++}) => {
+   const { org, celebrations, username } = useModel('courseHomeMeta', courseId);
+   const factoid = getRandomFactoid(intl, streakLengthToCelebrate);
+   // eslint-disable-next-line no-unused-vars
+@@ -106,15 +111,11 @@ function StreakModal({
+     } else {
+       setDiscountPercent(0);
+     }
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [streakDiscountCouponEnabled, username, verifiedMode]);
+ 
+-  function CloseText() {
+-    return (
+-      <span>
+-        {intl.formatMessage(messages.streakButton)}
+-        <span className="sr-only">. {intl.formatMessage(messages.streakButtonSrOnly)}</span>
+-      </span>
+-    );
++  if (!isStreakCelebrationOpen) {
++    return null;
+   }
+ 
+   let upgradeUrl;
+@@ -230,12 +231,12 @@ function StreakModal({
+           </>
+         )}
+         { !queryingDiscount && !showOffer && (
+-          <ModalDialog.CloseButton className="px-5" variant="primary"><CloseText /></ModalDialog.CloseButton>
++          <ModalDialog.CloseButton className="px-5" variant="primary"><CloseText intl={intl} /></ModalDialog.CloseButton>
+         )}
+       </ModalDialog.Footer>
+     </ModalDialog>
+   );
+-}
++};
+ 
+ StreakModal.defaultProps = {
+   isStreakCelebrationOpen: false,
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index db31ca6..2ba3067 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -15,13 +15,13 @@ import useLogistrationAlert from '../alerts/logistration-alert';
+ 
+ import ProductTours from '../product-tours/ProductTours';
+ 
+-function LoadedTabPage({
++const LoadedTabPage = ({
+   activeTabSlug,
+   children,
+   courseId,
+   metadataModel,
+   unitId,
+-}) {
++}) => {
+   const {
+     celebrations,
+     org,
+@@ -85,7 +85,7 @@ function LoadedTabPage({
+       </main>
+     </>
+   );
+-}
++};
+ 
+ LoadedTabPage.propTypes = {
+   activeTabSlug: PropTypes.string.isRequired,
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+index b4c3f99..ec521cc 100644
+--- a/src/tab-page/LoadedTabPage.test.jsx
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -3,10 +3,18 @@ import { Factory } from 'rosie';
+ import { initializeTestStore, render, screen } from '../setupTest';
+ import LoadedTabPage from './LoadedTabPage';
+ 
+-jest.mock('../course-tabs/CourseTabsNavigation', () => () => <div data-testid="CourseTabsNavigation" />);
+-jest.mock('../instructor-toolbar/InstructorToolbar', () => () => <div data-testid="InstructorToolbar" />);
+-jest.mock('../shared/streak-celebration/StreakCelebrationModal', () => () => <div data-testid="StreakModal" />);
+-jest.mock('../product-tours/ProductTours', () => () => <div data-testid="ProductTours" />);
++jest.mock('../course-tabs/CourseTabsNavigation', () => function () {
++  return <div data-testid="CourseTabsNavigation" />;
++});
++jest.mock('../instructor-toolbar/InstructorToolbar', () => function () {
++  return <div data-testid="InstructorToolbar" />;
++});
++jest.mock('../shared/streak-celebration/StreakCelebrationModal', () => function () {
++  return <div data-testid="StreakModal" />;
++});
++jest.mock('../product-tours/ProductTours', () => function () {
++  return <div data-testid="ProductTours" />;
++});
+ 
+ describe('Loaded Tab Page', () => {
+   const mockData = { activeTabSlug: 'courseware', metadataModel: 'coursewareMeta' };
+diff --git a/src/tab-page/TabContainer.jsx b/src/tab-page/TabContainer.jsx
+index 4961d37..c5331f9 100644
+--- a/src/tab-page/TabContainer.jsx
++++ b/src/tab-page/TabContainer.jsx
+@@ -6,7 +6,7 @@ import { OuterExamTimer } from '@edx/frontend-lib-special-exams';
+ 
+ import TabPage from './TabPage';
+ 
+-export default function TabContainer(props) {
++const TabContainer = (props) => {
+   const {
+     children,
+     fetch,
+@@ -19,6 +19,7 @@ export default function TabContainer(props) {
+   useEffect(() => {
+     // The courseId from the URL is the course we WANT to load.
+     dispatch(fetch(courseIdFromUrl));
++  // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [courseIdFromUrl]);
+ 
+   // The courseId from the store is the course we HAVE loaded.  If the URL changes,
+@@ -39,7 +40,7 @@ export default function TabContainer(props) {
+       {children}
+     </TabPage>
+   );
+-}
++};
+ 
+ TabContainer.propTypes = {
+   children: PropTypes.node.isRequired,
+@@ -47,3 +48,5 @@ TabContainer.propTypes = {
+   slice: PropTypes.string.isRequired,
+   tab: PropTypes.string.isRequired,
+ };
++
++export default TabContainer;
+diff --git a/src/tab-page/TabContainer.test.jsx b/src/tab-page/TabContainer.test.jsx
+index 3479d15..6052412 100644
+--- a/src/tab-page/TabContainer.test.jsx
++++ b/src/tab-page/TabContainer.test.jsx
+@@ -10,7 +10,9 @@ jest.mock('react-redux', () => ({
+   ...jest.requireActual('react-redux'),
+   useDispatch: () => mockDispatch,
+ }));
+-jest.mock('./TabPage', () => () => <div data-testid="TabPage" />);
++jest.mock('./TabPage', () => function () {
++  return <div data-testid="TabPage" />;
++});
+ 
+ describe('Tab Container', () => {
+   let courseId;
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index 24f1dd2..5c2b692 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -17,7 +17,7 @@ import LoadedTabPage from './LoadedTabPage';
+ import { setCallToActionToast } from '../course-home/data/slice';
+ import LaunchCourseHomeTourButton from '../product-tours/newUserCourseHomeTour/LaunchCourseHomeTourButton';
+ 
+-function TabPage({ intl, ...props }) {
++const TabPage = ({ intl, ...props }) => {
+   const {
+     activeTabSlug,
+     courseId,
+@@ -95,7 +95,7 @@ function TabPage({ intl, ...props }) {
+       <Footer />
+     </>
+   );
+-}
++};
+ 
+ TabPage.defaultProps = {
+   courseId: null,
+diff --git a/src/tab-page/TabPage.test.jsx b/src/tab-page/TabPage.test.jsx
+index c610107..2763b61 100644
+--- a/src/tab-page/TabPage.test.jsx
++++ b/src/tab-page/TabPage.test.jsx
+@@ -10,7 +10,9 @@ import { executeThunk } from '../utils';
+ import * as thunks from '../course-home/data/thunks';
+ 
+ // We should not test `LoadedTabPage` page here, as `TabPage` is used only for passing `passthroughProps`.
+-jest.mock('./LoadedTabPage', () => () => <div data-testid="LoadedTabPage" />);
++jest.mock('./LoadedTabPage', () => function () {
++  return <div data-testid="LoadedTabPage" />;
++});
+ 
+ describe('Tab Page', () => {
+   const mockData = {
+-- 
+2.34.1
+

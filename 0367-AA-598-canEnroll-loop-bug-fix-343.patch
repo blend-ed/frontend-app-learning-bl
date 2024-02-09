@@ -1,0 +1,42 @@
+From 48e3f430629c5aeadd60beb8a4acb940c63b6e15 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 11 Jan 2021 16:53:22 -0500
+Subject: [PATCH 0367/1021] AA-598: canEnroll loop bug fix (#343)
+
+---
+ src/alerts/enrollment-alert/hooks.js     | 4 ++--
+ src/alerts/private-course-alert/hooks.js | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index b5ddbb1..7c6ec8d 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -25,9 +25,9 @@ export function useEnrollmentAlert(courseId) {
+    */
+   const isVisible = !enrolledUser && authenticatedUser !== null && privateOutline;
+   const payload = {
+-    canEnroll: outline ? outline.enrollAlert.canEnroll : false,
++    canEnroll: outline && outline.enrollAlert ? outline.enrollAlert.canEnroll : false,
+     courseId,
+-    extraText: outline ? outline.enrollAlert.extraText : '',
++    extraText: outline && outline.enrollAlert ? outline.enrollAlert.extraText : '',
+     isStaff: course.isStaff,
+   };
+ 
+diff --git a/src/alerts/private-course-alert/hooks.js b/src/alerts/private-course-alert/hooks.js
+index 07d32a5..24c7245 100644
+--- a/src/alerts/private-course-alert/hooks.js
++++ b/src/alerts/private-course-alert/hooks.js
+@@ -20,7 +20,7 @@ export function usePrivateCourseAlert(courseId) {
+   const isVisible = !enrolledUser && (privateOutline || authenticatedUser !== null);
+   const payload = {
+     anonymousUser: authenticatedUser === null,
+-    canEnroll: outline ? outline.enrollAlert.canEnroll : false,
++    canEnroll: outline && outline.enrollAlert ? outline.enrollAlert.canEnroll : false,
+     courseId,
+   };
+ 
+-- 
+2.34.1
+

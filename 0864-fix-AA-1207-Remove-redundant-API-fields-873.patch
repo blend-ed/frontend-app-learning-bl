@@ -1,0 +1,852 @@
+From 3cba1bbac42ea664b72d8c27a4592c8d42bbe416 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Fri, 18 Mar 2022 09:20:31 -0400
+Subject: [PATCH 0864/1021] fix: [AA-1207] Remove redundant API fields (#873)
+
+Remove redundant fields from courseware API. These are all found in courseHome:
+
+- number
+- org
+- originalUserIsStaff
+- isStaff
+- verifiedMode
+- isMasquerading (virtual field from isStaff and originalUserIsStaff)
+---
+ .../courseHomeMetadata.factory.js             | 12 +++++++++
+ .../data/__snapshots__/redux.test.js.snap     | 21 +++++++++++-----
+ src/courseware/CoursewareContainer.test.jsx   | 11 ++++----
+ src/courseware/course/Course.jsx              | 13 +++++-----
+ src/courseware/course/Course.test.jsx         |  8 +++---
+ .../course/celebration/CelebrationModal.jsx   |  2 +-
+ .../WeeklyGoalCelebrationModal.jsx            |  2 +-
+ src/courseware/course/celebration/utils.jsx   |  2 +-
+ .../course/course-exit/CatalogSuggestion.jsx  |  2 +-
+ .../course/course-exit/CourseCelebration.jsx  |  7 ++++--
+ .../course/course-exit/CourseExit.jsx         |  3 ++-
+ .../course/course-exit/CourseExit.test.jsx    | 16 ++++++++----
+ .../course/course-exit/CourseInProgress.jsx   |  7 ++++--
+ .../course/course-exit/CourseNonPassing.jsx   |  7 ++++--
+ .../course-exit/CourseRecommendations.jsx     |  3 ++-
+ .../course/course-exit/DashboardFootnote.jsx  |  2 +-
+ .../course/course-exit/UpgradeFootnote.jsx    |  2 +-
+ src/courseware/course/sequence/Sequence.jsx   |  8 ++++--
+ .../sequence/lock-paywall/LockPaywall.jsx     |  6 +++--
+ .../lock-paywall/LockPaywall.test.jsx         | 10 ++++----
+ .../course/sidebar/SidebarContextProvider.jsx |  2 +-
+ .../notifications/NotificationTray.jsx        |  8 ++++--
+ .../notifications/NotificationTray.test.jsx   |  4 +--
+ .../__factories__/courseMetadata.factory.js   |  8 ------
+ src/courseware/data/api.js                    |  6 -----
+ .../data/pact-tests/lmsPact.test.jsx          | 25 -------------------
+ src/courseware/data/redux.test.js             |  6 ++---
+ src/courseware/social-share/SocialIcons.jsx   |  5 ++--
+ src/experiments/mm-p2p/index.jsx              |  4 ++-
+ .../courseMetadataBase.factory.js             |  9 -------
+ .../StreakCelebrationModal.test.jsx           |  8 +++---
+ 31 files changed, 116 insertions(+), 113 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index b7d6ffc..fb4781b 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -8,6 +8,7 @@ Factory.define('courseHomeMetadata')
+     title: 'Demonstration Course',
+     is_self_paced: false,
+     is_enrolled: false,
++    is_staff: false,
+     can_load_courseware: true,
+     celebrations: null,
+     course_access: {
+@@ -18,9 +19,20 @@ Factory.define('courseHomeMetadata')
+       user_fragment: null,
+       user_message: null,
+     },
++    number: 'DemoX',
++    original_user_is_staff: false,
++    org: 'edX',
+     start: '2013-02-05T05:00:00Z',
+     user_timezone: 'UTC',
+     username: 'MockUser',
++    verified_mode: {
++      access_expiration_date: null,
++      currency: 'USD',
++      upgrade_url: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++      sku: '8CF08E5',
++      price: 149,
++      currency_symbol: '$',
++    },
+   })
+   .attr(
+     'tabs', ['id', 'host'], (id, host) => [
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 869c21a..8d927da 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -76,9 +76,12 @@ Object {
+         "userTimezone": "UTC",
+         "username": "MockUser",
+         "verifiedMode": Object {
++          "accessExpirationDate": null,
++          "currency": "USD",
+           "currencySymbol": "$",
+-          "price": 10,
+-          "upgradeUrl": "test",
++          "price": 149,
++          "sku": "8CF08E5",
++          "upgradeUrl": "http://localhost:18130/basket/add/?sku=8CF08E5",
+         },
+       },
+     },
+@@ -391,9 +394,12 @@ Object {
+         "userTimezone": "UTC",
+         "username": "MockUser",
+         "verifiedMode": Object {
++          "accessExpirationDate": null,
++          "currency": "USD",
+           "currencySymbol": "$",
+-          "price": 10,
+-          "upgradeUrl": "test",
++          "price": 149,
++          "sku": "8CF08E5",
++          "upgradeUrl": "http://localhost:18130/basket/add/?sku=8CF08E5",
+         },
+       },
+     },
+@@ -586,9 +592,12 @@ Object {
+         "userTimezone": "UTC",
+         "username": "MockUser",
+         "verifiedMode": Object {
++          "accessExpirationDate": null,
++          "currency": "USD",
+           "currencySymbol": "$",
+-          "price": 10,
+-          "upgradeUrl": "test",
++          "price": 149,
++          "sku": "8CF08E5",
++          "upgradeUrl": "http://localhost:18130/basket/add/?sku=8CF08E5",
+         },
+       },
+     },
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 71912ca..2fd42b4 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -72,7 +72,7 @@ describe('CoursewareContainer', () => {
+     sequenceBlocks: [defaultSequenceBlock],
+   } = buildSimpleCourseBlocks(
+     defaultCourseId,
+-    defaultCourseMetadata.name,
++    defaultCourseHomeMetadata.title,
+     { unitBlocks: defaultUnitBlocks },
+   );
+ 
+@@ -173,15 +173,16 @@ describe('CoursewareContainer', () => {
+ 
+   describe('when receiving successful course data', () => {
+     const courseMetadata = defaultCourseMetadata;
++    const courseHomeMetadata = defaultCourseHomeMetadata;
+     const courseId = defaultCourseId;
+ 
+     function assertLoadedHeader(container) {
+       const courseHeader = container.querySelector('.learning-header');
+       // Ensure the course number and org appear - this proves we loaded course metadata properly.
+-      expect(courseHeader).toHaveTextContent(courseMetadata.number);
+-      expect(courseHeader).toHaveTextContent(courseMetadata.org);
++      expect(courseHeader).toHaveTextContent(courseHomeMetadata.number);
++      expect(courseHeader).toHaveTextContent(courseHomeMetadata.org);
+       // Ensure the course title is showing up in the header.  This means we loaded course blocks properly.
+-      expect(courseHeader.querySelector('.course-title')).toHaveTextContent(courseMetadata.name);
++      expect(courseHeader.querySelector('.course-title')).toHaveTextContent(courseHomeMetadata.title);
+     }
+ 
+     function assertSequenceNavigation(container, expectedUnitCount = 3) {
+@@ -250,7 +251,7 @@ describe('CoursewareContainer', () => {
+       const {
+         courseBlocks, unitTree, sequenceTree, sectionTree,
+       } = buildBinaryCourseBlocks(
+-        courseId, courseMetadata.name,
++        courseId, courseHomeMetadata.title,
+       );
+ 
+       function setUrl(urlSequenceId, urlUnitId = null) {
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 56b25df..e27edbf 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -31,6 +31,10 @@ function Course({
+   windowWidth,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
++  const {
++    celebrations,
++    isStaff,
++  } = useModel('courseHomeMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const section = useModel('sections', sequence ? sequence.sectionId : null);
+ 
+@@ -40,11 +44,6 @@ function Course({
+     course,
+   ].filter(element => element != null).map(element => element.title);
+ 
+-  const {
+-    celebrations,
+-    courseGoals,
+-  } = course;
+-
+   // Below the tabs, above the breadcrumbs alerts (appearing in the order listed here)
+   const dispatch = useDispatch();
+   const celebrateFirstSection = celebrations && celebrations.firstSection;
+@@ -57,7 +56,7 @@ function Course({
+     celebrations && !celebrations.streakLengthToCelebrate && celebrations.weeklyGoal,
+   );
+   const shouldDisplayTriggers = windowWidth >= breakpoints.small.minWidth;
+-  const daysPerWeek = courseGoals?.selectedGoal?.daysPerWeek;
++  const daysPerWeek = course?.courseGoals?.selectedGoal?.daysPerWeek;
+ 
+   // Responsive breakpoints for showing the notification button/tray
+   const shouldDisplayNotificationTrayOpenOnLoad = windowWidth > breakpoints.medium.minWidth;
+@@ -85,7 +84,7 @@ function Course({
+           courseId={courseId}
+           sectionId={section ? section.id : null}
+           sequenceId={sequenceId}
+-          isStaff={course ? course.isStaff : null}
++          isStaff={isStaff}
+           unitId={unitId}
+           //* * [MM-P2P] Experiment */
+           mmp2p={MMP2P}
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 84b60b5..cd6b0a5 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -64,8 +64,8 @@ describe('Course', () => {
+   });
+ 
+   it('displays first section celebration modal', async () => {
+-    const courseMetadata = Factory.build('courseMetadata', { celebrations: { firstSection: true } });
+-    const testStore = await initializeTestStore({ courseMetadata }, false);
++    const courseHomeMetadata = Factory.build('courseHomeMetadata', { celebrations: { firstSection: true } });
++    const testStore = await initializeTestStore({ courseHomeMetadata }, false);
+     const { courseware, models } = testStore.getState();
+     const { courseId, sequenceId } = courseware;
+     const testData = {
+@@ -84,8 +84,8 @@ describe('Course', () => {
+   });
+ 
+   it('displays weekly goal celebration modal', async () => {
+-    const courseMetadata = Factory.build('courseMetadata', { celebrations: { weeklyGoal: true } });
+-    const testStore = await initializeTestStore({ courseMetadata }, false);
++    const courseHomeMetadata = Factory.build('courseHomeMetadata', { celebrations: { weeklyGoal: true } });
++    const testStore = await initializeTestStore({ courseHomeMetadata }, false);
+     const { courseware, models } = testStore.getState();
+     const { courseId, sequenceId } = courseware;
+     const testData = {
+diff --git a/src/courseware/course/celebration/CelebrationModal.jsx b/src/courseware/course/celebration/CelebrationModal.jsx
+index e59818b..768bc1f 100644
+--- a/src/courseware/course/celebration/CelebrationModal.jsx
++++ b/src/courseware/course/celebration/CelebrationModal.jsx
+@@ -19,7 +19,7 @@ import { useModel } from '../../../generic/model-store';
+ function CelebrationModal({
+   courseId, intl, isOpen, onClose, ...rest
+ }) {
+-  const { org } = useModel('coursewareMeta', courseId);
++  const { org } = useModel('courseHomeMeta', courseId);
+   const wideScreen = useWindowSize().width >= breakpoints.small.minWidth;
+ 
+   useEffect(() => {
+diff --git a/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx b/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
+index 6bc6c17..4b278bb 100644
+--- a/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
++++ b/src/courseware/course/celebration/WeeklyGoalCelebrationModal.jsx
+@@ -14,7 +14,7 @@ import { useModel } from '../../../generic/model-store';
+ function WeeklyGoalCelebrationModal({
+   courseId, daysPerWeek, intl, isOpen, onClose, ...rest
+ }) {
+-  const { org } = useModel('coursewareMeta', courseId);
++  const { org } = useModel('courseHomeMeta', courseId);
+ 
+   useEffect(() => {
+     if (isOpen) {
+diff --git a/src/courseware/course/celebration/utils.jsx b/src/courseware/course/celebration/utils.jsx
+index bf4a76a..7206efb 100644
+--- a/src/courseware/course/celebration/utils.jsx
++++ b/src/courseware/course/celebration/utils.jsx
+@@ -71,7 +71,7 @@ function shouldCelebrateOnSectionLoad(courseId, sequenceId, celebrateFirstSectio
+ 
+     // Update our local copy of course data from LMS
+     dispatch(updateModel({
+-      modelType: 'coursewareMeta',
++      modelType: 'courseHomeMeta',
+       model: {
+         id: courseId,
+         celebrations: {
+diff --git a/src/courseware/course/course-exit/CatalogSuggestion.jsx b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+index e8931b2..ededa14 100644
+--- a/src/courseware/course/course-exit/CatalogSuggestion.jsx
++++ b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+@@ -18,7 +18,7 @@ import { logClick } from './utils';
+ 
+ function CatalogSuggestion({ intl, variant }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org } = useModel('coursewareMeta', courseId);
++  const { org } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   const searchOurCatalogLink = (
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index e190770..1b61a76 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -46,14 +46,17 @@ function CourseCelebration({ intl }) {
+     linkedinAddToProfileUrl,
+     marketingUrl,
+     offer,
+-    org,
+     relatedPrograms,
+     title,
+-    verifiedMode,
+     verifyIdentityUrl,
+     verificationStatus,
+   } = useModel('coursewareMeta', courseId);
+ 
++  const {
++    org,
++    verifiedMode,
++  } = useModel('courseHomeMeta', courseId);
++
+   const {
+     certStatus,
+     certWebViewUrl,
+diff --git a/src/courseware/course/course-exit/CourseExit.jsx b/src/courseware/course/course-exit/CourseExit.jsx
+index 3c95f5b..b9e7de7 100644
+--- a/src/courseware/course/course-exit/CourseExit.jsx
++++ b/src/courseware/course/course-exit/CourseExit.jsx
+@@ -24,10 +24,11 @@ function CourseExit({ intl }) {
+     enrollmentMode,
+     hasScheduledContent,
+     isEnrolled,
+-    isMasquerading,
+     userHasPassingGrade,
+   } = useModel('coursewareMeta', courseId);
+ 
++  const { isMasquerading } = useModel('courseHomeMeta', courseId);
++
+   const mode = getCourseExitMode(
+     certificateData,
+     hasScheduledContent,
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 2511756..122b2b9 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -30,7 +30,7 @@ describe('Course Exit Pages', () => {
+   });
+   const courseId = coursewareMetadata.id;
+   const courseHomeMetadata = Factory.build('courseHomeMetadata');
+-  const { courseBlocks: defaultCourseBlocks } = buildSimpleCourseBlocks(courseId, coursewareMetadata.name);
++  const { courseBlocks: defaultCourseBlocks } = buildSimpleCourseBlocks(courseId, courseHomeMetadata.title);
+ 
+   let coursewareMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
+   coursewareMetadataUrl = appendBrowserTimezoneToUrl(coursewareMetadataUrl);
+@@ -39,9 +39,11 @@ describe('Course Exit Pages', () => {
+   const enrollmentsUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment*`);
+   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
+ 
+-  function setMetadata(attributes) {
+-    const courseMetadata = { ...coursewareMetadata, ...attributes };
+-    axiosMock.onGet(coursewareMetadataUrl).reply(200, courseMetadata);
++  function setMetadata(coursewareAttributes, courseHomeAttributes = {}) {
++    const extendedCourseMetadata = { ...coursewareMetadata, ...coursewareAttributes };
++    axiosMock.onGet(coursewareMetadataUrl).reply(200, extendedCourseMetadata);
++    const extendedCourseHomeMetadata = { ...courseHomeMetadata, ...courseHomeAttributes };
++    axiosMock.onGet(courseHomeMetadataUrl).reply(200, extendedCourseHomeMetadata);
+   }
+ 
+   async function fetchAndRender(component) {
+@@ -186,6 +188,8 @@ describe('Course Exit Pages', () => {
+     it('Displays upgrade link when available', async () => {
+       setMetadata({
+         certificate_data: { cert_status: 'audit_passing' },
++      },
++      {
+         verified_mode: {
+           access_expiration_date: '9999-08-06T12:00:00Z',
+           upgrade_url: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+@@ -206,6 +210,8 @@ describe('Course Exit Pages', () => {
+     it('Displays nothing if audit only', async () => {
+       setMetadata({
+         certificate_data: { cert_status: 'audit_passing' },
++      },
++      {
+         verified_mode: null,
+       });
+       await fetchAndRender(<CourseCelebration />);
+@@ -371,7 +377,7 @@ describe('Course Exit Pages', () => {
+   describe('Course in progress experience', () => {
+     it('Displays link to dates tab', async () => {
+       setMetadata({ user_has_passing_grade: false });
+-      const { courseBlocks } = buildSimpleCourseBlocks(courseId, coursewareMetadata.name,
++      const { courseBlocks } = buildSimpleCourseBlocks(courseId, courseHomeMetadata.title,
+         { hasScheduledContent: true });
+       axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
+ 
+diff --git a/src/courseware/course/course-exit/CourseInProgress.jsx b/src/courseware/course/course-exit/CourseInProgress.jsx
+index 9a87b91..7c230d4 100644
+--- a/src/courseware/course/course-exit/CourseInProgress.jsx
++++ b/src/courseware/course/course-exit/CourseInProgress.jsx
+@@ -16,8 +16,11 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseInProgress({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org, title } = useModel('coursewareMeta', courseId);
+-  const { tabs } = useModel('courseHomeMeta', courseId);
++  const {
++    org,
++    tabs,
++    title,
++  } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get dates tab link for 'view course schedule' button
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index a8874bc..a39d35b 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -16,8 +16,11 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseNonPassing({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org, title } = useModel('coursewareMeta', courseId);
+-  const { tabs } = useModel('courseHomeMeta', courseId);
++  const {
++    org,
++    tabs,
++    title,
++  } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get progress tab link for 'view grades' button
+diff --git a/src/courseware/course/course-exit/CourseRecommendations.jsx b/src/courseware/course/course-exit/CourseRecommendations.jsx
+index 19b578c..53dff1b 100644
+--- a/src/courseware/course/course-exit/CourseRecommendations.jsx
++++ b/src/courseware/course/course-exit/CourseRecommendations.jsx
+@@ -133,7 +133,8 @@ const IntlCard = injectIntl(CourseCard);
+ 
+ function CourseRecommendations({ intl, variant }) {
+   const { courseId, recommendationsStatus } = useSelector(state => ({ ...state.recommendations, ...state.courseware }));
+-  const { org, number, recommendations } = useModel('coursewareMeta', courseId);
++  const { recommendations } = useModel('coursewareMeta', courseId);
++  const { org, number } = useModel('courseHomeMeta', courseId);
+   const dispatch = useDispatch();
+ 
+   const courseKey = `${org}+${number}`;
+diff --git a/src/courseware/course/course-exit/DashboardFootnote.jsx b/src/courseware/course/course-exit/DashboardFootnote.jsx
+index 37a22dd..5a52542 100644
+--- a/src/courseware/course/course-exit/DashboardFootnote.jsx
++++ b/src/courseware/course/course-exit/DashboardFootnote.jsx
+@@ -18,7 +18,7 @@ import { logClick } from './utils';
+ 
+ function DashboardFootnote({ intl, variant }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org } = useModel('coursewareMeta', courseId);
++  const { org } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   const dashboardLink = (
+diff --git a/src/courseware/course/course-exit/UpgradeFootnote.jsx b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+index fb3cd59..d417334 100644
+--- a/src/courseware/course/course-exit/UpgradeFootnote.jsx
++++ b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+@@ -16,7 +16,7 @@ import { useModel } from '../../../generic/model-store';
+ 
+ function UpgradeFootnote({ deadline, href, intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org } = useModel('coursewareMeta', courseId);
++  const { org } = useModel('courseHomeMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   const upgradeLink = (
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 12d1306..d3696fb 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -41,6 +41,10 @@ function Sequence({
+   mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
++  const {
++    isStaff,
++    originalUserIsStaff,
++  } = useModel('courseHomeMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+@@ -215,8 +219,8 @@ function Sequence({
+         <SequenceExamWrapper
+           sequence={sequence}
+           courseId={courseId}
+-          isStaff={course.isStaff}
+-          originalUserIsStaff={course.originalUserIsStaff}
++          isStaff={isStaff}
++          originalUserIsStaff={originalUserIsStaff}
+           isIntegritySignatureEnabled={course.isIntegritySignatureEnabled}
+           canAccessProctoredExams={course.canAccessProctoredExams}
+         >
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index f616c25..b128eab 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -29,10 +29,12 @@ function LockPaywall({
+     accessExpiration,
+     marketingUrl,
+     offer,
+-    org,
+-    verifiedMode,
+   } = course;
+ 
++  const {
++    org, verifiedMode,
++  } = useModel('courseHomeMeta', courseId);
++
+   // the following variables are set and used for resposive layout to work with
+   // whether the NotificationTray is open or not and if there's an offer with longer text
+   const shouldDisplayBulletPointsBelowCertificate = useWindowSize().width <= breakpoints.large.minWidth;
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+index 786df96..0f6768e 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+@@ -26,7 +26,7 @@ describe('Lock Paywall', () => {
+       currencySymbol,
+       price,
+       upgradeUrl,
+-    } = store.getState().models.coursewareMeta[mockData.courseId].verifiedMode;
++    } = store.getState().models.courseHomeMeta[mockData.courseId].verifiedMode;
+     render(<LockPaywall {...mockData} />);
+ 
+     const upgradeLink = screen.getByRole('link', { name: `Upgrade for ${currencySymbol}${price}` });
+@@ -56,7 +56,7 @@ describe('Lock Paywall', () => {
+     const {
+       currencySymbol,
+       price,
+-    } = store.getState().models.coursewareMeta[mockData.courseId].verifiedMode;
++    } = store.getState().models.courseHomeMeta[mockData.courseId].verifiedMode;
+     render(<LockPaywall {...mockData} />);
+ 
+     const upgradeLink = screen.getByRole('link', { name: `Upgrade for ${currencySymbol}${price}` });
+@@ -74,9 +74,9 @@ describe('Lock Paywall', () => {
+   });
+ 
+   it('does not display anything if course does not have verified mode', async () => {
+-    const courseMetadata = Factory.build('courseMetadata', { verified_mode: null });
+-    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
+-    const { container } = render(<LockPaywall {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++    const courseHomeMetadata = Factory.build('courseHomeMetadata', { verified_mode: null });
++    const testStore = await initializeTestStore({ courseHomeMetadata, excludeFetchSequence: true }, false);
++    const { container } = render(<LockPaywall {...mockData} courseId={courseHomeMetadata.id} />, { store: testStore });
+ 
+     expect(container).toBeEmptyDOMElement();
+   });
+diff --git a/src/courseware/course/sidebar/SidebarContextProvider.jsx b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+index 1e6c93a..9159a13 100644
+--- a/src/courseware/course/sidebar/SidebarContextProvider.jsx
++++ b/src/courseware/course/sidebar/SidebarContextProvider.jsx
+@@ -13,7 +13,7 @@ export default function SidebarProvider({
+   unitId,
+   children,
+ }) {
+-  const { verifiedMode } = useModel('coursewareMeta', courseId);
++  const { verifiedMode } = useModel('courseHomeMeta', courseId);
+   const shouldDisplayFullScreen = useWindowSize().width < breakpoints.large.minWidth;
+   const shouldDisplaySidebarOpen = useWindowSize().width > breakpoints.medium.minWidth;
+   const showNotificationsOnLoad = getSessionStorage(`notificationTrayStatus.${courseId}`) !== 'closed';
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
+index 2c7c3b9..bce9c89 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.jsx
+@@ -24,11 +24,15 @@ function NotificationTray({ intl }) {
+     contentTypeGatingEnabled,
+     marketingUrl,
+     offer,
+-    org,
+     timeOffsetMillis,
+     userTimezone,
+-    verifiedMode,
+   } = course;
++
++  const {
++    org,
++    verifiedMode,
++  } = useModel('courseHomeMeta', courseId);
++
+   // After three seconds, update notificationSeen (to hide red dot)
+   useEffect(() => { setTimeout(onNotificationSeen, 3000); }, []);
+ 
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+index 6be69b6..9028bdf 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+@@ -32,8 +32,8 @@ describe('NotificationTray', () => {
+   const courseHomeMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`);
+ 
+   function setMetadata(attributes, options) {
+-    const courseMetadata = Factory.build('courseMetadata', attributes, options);
+-    axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++    const updatedCourseHomeMetadata = Factory.build('courseHomeMetadata', attributes, options);
++    axiosMock.onGet(courseHomeMetadataUrl).reply(200, updatedCourseHomeMetadata);
+   }
+ 
+   async function fetchAndRender(component) {
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 09b60b4..53303cd 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -32,14 +32,6 @@ Factory.define('courseMetadata')
+       mode: null,
+       is_active: null,
+     },
+-    verified_mode: {
+-      access_expiration_date: null,
+-      currency: 'USD',
+-      upgrade_url: 'http://localhost:18130/basket/add/?sku=8CF08E5',
+-      sku: '8CF08E5',
+-      price: 149,
+-      currency_symbol: '$',
+-    },
+     show_calculator: false,
+     license: 'all-rights-reserved',
+     notes: {
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index ed36a0b..7cf1e22 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -95,9 +95,7 @@ function normalizeMetadata(metadata) {
+     courseGoals: camelCaseObject(data.course_goals),
+     id: data.id,
+     title: data.name,
+-    number: data.number,
+     offer: camelCaseObject(data.offer),
+-    org: data.org,
+     enrollmentStart: data.enrollment_start,
+     enrollmentEnd: data.enrollment_end,
+     end: data.end,
+@@ -105,10 +103,7 @@ function normalizeMetadata(metadata) {
+     enrollmentMode: data.enrollment.mode,
+     isEnrolled: data.enrollment.is_active,
+     canViewLegacyCourseware: data.can_view_legacy_courseware,
+-    originalUserIsStaff: data.original_user_is_staff,
+-    isStaff: data.is_staff,
+     license: data.license,
+-    verifiedMode: camelCaseObject(data.verified_mode),
+     userTimezone: data.user_timezone,
+     showCalculator: data.show_calculator,
+     notes: camelCaseObject(data.notes),
+@@ -125,7 +120,6 @@ function normalizeMetadata(metadata) {
+     relatedPrograms: camelCaseObject(data.related_programs),
+     isIntegritySignatureEnabled: data.is_integrity_signature_enabled,
+     userNeedsIntegritySignature: data.user_needs_integrity_signature,
+-    isMasquerading: data.original_user_is_staff && !data.is_staff,
+     canAccessProctoredExams: data.can_access_proctored_exams,
+   };
+ }
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index d18f335..48fc8e7 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -224,7 +224,6 @@ describe('Courseware Service', () => {
+             }),
+             license: string('all-rights-reserved'),
+             name: like('Demonstration Course'),
+-            number: like('DemoX'),
+             offer: {
+               code: string('code'),
+               expiration_date: term({
+@@ -236,7 +235,6 @@ describe('Courseware Service', () => {
+               percentage: integer(50),
+               upgrade_url: string('url'),
+             },
+-            org: like('edX'),
+             related_programs: null,
+             short_description: like(''),
+             start: term({
+@@ -269,11 +267,6 @@ describe('Courseware Service', () => {
+             }),
+             notes: { enabled: boolean(false), visible: boolean(true) },
+             marketing_url: null,
+-            celebrations: {
+-              first_section: boolean(false),
+-              streak_length_to_celebrate: null,
+-              streak_discount_enabled: boolean(false),
+-            },
+             user_has_passing_grade: boolean(false),
+             course_exit_page_is_active: boolean(false),
+             certificate_data: {
+@@ -298,7 +291,6 @@ describe('Courseware Service', () => {
+         contentTypeGatingEnabled: false,
+         id: 'course-v1:edX+DemoX+Demo_Course',
+         title: 'Demonstration Course',
+-        number: 'DemoX',
+         offer: {
+           code: 'code',
+           discountedPrice: '$99',
+@@ -307,7 +299,6 @@ describe('Courseware Service', () => {
+           percentage: 50,
+           upgradeUrl: 'url',
+         },
+-        org: 'edX',
+         enrollmentStart: '2013-02-05T05:00:00Z',
+         enrollmentEnd: '2013-02-05T05:00:00Z',
+         end: '2013-02-05T05:00:00Z',
+@@ -315,26 +306,11 @@ describe('Courseware Service', () => {
+         enrollmentMode: 'audit',
+         isEnrolled: true,
+         canViewLegacyCourseware: true,
+-        originalUserIsStaff: true,
+-        isStaff: true,
+         license: 'all-rights-reserved',
+-        verifiedMode: {
+-          accessExpirationDate: '2013-02-05T05:00:00Z',
+-          currency: 'USD',
+-          currencySymbol: '$',
+-          price: 149,
+-          sku: '8CF08E5',
+-          upgradeUrl: `${getConfig().ECOMMERCE_BASE_URL}/basket/add/?sku=8CF08E5`,
+-        },
+         userTimezone: null,
+         showCalculator: false,
+         notes: { enabled: false, visible: true },
+         marketingUrl: null,
+-        celebrations: {
+-          firstSection: false,
+-          streakLengthToCelebrate: null,
+-          streakDiscountEnabled: false,
+-        },
+         userHasPassingGrade: false,
+         courseExitPageIsActive: false,
+         certificateData: {
+@@ -349,7 +325,6 @@ describe('Courseware Service', () => {
+         linkedinAddToProfileUrl: null,
+         relatedPrograms: null,
+         userNeedsIntegritySignature: false,
+-        isMasquerading: false,
+       };
+       const response = await getCourseMetadata(courseId);
+       expect(response).toBeTruthy();
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index e5f0d98..6ab7aaf 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -112,7 +112,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].verifiedMode).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].marketingUrl).not.toBeUndefined();
+     });
+ 
+     it('Should fetch, normalize, and save metadata; filtering has no effect', async () => {
+@@ -132,7 +132,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].verifiedMode).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].marketingUrl).not.toBeUndefined();
+       expect(state.models.sequences.length === 1);
+ 
+       Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 1));
+@@ -159,7 +159,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].verifiedMode).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].marketingUrl).not.toBeUndefined();
+       expect(state.models.sequences === null);
+ 
+       Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 0));
+diff --git a/src/courseware/social-share/SocialIcons.jsx b/src/courseware/social-share/SocialIcons.jsx
+index a3dba14..1752166 100644
+--- a/src/courseware/social-share/SocialIcons.jsx
++++ b/src/courseware/social-share/SocialIcons.jsx
+@@ -29,11 +29,12 @@ function SocialIcons({
+   intl,
+   socialMessage,
+ }) {
++  const { marketingUrl } = useModel('coursewareMeta', courseId);
++
+   const {
+-    marketingUrl,
+     org,
+     title,
+-  } = useModel('coursewareMeta', courseId);
++  } = useModel('courseHomeMeta', courseId);
+ 
+   if (!marketingUrl) {
+     return null;
+diff --git a/src/experiments/mm-p2p/index.jsx b/src/experiments/mm-p2p/index.jsx
+index 2702e4e..3b1450c 100644
+--- a/src/experiments/mm-p2p/index.jsx
++++ b/src/experiments/mm-p2p/index.jsx
+@@ -202,9 +202,11 @@ const initCoursewareMMP2P = (courseId, sequenceId, unitId) => {
+ 
+     const models = {
+       coursewareMeta: state.models.coursewareMeta[courseId],
++      courseHomeMeta: state.models.courseHomeMeta[courseId],
+       units: state.models.units[unitId],
+     };
+-    const { accessExpiration, verifiedMode } = models.coursewareMeta;
++    const { accessExpiration } = models.coursewareMeta;
++    const { verifiedMode } = models.courseHomeMeta;
+     const graded = models.units !== undefined ? models.units.graded : false;
+ 
+     let access = {};
+diff --git a/src/shared/data/__factories__/courseMetadataBase.factory.js b/src/shared/data/__factories__/courseMetadataBase.factory.js
+index ea888bd..2086173 100644
+--- a/src/shared/data/__factories__/courseMetadataBase.factory.js
++++ b/src/shared/data/__factories__/courseMetadataBase.factory.js
+@@ -8,13 +8,4 @@ export default new Factory()
+   .option('host')
+   .attrs({
+     id: 'course-v1:edX+DemoX+Demo_Course',
+-    is_staff: false,
+-    original_user_is_staff: false,
+-    number: 'DemoX',
+-    org: 'edX',
+-    verified_mode: {
+-      upgrade_url: 'test',
+-      price: 10,
+-      currency_symbol: '$',
+-    },
+   });
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index 79dd55b..eb5d744 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -23,8 +23,8 @@ describe('Loaded Tab Page', () => {
+   let testStore;
+   let axiosMock;
+   const calculateUrl = `${getConfig().ECOMMERCE_BASE_URL}/api/v2/baskets/calculate/?code=ZGY11119949&sku=8CF08E5&username=MockUser`;
+-  const courseMetadata = Factory.build('courseMetadata', { celebrations: { streak_length_to_celebrate: 3 } });
+-  const courseHomeMetadata = Factory.build('courseHomeMetadata');
++  const courseMetadata = Factory.build('courseMetadata');
++  const courseHomeMetadata = Factory.build('courseHomeMetadata', { celebrations: { streak_length_to_celebrate: 3 } });
+ 
+   function setDiscount(percent) {
+     mockData.streakDiscountCouponEnabled = true;
+@@ -50,7 +50,7 @@ describe('Loaded Tab Page', () => {
+       isStreakCelebrationOpen: true,
+       metadataModel: 'coursewareMeta',
+       streakLengthToCelebrate: 3,
+-      verifiedMode: camelCaseObject(courseMetadata.verified_mode),
++      verifiedMode: camelCaseObject(courseHomeMetadata.verified_mode),
+     };
+ 
+     testStore = await initializeTestStore({ courseMetadata, courseHomeMetadata }, false);
+@@ -68,7 +68,7 @@ describe('Loaded Tab Page', () => {
+     expect(screen.getByText('Keep it up, you’re on a roll!')).toBeInTheDocument();
+     expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+     expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.celebration.streak.opened', {
+-      org_key: courseMetadata.org,
++      org_key: courseHomeMetadata.org,
+       courserun_key: mockData.courseId,
+       is_staff: false,
+     });
+-- 
+2.34.1
+

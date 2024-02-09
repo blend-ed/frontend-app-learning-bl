@@ -1,0 +1,49 @@
+From e9c3a6bc5ed3d0ce1a81727f8eaa8c164ae60785 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 14 Jun 2021 11:22:57 -0400
+Subject: [PATCH 0498/1021] fix: update assignment policy logic (#483)
+
+---
+ src/course-home/data/api.js | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index e99baaf..73fa35a 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -35,7 +35,7 @@ function normalizeAssignmentPolicies(assignmentPolicies, sectionScores) {
+ 
+   sectionScores.forEach((chapter) => {
+     chapter.subsections.forEach((subsection) => {
+-      if (!(subsection.hasGradedAssignment && subsection.showGrades)) {
++      if (!(subsection.hasGradedAssignment && subsection.showGrades && subsection.numPointsPossible)) {
+         return;
+       }
+       const {
+@@ -43,14 +43,19 @@ function normalizeAssignmentPolicies(assignmentPolicies, sectionScores) {
+         numPointsEarned,
+         numPointsPossible,
+       } = subsection;
+-      let {
+-        numAssignmentsCreated,
+-      } = gradeByAssignmentType[assignmentType];
+ 
+-      if (!numPointsPossible) {
++      // If a subsection's assignment type does not match an assignment policy in Studio,
++      // we won't be able to include it in this accumulation of grades by assignment type.
++      // This may happen if a course author has removed/renamed an assignment policy in Studio and
++      // neglected to update the subsection's of that assignment type
++      if (!gradeByAssignmentType[assignmentType]) {
+         return;
+       }
+ 
++      let {
++        numAssignmentsCreated,
++      } = gradeByAssignmentType[assignmentType];
++
+       numAssignmentsCreated++;
+       if (numAssignmentsCreated <= gradeByAssignmentType[assignmentType].numTotalExpectedAssignments) {
+         // Remove a placeholder grade so long as the number of recorded created assignments is less than the number
+-- 
+2.34.1
+

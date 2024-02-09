@@ -1,0 +1,26 @@
+From 36f567c834a69c42fc24fca1f44a7ed17168acce Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Tue, 4 May 2021 11:51:44 -0400
+Subject: [PATCH 0443/1021] fix: accurately represent pass/fail grade range
+ (#433)
+
+---
+ .../progress-tab/grades/course-grade/CourseGradeFooter.jsx      | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+index c4c03bb..cb01116 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+@@ -35,7 +35,7 @@ function CourseGradeFooter({ intl, passingGrade }) {
+   const OnMobile = layout.is('mobile');
+   const OnAtLeastTablet = layout.isAtLeast('tablet');
+ 
+-  const hasLetterGrades = !gradeRange.pass;
++  const hasLetterGrades = Object.keys(gradeRange).length > 1; // A pass/fail course will only have one key
+   let footerText = intl.formatMessage(messages.courseGradeFooterNonPassing, { passingGrade });
+ 
+   if (isPassing) {
+-- 
+2.34.1
+

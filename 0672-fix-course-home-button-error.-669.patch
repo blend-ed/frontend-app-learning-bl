@@ -1,0 +1,471 @@
+From 0889b17e85cad578ed4459ce5f413894f7b76b26 Mon Sep 17 00:00:00 2001
+From: connorhaugh <49422820+connorhaugh@users.noreply.github.com>
+Date: Wed, 6 Oct 2021 11:14:24 -0400
+Subject: [PATCH 0672/1021] fix: course home button error. (#669)
+
+In order to finish off TNL-7107 I needed to meet the acceptance criteria: When learners or educators select a section dropdown item they are taken to the first subsection within that section that is not completed by default. If all subsections are completed they should be taken to the first(subsection) in that section.
+
+This reimagining of Jumpnav does that by lazy loading in the menuItem's destinations and routing the user using React-Router.
+---
+ src/courseware/course/Course.jsx              |   1 +
+ src/courseware/course/CourseBreadcrumbs.jsx   | 108 +++++++++---------
+ .../course/CourseBreadcrumbs.test.jsx         |  26 +++--
+ src/courseware/course/JumpNavMenuItem.jsx     |  80 +++++++++++++
+ .../course/JumpNavMenuItem.test.jsx           |  69 +++++++++++
+ src/courseware/data/thunks.js                 |   4 +-
+ 6 files changed, 224 insertions(+), 64 deletions(-)
+ create mode 100644 src/courseware/course/JumpNavMenuItem.jsx
+ create mode 100644 src/courseware/course/JumpNavMenuItem.test.jsx
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 748d8a4..7458fe7 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -90,6 +90,7 @@ function Course({
+           courseId={courseId}
+           sectionId={section ? section.id : null}
+           sequenceId={sequenceId}
++          unitId={unitId}
+           //* * [MM-P2P] Experiment */
+           mmp2p={MMP2P}
+         />
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 14d76d3..41d4d2f 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -5,32 +5,18 @@ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faHome } from '@fortawesome/free-solid-svg-icons';
+ import { useSelector } from 'react-redux';
+-import { Hyperlink, MenuItem, SelectMenu } from '@edx/paragon';
++import { SelectMenu } from '@edx/paragon';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-import {
+-  sendTrackingLogEvent,
+-  sendTrackEvent,
+-} from '@edx/frontend-platform/analytics';
+ import { useModel, useModels } from '../../generic/model-store';
+ /** [MM-P2P] Experiment */
+ import { MMP2PFlyoverTrigger } from '../../experiments/mm-p2p';
++import JumpNavMenuItem from './JumpNavMenuItem';
+ 
+ function CourseBreadcrumb({
+-  content, withSeparator,
++  content, withSeparator, courseId, unitId,
+ }) {
+-  const defaultContent = content.filter(destination => destination.default)[0];
+-  const administrator = getAuthenticatedUser() ? getAuthenticatedUser().administrator : false;
+-  function logEvent(target) {
+-    const eventName = 'edx.ui.lms.jump_nav.selected';
+-    const payload = {
+-      target_name: target.label,
+-      id: target.id,
+-      current_id: defaultContent.id,
+-      widget_placement: 'breadcrumb',
+-    };
+-    sendTrackEvent(eventName, payload);
+-    sendTrackingLogEvent(eventName, payload);
+-  }
++  const defaultContent = content.filter(destination => destination.default)[0] || { id: courseId, label: '' };
++  const { administrator } = getAuthenticatedUser();
+ 
+   return (
+     <>
+@@ -46,20 +32,20 @@ function CourseBreadcrumb({
+       >
+         { getConfig().ENABLE_JUMPNAV !== 'true' || content.length < 2 || !administrator
+           ? (
+-            <a className="text-primary-500" href={defaultContent.url}>{defaultContent.label}
++            <a className="text-primary-500" href={`/course/${courseId}/${defaultContent.id}`}>
++              {defaultContent.label}
+             </a>
+           )
+           : (
+             <SelectMenu isLink defaultMessage={defaultContent.label}>
+               {content.map(item => (
+-                <MenuItem
+-                  as={Hyperlink}
+-                  defaultSelected={item.default}
+-                  destination={item.url}
+-                  onClick={logEvent(item)}
+-                >
+-                  {item.label}
+-                </MenuItem>
++                <JumpNavMenuItem
++                  isDefault={item.default}
++                  sequences={item.sequences}
++                  courseId={courseId}
++                  title={item.label}
++                  currentUnit={unitId}
++                />
+               ))}
+             </SelectMenu>
+           )}
+@@ -72,58 +58,71 @@ CourseBreadcrumb.propTypes = {
+   content: PropTypes.arrayOf(
+     PropTypes.shape({
+       default: PropTypes.bool,
+-      url: PropTypes.string,
+       id: PropTypes.string,
+       label: PropTypes.string,
+     }),
+   ).isRequired,
++  unitId: PropTypes.string,
+   withSeparator: PropTypes.bool,
++  courseId: PropTypes.string,
+ };
+ 
+ CourseBreadcrumb.defaultProps = {
+   withSeparator: false,
++  unitId: null,
++  courseId: null,
+ };
+ 
+ export default function CourseBreadcrumbs({
+   courseId,
+   sectionId,
+   sequenceId,
++  unitId,
+   /** [MM-P2P] Experiment */
+   mmp2p,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+   const courseStatus = useSelector(state => state.courseware.courseStatus);
+-  const sections = course ? Object.fromEntries(useModels('sections', course.sectionIds).map(section => [section.id, section])) : null;
+-  const possibleSequences = sections && sectionId ? sections[sectionId].sequenceIds : [];
+-  const sequences = Object.fromEntries(useModels('sequences', possibleSequences).map(sequence => [sequence.id, sequence]));
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+ 
++  const allSequencesInSections = Object.fromEntries(useModels('sections', course.sectionIds).map(section => [section.id, {
++    default: section.id === sectionId,
++    title: section.title,
++    sequences: useModels('sequences', section.sequenceIds),
++  }]));
++
+   const links = useMemo(() => {
+-    const temp = [];
++    const chapters = [];
++    const sequentials = [];
+     if (courseStatus === 'loaded' && sequenceStatus === 'loaded') {
+-      temp.push(course.sectionIds.map(id => ({
+-        id,
+-        label: sections[id].title,
+-        default: (id === sectionId),
+-        // navigate to first sequence in section, (TODO: navigate to first incomplete sequence in section)
+-        url: `${getConfig().BASE_URL}/course/${courseId}/${sections[id].sequenceIds[0]}`,
+-      })));
+-      temp.push(sections[sectionId].sequenceIds.map(id => ({
+-        id,
+-        label: sequences[id].title,
+-        default: id === sequenceId,
+-        // first unit it section (TODO: navigate to first incomplete  in sequence)
+-        url: `${getConfig().BASE_URL}/course/${courseId}/${sequences[id].id}/${sequences[id].unitIds[0]}`,
+-      })));
++      Object.entries(allSequencesInSections).forEach(([id, section]) => {
++        chapters.push({
++          id,
++          label: section.title,
++          default: section.default,
++          sequences: section.sequences,
++        });
++        if (section.default) {
++          section.sequences.forEach(sequence => {
++            sequentials.push({
++              id: sequence.id,
++              label: sequence.title,
++              default: sequence.id === sequenceId,
++              sequences: [sequence],
++            });
++          });
++        }
++      });
+     }
+-    return temp;
+-  }, [courseStatus, sections, sequences]);
++    return [chapters, sequentials];
++  }, [courseStatus, sequenceStatus, allSequencesInSections]);
++
+   return (
+     <nav aria-label="breadcrumb" className="my-4 d-inline-block col-sm-10">
+-      <ol className="list-unstyled d-flex align-items-center m-0">
+-        <li>
++      <ol className="list-unstyled d-flex  flex-nowrap align-items-center m-0">
++        <li className="list-unstyled d-flex m-0">
+           <a
+-            href={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course/`}
++            href={`/course/${courseId}/home`}
+             className="flex-shrink-0 text-primary"
+           >
+             <FontAwesomeIcon icon={faHome} className="mr-2" />
+@@ -136,7 +135,10 @@ export default function CourseBreadcrumbs({
+         </li>
+         {links.map(content => (
+           <CourseBreadcrumb
++            courseId={courseId}
++            sequenceId={sequenceId}
+             content={content}
++            unitId={unitId}
+             withSeparator
+           />
+         ))}
+@@ -153,6 +155,7 @@ CourseBreadcrumbs.propTypes = {
+   courseId: PropTypes.string.isRequired,
+   sectionId: PropTypes.string,
+   sequenceId: PropTypes.string,
++  unitId: PropTypes.string,
+   /** [MM-P2P] Experiment */
+   mmp2p: PropTypes.shape({
+     state: PropTypes.shape({
+@@ -164,6 +167,7 @@ CourseBreadcrumbs.propTypes = {
+ CourseBreadcrumbs.defaultProps = {
+   sectionId: null,
+   sequenceId: null,
++  unitId: null,
+   /** [MM-P2P] Experiment */
+   mmp2p: {},
+ };
+diff --git a/src/courseware/course/CourseBreadcrumbs.test.jsx b/src/courseware/course/CourseBreadcrumbs.test.jsx
+index c2fff42..a51e8e2 100644
+--- a/src/courseware/course/CourseBreadcrumbs.test.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.test.jsx
+@@ -1,13 +1,11 @@
+ import React from 'react';
+-import { screen, render, fireEvent } from '@testing-library/react';
+-import { useSelector } from 'react-redux';
++import { screen, render } from '@testing-library/react';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { getConfig } from '@edx/frontend-platform';
+ import { useModel, useModels } from '../../generic/model-store';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ 
+ jest.mock('@edx/frontend-platform');
+-jest.mock('react-redux');
+ jest.mock('@edx/frontend-platform/analytics');
+ 
+ // Remove When Fully rolled out>>>
+@@ -17,7 +15,16 @@ getConfig.mockImplementation(() => ({ ENABLE_JUMPNAV: 'true' }));
+ getAuthenticatedUser.mockImplementation(() => ({ administrator: true }));
+ // ^^^^Remove When Fully rolled out
+ 
+-useSelector.mockImplementation(() => 'loaded');
++jest.mock('react-redux', () => ({
++  connect: (mapStateToProps, mapDispatchToProps) => (ReactComponent) => ({
++    mapStateToProps,
++    mapDispatchToProps,
++    ReactComponent,
++  }),
++  Provider: ({ children }) => children,
++  useSelector: () => 'loaded',
++}));
++
+ useModels.mockImplementation((name) => {
+   if (name === 'sections') {
+     return [
+@@ -104,14 +111,11 @@ describe('CourseBreadcrumbs', () => {
+       sequenceId="block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions"
+     />,
+   );
+-  it('renders course breadcrumbs as expected, handles clicks', async () => {
++  it('renders course breadcrumbs as expected', async () => {
++    expect(screen.queryAllByRole('link')).toHaveLength(1);
++    const courseHomeButtonDestination = screen.getAllByRole('link')[0].href;
++    expect(courseHomeButtonDestination).toBe('http://localhost/course/course-v1:edX+DemoX+Demo_Course/home');
+     expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toBeInTheDocument();
+     expect(screen.queryAllByRole('button')).toHaveLength(2);
+-    const sectionButton = screen.getByText('Example Week 1: Getting Started');
+-    expect(screen.queryAllByRole('link')).toHaveLength(1);
+-    fireEvent.click(sectionButton);
+-    expect(screen.queryAllByRole('link')).toHaveLength(2);
+-    const menuItem = screen.queryAllByRole('link')[0];
+-    fireEvent.click(menuItem);
+   });
+ });
+diff --git a/src/courseware/course/JumpNavMenuItem.jsx b/src/courseware/course/JumpNavMenuItem.jsx
+new file mode 100644
+index 0000000..c3fb71d
+--- /dev/null
++++ b/src/courseware/course/JumpNavMenuItem.jsx
+@@ -0,0 +1,80 @@
++/* eslint-disable consistent-return */
++import React from 'react';
++import PropTypes from 'prop-types';
++import { history } from '@edx/frontend-platform';
++import { MenuItem } from '@edx/paragon';
++
++import {
++  sendTrackingLogEvent,
++  sendTrackEvent,
++} from '@edx/frontend-platform/analytics';
++import { useDispatch } from 'react-redux';
++import { checkBlockCompletion } from '../data';
++
++export default function JumpNavMenuItem({
++  title,
++  courseId,
++  currentUnit,
++  sequences,
++  isDefault,
++
++}) {
++  const dispatch = useDispatch();
++  function logEvent(targetUrl) {
++    const eventName = 'edx.ui.lms.jump_nav.selected';
++    const payload = {
++      target_name: title,
++      id: targetUrl,
++      current_id: courseId,
++      widget_placement: 'breadcrumb',
++    };
++    sendTrackEvent(eventName, payload);
++    sendTrackingLogEvent(eventName, payload);
++  }
++
++  function lazyloadUrl() {
++    if (isDefault) {
++      return `/course/${courseId}/${currentUnit}`;
++    }
++    const destinationString = sequences.forEach(sequence => sequence.unitIds.forEach(unitId => {
++      const complete = dispatch(checkBlockCompletion(
++        courseId,
++        sequence.id, unitId,
++      ))
++        .then(value => value);
++      if (!complete) { return `/course/${courseId}/${unitId}`; }
++    }));
++    return destinationString || `/course/${courseId}/${sequences[0].unitIds[0]}`;
++  }
++  function handleClick() {
++    const url = lazyloadUrl();
++    logEvent(url);
++    history.push(url);
++  }
++
++  return (
++    <MenuItem
++      defaultSelected={isDefault}
++      onClick={() => handleClick()}
++    >
++      {title}
++    </MenuItem>
++  );
++}
++
++const sequenceShape = PropTypes.shape({
++  id: PropTypes.string.isRequired,
++  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++  sectionId: PropTypes.string.isRequired,
++  isTimeLimited: PropTypes.bool,
++  isProctored: PropTypes.bool,
++  legacyWebUrl: PropTypes.string,
++});
++
++JumpNavMenuItem.propTypes = {
++  title: PropTypes.string.isRequired,
++  sequences: PropTypes.arrayOf(sequenceShape).isRequired,
++  isDefault: PropTypes.bool.isRequired,
++  courseId: PropTypes.string.isRequired,
++  currentUnit: PropTypes.string.isRequired,
++};
+diff --git a/src/courseware/course/JumpNavMenuItem.test.jsx b/src/courseware/course/JumpNavMenuItem.test.jsx
+new file mode 100644
+index 0000000..4bdf832
+--- /dev/null
++++ b/src/courseware/course/JumpNavMenuItem.test.jsx
+@@ -0,0 +1,69 @@
++import React from 'react';
++import { screen, render } from '@testing-library/react';
++import JumpNavMenuItem from './JumpNavMenuItem';
++import { fireEvent } from '../../setupTest';
++
++jest.mock('@edx/frontend-platform');
++jest.mock('@edx/frontend-platform/analytics');
++
++const mockCheckBlock = jest.fn(() => Promise.resolve(true)); // check all units
++
++jest.mock('react-redux', () => ({
++  useDispatch: () => mockCheckBlock,
++}));
++
++const mockData = {
++  sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
++  sequenceId: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions',
++
++  title: 'Demo Menu Item',
++  courseId: 'course-v1:edX+DemoX+Demo_Course',
++  currentUnit: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
++  sequences: [
++    {
++      id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@19a30717eff543078a5d94ae9d6c18a5',
++      blockType: 'sequential',
++      unitIds: [
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@867dddb6f55d410caaa9c1eb9c6743ec',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@4f6c1b4e316a419ab5b6bf30e6c708e9',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@3dc16db8d14842e38324e95d4030b8a0',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@4a1bba2a403f40bca5ec245e945b0d76',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@256f17a44983429fb1a60802203ee4e0',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@e3601c0abee6427d8c17e6d6f8fdddd1',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@134df56c516a4a0dbb24dd5facef746e',
++      ],
++      legacyWebUrl: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@19a30717eff543078a5d94ae9d6c18a5?experience=legacy',
++      sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
++    },
++    {
++      id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions',
++      title: 'Homework - Question Styles',
++      legacyWebUrl: 'http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions?experience=legacy',
++      unitIds: [
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@2152d4a4aadc4cb0af5256394a3d1fc7',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@47dbd5f836544e61877a483c0b75606c',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@54bb9b142c6c4c22afc62bcb628f0e68',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0c92347a5c00',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_1fef54c2b23b',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@2889db1677a549abb15eb4d886f95d1c',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@e8a5cc2aed424838853defab7be45e42',
++      ],
++      sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
++    },
++  ],
++  isDefault: false,
++};
++describe('JumpNavMenuItem', () => {
++  render(
++    <JumpNavMenuItem
++      {...mockData}
++    />,
++  );
++  it('renders menu Item as expected with button and Text and handles clicks', () => {
++    expect(screen.queryAllByRole('button')).toHaveLength(1);
++    expect(screen.getByText('Demo Menu Item'));
++    const navButton = screen.queryAllByRole('button')[0];
++    fireEvent.click(navButton);
++    expect(mockCheckBlock).toBeCalledTimes(14); // number of units to check on load.
++  });
++});
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 1eb09d3..15db701 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -247,7 +247,7 @@ export function checkBlockCompletion(courseId, sequenceId, unitId) {
+   return async (dispatch, getState) => {
+     const { models } = getState();
+     if (models.units[unitId].complete) {
+-      return; // do nothing. Things don't get uncompleted after they are completed.
++      return {}; // do nothing. Things don't get uncompleted after they are completed.
+     }
+ 
+     try {
+@@ -259,9 +259,11 @@ export function checkBlockCompletion(courseId, sequenceId, unitId) {
+           complete: isComplete,
+         },
+       }));
++      return isComplete;
+     } catch (error) {
+       logError(error);
+     }
++    return {};
+   };
+ }
+ 
+-- 
+2.34.1
+

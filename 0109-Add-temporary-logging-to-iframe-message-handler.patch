@@ -1,0 +1,32 @@
+From 5185f986df5318fe622be537ae66cd598d8e6687 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Thu, 30 Apr 2020 11:34:13 -0700
+Subject: [PATCH 0109/1021] Add temporary logging to iframe message handler
+
+---
+ src/courseware/course/sequence/Unit.jsx | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index de9b3ac..2e00a57 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -37,11 +37,15 @@ function Unit({
+     global.onmessage = (event) => {
+       const { type, payload } = event.data;
+ 
++      console.log('MFE App', 'onmessage', id, iframeUrl, event.source, type, payload, event);
+       if (type === 'plugin.resize') {
+         setIframeHeight(payload.height);
++        console.log('MFE App', 'plugin.resize', hasLoaded, iframeHeight, payload.height);
+         if (!hasLoaded && iframeHeight === 0 && payload.height > 0) {
++          console.log('MFE App', 'hasLoaded', true);
+           setHasLoaded(true);
+           if (onLoaded) {
++            console.log('MFE App', 'fire onLoaded handler');
+             onLoaded();
+           }
+         }
+-- 
+2.34.1
+

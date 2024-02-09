@@ -1,0 +1,84 @@
+From 1950fe56bded2ab939837af4aedbde55f28de348 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Wed, 14 Oct 2020 10:11:14 -0400
+Subject: [PATCH 0279/1021] TNL-7299 - Hide sequences that are time limited
+ (special exams) (#241)
+
+If a sequence has its isTimeLimited flag set, then show a spinner instead of the sequence content.  The CoursewareContainer, meanwhile, will be attempting to redirect to the legacy experience.
+
+This prevents a situation where we temporarily show proctored/special exam content to users before their exam starts.
+---
+ src/courseware/course/sequence/Sequence.jsx   | 14 +++++++++
+ .../course/sequence/Sequence.test.jsx         | 31 +++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 34bce24..2fe1cff 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -113,6 +113,20 @@ function Sequence({
+     );
+   }
+ 
++  /*
++  TODO: When the micro-frontend supports viewing special exams without redirecting to the legacy
++  experience, we can remove this whole conditional. For now, though, we show the spinner here
++  because we expect CoursewareContainer to be performing a redirect to the legacy experience while
++  we're waiting. That redirect may take a few seconds, so we show the spinner in the meantime.
++  */
++  if (sequenceStatus === 'loaded' && sequence.isTimeLimited) {
++    return (
++      <PageLoading
++        srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++      />
++    );
++  }
++
+   const gated = sequence && sequence.gatedContent !== undefined && sequence.gatedContent.gated;
+   const goToCourseExitPage = () => {
+     history.push(`/course/${courseId}/course-exit`);
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 966525b..fc2e362 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -78,6 +78,37 @@ describe('Sequence', () => {
+     expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
+   });
+ 
++  it('renders correctly for exam content', async () => {
++    // Exams should NOT render in the Sequence.  They should permanently show a spinner until the
++    // application redirects away from the page.  Note that this component is not responsible for
++    // that redirect behavior, so there's no record of it here.
++    // See CoursewareContainer.jsx "checkExamRedirect" function.
++    const sequenceBlock = [Factory.build(
++      'block',
++      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { courseId: courseMetadata.id },
++    )];
++    const sequenceMetadata = [Factory.build(
++      'sequenceMetadata',
++      { is_time_limited: true },
++      { courseId: courseMetadata.id, unitBlocks, sequenceBlock: sequenceBlock[0] },
++    )];
++    const testStore = await initializeTestStore(
++      {
++        courseMetadata, unitBlocks, sequenceBlock, sequenceMetadata,
++      }, false,
++    );
++    const { container } = render(
++      <Sequence {...mockData} {...{ sequenceId: sequenceBlock[0].id }} />,
++      { store: testStore },
++    );
++
++    // We expect that the sequence container isn't rendering at all.
++    expect(container.querySelector('.sequence-container')).toBeNull();
++    // But that we're seeing a nice spinner.
++    expect(screen.queryByText('Loading learning sequence...')).toBeInTheDocument();
++  });
++
+   it('displays error message on sequence load failure', async () => {
+     const testStore = await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true }, false);
+     testStore.dispatch(fetchSequenceFailure({ sequenceId: mockData.sequenceId }));
+-- 
+2.34.1
+

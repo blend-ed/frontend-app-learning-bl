@@ -1,0 +1,54 @@
+From d8e1124a4c0d99d27ab81a98607c79f20abf2780 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 25 Feb 2022 16:48:09 -0500
+Subject: [PATCH 0822/1021] chore: update to paragon 19.3.0
+
+No change on our end, this is just to get us as up-to-date as
+possible.
+
+This is the latest version of paragon we probably want to use as
+long as we still claim to support IE11 via browserlist. We start
+getting warnings about grid-auto-rows not being supported in IE11
+beginning in paragon 19.4.0 with its new SelectableBox component.
+
+To update our browerlist to drop IE11, we'll need to update our
+node version. Which is in progress elsewhere. But for this series
+of commits, I've gotten as far as I can / want to with paragon.
+---
+ package-lock.json | 6 +++---
+ package.json      | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 9041532..b7c638c 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -4070,9 +4070,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "19.1.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-19.1.0.tgz",
+-      "integrity": "sha512-n+dO0vqo0tzcHywtjzKakI9VIRVqrbcm2WyPAEU2nru9WsZrQs0icwnVEKPkouWmsxPKfMNHepQf4l+P0CeXUg==",
++      "version": "19.3.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-19.3.0.tgz",
++      "integrity": "sha512-MYseqd5qghzn3ABGb9tMpey4qWvv0r7G7VZiBRSCB6ygTTSs18QVT+XtDSL4UXZMY8/SqsMG1JoUhe0Yv/kqBA==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.36",
+         "@fortawesome/free-solid-svg-icons": "^5.15.4",
+diff --git a/package.json b/package.json
+index 2ce4803..cd7702b 100644
+--- a/package.json
++++ b/package.json
+@@ -36,7 +36,7 @@
+     "@edx/frontend-enterprise-utils": "1.1.1",
+     "@edx/frontend-lib-special-exams": "1.15.5",
+     "@edx/frontend-platform": "1.14.3",
+-    "@edx/paragon": "19.1.0",
++    "@edx/paragon": "19.3.0",
+     "@edx/frontend-component-header": "^2.4.2",
+     "@fortawesome/fontawesome-svg-core": "1.2.36",
+     "@fortawesome/free-brands-svg-icons": "5.15.4",
+-- 
+2.34.1
+

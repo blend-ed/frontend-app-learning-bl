@@ -1,0 +1,75 @@
+From f17a635e9d2c5074d6a1bbde3cbc861500f2a1b3 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 18 Feb 2022 15:46:07 -0500
+Subject: [PATCH 0819/1021] chore: update to paragon 17.1.2
+
+Adapt to secret <Spinner> API breakage (they stopped rendering
+children, instead requiring a screenReaderText prop).
+---
+ package-lock.json                                        | 6 +++---
+ package.json                                             | 2 +-
+ src/generic/PageLoading.jsx                              | 4 +---
+ src/shared/streak-celebration/StreakCelebrationModal.jsx | 2 +-
+ 4 files changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 16cab0b..c9e4d2a 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -4070,9 +4070,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "17.0.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-17.0.0.tgz",
+-      "integrity": "sha512-ysj3dQPIGTf+kztoLqP8geLt3fzNSRPIn6k9KTQD0dvl6f28R8C3V/kgfH4HoCaVbvpImeuyaGyYo/4cBmoOoA==",
++      "version": "17.1.2",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-17.1.2.tgz",
++      "integrity": "sha512-PDPOtpe3zuOFBs18T9cAfCABJ7ABxcPWw+sY256fNjIZlaodOwOK/LN1rtuI9MEEfRk174QKRYZzFbihcbn4iw==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+diff --git a/package.json b/package.json
+index 587e7fb..5202810 100644
+--- a/package.json
++++ b/package.json
+@@ -36,7 +36,7 @@
+     "@edx/frontend-enterprise-utils": "1.1.1",
+     "@edx/frontend-lib-special-exams": "1.15.5",
+     "@edx/frontend-platform": "1.14.3",
+-    "@edx/paragon": "17.0.0",
++    "@edx/paragon": "17.1.2",
+     "@edx/frontend-component-header": "^2.4.2",
+     "@fortawesome/fontawesome-svg-core": "1.2.36",
+     "@fortawesome/free-brands-svg-icons": "5.15.4",
+diff --git a/src/generic/PageLoading.jsx b/src/generic/PageLoading.jsx
+index 1ffc783..f99422a 100644
+--- a/src/generic/PageLoading.jsx
++++ b/src/generic/PageLoading.jsx
+@@ -25,9 +25,7 @@ export default class PageLoading extends Component {
+             height: '50vh',
+           }}
+         >
+-          <Spinner animation="border" variant="primary" role="status">
+-            {this.renderSrMessage()}
+-          </Spinner>
++          <Spinner animation="border" variant="primary" screenReaderText={this.renderSrMessage()} />
+         </div>
+       </div>
+     );
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index 831219e..f103347 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -166,7 +166,7 @@ function StreakModal({
+           {wideScreen && <img src={StreakDesktopImage} alt="" className="img-fluid" />}
+         </p>
+         { queryingDiscount && (
+-          <Spinner animation="border" variant="primary" role="status" />
++          <Spinner animation="border" variant="primary" />
+         )}
+         { !queryingDiscount && !showOffer && (
+           <div className="d-flex py-3 bg-light-300">
+-- 
+2.34.1
+

@@ -1,0 +1,75 @@
+From 7c046870e3b98bfad50d00271a0f240716749163 Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Wed, 15 Jul 2020 22:53:04 +0200
+Subject: [PATCH 0196/1021] [TNL-7268] Remove icon mock
+
+As we're not using snapshots, we will not need this anymore.
+---
+ .../sequence-navigation/UnitIcon.test.jsx     |  6 ++--
+ .../@fortawesome/react-fontawesome.js         | 32 -------------------
+ 2 files changed, 3 insertions(+), 35 deletions(-)
+ delete mode 100644 src/test/__mocks__/@fortawesome/react-fontawesome.js
+
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+index 509474e..8bfae84 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+@@ -1,5 +1,5 @@
+ import React from 'react';
+-import { render, screen } from '../../../../setupTest';
++import { render } from '../../../../setupTest';
+ import UnitIcon from './UnitIcon';
+ 
+ describe('Unit Icon', () => {
+@@ -19,8 +19,8 @@ describe('Unit Icon', () => {
+         jest.spyOn(console, 'error').mockImplementation(() => {});
+       }
+ 
+-      render(<UnitIcon type={key} />);
+-      expect(screen.getByTestId('icon')).toHaveClass(value);
++      const { container } = render(<UnitIcon type={key} />);
++      expect(container.querySelector('svg')).toHaveClass(value);
+     });
+   });
+ });
+diff --git a/src/test/__mocks__/@fortawesome/react-fontawesome.js b/src/test/__mocks__/@fortawesome/react-fontawesome.js
+deleted file mode 100644
+index 2d1ef1c..0000000
+--- a/src/test/__mocks__/@fortawesome/react-fontawesome.js
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/**
+- * Mocks `@fortawesome/react-fontawesome.js` to return a simple <img> element containing `data-testid` attribute.
+- * This way we can check whether the icon matches without relying on its internal implementation
+- * and avoid storing its <svg> content in the snapshot tests.
+- */
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-// eslint-disable-next-line no-use-before-define
+-FontAwesomeIcon.propTypes = {
+-  icon: PropTypes.oneOfType([
+-    PropTypes.string,
+-    PropTypes.shape({
+-      icon: PropTypes.arrayOf(PropTypes.any),
+-    }),
+-  ]).isRequired,
+-};
+-
+-// eslint-disable-next-line import/prefer-default-export
+-export function FontAwesomeIcon(props) {
+-  const { icon } = props;
+-
+-  let iconName;
+-  if (typeof icon === 'string') {
+-    iconName = icon;
+-  } else {
+-    iconName = `fa-${icon.iconName}`;
+-  }
+-
+-  // eslint-disable-next-line react/jsx-filename-extension
+-  return <svg data-testid="icon" className={iconName} />;
+-}
+-- 
+2.34.1
+

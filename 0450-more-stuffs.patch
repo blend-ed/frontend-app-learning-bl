@@ -1,0 +1,312 @@
+From 531f6d96ae38c7ef7fe6ad607cfe708a5188e6de Mon Sep 17 00:00:00 2001
+From: Emma Green <emma.green.software@gmail.com>
+Date: Tue, 4 May 2021 17:31:52 -0400
+Subject: [PATCH 0450/1021] more stuffs
+
+---
+ src/course-home/data/api.js                   |  3 +-
+ .../outline-tab/widgets/UpgradeCard.jsx       | 67 ++++++++---------
+ .../outline-tab/widgets/UpgradeCard.scss      |  6 ++
+ .../outline-tab/widgets/UpgradeCard.test.jsx  | 73 ++++++++++++++++---
+ 4 files changed, 104 insertions(+), 45 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index bc75c90..b39379d 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -195,6 +195,7 @@ export async function getOutlineTabData(courseId) {
+ 
+   const {
+     data,
++    headers,
+   } = tabData;
+   const accessExpiration = camelCaseObject(data.access_expiration);
+   const canShowUpgradeSock = data.can_show_upgrade_sock;
+@@ -208,7 +209,7 @@ export async function getOutlineTabData(courseId) {
+   const hasEnded = data.has_ended;
+   const offer = camelCaseObject(data.offer);
+   const resumeCourse = camelCaseObject(data.resume_course);
+-  const timeOffsetMillis = getTimeOffsetMillis(tabData.headers.date, requestTime, responseTime);
++  const timeOffsetMillis = getTimeOffsetMillis(headers.date, requestTime, responseTime);
+   const verifiedMode = camelCaseObject(data.verified_mode);
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+index 868d559..d7b6925 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+@@ -97,7 +97,7 @@ function UpsellFBEFarAwayCardContent() {
+ 
+ function UpsellFBESoonCardContent({ accessExpirationDate, timezoneFormatArgs }) {
+   return (
+-    <div>
++    <div className="upgrade-card-text">
+       <p>
+         <FormattedMessage
+           id="learning.outline.alert.upgradecard.expirationAccessLoss"
+@@ -279,20 +279,10 @@ function UpgradeCard({
+   let offerCode;
+ 
+   if (!!accessExpiration && !!contentTypeGatingEnabled) {
+-    if (offer) { // if there's a first purchase discount, show it
+-      const hoursToDiscountExpiration = Math.floor((new Date(offer.expirationDate) - correctedTime) / 1000 / 60 / 60);
++    const accessExpirationDate = new Date(accessExpiration.expirationDate);
++    const hoursToAccessExpiration = Math.floor((accessExpirationDate - correctedTime) / 1000 / 60 / 60);
+ 
+-      upgradeCardHeaderText = (
+-        <FormattedMessage
+-          id="learning.outline.alert.upgradecard.firstTimeLearnerDiscount"
+-          defaultMessage="{percentage}% First-Time Learner Discount"
+-          values={{
+-            percentage: (offer.percentage),
+-          }}
+-        />
+-      );
+-      expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToDiscountExpiration} />;
+-      upsellMessage = <UpsellFBEFarAwayCardContent />;
++    if (offer) { // if there's a first purchase discount, message the code at the bottom
+       offerCode = (
+         <div className="text-center discount-info">
+           <FormattedMessage
+@@ -304,39 +294,50 @@ function UpgradeCard({
+           />
+         </div>
+       );
+-    } else {
+-      const accessExpirationDate = new Date(accessExpiration.expirationDate);
+-      const hoursToAccessExpiration = Math.floor((accessExpirationDate - correctedTime) / 1000 / 60 / 60);
++    }
+ 
+-      if (hoursToAccessExpiration >= (7 * 24)) {
++    if (hoursToAccessExpiration >= (7 * 24)) {
++      if (offer) { // countdown to the first purchase discount if there is one
++        const hoursToDiscountExpiration = Math.floor((new Date(offer.expirationDate) - correctedTime) / 1000 / 60 / 60);
+         upgradeCardHeaderText = (
+           <FormattedMessage
+-            id="learning.outline.alert.upgradecard.accessExpiration"
+-            defaultMessage="Upgrade your course today"
+-          />
+-        );
+-        expirationBanner = (
+-          <AccessExpirationDateBanner
+-            accessExpirationDate={accessExpirationDate}
+-            timezoneFormatArgs={timezoneFormatArgs}
++            id="learning.outline.alert.upgradecard.firstTimeLearnerDiscount"
++            defaultMessage="{percentage}% First-Time Learner Discount"
++            values={{
++              percentage: (offer.percentage),
++            }}
+           />
+         );
+-        upsellMessage = <UpsellFBEFarAwayCardContent />;
+-      } else { // more urgent messaging if there's less than 7 days left
++        expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToDiscountExpiration} />;
++      } else {
+         upgradeCardHeaderText = (
+           <FormattedMessage
+-            id="learning.outline.alert.upgradecard.accessExpirationUrgent"
+-            defaultMessage="Course Access Expiration"
++            id="learning.outline.alert.upgradecard.accessExpiration"
++            defaultMessage="Upgrade your course today"
+           />
+         );
+-        expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToAccessExpiration} />;
+-        upsellMessage = (
+-          <UpsellFBESoonCardContent
++        expirationBanner = (
++          <AccessExpirationDateBanner
+             accessExpirationDate={accessExpirationDate}
+             timezoneFormatArgs={timezoneFormatArgs}
+           />
+         );
+       }
++      upsellMessage = <UpsellFBEFarAwayCardContent />;
++    } else { // more urgent messaging if there's less than 7 days left to access expiration
++      upgradeCardHeaderText = (
++        <FormattedMessage
++          id="learning.outline.alert.upgradecard.accessExpirationUrgent"
++          defaultMessage="Course Access Expiration"
++        />
++      );
++      expirationBanner = <ExpirationCountdown hoursToExpiration={hoursToAccessExpiration} />;
++      upsellMessage = (
++        <UpsellFBESoonCardContent
++          accessExpirationDate={accessExpirationDate}
++          timezoneFormatArgs={timezoneFormatArgs}
++        />
++      );
+     }
+   } else { // FBE is turned off
+     upgradeCardHeaderText = (
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.scss b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+index 226c04d..fe564af 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.scss
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+@@ -32,6 +32,12 @@
+   left: -2.125rem;
+ }
+ 
++.upgrade-card-text{
++  padding-top: 0.875rem;
++  padding-right: 1.25rem;
++  padding-left: 1.25rem;
++}
++
+ .upgrade-card-button{
+   margin-left: 1.25rem;
+   margin-right: 1.25rem;
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+index 427403d..4e80aae 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+@@ -6,7 +6,7 @@ import UpgradeCard from './UpgradeCard';
+ 
+ initializeMockApp();
+ jest.mock('@edx/frontend-platform/analytics');
+-const dateNow = new Date('2021-04-13T11:01:58.135Z');
++const dateNow = new Date('2021-04-13T11:01:58.000Z');
+ jest
+   .spyOn(global.Date, 'now')
+   .mockImplementation(() => dateNow.valueOf());
+@@ -30,12 +30,36 @@ describe('Upgrade Card', () => {
+     expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+   });
+ 
++  it('renders non-FBE when there is a verified mode and access expiration, but no content gating', async () => {
++    const expirationDate = new Date(dateNow);
++    expirationDate.setMinutes(expirationDate.getMinutes() + 45);
++    buildAndRender({
++      accessExpiration: {
++        expirationDate: expirationDate.toString(),
++      },
++    });
++    expect(screen.getByRole('heading', { name: 'Pursue a verified certificate' })).toBeInTheDocument();
++    expect(screen.getByText(/Earn a.*?of completion to showcase on your resume/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resume');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
++    expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
++  });
++
++  it('renders non-FBE when there is a verified mode and content gating, but no access expiration', async () => {
++    buildAndRender({
++      contentTypeGatingEnabled: true,
++    });
++    expect(screen.getByRole('heading', { name: 'Pursue a verified certificate' })).toBeInTheDocument();
++    expect(screen.getByText(/Earn a.*?of completion to showcase on your resume/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resume');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
++    expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
++  });
++
+   it('renders FBE expiration within an hour properly', async () => {
+     const expirationDate = new Date(dateNow);
+     expirationDate.setMinutes(expirationDate.getMinutes() + 45);
+     buildAndRender({
+       accessExpiration: {
+-        expirationDate,
++        expirationDate: expirationDate.toString(),
+       },
+       contentTypeGatingEnabled: true,
+     });
+@@ -51,7 +75,7 @@ describe('Upgrade Card', () => {
+     expirationDate.setHours(expirationDate.getHours() + 12);
+     buildAndRender({
+       accessExpiration: {
+-        expirationDate,
++        expirationDate: expirationDate.toString(),
+       },
+       contentTypeGatingEnabled: true,
+     });
+@@ -67,7 +91,7 @@ describe('Upgrade Card', () => {
+     expirationDate.setDate(expirationDate.getDate() + 6);
+     buildAndRender({
+       accessExpiration: {
+-        expirationDate,
++        expirationDate: expirationDate.toString(),
+       },
+       contentTypeGatingEnabled: true,
+     });
+@@ -83,7 +107,7 @@ describe('Upgrade Card', () => {
+     expirationDate.setDate(expirationDate.getDate() + 14);
+     buildAndRender({
+       accessExpiration: {
+-        expirationDate,
++        expirationDate: expirationDate.toString(),
+       },
+       contentTypeGatingEnabled: true,
+     });
+@@ -103,11 +127,11 @@ describe('Upgrade Card', () => {
+     discountExpirationDate.setMinutes(discountExpirationDate.getMinutes() + 30);
+     buildAndRender({
+       accessExpiration: {
+-        accessExpirationDate,
++        expirationDate: accessExpirationDate.toString(),
+       },
+       contentTypeGatingEnabled: true,
+       offer: {
+-        expirationDate: discountExpirationDate,
++        expirationDate: discountExpirationDate.toString(),
+         percentage: 15,
+         code: 'Welcome15',
+         discountedPrice: '126.65',
+@@ -132,11 +156,11 @@ describe('Upgrade Card', () => {
+     discountExpirationDate.setHours(discountExpirationDate.getHours() + 12);
+     buildAndRender({
+       accessExpiration: {
+-        accessExpirationDate,
++        expirationDate: accessExpirationDate.toString(),
+       },
+       contentTypeGatingEnabled: true,
+       offer: {
+-        expirationDate: discountExpirationDate,
++        expirationDate: discountExpirationDate.toString(),
+         percentage: 15,
+         code: 'Welcome15',
+         discountedPrice: '126.65',
+@@ -161,11 +185,11 @@ describe('Upgrade Card', () => {
+     discountExpirationDate.setDate(discountExpirationDate.getDate() + 6);
+     buildAndRender({
+       accessExpiration: {
+-        accessExpirationDate,
++        expirationDate: accessExpirationDate.toString(),
+       },
+       contentTypeGatingEnabled: true,
+       offer: {
+-        expirationDate: discountExpirationDate,
++        expirationDate: discountExpirationDate.toString(),
+         percentage: 15,
+         code: 'Welcome15',
+         discountedPrice: '126.65',
+@@ -182,4 +206,31 @@ describe('Upgrade Card', () => {
+     expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
+     expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
+   });
++
++  it('renders discount less a week access expiration less than a week properly', async () => {
++    const accessExpirationDate = new Date(dateNow);
++    accessExpirationDate.setDate(accessExpirationDate.getDate() + 5);
++    const discountExpirationDate = new Date(dateNow);
++    discountExpirationDate.setDate(discountExpirationDate.getDate() + 6);
++    buildAndRender({
++      accessExpiration: {
++        expirationDate: accessExpirationDate.toString(),
++      },
++      contentTypeGatingEnabled: true,
++      offer: {
++        expirationDate: discountExpirationDate.toString(),
++        percentage: 15,
++        code: 'Welcome15',
++        discountedPrice: '126.65',
++        originalPrice: '149',
++        upgradeUrl: 'www.exampleUpgradeUrl.com',
++      },
++    });
++    expect(screen.getByRole('heading', { name: 'Course Access Expiration' })).toBeInTheDocument();
++    expect(screen.getByText('5 days left')).toBeInTheDocument(); // setting the time to 12 will mean that it's slightly less than 12
++    expect(screen.getByText(/You will lose all access to this course.*?on/s).textContent).toMatch('You will lose all access to this course, including any progress, on April 18.');
++    expect(screen.getByText(/Upgrading your course enables you/s).textContent).toMatch('Upgrading your course enables you to pursue a verified certificate and unlocks numerous features. Learn more about the benefits of upgrading.');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('126.65 (149)');
++    expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
++  });
+ });
+-- 
+2.34.1
+

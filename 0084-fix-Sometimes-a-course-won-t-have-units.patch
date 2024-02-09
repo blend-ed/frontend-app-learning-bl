@@ -1,0 +1,39 @@
+From 781508dd03298040d9dcdebdff95a03c2e4bc76e Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 23 Mar 2020 14:15:25 -0400
+Subject: [PATCH 0084/1021] =?UTF-8?q?fix:=20Sometimes=20a=20course=20won?=
+ =?UTF-8?q?=E2=80=99t=20have=20units.?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+If a sequence has no unitIds, bail on changing the URL.
+---
+ src/courseware/CoursewareContainer.jsx | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index bbe0cb6..4c2fb1b 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -97,11 +97,13 @@ function useContentRedirect(courseStatus, sequenceStatus) {
+   useEffect(() => {
+     if (sequenceStatus === 'loaded' && sequenceId && !unitId) {
+       // The position may be null, in which case we'll just assume 0.
+-      const unitIndex = sequence.position || 0;
+-      const nextUnitId = sequence.unitIds[unitIndex];
+-      history.replace(`/course/${courseUsageKey}/${sequence.id}/${nextUnitId}`);
++      if (sequence.unitIds !== undefined && sequence.unitIds.length > 0) {
++        const unitIndex = sequence.position || 0;
++        const nextUnitId = sequence.unitIds[unitIndex];
++        history.replace(`/course/${courseUsageKey}/${sequence.id}/${nextUnitId}`);
++      }
+     }
+-  }, [sequenceStatus]);
++  }, [sequenceStatus, sequenceId, unitId]);
+ }
+ 
+ function useSavedSequencePosition(courseUsageKey, sequenceId, unitId) {
+-- 
+2.34.1
+

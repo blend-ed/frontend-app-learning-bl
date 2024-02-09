@@ -1,0 +1,428 @@
+From a0839f0a6323463a577ca62c73a22592d55ae173 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Wed, 11 Mar 2020 09:37:54 -0400
+Subject: [PATCH 0075/1021] Mobile layout for breadcrumbs and tabs (#26)
+
+TNL-7072 mobile layout updates. Breadcrumbs truncate section and subsection titles with ellipsis. Tabs that would overflow are tucked under a "more" dropdown.
+---
+ src/courseware/course/CourseBreadcrumb.jsx    |  20 ---
+ src/courseware/course/CourseBreadcrumbs.jsx   |  64 +++++++---
+ .../course/CourseTabsNavigation.jsx           |  31 +++--
+ src/courseware/course/NavTab.jsx              |  33 -----
+ src/index.scss                                |  11 +-
+ src/tabs/Tabs.jsx                             | 119 ++++++++++++++++++
+ src/tabs/useWindowSize.js                     |  26 ++++
+ 7 files changed, 218 insertions(+), 86 deletions(-)
+ delete mode 100644 src/courseware/course/CourseBreadcrumb.jsx
+ delete mode 100644 src/courseware/course/NavTab.jsx
+ create mode 100644 src/tabs/Tabs.jsx
+ create mode 100644 src/tabs/useWindowSize.js
+
+diff --git a/src/courseware/course/CourseBreadcrumb.jsx b/src/courseware/course/CourseBreadcrumb.jsx
+deleted file mode 100644
+index 4ee35fe..0000000
+--- a/src/courseware/course/CourseBreadcrumb.jsx
++++ /dev/null
+@@ -1,20 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-export default function CourseBreadcrumb({ url, label }) {
+-  return (
+-    <React.Fragment key={`${label}-${url}`}>
+-      <li className="list-inline-item text-gray-300" role="presentation" aria-label="spacer">
+-        /
+-      </li>
+-      <li className="list-inline-item">
+-        <a href={url}>{label}</a>
+-      </li>
+-    </React.Fragment>
+-  );
+-}
+-
+-CourseBreadcrumb.propTypes = {
+-  url: PropTypes.string.isRequired,
+-  label: PropTypes.string.isRequired,
+-};
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 1d0b744..2db5ab5 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -5,7 +5,31 @@ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faHome } from '@fortawesome/free-solid-svg-icons';
+ 
+-import CourseBreadcrumb from './CourseBreadcrumb';
++function CourseBreadcrumb({
++  url, children, withSeparator, ...attrs
++}) {
++  return (
++    <>
++      {withSeparator && (
++        <li className="mx-2 text-gray-300" role="presentation" aria-hidden>/</li>
++      )}
++      <li {...attrs}>
++        <a href={url}>{children}</a>
++      </li>
++    </>
++  );
++}
++
++CourseBreadcrumb.propTypes = {
++  url: PropTypes.string.isRequired,
++  children: PropTypes.node.isRequired,
++  withSeparator: PropTypes.bool,
++};
++
++CourseBreadcrumb.defaultProps = {
++  withSeparator: false,
++};
++
+ 
+ export default function CourseBreadcrumbs({
+   courseUsageKey, courseId, sequenceId, models,
+@@ -24,19 +48,31 @@ export default function CourseBreadcrumbs({
+ 
+   return (
+     <nav aria-label="breadcrumb" className="my-4">
+-      <ol className="list-inline m-0">
+-        <li className="list-inline-item">
+-          <a href={`${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/`}>
+-            <FontAwesomeIcon icon={faHome} className="mr-2" />
+-            <FormattedMessage
+-              id="learn.breadcrumb.navigation.course.home"
+-              description="The course home link in breadcrumbs nav"
+-              defaultMessage="Course"
+-            />
+-          </a>
+-        </li>
+-        {links.map(({ id, url, label }, i) => (
+-          <CourseBreadcrumb key={id} url={url} label={label} last={i === links.length - 1} />
++      <ol className="list-unstyled d-flex m-0">
++        <CourseBreadcrumb
++          url={`${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/`}
++          className="flex-shrink-0"
++        >
++          <FontAwesomeIcon icon={faHome} className="mr-2" />
++          <FormattedMessage
++            id="learn.breadcrumb.navigation.course.home"
++            description="The course home link in breadcrumbs nav"
++            defaultMessage="Course"
++          />
++        </CourseBreadcrumb>
++        {links.map(({ id, url, label }) => (
++          <CourseBreadcrumb
++            key={id}
++            url={url}
++            withSeparator
++            style={{
++              overflow: 'hidden',
++              textOverflow: 'ellipsis',
++              whiteSpace: 'nowrap',
++            }}
++          >
++            {label}
++          </CourseBreadcrumb>
+         ))}
+       </ol>
+     </nav>
+diff --git a/src/courseware/course/CourseTabsNavigation.jsx b/src/courseware/course/CourseTabsNavigation.jsx
+index 4a5b724..a4ed69c 100644
+--- a/src/courseware/course/CourseTabsNavigation.jsx
++++ b/src/courseware/course/CourseTabsNavigation.jsx
+@@ -1,31 +1,32 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { getConfig } from '@edx/frontend-platform';
+ import classNames from 'classnames';
+ 
+ import messages from './messages';
+-import NavTab from './NavTab';
++import Tabs from '../../tabs/Tabs';
+ 
+ function CourseTabsNavigation({
+-  activeTabSlug, tabs, intl, className,
++  activeTabSlug, tabs, intl,
+ }) {
+-  const courseNavTabs = tabs.map(({ slug, ...courseTab }) => (
+-    <NavTab
+-      isActive={slug === activeTabSlug}
+-      key={slug}
+-      {...courseTab}
+-    />
+-  ));
+-
+   return (
+     <div className="course-tabs-navigation">
+       <div className="container-fluid">
+-        <nav
++        <Tabs
++          className="nav-underline-tabs"
+           aria-label={intl.formatMessage(messages['learn.navigation.course.tabs.label'])}
+-          className={classNames('nav nav-underline-tabs', className)}
+         >
+-          {courseNavTabs}
+-        </nav>
++          {tabs.map(({ url, title, slug }) => (
++            <a
++              key={slug}
++              className={classNames('nav-link', { active: slug === activeTabSlug })}
++              href={`${getConfig().LMS_BASE_URL}${url}`}
++            >
++              {title}
++            </a>
++          ))}
++        </Tabs>
+       </div>
+     </div>
+   );
+@@ -33,7 +34,6 @@ function CourseTabsNavigation({
+ 
+ CourseTabsNavigation.propTypes = {
+   activeTabSlug: PropTypes.string,
+-  className: PropTypes.string,
+   tabs: PropTypes.arrayOf(PropTypes.shape({
+     title: PropTypes.string.isRequired,
+     priority: PropTypes.number.isRequired,
+@@ -45,7 +45,6 @@ CourseTabsNavigation.propTypes = {
+ 
+ CourseTabsNavigation.defaultProps = {
+   activeTabSlug: undefined,
+-  className: null,
+ };
+ 
+ export default injectIntl(CourseTabsNavigation);
+diff --git a/src/courseware/course/NavTab.jsx b/src/courseware/course/NavTab.jsx
+deleted file mode 100644
+index 1bb3f1e..0000000
+--- a/src/courseware/course/NavTab.jsx
++++ /dev/null
+@@ -1,33 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import classNames from 'classnames';
+-import { getConfig } from '@edx/frontend-platform';
+-
+-
+-export default function NavTab(props) {
+-  const {
+-    isActive, url, title, ...attrs
+-  } = props;
+-
+-  const className = classNames(
+-    'nav-item nav-link',
+-    { active: isActive },
+-    attrs.className,
+-  );
+-
+-  // TODO: We probably don't want to blindly add LMS_BASE_URL here.  I think it's more likely
+-  // that the course metadata API should provide us fully qualified URLs.
+-  return <a {...attrs} className={className} href={`${getConfig().LMS_BASE_URL}${url}`}>{title}</a>;
+-}
+-
+-NavTab.propTypes = {
+-  className: PropTypes.string,
+-  isActive: PropTypes.bool,
+-  title: PropTypes.string.isRequired,
+-  url: PropTypes.string.isRequired,
+-};
+-
+-NavTab.defaultProps = {
+-  className: undefined,
+-  isActive: false,
+-};
+diff --git a/src/index.scss b/src/index.scss
+index 918d21a..995bd2d 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -46,21 +46,26 @@ $primary: #1176B2;
+ }
+ 
+ .course-tabs-navigation {
+-  margin-top: 4px;
+   border-bottom: solid 1px #EAEAEA;
+ }
+ .nav-underline-tabs {
+-  margin: 0;
++  margin: 0 0 -1px;
+   .nav-link {
+     border-bottom: 4px solid transparent;
++    border-top: 4px solid transparent;
+     color: theme-color('gray', 400);
+ 
++    // temporary until we can remove .btn class from dropdowns
++    border-left: 0;
++    border-right: 0;
++    border-radius: 0;
++
+     &:hover,
+     &:focus,
+     &.active {
+       font-weight: $font-weight-normal;
+       color: theme-color('primary', 500);
+-      border-color: theme-color('primary', 500);
++      border-bottom-color: theme-color('primary', 500);
+     }
+   }
+ }
+diff --git a/src/tabs/Tabs.jsx b/src/tabs/Tabs.jsx
+new file mode 100644
+index 0000000..32e7a58
+--- /dev/null
++++ b/src/tabs/Tabs.jsx
+@@ -0,0 +1,119 @@
++import React, {
++  useLayoutEffect, useRef, useMemo, useState,
++} from 'react';
++import PropTypes from 'prop-types';
++import { Dropdown } from '@edx/paragon';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++import classNames from 'classnames';
++import useWindowSize from './useWindowSize';
++
++const invisibleStyle = {
++  position: 'absolute',
++  left: 0,
++  pointerEvents: 'none',
++  visibility: 'hidden',
++};
++export default function Tabs({ children, className, ...attrs }) {
++  const [cutOffIndex, setCutOffIndex] = useState(React.Children.count(children));
++  const windowSize = useWindowSize();
++  const navElementRef = useRef(null);
++  const tabsRectRef = useRef({});
++  const overflowEl = useRef(null);
++
++  // eslint-disable-next-line prefer-arrow-callback
++  useLayoutEffect(function findCutOffIndex() {
++    const tabsRect = navElementRef.current.getBoundingClientRect();
++
++    // No-op if the width is unchanged.
++    // (Assumes tabs themselves don't change count or width).
++    if (!tabsRect.width === tabsRectRef.current.width) {
++      return;
++    }
++    // Update for future comparison
++    tabsRectRef.current = tabsRect;
++
++    // Get array of child nodes from NodeList form
++    const childNodesArray = Array.prototype.slice.call(navElementRef.current.children);
++    // Use reduce to sum the widths of child nodes and determine the new cutoff index
++    const { lastFittingChildIndex } = childNodesArray.reduce((acc, childNode) => {
++      const isOverflowElement = childNode === overflowEl.current;
++      if (isOverflowElement) {
++        return acc;
++      }
++
++      acc.sumWidth += childNode.getBoundingClientRect().width;
++
++      if (acc.sumWidth <= tabsRect.width) {
++        acc.lastFittingChildIndex += 1;
++      }
++
++      return acc;
++    }, {
++      // Include the overflow element's width to begin with. Doing this means
++      // sometimes we'll show a dropdown with one item in it when it would fit,
++      // but allowing this case dramatically simplifies the calculations we need
++      // to do above.
++      sumWidth: overflowEl.current.getBoundingClientRect().width,
++      lastFittingChildIndex: 0,
++    });
++
++    setCutOffIndex(lastFittingChildIndex);
++  }, [windowSize]);
++
++  const tabChildren = useMemo(() => {
++    const childrenArray = React.Children.toArray(children);
++
++    // All tabs will be rendered. Those that would overflow are set to invisible.
++    const wrappedChildren = childrenArray.map((child, index) => (
++      <li className="nav-item" style={cutOffIndex <= index ? invisibleStyle : null}>
++        {React.cloneElement(child)}
++      </li>
++    ));
++
++    // Build the list of items to put in the overflow menu
++    const overflowChildren = childrenArray.slice(cutOffIndex)
++      .map((overflowChild) => React.cloneElement(overflowChild, { className: 'dropdown-item' }));
++
++    // Insert the overflow menu at the cut off index (even if it will be hidden
++    // it so it can be part of measurements)
++    wrappedChildren.splice(cutOffIndex, 0, (
++      <li
++        className="nav-item"
++        style={cutOffIndex >= React.Children.count(children) ? invisibleStyle : null}
++        ref={overflowEl}
++      >
++        <Dropdown>
++          <Dropdown.Button className="nav-link font-weight-normal">
++            <FormattedMessage
++              id="learn.course.tabs.navigation.overflow.menu"
++              description="The title of the overflow menu for course tabs"
++              defaultMessage="More..."
++            />
++          </Dropdown.Button>
++          <Dropdown.Menu className="dropdown-menu-right">{overflowChildren}</Dropdown.Menu>
++        </Dropdown>
++      </li>
++    ));
++    return wrappedChildren;
++  }, [children, cutOffIndex]);
++
++  return (
++    <ul
++      {...attrs}
++      className={classNames('nav flex-nowrap', className)}
++      ref={navElementRef}
++    >
++      {tabChildren}
++    </ul>
++  );
++}
++
++Tabs.propTypes = {
++  children: PropTypes.node,
++  className: PropTypes.string,
++};
++
++Tabs.defaultProps = {
++  children: null,
++  className: undefined,
++};
+diff --git a/src/tabs/useWindowSize.js b/src/tabs/useWindowSize.js
+new file mode 100644
+index 0000000..20e7684
+--- /dev/null
++++ b/src/tabs/useWindowSize.js
+@@ -0,0 +1,26 @@
++import { useState, useEffect } from 'react';
++
++export default function useWindowSize() {
++  const isClient = typeof global === 'object';
++
++  const getSize = () => ({
++    width: isClient ? global.innerWidth : undefined,
++    height: isClient ? global.innerHeight : undefined,
++  });
++
++  const [windowSize, setWindowSize] = useState(getSize);
++
++  useEffect(() => {
++    if (!isClient) {
++      return false;
++    }
++
++    const handleResize = () => {
++      setWindowSize(getSize());
++    };
++    global.addEventListener('resize', handleResize);
++    return () => global.removeEventListener('resize', handleResize);
++  }, []);
++
++  return windowSize;
++}
+-- 
+2.34.1
+

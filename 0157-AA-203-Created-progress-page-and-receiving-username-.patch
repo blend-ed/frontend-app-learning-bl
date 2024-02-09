@@ -1,0 +1,142 @@
+From fe013f57c57790b855812735d51cd8fa622714a2 Mon Sep 17 00:00:00 2001
+From: daphneli-chen <47010279+daphneli-chen@users.noreply.github.com>
+Date: Wed, 8 Jul 2020 16:00:25 -0400
+Subject: [PATCH 0157/1021] AA-203: Created progress page and receiving
+ username, email, and enrollment status (#96)
+
+Co-authored-by: Daphne Li-Chen <dli-chen@edx.org>
+---
+ src/course-home/data/api.js                  | 15 +++++++++++
+ src/course-home/data/index.js                |  1 +
+ src/course-home/data/thunks.js               |  5 ++++
+ src/course-home/progress-tab/ProgressTab.jsx | 27 ++++++++++++++++++++
+ src/index.jsx                                |  8 +++++-
+ 5 files changed, 55 insertions(+), 1 deletion(-)
+ create mode 100644 src/course-home/progress-tab/ProgressTab.jsx
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index b257de6..463a4a8 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -36,6 +36,21 @@ export async function getDatesTabData(courseId) {
+   }
+ }
+ 
++export async function getProgressTabData(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
++  try {
++    const { data } = await getAuthenticatedHttpClient().get(url);
++    return camelCaseObject(data);
++  } catch (error) {
++    const { httpErrorStatus } = error && error.customAttributes;
++    if (httpErrorStatus === 404) {
++      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
++      return {};
++    }
++    throw error;
++  }
++}
++
+ export async function getOutlineTabData(courseId) {
+   const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline/${courseId}`;
+   let { tabData } = {};
+diff --git a/src/course-home/data/index.js b/src/course-home/data/index.js
+index 69e7820..5c08887 100644
+--- a/src/course-home/data/index.js
++++ b/src/course-home/data/index.js
+@@ -1,6 +1,7 @@
+ export {
+   fetchDatesTab,
+   fetchOutlineTab,
++  fetchProgressTab,
+   resetDeadlines,
+ } from './thunks';
+ 
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index cd8c6a9..335289d 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -3,6 +3,7 @@ import {
+   getCourseHomeCourseMetadata,
+   getDatesTabData,
+   getOutlineTabData,
++  getProgressTabData,
+   postCourseDeadlines,
+ } from './api';
+ 
+@@ -63,6 +64,10 @@ export function fetchDatesTab(courseId) {
+   return fetchTab(courseId, 'dates', getDatesTabData);
+ }
+ 
++export function fetchProgressTab(courseId) {
++  return fetchTab(courseId, 'progress', getProgressTabData);
++}
++
+ export function fetchOutlineTab(courseId) {
+   return fetchTab(courseId, 'outline', getOutlineTabData);
+ }
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+new file mode 100644
+index 0000000..a5892e9
+--- /dev/null
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -0,0 +1,27 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { useModel } from '../../generic/model-store';
++
++export default function ProgressTab() {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const { administrator, username } = getAuthenticatedUser();
++
++  const {
++    enrollmentMode,
++  } = useModel('progress', courseId);
++
++
++  return (
++    <section>
++      <h2 className="mb-4">
++        the user is {username} and they are enrolled as an {enrollmentMode} learner
++        {administrator
++        && <div>the user is admin</div>}
++      </h2>
++    </section>
++  );
++}
+diff --git a/src/index.jsx b/src/index.jsx
+index ad8609d..6c763e1 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -22,10 +22,11 @@ import OutlineTab from './course-home/outline-tab';
+ import CoursewareContainer from './courseware';
+ import CoursewareRedirect from './CoursewareRedirect';
+ import DatesTab from './course-home/dates-tab';
++import ProgressTab from './course-home/progress-tab/ProgressTab';
+ import { TabContainer } from './tab-page';
+ 
+ import store from './store';
+-import { fetchDatesTab, fetchOutlineTab } from './course-home/data';
++import { fetchDatesTab, fetchOutlineTab, fetchProgressTab } from './course-home/data';
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+@@ -43,6 +44,11 @@ subscribe(APP_READY, () => {
+               <DatesTab />
+             </TabContainer>
+           </Route>
++          <Route path="/course/:courseId/progress">
++            <TabContainer tab="progress" fetch={fetchProgressTab}>
++              <ProgressTab />
++            </TabContainer>
++          </Route>
+           <Route
+             path={[
+               '/course/:courseId/:sequenceId/:unitId',
+-- 
+2.34.1
+

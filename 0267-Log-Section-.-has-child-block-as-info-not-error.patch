@@ -1,0 +1,71 @@
+From 753925ba99c7eb0367b2084aca2ea448b40fc377 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Wed, 30 Sep 2020 14:02:59 -0700
+Subject: [PATCH 0267/1021] Log "Section ... has child block" as info, not
+ error
+
+---
+ src/course-home/data/api.js | 7 ++-----
+ src/courseware/data/api.js  | 9 +++------
+ 2 files changed, 5 insertions(+), 11 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 2063638..8dd05b4 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -1,9 +1,6 @@
+ import { camelCaseObject, getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+-import {
+-  logError,
+-  logInfo,
+-} from '@edx/frontend-platform/logging';
++import { logInfo } from '@edx/frontend-platform/logging';
+ 
+ function normalizeCourseHomeCourseMetadata(metadata) {
+   const data = camelCaseObject(metadata);
+@@ -77,7 +74,7 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+         if (sequenceId in models.sequences) {
+           models.sequences[sequenceId].sectionId = section.id;
+         } else {
+-          logError(`Section ${section.id} has child block ${sequenceId}, but that block is not in the list of sequences.`);
++          logInfo(`Section ${section.id} has child block ${sequenceId}, but that block is not in the list of sequences.`);
+         }
+       });
+     }
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index f343c1a..00022c8 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -1,9 +1,6 @@
+ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-import {
+-  logError,
+-  logInfo,
+-} from '@edx/frontend-platform/logging';
++import { logInfo } from '@edx/frontend-platform/logging';
+ 
+ export function normalizeBlocks(courseId, blocks) {
+   const models = {
+@@ -67,7 +64,7 @@ export function normalizeBlocks(courseId, blocks) {
+         if (sequenceId in models.sequences) {
+           models.sequences[sequenceId].sectionId = section.id;
+         } else {
+-          logError(`Section ${section.id} has child block ${sequenceId}, but that block is not in the list of sequences.`);
++          logInfo(`Section ${section.id} has child block ${sequenceId}, but that block is not in the list of sequences.`);
+         }
+       });
+     }
+@@ -79,7 +76,7 @@ export function normalizeBlocks(courseId, blocks) {
+         if (unitId in models.units) {
+           models.units[unitId].sequenceId = sequence.id;
+         } else {
+-          logError(`Sequence ${sequence.id} has child block ${unitId}, but that block is not in the list of units.`);
++          logInfo(`Sequence ${sequence.id} has child block ${unitId}, but that block is not in the list of units.`);
+         }
+       });
+     }
+-- 
+2.34.1
+

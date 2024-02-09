@@ -1,0 +1,139 @@
+From cc7142e5c1f3f582aa86c4ff265ee9cbf22d7121 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Wed, 12 Aug 2020 12:13:46 -0400
+Subject: [PATCH 0227/1021] Fix checkBlockCompletion parameters
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+We were assuming a prop named unitId existed in CoursewareContainer - it doesn’t.  unitId is not in redux.  What we do have, is the unitId in the route params - what we refer to as routeUnitId.  If we use this instead of the non-existent unitId, then life is good.
+
+I wrote a test (that breaks!) prior to implementing the fix.  The fix satisfies the test. :tada:
+---
+ src/courseware/CoursewareContainer.jsx        | 15 +++++++-----
+ src/courseware/CoursewareContainer.test.jsx   | 24 ++++++++++++++++++-
+ .../sequence-navigation/UnitNavigation.jsx    |  6 ++++-
+ 3 files changed, 37 insertions(+), 8 deletions(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 7485fc4..5c610ab 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -125,9 +125,15 @@ class CoursewareContainer extends Component {
+ 
+   handleUnitNavigationClick = (nextUnitId) => {
+     const {
+-      courseId, sequenceId, unitId,
++      courseId, sequenceId,
++      match: {
++        params: {
++          unitId: routeUnitId,
++        },
++      },
+     } = this.props;
+-    this.props.checkBlockCompletion(courseId, sequenceId, unitId);
++
++    this.props.checkBlockCompletion(courseId, sequenceId, routeUnitId);
+     history.push(`/course/${courseId}/${sequenceId}/${nextUnitId}`);
+   }
+ 
+@@ -256,7 +262,6 @@ CoursewareContainer.propTypes = {
+   courseId: PropTypes.string,
+   sequenceId: PropTypes.string,
+   firstSequenceId: PropTypes.string,
+-  unitId: PropTypes.string,
+   courseStatus: PropTypes.oneOf(['loaded', 'loading', 'failed', 'denied']).isRequired,
+   sequenceStatus: PropTypes.oneOf(['loaded', 'loading', 'failed']).isRequired,
+   nextSequence: sequenceShape,
+@@ -273,7 +278,6 @@ CoursewareContainer.defaultProps = {
+   courseId: null,
+   sequenceId: null,
+   firstSequenceId: null,
+-  unitId: null,
+   nextSequence: null,
+   previousSequence: null,
+   course: null,
+@@ -353,13 +357,12 @@ const firstSequenceIdSelector = createSelector(
+ 
+ const mapStateToProps = (state) => {
+   const {
+-    courseId, sequenceId, unitId, courseStatus, sequenceStatus,
++    courseId, sequenceId, courseStatus, sequenceStatus,
+   } = state.courseware;
+ 
+   return {
+     courseId,
+     sequenceId,
+-    unitId,
+     courseStatus,
+     sequenceStatus,
+     course: currentCourseSelector(state),
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index a9df0d8..b78e94e 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -1,7 +1,7 @@
+ import { getConfig, history } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import { AppProvider } from '@edx/frontend-platform/react';
+-import { waitForElementToBeRemoved } from '@testing-library/dom';
++import { waitForElementToBeRemoved, fireEvent } from '@testing-library/dom';
+ import '@testing-library/jest-dom/extend-expect';
+ import { render, screen } from '@testing-library/react';
+ import React from 'react';
+@@ -33,6 +33,8 @@ jest.mock(
+   () => MockUnit,
+ );
+ 
++jest.mock('@edx/frontend-platform/analytics');
++
+ initializeMockApp();
+ 
+ describe('CoursewareContainer', () => {
+@@ -261,6 +263,26 @@ describe('CoursewareContainer', () => {
+         expect(container.querySelector('.fake-unit')).toHaveTextContent(courseId);
+         expect(container.querySelector('.fake-unit')).toHaveTextContent(unitBlocks[2].id);
+       });
++
++      it('should navigate between units and check block completion', async () => {
++        history.push(`/course/${courseId}/${sequenceBlock.id}/${unitBlocks[0].id}`);
++        const { container } = render(component);
++
++        axiosMock.onPost(`${courseId}/xblock/${sequenceBlock.id}/handler/xmodule_handler/get_completion`).reply(200, {
++          complete: true,
++        });
++
++        // This is an important line that ensures the spinner has been removed - and thus our main
++        // content has been loaded - prior to proceeding with our expectations.
++        await waitForElementToBeRemoved(screen.getByRole('status'));
++
++        const sequenceNavButtons = container.querySelectorAll('nav.sequence-navigation button');
++        const sequenceNextButton = sequenceNavButtons[4];
++        expect(sequenceNextButton).toHaveTextContent('Next');
++        fireEvent.click(sequenceNavButtons[4]);
++
++        expect(global.location.href).toEqual(`http://localhost/course/${courseId}/${sequenceBlock.id}/${unitBlocks[1].id}`);
++      });
+     });
+ 
+     describe('when the current sequence is an exam', () => {
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+index 42f8194..17137e6 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+@@ -60,7 +60,11 @@ export default function UnitNavigation(props) {
+ 
+ UnitNavigation.propTypes = {
+   sequenceId: PropTypes.string.isRequired,
+-  unitId: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
+   onClickPrevious: PropTypes.func.isRequired,
+   onClickNext: PropTypes.func.isRequired,
+ };
++
++UnitNavigation.defaultProps = {
++  unitId: null,
++};
+-- 
+2.34.1
+

@@ -1,0 +1,472 @@
+From ddfc88dad6adab5ea9a6c3f3c23c5e2de1747f53 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Tue, 8 Dec 2020 17:13:23 -0500
+Subject: [PATCH 0327/1021] Miscellaneous rebranding fixes (#300)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Rebranding course license
+
+- Fixing horizontal padding
+- Setting color to gray 500
+- Removing unnecessary a:hover color
+- Removing unneeded CSS classes (sequence-footer, course-license, and license-text)
+- Removing unnecessary spans
+
+* Removing all usages of theme-color.
+
+* Removing underline from “Help” button in header
+
+* Use outline-primary for user menu button in header.
+
+* Revert text-decoration-none on Help link
+
+This is unnecessary now - it’s fixed at the brand level.
+
+* Rebranding breadcrumbs to be primary-500.
+
+* Set styling for Unit title to h3.
+
+* Setting bookmark button color to primary-500
+
+* Aligning current selection line to be inside dropdown, not outside.
+
+* Adjusting sequence dropdown colors
+
+Gray 700 for non-active units, primary 500 for active unit icon.
+
+* Remove custom btn-outline-light config
+
+We no longer use it in this MFE and the color palette in paragon/the brand has changed anyway.
+
+* Let the stylesheet breathe!
+---
+ src/course-header/Header.jsx                  |  2 +-
+ .../outline-tab/widgets/UpgradeCard.scss      |  4 +-
+ src/courseware/course/CourseBreadcrumbs.jsx   |  4 +-
+ .../course/bookmark/BookmarkButton.jsx        |  2 +-
+ .../course/course-license/CourseLicense.jsx   | 14 ++--
+ src/courseware/course/sequence/Sequence.jsx   |  4 +-
+ src/courseware/course/sequence/Unit.jsx       |  2 +-
+ .../sequence/sequence-navigation/UnitIcon.jsx |  2 +-
+ src/index.scss                                | 66 ++++++++++++-------
+ 9 files changed, 56 insertions(+), 44 deletions(-)
+
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index f9934bd..7d5b980 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -85,7 +85,7 @@ function Header({
+         </div>
+         <a className="text-gray-700 mr-3" href={`${getConfig().SUPPORT_URL}`}>{intl.formatMessage(messages.help)}</a>
+         <Dropdown className="user-dropdown">
+-          <Dropdown.Toggle variant="light">
++          <Dropdown.Toggle variant="outline-primary">
+             <FontAwesomeIcon icon={faUserCircle} className="d-md-none" size="lg" />
+             <span data-hj-suppress className="d-none d-md-inline">
+               {authenticatedUser.username}
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.scss b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+index 5bab413..3d517d3 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.scss
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+@@ -1,4 +1,4 @@
+ .outline-sidebar-upgrade-card {
+-  border: 1px solid theme-color("gray", "border");
+-  border-top: 5px solid theme-color("success", "default");
++  border: 1px solid $gray-500;
++  border-top: 5px solid $success-500;
+ }
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index b75c43a..38deff3 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -13,10 +13,10 @@ function CourseBreadcrumb({
+   return (
+     <>
+       {withSeparator && (
+-        <li className="mx-2 text-gray-300" role="presentation" aria-hidden>/</li>
++        <li className="mx-2 text-primary-500" role="presentation" aria-hidden>/</li>
+       )}
+       <li {...attrs}>
+-        <a href={url}>{children}</a>
++        <a className="text-primary-500" href={url}>{children}</a>
+       </li>
+     </>
+   );
+diff --git a/src/courseware/course/bookmark/BookmarkButton.jsx b/src/courseware/course/bookmark/BookmarkButton.jsx
+index c2e2098..29e9d9b 100644
+--- a/src/courseware/course/bookmark/BookmarkButton.jsx
++++ b/src/courseware/course/bookmark/BookmarkButton.jsx
+@@ -41,7 +41,7 @@ export default function BookmarkButton({
+   return (
+     <StatefulButton
+       variant="link"
+-      className="px-1 ml-n1 btn-sm"
++      className="px-1 ml-n1 btn-sm text-primary-500"
+       onClick={toggleBookmark}
+       state={state}
+       disabledStates={['defaultProcessing', 'bookmarkedProcessing']}
+diff --git a/src/courseware/course/course-license/CourseLicense.jsx b/src/courseware/course/course-license/CourseLicense.jsx
+index 9aa0d72..3d3cf51 100644
+--- a/src/courseware/course/course-license/CourseLicense.jsx
++++ b/src/courseware/course/course-license/CourseLicense.jsx
+@@ -108,17 +108,15 @@ function CourseLicense({
+   intl,
+ }) {
+   const renderAllRightsReservedLicense = () => (
+-    <div>
++    <div className="text-gray-500">
+       <FontAwesomeIcon aria-hidden="true" className="mr-1" icon={faCopyright} />
+-      <span className="license-text">
+-        {intl.formatMessage(messages['learn.course.license.allRightsReserved.text'])}
+-      </span>
++      {intl.formatMessage(messages['learn.course.license.allRightsReserved.text'])}
+     </div>
+   );
+ 
+   const renderCreativeCommonsLicense = (activeCreativeCommonsLicenseTags, version) => (
+     <a
+-      className="text-decoration-none text-gray-700"
++      className="text-decoration-none text-gray-500"
+       rel="license noopener noreferrer"
+       target="_blank"
+       href={`https://creativecommons.org/licenses/${activeCreativeCommonsLicenseTags.join('-')}/${version}/`}
+@@ -135,16 +133,14 @@ function CourseLicense({
+           <FontAwesomeIcon aria-hidden="true" className="mr-1" icon={CreativeCommonsLicenseTags[tag].icon} />
+         </span>
+       ))}
+-      <span className="license-text">
+-        {intl.formatMessage(messages['learn.course.license.creativeCommons.text'])}
+-      </span>
++      {intl.formatMessage(messages['learn.course.license.creativeCommons.text'])}
+     </a>
+   );
+ 
+   const [licenseType, licenseOptions, licenseVersion] = parseLicense(license);
+ 
+   return (
+-    <div className="course-license text-right small">
++    <div className="text-right small py-1">
+       {licenseType === 'all-rights-reserved' && renderAllRightsReservedLicense()}
+       {licenseType === 'creative-commons' && renderCreativeCommonsLicense(
+         Object.keys(licenseOptions),
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 1cad424..3e44fe7 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -183,9 +183,7 @@ function Sequence({
+             )}
+           </div>
+         </div>
+-        <div className="sequence-footer px-4 py-1">
+-          <CourseLicense license={course.license || undefined} />
+-        </div>
++        <CourseLicense license={course.license || undefined} />
+       </div>
+     );
+   }
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index f49f133..17bce39 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -111,7 +111,7 @@ function Unit({
+ 
+   return (
+     <div className="unit">
+-      <h2 className="mb-0 h4">{unit.title}</h2>
++      <h2 className="mb-0 h3">{unit.title}</h2>
+       <BookmarkButton
+         unitId={unit.id}
+         isBookmarked={unit.bookmarked}
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx b/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
+index 4a48c53..27ade70 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitIcon.jsx
+@@ -28,7 +28,7 @@ export default function UnitIcon({ type }) {
+   }
+ 
+   return (
+-    <FontAwesomeIcon icon={icon} />
++    <FontAwesomeIcon className="unit-icon" icon={icon} />
+   );
+ }
+ 
+diff --git a/src/index.scss b/src/index.scss
+index 133562f..9a51cc5 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -5,18 +5,6 @@
+ 
+ @import "~@edx/frontend-component-footer/dist/footer";
+ 
+-// TODO: Fix .btn-outline-light style in paragon
+-.btn-outline-light {
+-  &:hover, &:focus {
+-    color: $primary;
+-    border-color: $white;
+-    background-color: $white;
+-  }
+-  &:not(:disabled):not(.disabled):active {
+-    border-color: $white;
+-  }
+-}
+-
+ // TODO: Fix .container-fluid for mobile in paragon
+ .container-fluid {
+   @media (max-width: -1 + map-get($grid-breakpoints, 'sm')) {
+@@ -29,9 +17,11 @@
+   display: flex;
+   flex-direction: column;
+   min-height: 100vh;
++
+   main {
+     flex-grow: 1;
+   }
++
+   header {
+     flex: 0 0 auto;
+ 
+@@ -56,8 +46,10 @@
+ 
+ .course-header {
+   min-width: 0;
++
+   .course-title-lockup {
+     min-width: 0;
++
+     span {
+       white-space: nowrap;
+       overflow: hidden;
+@@ -65,6 +57,7 @@
+       padding-bottom: .1rem;
+     }
+   }
++
+   .user-dropdown {
+     .btn {
+       height: 3rem;
+@@ -80,10 +73,11 @@
+ 
+ .nav-underline-tabs {
+   margin: 0 0 -1px;
++
+   .nav-link {
+     border-bottom: 4px solid transparent;
+     border-top: 4px solid transparent;
+-    color: theme-color('gray', 700);
++    color: $gray-700;
+ 
+     // temporary until we can remove .btn class from dropdowns
+     border-left: 0;
+@@ -94,8 +88,8 @@
+     &:focus,
+     &.active {
+       font-weight: $font-weight-normal;
+-      color: theme-color('primary', 500);
+-      border-bottom-color: theme-color('primary', 500);
++      color: $primary-500;
++      border-bottom-color: $primary-500;
+     }
+   }
+ }
+@@ -105,6 +99,7 @@
+   flex-direction: column;
+   flex-grow: 1;
+   margin-bottom: 4rem;
++
+   // On mobile, the unit container will be responsible
+   // for container padding.
+   @media (min-width: map-get($grid-breakpoints, 'sm')) {
+@@ -124,6 +119,7 @@
+ 
+ .sequence-navigation {
+   display: flex;
++
+   @media (min-width: map-get($grid-breakpoints, 'sm')) {
+     margin: -1px -1px 0;
+   }
+@@ -140,17 +136,19 @@
+     height: 3rem;
+     justify-content: center;
+     align-items: center;
+-    color: theme-color('gray', 500);
++    color: $gray-500;
+     white-space: nowrap;
+ 
+     &:hover,
+     &:focus,
+     &.active {
+-      color: theme-color('gray', 700);
++      color: $gray-700;
+     }
++
+     &:focus {
+       z-index: 1;
+     }
++
+     &.active {
+       &:after {
+         content: '';
+@@ -162,6 +160,7 @@
+         background: $primary;
+       }
+     }
++
+     &.complete {
+       background-color: #EEF7E5;
+       color: $success;
+@@ -170,6 +169,7 @@
+     &:first-child {
+       border-left-width: 0;
+     }
++
+     &:last-child {
+       border-right-width: 0;
+     }
+@@ -184,12 +184,14 @@
+     // https://dev.to/martyhimmel/quick-tip-to-stop-flexbox-from-overflowing-peb
+     min-width: 0;
+   }
++
+   .sequence-navigation-tabs {
+     .btn {
+       flex-basis: 100%;
+       min-width: 2rem;
+     }
+   }
++
+   .sequence-navigation-dropdown {
+     .dropdown-menu .btn {
+       flex-basis: 100%;
+@@ -200,9 +202,11 @@
+       align-items: center;
+       justify-content: flex-start;
+       border-right: 0;
++
+       & + .btn {
+         border-top: 0;
+       }
++
+       .unit-title {
+         flex-grow: 1;
+         text-align: left;
+@@ -210,14 +214,20 @@
+         min-width: 0;
+         margin: 0 1rem;
+         text-overflow: ellipsis;
++        color: $gray-700;
+       }
++
+       &.active {
++        .unit-icon {
++          color: $primary-500;
++        }
++
+         &:after {
+           content: '';
+           position: absolute;
+           bottom: 0px;
+-          left: -1px;
+-          top: 0;
++          left: 0px;
++          top: 0px;
+           right: auto;
+           width: 2px;
+           height: auto;
+@@ -225,6 +235,7 @@
+         }
+       }
+     }
++
+     .dropdown-item {
+       &.active {
+         // This is un-doing the default react-bootstrap styling for active dropdown-item elements.
+@@ -234,17 +245,20 @@
+   }
+ 
+   .previous-btn, .next-btn {
+-    color: theme-color('gray', 700);
++    color: $gray-700;
+     display: inline-flex;
+     justify-content: center;
+     align-items: center;
++
+     @media (max-width: -1 + map-get($grid-breakpoints, 'sm')) {
+       padding-top: 1rem;
+       padding-bottom: 1rem;
++
+       span {
+         @include sr-only();
+       }
+     }
++
+     @media (min-width: map-get($grid-breakpoints, 'sm')) {
+       min-width: fit-content;
+       padding-left: 2rem;
+@@ -255,6 +269,7 @@
+   .previous-btn {
+     border-left-width: 0;
+     margin-left: 0;
++
+     @media (min-width: map-get($grid-breakpoints, 'sm')) {
+       border-left-width: 1px;
+       border-top-left-radius: 4px;
+@@ -264,6 +279,7 @@
+   .next-btn {
+     border-left-width: 1px;
+     border-right-width: 0;
++
+     @media (min-width: map-get($grid-breakpoints, 'sm')) {
+       border-top-right-radius: 4px;
+       border-right-width: 1px;
+@@ -271,15 +287,12 @@
+   }
+ }
+ 
+-.sequence-footer .course-license a:hover {
+-  color: theme-color('primary', 500) !important;
+-}
+-
+ .unit-container {
+   padding: 0 $grid-gutter-width 2rem;
+   max-width: 1024px;
+   margin-left: auto;
+   margin-right: auto;
++
+   @media (min-width: 830px) {
+     padding-left: 40px;
+     padding-right: 40px;
+@@ -288,6 +301,7 @@
+ 
+ .unit-iframe-wrapper {
+   margin: 0 -20px 2rem;
++
+   @media (min-width: 830px) {
+     margin: 0 -40px 2rem;
+   }
+@@ -304,17 +318,21 @@
+   justify-content: center;
+   max-width: 640px;
+   margin: 0 auto;
++
+   .previous-button,
+   .next-button {
+     white-space: nowrap;
+     border-radius: 4px;
++
+     &:focus:before {
+       border-radius: 6px;
+     }
+   }
++
+   .next-button {
+     flex-basis: 75%;
+   }
++
+   .previous-button {
+     flex-basis: 25%;
+   }
+-- 
+2.34.1
+

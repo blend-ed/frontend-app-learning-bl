@@ -1,0 +1,701 @@
+From 6ba8929c97c6a3f73c9fbb9c1ee41676c2b81850 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Fri, 6 Mar 2020 13:21:18 -0500
+Subject: [PATCH 0071/1021] Initial version of Course Home page (#20)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* refactor: Moving PageLoading up to the top
+
+This way it can be used on both the courseware and outline pages.
+
+* Adding index.js files to data directories, and PropTypes data shapes
+
+- The course-blocks and course-meta data directories now have index files so their exports can be imported from that, rather than reaching into specific files in the directories.
+- Also added “shapes” for use in React Components that use PropTypes for the course blocks data structure, and the course metadata data structure.
+
+* Simplifying/refactoring CourseContainer rendering a bit.
+
+* Adding course outline page.
+
+This page is not complete.
+
+- It contains the ‘outline’ itself with links to the Sequences in the course.
+- It contains a very basic stab at displaying dates - they’re not even formatted.
+- It shows logistration and enrollment alerts for anonymous and unenrolled users.
+
+It does not include any other content in the right-hand sidebar.  It also doesn’t include a welcome message, or perhaps any number of other features on the page.  This is effectively an initial implementation for discovering how much data we’re missing from our APIs.  It should not be used as-is by any means.
+---
+ src/{courseware => }/PageLoading.jsx        |   0
+ src/courseware/CourseContainer.jsx          |  37 ++-----
+ src/courseware/course/SequenceContainer.jsx |   4 +-
+ src/courseware/sequence/Sequence.jsx        |   2 +-
+ src/courseware/sequence/Unit.jsx            |   2 +-
+ src/data/course-blocks/index.js             |  20 ++++
+ src/data/course-blocks/slice.js             |   8 ++
+ src/data/course-meta/index.js               |   6 +
+ src/data/course-meta/slice.js               |  62 ++++++++++-
+ src/index.jsx                               |   2 +
+ src/outline/Chapter.jsx                     |  45 ++++++++
+ src/outline/CourseDates.jsx                 |  41 +++++++
+ src/outline/Outline.jsx                     | 115 ++++++++++++++++++++
+ src/outline/OutlineContainer.jsx            |  85 +++++++++++++++
+ src/outline/SequenceLink.jsx                |  19 ++++
+ src/store.js                                |   4 +-
+ 16 files changed, 415 insertions(+), 37 deletions(-)
+ rename src/{courseware => }/PageLoading.jsx (100%)
+ create mode 100644 src/data/course-blocks/index.js
+ create mode 100644 src/data/course-meta/index.js
+ create mode 100644 src/outline/Chapter.jsx
+ create mode 100644 src/outline/CourseDates.jsx
+ create mode 100644 src/outline/Outline.jsx
+ create mode 100644 src/outline/OutlineContainer.jsx
+ create mode 100644 src/outline/SequenceLink.jsx
+
+diff --git a/src/courseware/PageLoading.jsx b/src/PageLoading.jsx
+similarity index 100%
+rename from src/courseware/PageLoading.jsx
+rename to src/PageLoading.jsx
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index 16a0d9d..cd726f5 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -3,11 +3,11 @@ import PropTypes from 'prop-types';
+ import { connect } from 'react-redux';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { history, getConfig } from '@edx/frontend-platform';
+-import { fetchCourseMetadata } from '../data/course-meta/thunks';
+-import { fetchCourseBlocks } from '../data/course-blocks/thunks';
++import { fetchCourseMetadata, courseMetadataShape } from '../data/course-meta';
++import { fetchCourseBlocks } from '../data/course-blocks';
+ 
+ import messages from './messages';
+-import PageLoading from './PageLoading';
++import PageLoading from '../PageLoading';
+ import Course from './course/Course';
+ 
+ function CourseContainer(props) {
+@@ -24,8 +24,6 @@ function CourseContainer(props) {
+     unitId,
+   } = match.params;
+ 
+-  const metadataLoaded = metadata.fetchState === 'loaded';
+-
+   useEffect(() => {
+     props.fetchCourseMetadata(courseUsageKey);
+     props.fetchCourseBlocks(courseUsageKey);
+@@ -41,17 +39,19 @@ function CourseContainer(props) {
+     }
+   }, [courseUsageKey, courseId, sequenceId]);
+ 
++  const metadataLoaded = metadata.fetchState === 'loaded';
+   useEffect(() => {
+     if (metadataLoaded && !metadata.userHasAccess) {
+       global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/`);
+     }
+   }, [metadataLoaded]);
+ 
+-  const isLoaded = courseId && sequenceId && metadataLoaded;
++  // Whether or not the container is ready to render the Course.
++  const ready = metadataLoaded && courseId && sequenceId;
+ 
+   return (
+     <main className="flex-grow-1 d-flex flex-column">
+-      { isLoaded ? (
++      {ready ? (
+         <Course
+           courseOrg={props.metadata.org}
+           courseNumber={props.metadata.number}
+@@ -80,28 +80,7 @@ CourseContainer.propTypes = {
+   blocks: PropTypes.objectOf(PropTypes.shape({
+     id: PropTypes.string,
+   })),
+-  metadata: PropTypes.shape({
+-    fetchState: PropTypes.string,
+-    org: PropTypes.string,
+-    number: PropTypes.string,
+-    name: PropTypes.string,
+-    userHasAccess: PropTypes.bool,
+-    tabs: PropTypes.arrayOf(PropTypes.shape({
+-      priority: PropTypes.number,
+-      slug: PropTypes.string,
+-      title: PropTypes.string,
+-      type: PropTypes.string,
+-      url: PropTypes.string,
+-    })),
+-    isEnrolled: PropTypes.bool,
+-    verifiedMode: PropTypes.shape({
+-      price: PropTypes.number.isRequired,
+-      currency: PropTypes.string.isRequired,
+-      currencySymbol: PropTypes.string.isRequired,
+-      sku: PropTypes.string.isRequired,
+-      upgradeUrl: PropTypes.string.isRequired,
+-    }),
+-  }),
++  metadata: courseMetadataShape,
+   fetchCourseMetadata: PropTypes.func.isRequired,
+   fetchCourseBlocks: PropTypes.func.isRequired,
+   match: PropTypes.shape({
+diff --git a/src/courseware/course/SequenceContainer.jsx b/src/courseware/course/SequenceContainer.jsx
+index 453ec3c..98d8186 100644
+--- a/src/courseware/course/SequenceContainer.jsx
++++ b/src/courseware/course/SequenceContainer.jsx
+@@ -6,10 +6,10 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { history } from '@edx/frontend-platform';
+ 
+ import messages from '../messages';
+-import PageLoading from '../PageLoading';
++import PageLoading from '../../PageLoading';
+ import Sequence from '../sequence/Sequence';
+ import AlertList from '../../user-messages/AlertList';
+-import { fetchSequenceMetadata, checkBlockCompletion, saveSequencePosition } from '../../data/course-blocks/thunks';
++import { fetchSequenceMetadata, checkBlockCompletion, saveSequencePosition } from '../../data/course-blocks';
+ 
+ function SequenceContainer(props) {
+   const {
+diff --git a/src/courseware/sequence/Sequence.jsx b/src/courseware/sequence/Sequence.jsx
+index 71bfcf5..5ad38d8 100644
+--- a/src/courseware/sequence/Sequence.jsx
++++ b/src/courseware/sequence/Sequence.jsx
+@@ -10,7 +10,7 @@ import { Button } from '@edx/paragon';
+ 
+ import Unit from './Unit';
+ import SequenceNavigation from './SequenceNavigation';
+-import PageLoading from '../PageLoading';
++import PageLoading from '../../PageLoading';
+ import messages from './messages';
+ import UserMessagesContext from '../../user-messages/UserMessagesContext';
+ 
+diff --git a/src/courseware/sequence/Unit.jsx b/src/courseware/sequence/Unit.jsx
+index 2cf484b..5503027 100644
+--- a/src/courseware/sequence/Unit.jsx
++++ b/src/courseware/sequence/Unit.jsx
+@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
+ import { connect } from 'react-redux';
+ import BookmarkButton from './bookmark/BookmarkButton';
+-import { addBookmark, removeBookmark } from '../../data/course-blocks/thunks';
++import { addBookmark, removeBookmark } from '../../data/course-blocks';
+ 
+ function Unit({
+   bookmarked,
+diff --git a/src/data/course-blocks/index.js b/src/data/course-blocks/index.js
+new file mode 100644
+index 0000000..f9711ea
+--- /dev/null
++++ b/src/data/course-blocks/index.js
+@@ -0,0 +1,20 @@
++export {
++  getCourseBlocks,
++  getSequenceMetadata,
++  updateSequencePosition,
++  getBlockCompletion,
++  createBookmark,
++  deleteBookmark,
++} from './api';
++export {
++  reducer,
++  courseBlocksShape,
++} from './slice';
++export {
++  fetchCourseBlocks,
++  fetchSequenceMetadata,
++  checkBlockCompletion,
++  saveSequencePosition,
++  addBookmark,
++  removeBookmark,
++} from './thunks';
+diff --git a/src/data/course-blocks/slice.js b/src/data/course-blocks/slice.js
+index 2f72a01..15c294e 100644
+--- a/src/data/course-blocks/slice.js
++++ b/src/data/course-blocks/slice.js
+@@ -1,5 +1,6 @@
+ /* eslint-disable no-param-reassign */
+ import { createSlice } from '@reduxjs/toolkit';
++import PropTypes from 'prop-types';
+ 
+ const blocksSlice = createSlice({
+   name: 'blocks',
+@@ -132,3 +133,10 @@ export const {
+ } = blocksSlice.actions;
+ 
+ export const { reducer } = blocksSlice;
++
++export const courseBlocksShape = PropTypes.objectOf(PropTypes.shape({
++  id: PropTypes.string.isRequired,
++  displayName: PropTypes.string.isRequired,
++  children: PropTypes.arrayOf(PropTypes.string),
++  parentId: PropTypes.string,
++}));
+diff --git a/src/data/course-meta/index.js b/src/data/course-meta/index.js
+new file mode 100644
+index 0000000..f675646
+--- /dev/null
++++ b/src/data/course-meta/index.js
+@@ -0,0 +1,6 @@
++export { getCourseMetadata } from './api';
++export {
++  reducer,
++  courseMetadataShape,
++} from './slice';
++export { fetchCourseMetadata } from './thunks';
+diff --git a/src/data/course-meta/slice.js b/src/data/course-meta/slice.js
+index e494174..49e11cd 100644
+--- a/src/data/course-meta/slice.js
++++ b/src/data/course-meta/slice.js
+@@ -1,5 +1,6 @@
+ /* eslint-disable no-param-reassign */
+ import { createSlice } from '@reduxjs/toolkit';
++import PropTypes from 'prop-types';
+ 
+ const courseMetaSlice = createSlice({
+   name: 'course-meta',
+@@ -12,13 +13,33 @@ const courseMetaSlice = createSlice({
+     },
+     fetchCourseMetadataSuccess: (draftState, { payload }) => ({
+       fetchState: 'loaded',
++
++      /*
++       * NOTE: If you change the data saved here,
++       * update the courseMetadataShape below!
++       */
++
++      // Course identifiers
+       name: payload.name,
+       number: payload.number,
+       org: payload.org,
+-      tabs: payload.tabs,
+-      userHasAccess: payload.userHasAccess,
++
++      // Enrollment dates
++      enrollmentStart: payload.enrollmentStart,
++      enrollmentEnd: payload.enrollmentEnd,
++
++      // Course dates
++      end: payload.end,
++      start: payload.start,
++
++      // User access/enrollment status
++      enrollmentMode: payload.enrollment.mode,
+       isEnrolled: payload.enrollment.isActive,
++      userHasAccess: payload.userHasAccess,
+       verifiedMode: payload.verifiedMode,
++
++      // Misc
++      tabs: payload.tabs,
+     }),
+     fetchCourseMetadataFailure: (draftState) => {
+       draftState.fetchState = 'failed';
+@@ -33,3 +54,40 @@ export const {
+ } = courseMetaSlice.actions;
+ 
+ export const { reducer } = courseMetaSlice;
++
++export const courseMetadataShape = PropTypes.shape({
++  fetchState: PropTypes.string,
++  // Course identifiers
++  name: PropTypes.string,
++  number: PropTypes.string,
++  org: PropTypes.string,
++
++  // Enrollment dates
++  enrollmentStart: PropTypes.string,
++  enrollmentEnd: PropTypes.string,
++
++  // User access/enrollment status
++  enrollmentMode: PropTypes.string,
++  isEnrolled: PropTypes.bool,
++  userHasAccess: PropTypes.bool,
++  verifiedMode: PropTypes.shape({
++    price: PropTypes.number.isRequired,
++    currency: PropTypes.string.isRequired,
++    currencySymbol: PropTypes.string.isRequired,
++    sku: PropTypes.string.isRequired,
++    upgradeUrl: PropTypes.string.isRequired,
++  }),
++
++  // Course dates
++  start: PropTypes.string,
++  end: PropTypes.string,
++
++  // Misc
++  tabs: PropTypes.arrayOf(PropTypes.shape({
++    priority: PropTypes.number,
++    slug: PropTypes.string,
++    title: PropTypes.string,
++    type: PropTypes.string,
++    url: PropTypes.string,
++  })),
++});
+diff --git a/src/index.jsx b/src/index.jsx
+index 6cf899e..fd0e73d 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -18,6 +18,7 @@ import UserMessagesProvider from './user-messages/UserMessagesProvider';
+ import './index.scss';
+ import './assets/favicon.ico';
+ import CourseContainer from './courseware/CourseContainer';
++import OutlineContainer from './outline/OutlineContainer';
+ 
+ import store from './store';
+ 
+@@ -39,6 +40,7 @@ subscribe(APP_READY, () => {
+       <UserMessagesProvider>
+         <Switch>
+           <Route exact path="/" render={courseLinks} />
++          <Route path="/outline/:courseUsageKey" component={OutlineContainer} />
+           <Route
+             path={[
+               '/course/:courseUsageKey/:sequenceId/:unitId',
+diff --git a/src/outline/Chapter.jsx b/src/outline/Chapter.jsx
+new file mode 100644
+index 0000000..7112309
+--- /dev/null
++++ b/src/outline/Chapter.jsx
+@@ -0,0 +1,45 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { Collapsible } from '@edx/paragon';
++import { faChevronRight, faChevronDown } from '@fortawesome/free-solid-svg-icons';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import SequenceLink from './SequenceLink';
++import { courseBlocksShape } from '../data/course-blocks';
++
++export default function Chapter({ id, courseUsageKey, models }) {
++  const { displayName, children } = models[id];
++  return (
++    <Collapsible.Advanced className="collapsible-card mb-2">
++      <Collapsible.Trigger className="collapsible-trigger d-flex align-items-start">
++        <Collapsible.Visible whenClosed>
++          <div style={{ minWidth: '1rem' }}>
++            <FontAwesomeIcon icon={faChevronRight} />
++          </div>
++        </Collapsible.Visible>
++        <Collapsible.Visible whenOpen>
++          <div style={{ minWidth: '1rem' }}>
++            <FontAwesomeIcon icon={faChevronDown} />
++          </div>
++        </Collapsible.Visible>
++        <div className="ml-2 flex-grow-1">{displayName}</div>
++      </Collapsible.Trigger>
++
++      <Collapsible.Body className="collapsible-body">
++        {children.map((sequenceId) => (
++          <SequenceLink
++            key={sequenceId}
++            id={sequenceId}
++            courseUsageKey={courseUsageKey}
++            models={models}
++          />
++        ))}
++      </Collapsible.Body>
++    </Collapsible.Advanced>
++  );
++}
++
++Chapter.propTypes = {
++  id: PropTypes.string.isRequired,
++  courseUsageKey: PropTypes.string.isRequired,
++  models: courseBlocksShape.isRequired,
++};
+diff --git a/src/outline/CourseDates.jsx b/src/outline/CourseDates.jsx
+new file mode 100644
+index 0000000..8a86a3d
+--- /dev/null
++++ b/src/outline/CourseDates.jsx
+@@ -0,0 +1,41 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++export default function CourseDates({
++  start,
++  end,
++  enrollmentStart,
++  enrollmentEnd,
++  enrollmentMode,
++  isEnrolled,
++}) {
++  return (
++    <section>
++      <h4>Upcoming Dates</h4>
++      <div><strong>Course Start:</strong><br />{start}</div>
++      <div><strong>Course End:</strong><br />{end}</div>
++      <div><strong>Enrollment Start:</strong><br />{enrollmentStart}</div>
++      <div><strong>Enrollment End:</strong><br />{enrollmentEnd}</div>
++      <div><strong>Mode:</strong><br />{enrollmentMode}</div>
++      <div>{isEnrolled ? 'Active Enrollment' : 'Inactive Enrollment'}</div>
++    </section>
++  );
++}
++
++CourseDates.propTypes = {
++  start: PropTypes.string,
++  end: PropTypes.string,
++  enrollmentStart: PropTypes.string,
++  enrollmentEnd: PropTypes.string,
++  enrollmentMode: PropTypes.string,
++  isEnrolled: PropTypes.bool,
++};
++
++CourseDates.defaultProps = {
++  start: null,
++  end: null,
++  enrollmentStart: null,
++  enrollmentEnd: null,
++  enrollmentMode: null,
++  isEnrolled: false,
++};
+diff --git a/src/outline/Outline.jsx b/src/outline/Outline.jsx
+new file mode 100644
+index 0000000..bf9b5cb
+--- /dev/null
++++ b/src/outline/Outline.jsx
+@@ -0,0 +1,115 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { Button } from '@edx/paragon';
++
++import AlertList from '../user-messages/AlertList';
++import CourseHeader from '../courseware/course/CourseHeader';
++import CourseTabsNavigation from '../courseware/course/CourseTabsNavigation';
++import CourseDates from './CourseDates';
++import { useLogistrationAlert, useEnrollmentAlert } from '../hooks';
++import Chapter from './Chapter';
++import { courseBlocksShape } from '../data/course-blocks';
++
++const EnrollmentAlert = React.lazy(() => import('../enrollment-alert'));
++const LogistrationAlert = React.lazy(() => import('../logistration-alert'));
++
++export default function Outline({
++  courseOrg,
++  courseNumber,
++  courseName,
++  courseUsageKey,
++  courseId,
++  models,
++  tabs,
++  start,
++  end,
++  enrollmentStart,
++  enrollmentEnd,
++  enrollmentMode,
++  isEnrolled,
++}) {
++  const course = models[courseId];
++
++  useLogistrationAlert();
++  useEnrollmentAlert(isEnrolled);
++
++  return (
++    <>
++      <CourseHeader
++        courseOrg={courseOrg}
++        courseNumber={courseNumber}
++        courseName={courseName}
++      />
++      <main className="d-flex flex-column flex-grow-1">
++        <div className="container-fluid">
++          <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug="courseware" />
++          <AlertList
++            topic="outline"
++            className="mb-3"
++            customAlerts={{
++              clientEnrollmentAlert: EnrollmentAlert,
++              clientLogistrationAlert: LogistrationAlert,
++            }}
++          />
++        </div>
++        <div className="flex-grow-1">
++          <div className="container-fluid">
++            <div className="d-flex justify-content-between mb-3">
++              <h2>{courseName}</h2>
++              <Button className="btn-primary" type="button">Resume Course</Button>
++            </div>
++            <div className="row">
++              <div className="col col-8">
++                {course.children.map((chapterId) => (
++                  <Chapter
++                    key={chapterId}
++                    id={chapterId}
++                    courseUsageKey={courseUsageKey}
++                    models={models}
++                  />
++                ))}
++              </div>
++              <div className="col col-4">
++                <CourseDates
++                  start={start}
++                  end={end}
++                  enrollmentStart={enrollmentStart}
++                  enrollmentEnd={enrollmentEnd}
++                  enrollmentMode={enrollmentMode}
++                  isEnrolled={isEnrolled}
++                />
++              </div>
++            </div>
++          </div>
++        </div>
++      </main>
++    </>
++  );
++}
++
++Outline.propTypes = {
++  courseOrg: PropTypes.string.isRequired,
++  courseNumber: PropTypes.string.isRequired,
++  courseName: PropTypes.string.isRequired,
++  courseUsageKey: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
++  start: PropTypes.string.isRequired,
++  end: PropTypes.string.isRequired,
++  enrollmentStart: PropTypes.string.isRequired,
++  enrollmentEnd: PropTypes.string.isRequired,
++  enrollmentMode: PropTypes.string.isRequired,
++  isEnrolled: PropTypes.bool,
++  models: courseBlocksShape.isRequired,
++  tabs: PropTypes.arrayOf(PropTypes.shape({
++    slug: PropTypes.string.isRequired,
++    priority: PropTypes.number.isRequired,
++    title: PropTypes.string.isRequired,
++    type: PropTypes.string.isRequired,
++    url: PropTypes.string.isRequired,
++  })).isRequired,
++};
++
++Outline.defaultProps = {
++  isEnrolled: false,
++};
+diff --git a/src/outline/OutlineContainer.jsx b/src/outline/OutlineContainer.jsx
+new file mode 100644
+index 0000000..d56a748
+--- /dev/null
++++ b/src/outline/OutlineContainer.jsx
+@@ -0,0 +1,85 @@
++import React, { useEffect } from 'react';
++import PropTypes from 'prop-types';
++import { connect } from 'react-redux';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { fetchCourseMetadata, courseMetadataShape } from '../data/course-meta';
++import { fetchCourseBlocks, courseBlocksShape } from '../data/course-blocks';
++
++import messages from '../courseware/messages';
++import PageLoading from '../PageLoading';
++import Outline from './Outline';
++
++function OutlineContainer(props) {
++  const {
++    intl,
++    match,
++    courseId,
++    blocks: models,
++    metadata,
++  } = props;
++  const { courseUsageKey } = match.params;
++
++  useEffect(() => {
++    props.fetchCourseMetadata(courseUsageKey);
++    props.fetchCourseBlocks(courseUsageKey);
++  }, [courseUsageKey]);
++
++  const ready = metadata.fetchState === 'loaded' && courseId;
++
++  return (
++    <>
++      {ready ? (
++        <Outline
++          courseOrg={metadata.org}
++          courseNumber={metadata.number}
++          courseName={metadata.name}
++          courseUsageKey={courseUsageKey}
++          courseId={courseId}
++          start={metadata.start}
++          end={metadata.end}
++          enrollmentStart={metadata.enrollmentStart}
++          enrollmentEnd={metadata.enrollmentEnd}
++          enrollmentMode={metadata.enrollmentMode}
++          isEnrolled={metadata.isEnrolled}
++          models={models}
++          tabs={metadata.tabs}
++        />
++      ) : (
++        <PageLoading
++          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++        />
++      )}
++    </>
++  );
++}
++
++OutlineContainer.propTypes = {
++  intl: intlShape.isRequired,
++  courseId: PropTypes.string,
++  blocks: courseBlocksShape,
++  metadata: courseMetadataShape,
++  fetchCourseMetadata: PropTypes.func.isRequired,
++  fetchCourseBlocks: PropTypes.func.isRequired,
++  match: PropTypes.shape({
++    params: PropTypes.shape({
++      courseUsageKey: PropTypes.string.isRequired,
++    }).isRequired,
++  }).isRequired,
++};
++
++OutlineContainer.defaultProps = {
++  blocks: {},
++  metadata: undefined,
++  courseId: undefined,
++};
++
++const mapStateToProps = state => ({
++  courseId: state.courseBlocks.root,
++  metadata: state.courseMeta,
++  blocks: state.courseBlocks.blocks,
++});
++
++export default connect(mapStateToProps, {
++  fetchCourseMetadata,
++  fetchCourseBlocks,
++})(injectIntl(OutlineContainer));
+diff --git a/src/outline/SequenceLink.jsx b/src/outline/SequenceLink.jsx
+new file mode 100644
+index 0000000..631a5a5
+--- /dev/null
++++ b/src/outline/SequenceLink.jsx
+@@ -0,0 +1,19 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { Link } from 'react-router-dom';
++import { courseBlocksShape } from '../data/course-blocks';
++
++export default function SequenceLink({ id, courseUsageKey, models }) {
++  const sequence = models[id];
++  return (
++    <div className="ml-4">
++      <Link to={`/course/${courseUsageKey}/${id}`}>{sequence.displayName}</Link>
++    </div>
++  );
++}
++
++SequenceLink.propTypes = {
++  id: PropTypes.string.isRequired,
++  courseUsageKey: PropTypes.string.isRequired,
++  models: courseBlocksShape.isRequired,
++};
+diff --git a/src/store.js b/src/store.js
+index 0f7dd26..a5bb3fa 100644
+--- a/src/store.js
++++ b/src/store.js
+@@ -1,6 +1,6 @@
+ import { configureStore } from '@reduxjs/toolkit';
+-import { reducer as courseReducer } from './data/course-meta/slice';
+-import { reducer as courseBlocksReducer } from './data/course-blocks/slice';
++import { reducer as courseReducer } from './data/course-meta';
++import { reducer as courseBlocksReducer } from './data/course-blocks';
+ 
+ const store = configureStore({
+   reducer: {
+-- 
+2.34.1
+

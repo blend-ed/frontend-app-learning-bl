@@ -1,0 +1,155 @@
+From f3d23abe8435d659f90c29d6b4a0f4d66181881d Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Thu, 9 Jul 2020 16:28:12 +0200
+Subject: [PATCH 0194/1021] [TNL-7268] Fix imports, ignore implicit exports for
+ tests
+
+---
+ .eslintrc.js                                          | 10 +++++++++-
+ src/courseware/course/sequence/Sequence.test.jsx      |  4 +---
+ src/courseware/course/sequence/Unit.test.jsx          |  4 +---
+ .../sequence-navigation/SequenceNavigation.test.jsx   |  4 +---
+ .../SequenceNavigationDropdown.test.jsx               |  3 +--
+ .../sequence/sequence-navigation/UnitButton.test.jsx  |  3 +--
+ .../sequence-navigation/UnitNavigation.test.jsx       |  3 +--
+ src/setupTest.js                                      | 11 ++++-------
+ 8 files changed, 19 insertions(+), 23 deletions(-)
+
+diff --git a/.eslintrc.js b/.eslintrc.js
+index 0e87381..9ed6c9f 100644
+--- a/.eslintrc.js
++++ b/.eslintrc.js
+@@ -1,3 +1,11 @@
+ const { createConfig } = require('@edx/frontend-build');
+ 
+-module.exports = createConfig('eslint');
+\ No newline at end of file
++module.exports = createConfig('eslint', {
++  overrides: [{
++    files: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)", "setupTest.js"],
++    rules: {
++      'import/named': 'off',
++      'import/no-extraneous-dependencies': 'off',
++    },
++  }],
++});
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 14afec0..28559d6 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -1,10 +1,8 @@
+ import React from 'react';
+-import { fireEvent, waitFor } from '@testing-library/dom';
+-// eslint-disable-next-line import/no-extraneous-dependencies
+ import { cloneDeep } from 'lodash';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import {
+-  initialState, loadUnit, render, screen, testUnits,
++  initialState, loadUnit, render, screen, testUnits, fireEvent, waitFor,
+ } from '../../../setupTest';
+ import Sequence from './Sequence';
+ 
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index a730e0c..16c23c1 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -1,9 +1,7 @@
+ import React from 'react';
+-// eslint-disable-next-line import/no-extraneous-dependencies
+ import { cloneDeep } from 'lodash';
+-import { waitFor } from '@testing-library/dom';
+ import {
+-  initialState, loadUnit, messageEvent, render, screen,
++  initialState, loadUnit, messageEvent, render, screen, waitFor,
+ } from '../../../setupTest';
+ import Unit from './Unit';
+ 
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index e52f48d..185b73a 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -1,9 +1,7 @@
+ import React from 'react';
+-// eslint-disable-next-line import/no-extraneous-dependencies
+ import { cloneDeep } from 'lodash';
+-import { fireEvent, getByText } from '@testing-library/dom';
+ import {
+-  initialState, render, screen, testUnits,
++  initialState, render, screen, testUnits, fireEvent, getByText,
+ } from '../../../../setupTest';
+ import SequenceNavigation from './SequenceNavigation';
+ import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastVisibleChild';
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+index de7eb29..81eb3b7 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+@@ -1,8 +1,7 @@
+ import React from 'react';
+-import { fireEvent } from '@testing-library/dom';
+ import SequenceNavigationDropdown from './SequenceNavigationDropdown';
+ import {
+-  initialState, render, screen, testUnits,
++  initialState, render, screen, testUnits, fireEvent,
+ } from '../../../../setupTest';
+ 
+ describe('Sequence Navigation Dropdown', () => {
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+index 3f0b9d7..7f3f77d 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+@@ -1,6 +1,5 @@
+ import React from 'react';
+-import { fireEvent } from '@testing-library/dom';
+-import { render, screen } from '../../../../setupTest';
++import { render, screen, fireEvent } from '../../../../setupTest';
+ import UnitButton from './UnitButton';
+ 
+ describe('Unit Button', () => {
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+index a55201a..4ab8d29 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+@@ -1,7 +1,6 @@
+ import React from 'react';
+-import { fireEvent } from '@testing-library/dom';
+ import {
+-  initialState, render, screen, testUnits,
++  initialState, render, screen, testUnits, fireEvent,
+ } from '../../../../setupTest';
+ import UnitNavigation from './UnitNavigation';
+ 
+diff --git a/src/setupTest.js b/src/setupTest.js
+index d35a4ad..327617b 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -7,11 +7,9 @@ import { configure as configureLogging } from '@edx/frontend-platform/logging';
+ import { configure as configureAuth, MockAuthService } from '@edx/frontend-platform/auth';
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-// eslint-disable-next-line import/no-extraneous-dependencies
+-import { render as rtlRender, screen } from '@testing-library/react';
++import { render as rtlRender } from '@testing-library/react';
+ import { Provider } from 'react-redux';
+ import { configureStore } from '@reduxjs/toolkit';
+-// eslint-disable-next-line import/no-extraneous-dependencies
+ import { IntlProvider } from 'react-intl';
+ import { reducer as courseHomeReducer } from './course-home/data';
+ import { reducer as coursewareReducer } from './courseware/data/slice';
+@@ -185,11 +183,10 @@ function render(
+   return rtlRender(ui, { wrapper: Wrapper, ...renderOptions });
+ }
+ 
+-// re-export everything
+-// eslint-disable-next-line import/no-extraneous-dependencies
++// Re-export everything.
+ export * from '@testing-library/react';
+ 
+-// override `render` method; export `screen` too to suppress errors
++// Override `render` method; export `screen` too to suppress errors.
+ export {
+-  render, screen, testUnits, baseInitialState as initialState, messageEvent, loadUnit,
++  render, testUnits, baseInitialState as initialState, messageEvent, loadUnit,
+ };
+-- 
+2.34.1
+

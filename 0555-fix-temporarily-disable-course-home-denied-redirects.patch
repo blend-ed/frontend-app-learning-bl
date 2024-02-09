@@ -1,0 +1,56 @@
+From 52750ef769be388035b7ab5b416917058e7243b1 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 27 Jul 2021 11:46:38 -0400
+Subject: [PATCH 0555/1021] fix: temporarily disable course-home denied
+ redirects (#563)
+
+They caused a regression when not logged in or enrolled. Will
+hopefully re-enable after developing a fix.
+---
+ src/course-home/data/thunks.js              | 8 +++++---
+ src/course-home/dates-tab/DatesTab.test.jsx | 2 +-
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index 7923ea0..1002a7b 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -17,7 +17,7 @@ import {
+ } from '../../generic/model-store';
+ 
+ import {
+-  fetchTabDenied,
++  // fetchTabDenied,
+   fetchTabFailure,
+   fetchTabRequest,
+   fetchTabSuccess,
+@@ -62,9 +62,11 @@ export function fetchTab(courseId, tab, getTabData, targetUserId) {
+         logError(tabDataResult.reason);
+       }
+ 
+-      if (fetchedCourseHomeCourseMetadata && !courseHomeCourseMetadataResult.value.courseAccess.hasAccess) {
++      // Disable the access-denied path for now - it caused a regression
++      /* if (fetchedCourseHomeCourseMetadata && !courseHomeCourseMetadataResult.value.courseAccess.hasAccess) {
+         dispatch(fetchTabDenied({ courseId }));
+-      } else if (fetchedCourseHomeCourseMetadata && fetchedTabData) {
++      } else */
++      if (fetchedCourseHomeCourseMetadata && fetchedTabData) {
+         dispatch(fetchTabSuccess({ courseId, targetUserId }));
+       } else {
+         dispatch(fetchTabFailure({ courseId }));
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index b0e1591..d093777 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -299,7 +299,7 @@ describe('DatesTab', () => {
+     });
+   });
+ 
+-  describe('when receiving an access denied error', () => {
++  describe.skip('when receiving an access denied error', () => {
+     // These tests could go into any particular tab, as they all go through the same flow. But dates tab works.
+ 
+     async function renderDenied(errorCode) {
+-- 
+2.34.1
+

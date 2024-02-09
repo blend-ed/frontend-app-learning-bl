@@ -1,0 +1,92 @@
+From a10e6c282671d2e890476f2fc24830a74c0cd4d9 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Mon, 6 Apr 2020 15:32:50 -0400
+Subject: [PATCH 0097/1021] Switching the MFE to use the new permissions fields
+ (#43)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- “userHasAccess” becomes “canLoadCourseware”, and is loaded from “can_load_courseware”
+- “isStaff” is now loaded from “is_staff” instead of “user_has_staff_access”
+---
+ src/data/api.js                 | 4 ++--
+ src/data/thunks.js              | 2 +-
+ src/enrollment-alert/hooks.js   | 4 ++--
+ src/logistration-alert/hooks.js | 4 ++--
+ 4 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/src/data/api.js b/src/data/api.js
+index b563f75..37363af 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -15,8 +15,8 @@ function normalizeMetadata(metadata) {
+     start: metadata.start,
+     enrollmentMode: metadata.enrollment.mode,
+     isEnrolled: metadata.enrollment.is_active,
+-    userHasAccess: metadata.user_has_access,
+-    isStaff: metadata.user_has_staff_access,
++    canLoadCourseware: metadata.can_load_courseware,
++    isStaff: metadata.is_staff,
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+     tabs: camelCaseObject(metadata.tabs),
+     showCalculator: metadata.show_calculator,
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index ded167b..365d548 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -68,7 +68,7 @@ export function fetchCourse(courseId) {
+       }
+ 
+       if (fetchedMetadata) {
+-        if (courseMetadataResult.value.userHasAccess && fetchedBlocks) {
++        if (courseMetadataResult.value.canLoadCourseware && fetchedBlocks) {
+           // User has access
+           dispatch(fetchCourseSuccess({ courseId }));
+           return;
+diff --git a/src/enrollment-alert/hooks.js b/src/enrollment-alert/hooks.js
+index 587292a..b2bdfc5 100644
+--- a/src/enrollment-alert/hooks.js
++++ b/src/enrollment-alert/hooks.js
+@@ -10,7 +10,7 @@ export function useEnrollmentAlert(courseId) {
+   const isEnrolled = course && course.isEnrolled;
+   useEffect(() => {
+     if (course && course.isEnrolled !== undefined) {
+-      if (!course.isEnrolled) {
++      if (!course.isEnrolled && alertId === null) {
+         if (course.isStaff) {
+           setAlertId(add({
+             code: 'clientStaffEnrollmentAlert',
+@@ -22,7 +22,7 @@ export function useEnrollmentAlert(courseId) {
+             topic: 'course',
+           }));
+         }
+-      } else if (alertId !== null) {
++      } else if (course.isEnrolled && alertId !== null) {
+         remove(alertId);
+         setAlertId(null);
+       }
+diff --git a/src/logistration-alert/hooks.js b/src/logistration-alert/hooks.js
+index 4bad876..bd21a0c 100644
+--- a/src/logistration-alert/hooks.js
++++ b/src/logistration-alert/hooks.js
+@@ -8,14 +8,14 @@ export function useLogistrationAlert() {
+   const { add, remove } = useContext(UserMessagesContext);
+   const [alertId, setAlertId] = useState(null);
+   useEffect(() => {
+-    if (authenticatedUser === null) {
++    if (authenticatedUser === null && alertId === null) {
+       setAlertId(add({
+         code: 'clientLogistrationAlert',
+         dismissible: false,
+         type: 'error',
+         topic: 'course',
+       }));
+-    } else if (alertId !== null) {
++    } else if (authenticatedUser !== null && alertId !== null) {
+       remove(alertId);
+       setAlertId(null);
+     }
+-- 
+2.34.1
+

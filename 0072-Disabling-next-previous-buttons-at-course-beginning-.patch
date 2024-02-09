@@ -1,0 +1,313 @@
+From 6082ade9e0e7fa2b7be3e6d84ad82984acb692a7 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Fri, 6 Mar 2020 16:38:47 -0500
+Subject: [PATCH 0072/1021] Disabling next/previous buttons at course beginning
+ and end (#23)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+At the end, the “next” button at the bottom of the page is replaced with a friendly message.
+
+This PR also alphabetizes some props for SequenceNavigation and Sequence, as I was adding two new ones - isFirst and isLast.
+---
+ src/courseware/course/SequenceContainer.jsx   | 29 +++++---
+ src/courseware/sequence/Sequence.jsx          | 66 ++++++++++++-------
+ .../sequence/SequenceNavigation.jsx           | 24 ++++---
+ src/courseware/sequence/messages.js           |  5 ++
+ 4 files changed, 79 insertions(+), 45 deletions(-)
+
+diff --git a/src/courseware/course/SequenceContainer.jsx b/src/courseware/course/SequenceContainer.jsx
+index 98d8186..6ab03de 100644
+--- a/src/courseware/course/SequenceContainer.jsx
++++ b/src/courseware/course/SequenceContainer.jsx
+@@ -10,6 +10,7 @@ import PageLoading from '../../PageLoading';
+ import Sequence from '../sequence/Sequence';
+ import AlertList from '../../user-messages/AlertList';
+ import { fetchSequenceMetadata, checkBlockCompletion, saveSequencePosition } from '../../data/course-blocks';
++import { createSequenceIdList } from '../utils';
+ 
+ function SequenceContainer(props) {
+   const {
+@@ -30,10 +31,12 @@ function SequenceContainer(props) {
+     position,
+     items,
+     lmsWebUrl,
++    models,
+   } = props;
+   const loaded = fetchState === 'loaded';
+ 
+   const unitIds = useMemo(() => items.map(({ id }) => id), [items]);
++  const sequenceIds = useMemo(() => createSequenceIdList(models, courseId), [models, courseId]);
+ 
+   useEffect(() => {
+     props.fetchSequenceMetadata(sequenceId);
+@@ -68,7 +71,9 @@ function SequenceContainer(props) {
+   }, [isTimeLimited]);
+ 
+   const isLoading = !loaded || !unitId || isTimeLimited;
+-
++  const isFirstUnit = sequenceIds.indexOf(sequenceId) === 0 && unitIds.indexOf(unitId) === 0;
++  const isLastUnit = sequenceIds.indexOf(sequenceId) === sequenceIds.length - 1
++    && unitIds.indexOf(unitId) === unitIds.length - 1;
+   return (
+     <>
+       <AlertList topic="sequence" />
+@@ -79,24 +84,22 @@ function SequenceContainer(props) {
+           />
+         ) : (
+           <Sequence
+-            id={sequenceId}
++            activeUnitId={unitId}
++            bannerText={bannerText}
+             courseUsageKey={courseUsageKey}
+-            courseId={courseId}
+-            unitIds={unitIds}
+             displayName={displayName}
+-            activeUnitId={unitId}
+-            showCompletion={showCompletion}
+-            isTimeLimited={isTimeLimited}
++            isFirstUnit={isFirstUnit}
+             isGated={gatedContent.gated}
+-            savePosition={savePosition}
+-            bannerText={bannerText}
++            isLastUnit={isLastUnit}
++            onNavigateUnit={handleUnitNavigation}
+             onNext={onNext}
+             onPrevious={onPrevious}
+-            onNavigateUnit={handleUnitNavigation}
+             prerequisite={{
+               id: gatedContent.prereqId,
+               name: gatedContent.gatedSectionName,
+             }}
++            showCompletion={showCompletion}
++            unitIds={unitIds}
+           />
+         )}
+       </div>
+@@ -121,6 +124,12 @@ SequenceContainer.propTypes = {
+     gatedSectionName: PropTypes.string,
+     prereqId: PropTypes.string,
+   }),
++  models: PropTypes.objectOf(PropTypes.shape({
++    id: PropTypes.string.isRequired,
++    displayName: PropTypes.string.isRequired,
++    children: PropTypes.arrayOf(PropTypes.string),
++    parentId: PropTypes.string,
++  })).isRequired,
+   checkBlockCompletion: PropTypes.func.isRequired,
+   fetchSequenceMetadata: PropTypes.func.isRequired,
+   saveSequencePosition: PropTypes.func.isRequired,
+diff --git a/src/courseware/sequence/Sequence.jsx b/src/courseware/sequence/Sequence.jsx
+index 44d397a..394775c 100644
+--- a/src/courseware/sequence/Sequence.jsx
++++ b/src/courseware/sequence/Sequence.jsx
+@@ -18,18 +18,20 @@ import UserMessagesContext from '../../user-messages/UserMessagesContext';
+ const ContentLock = React.lazy(() => import('./content-lock'));
+ 
+ function Sequence({
++  activeUnitId,
++  bannerText,
+   courseUsageKey,
+-  unitIds,
+   displayName,
+-  showCompletion,
++  intl,
++  isFirstUnit,
++  isGated,
++  isLastUnit,
++  onNavigateUnit,
+   onNext,
+   onPrevious,
+-  onNavigateUnit,
+-  isGated,
+   prerequisite,
+-  activeUnitId,
+-  bannerText,
+-  intl,
++  showCompletion,
++  unitIds,
+ }) {
+   const handleNext = () => {
+     const nextIndex = unitIds.indexOf(activeUnitId) + 1;
+@@ -102,7 +104,11 @@ function Sequence({
+   return (
+     <>
+       <SequenceNavigation
++        activeUnitId={activeUnitId}
+         className="mb-4"
++        isFirstUnit={isFirstUnit}
++        isLastUnit={isLastUnit}
++        isLocked={isGated}
+         onNext={() => {
+           logEvent('edx.ui.lms.sequence.next_selected', 'top');
+           handleNext();
+@@ -115,10 +121,8 @@ function Sequence({
+           logEvent('edx.ui.lms.sequence.previous_selected', 'top');
+           handlePrevious();
+         }}
+-        unitIds={unitIds}
+-        activeUnitId={activeUnitId}
+-        isLocked={isGated}
+         showCompletion={showCompletion}
++        unitIds={unitIds}
+       />
+       <div className="flex-grow-1">
+         {isGated && (
+@@ -149,6 +153,7 @@ function Sequence({
+         <div className="unit-content-container below-unit-navigation">
+           <Button
+             className="btn-outline-secondary previous-button w-25 mr-2"
++            disabled={isFirstUnit}
+             onClick={() => {
+               logEvent('edx.ui.lms.sequence.previous_selected', 'bottom');
+               handlePrevious();
+@@ -161,20 +166,29 @@ function Sequence({
+               defaultMessage="Previous"
+             />
+           </Button>
+-          <Button
+-            className="btn-outline-primary next-button w-75"
+-            onClick={() => {
+-              logEvent('edx.ui.lms.sequence.next_selected', 'bottom');
+-              handleNext();
+-            }}
+-          >
+-            <FormattedMessage
+-              id="learn.sequence.navigation.after.unit.next"
+-              description="The button to go to the next unit"
+-              defaultMessage="Next"
+-            />
+-            <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
+-          </Button>
++          {isLastUnit ? (
++            <div className="m-2">
++              <span role="img" aria-hidden="true">&#129303;</span> {/* This is a hugging face emoji */}
++              {' '}
++              {intl.formatMessage(messages['learn.end.of.course'])}
++            </div>
++          ) : (
++            <Button
++              className="btn-outline-primary next-button w-75"
++              onClick={() => {
++                logEvent('edx.ui.lms.sequence.next_selected', 'bottom');
++                handleNext();
++              }}
++              disabled={isLastUnit}
++            >
++              <FormattedMessage
++                id="learn.sequence.navigation.after.unit.next"
++                description="The button to go to the next unit"
++                defaultMessage="Next"
++              />
++              <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
++            </Button>
++          )}
+         </div>
+       ) : null}
+     </>
+@@ -183,10 +197,13 @@ function Sequence({
+ 
+ Sequence.propTypes = {
+   activeUnitId: PropTypes.string.isRequired,
++  bannerText: PropTypes.string,
+   courseUsageKey: PropTypes.string.isRequired,
+   displayName: PropTypes.string.isRequired,
+   intl: intlShape.isRequired,
++  isFirstUnit: PropTypes.bool.isRequired,
+   isGated: PropTypes.bool.isRequired,
++  isLastUnit: PropTypes.bool.isRequired,
+   onNavigateUnit: PropTypes.func,
+   onNext: PropTypes.func.isRequired,
+   onPrevious: PropTypes.func.isRequired,
+@@ -196,7 +213,6 @@ Sequence.propTypes = {
+     id: PropTypes.string,
+   }).isRequired,
+   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+-  bannerText: PropTypes.string,
+ };
+ 
+ Sequence.defaultProps = {
+diff --git a/src/courseware/sequence/SequenceNavigation.jsx b/src/courseware/sequence/SequenceNavigation.jsx
+index e041466..19cb280 100644
+--- a/src/courseware/sequence/SequenceNavigation.jsx
++++ b/src/courseware/sequence/SequenceNavigation.jsx
+@@ -9,14 +9,16 @@ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import UnitButton from './UnitButton';
+ 
+ export default function SequenceNavigation({
++  activeUnitId,
++  className,
++  isFirstUnit,
++  isLastUnit,
++  isLocked,
++  onNavigate,
+   onNext,
+   onPrevious,
+-  onNavigate,
+-  unitIds,
+-  isLocked,
+   showCompletion,
+-  activeUnitId,
+-  className,
++  unitIds,
+ }) {
+   const unitButtons = unitIds.map(unitId => (
+     <UnitButton
+@@ -30,7 +32,7 @@ export default function SequenceNavigation({
+ 
+   return (
+     <nav className={classNames('sequence-navigation', className)}>
+-      <Button className="previous-btn" onClick={onPrevious}>
++      <Button className="previous-btn" onClick={onPrevious} disabled={isFirstUnit}>
+         <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
+         <FormattedMessage
+           defaultMessage="Previous"
+@@ -41,7 +43,7 @@ export default function SequenceNavigation({
+ 
+       {isLocked ? <UnitButton type="lock" isActive /> : unitButtons}
+ 
+-      <Button className="next-btn" onClick={onNext}>
++      <Button className="next-btn" onClick={onNext} disabled={isLastUnit}>
+         <FormattedMessage
+           defaultMessage="Next"
+           id="learn.sequence.navigation.next.button"
+@@ -54,14 +56,16 @@ export default function SequenceNavigation({
+ }
+ 
+ SequenceNavigation.propTypes = {
++  activeUnitId: PropTypes.string.isRequired,
+   className: PropTypes.string,
++  isFirstUnit: PropTypes.bool.isRequired,
++  isLastUnit: PropTypes.bool.isRequired,
++  isLocked: PropTypes.bool.isRequired,
++  onNavigate: PropTypes.func.isRequired,
+   onNext: PropTypes.func.isRequired,
+   onPrevious: PropTypes.func.isRequired,
+-  onNavigate: PropTypes.func.isRequired,
+-  isLocked: PropTypes.bool.isRequired,
+   showCompletion: PropTypes.bool.isRequired,
+   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+-  activeUnitId: PropTypes.string.isRequired,
+ };
+ 
+ SequenceNavigation.defaultProps = {
+diff --git a/src/courseware/sequence/messages.js b/src/courseware/sequence/messages.js
+index fc3007b..9c04cc9 100644
+--- a/src/courseware/sequence/messages.js
++++ b/src/courseware/sequence/messages.js
+@@ -6,6 +6,11 @@ const messages = defineMessages({
+     defaultMessage: 'Loading locked content messaging...',
+     description: 'Message shown when an interface about locked content is being loaded',
+   },
++  'learn.end.of.course': {
++    id: 'learn.end.of.course',
++    defaultMessage: "You've reached the end of this course!",
++    description: "Message shown to students in place of a 'Next' button when they're at the end of a course.",
++  },
+ });
+ 
+ export default messages;
+-- 
+2.34.1
+

@@ -1,0 +1,38 @@
+From 264f36b89e790227560592f6d76ec16056d94588 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 9 Dec 2020 14:36:39 -0500
+Subject: [PATCH 0329/1021] AA-504: Dates tab rebrand fix (#303)
+
+---
+ src/course-home/dates-banner/DatesBanner.jsx | 2 +-
+ src/course-home/dates-tab/badgelist.jsx      | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/course-home/dates-banner/DatesBanner.jsx b/src/course-home/dates-banner/DatesBanner.jsx
+index c418ac3..26df788 100644
+--- a/src/course-home/dates-banner/DatesBanner.jsx
++++ b/src/course-home/dates-banner/DatesBanner.jsx
+@@ -23,7 +23,7 @@ function DatesBanner(props) {
+         </div>
+         {bannerClickHandler && (
+           <div className="col-auto col-lg-3 p-lg-0 d-inline-flex align-items-center justify-content-start justify-content-lg-center">
+-            <Button variant="outline-primary" className="align-self-center bg-white mt-3 mt-lg-0" onClick={bannerClickHandler}>
++            <Button variant="outline-primary" className="align-self-center mt-3 mt-lg-0" onClick={bannerClickHandler}>
+               {intl.formatMessage(messages[`datesBanner.${name}.button`])}
+             </Button>
+           </div>
+diff --git a/src/course-home/dates-tab/badgelist.jsx b/src/course-home/dates-tab/badgelist.jsx
+index fb94b62..2f8fe5d 100644
+--- a/src/course-home/dates-tab/badgelist.jsx
++++ b/src/course-home/dates-tab/badgelist.jsx
+@@ -50,6 +50,7 @@ function getBadgeListAndColor(date, intl, item, items) {
+       shownForDay: assignments.length && assignments.every(isPastDue),
+       shownForItem: x => isLearnerAssignment(x) && isPastDue(x),
+       bg: 'bg-dark-200',
++      className: 'text-white',
+     },
+     {
+       message: messages.dueNext,
+-- 
+2.34.1
+

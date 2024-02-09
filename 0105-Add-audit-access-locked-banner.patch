@@ -1,0 +1,433 @@
+From 6d6058459612c8ed773e61058045a08f3b537731 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 7 Apr 2020 13:20:59 -0700
+Subject: [PATCH 0105/1021] Add audit access locked banner
+
+when Content Type Gating, aka Feature Based Enrollment is enabled.
+---
+ src/courseware/course/sequence/Sequence.jsx   |   1 +
+ src/courseware/course/sequence/Unit.jsx       |  38 ++++++++++-
+ .../sequence/lock-paywall/LockPaywall.jsx     |  61 ++++++++++++++++++
+ .../assets/edx-verified-mini-cert.png         | Bin 0 -> 9120 bytes
+ .../course/sequence/lock-paywall/index.js     |   1 +
+ .../course/sequence/lock-paywall/messages.js  |  26 ++++++++
+ src/data/api.js                               |   4 +-
+ 7 files changed, 128 insertions(+), 3 deletions(-)
+ create mode 100644 src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+ create mode 100644 src/courseware/course/sequence/lock-paywall/assets/edx-verified-mini-cert.png
+ create mode 100644 src/courseware/course/sequence/lock-paywall/index.js
+ create mode 100644 src/courseware/course/sequence/lock-paywall/messages.js
+
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 310a695..8befcbb 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -150,6 +150,7 @@ function Sequence({
+             )}
+             {!gated && unitId !== null && (
+               <Unit
++                courseId={courseId}
+                 key={unitId}
+                 id={unitId}
+                 onLoaded={handleUnitLoaded}
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 67ef962..de9b3ac 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -1,12 +1,24 @@
+-import React, { useRef, useEffect, useState } from 'react';
++import React, {
++  Suspense,
++  useRef,
++  useEffect,
++  useState,
++} from 'react';
+ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import messages from './messages';
+ import BookmarkButton from '../bookmark/BookmarkButton';
+ import { useModel } from '../../../model-store';
++import PageLoading from '../../../PageLoading';
+ 
+-export default function Unit({
++const LockPaywall = React.lazy(() => import('./lock-paywall'));
++
++function Unit({
++  courseId,
+   onLoaded,
+   id,
++  intl,
+ }) {
+   const iframeRef = useRef(null);
+   const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0`;
+@@ -15,6 +27,11 @@ export default function Unit({
+   const [hasLoaded, setHasLoaded] = useState(false);
+ 
+   const unit = useModel('units', id);
++  const course = useModel('courses', courseId);
++  const {
++    contentTypeGatingEnabled,
++    enrollmentMode,
++  } = course;
+ 
+   useEffect(() => {
+     global.onmessage = (event) => {
+@@ -40,6 +57,19 @@ export default function Unit({
+         isBookmarked={unit.bookmarked}
+         isProcessing={unit.bookmarkedUpdateState === 'loading'}
+       />
++      { contentTypeGatingEnabled && unit.graded && enrollmentMode === 'audit' && (
++        <Suspense
++          fallback={(
++            <PageLoading
++              srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
++            />
++          )}
++        >
++          <LockPaywall
++            courseId={courseId}
++          />
++        </Suspense>
++      )}
+       <div className="unit-iframe-wrapper">
+         <iframe
+           id="unit-iframe"
+@@ -57,10 +87,14 @@ export default function Unit({
+ }
+ 
+ Unit.propTypes = {
++  courseId: PropTypes.string.isRequired,
+   id: PropTypes.string.isRequired,
++  intl: intlShape.isRequired,
+   onLoaded: PropTypes.func,
+ };
+ 
+ Unit.defaultProps = {
+   onLoaded: undefined,
+ };
++
++export default injectIntl(Unit);
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+new file mode 100644
+index 0000000..8a320b5
+--- /dev/null
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -0,0 +1,61 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faLock } from '@fortawesome/free-solid-svg-icons';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from './messages';
++import VerifiedCert from './assets/edx-verified-mini-cert.png';
++import { useModel } from '../../../../model-store';
++
++function LockPaywall({
++  intl,
++  courseId,
++}) {
++  const course = useModel('courses', courseId);
++  const {
++    verifiedMode,
++  } = course;
++
++  if (!verifiedMode) {
++    return null;
++  }
++  const {
++    currencySymbol,
++    price,
++    upgradeUrl,
++  } = verifiedMode;
++  return (
++    <div className="border border-gray rounded d-flex justify-content-between mt-2 p-3">
++      <div>
++        <h4 className="font-weight-bold mb-2">
++          <FontAwesomeIcon icon={faLock} className="text-black mr-2 ml-1" style={{ fontSize: '2rem' }} />
++          <span>{intl.formatMessage(messages['learn.lockPaywall.title'])}</span>
++        </h4>
++        <p className="mb-0">
++          <span>{intl.formatMessage(messages['learn.lockPaywall.content'])}</span>
++          &nbsp;
++          <a href={upgradeUrl}>
++            {intl.formatMessage(messages['learn.lockPaywall.upgrade.link'], {
++              currencySymbol,
++              price,
++            })}
++          </a>
++        </p>
++      </div>
++      <div>
++        <img
++          alt={intl.formatMessage(messages['learn.lockPaywall.example.alt'])}
++          src={VerifiedCert}
++          className="border-0"
++          style={{ height: '70px' }}
++        />
++      </div>
++    </div>
++  );
++}
++LockPaywall.propTypes = {
++  intl: intlShape.isRequired,
++  courseId: PropTypes.string.isRequired,
++};
++export default injectIntl(LockPaywall);
+diff --git a/src/courseware/course/sequence/lock-paywall/assets/edx-verified-mini-cert.png b/src/courseware/course/sequence/lock-paywall/assets/edx-verified-mini-cert.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..35b9b9f1dc75887b2618d49c558609977db2f221
+GIT binary patch
+literal 9120
+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
+RWA@Sj)ReRp8xYpv{{csAESCTP
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/courseware/course/sequence/lock-paywall/index.js b/src/courseware/course/sequence/lock-paywall/index.js
+new file mode 100644
+index 0000000..d609d27
+--- /dev/null
++++ b/src/courseware/course/sequence/lock-paywall/index.js
+@@ -0,0 +1 @@
++export { default } from './LockPaywall';
+diff --git a/src/courseware/course/sequence/lock-paywall/messages.js b/src/courseware/course/sequence/lock-paywall/messages.js
+new file mode 100644
+index 0000000..20b2e7b
+--- /dev/null
++++ b/src/courseware/course/sequence/lock-paywall/messages.js
+@@ -0,0 +1,26 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learn.lockPaywall.title': {
++    id: 'learn.lockPaywall.title',
++    defaultMessage: 'Verified Track Access',
++    description: 'Heading for message shown to indicate that a piece of content is unavailable to audit track users.',
++  },
++  'learn.lockPaywall.content': {
++    id: 'learn.lockPaywall.content',
++    defaultMessage: 'Graded assessments are available to Verified Track learners.',
++    description: 'Message shown to indicate that a piece of content is unavailable to audit track users.',
++  },
++  'learn.lockPaywall.upgrade.link': {
++    id: 'learn.lockPaywall.upgrade.link',
++    defaultMessage: 'Upgrade to unlock ({currencySymbol}{price})',
++    description: 'A link users can click that navigates their browser to the upgrade payment page.',
++  },
++  'learn.lockPaywall.example.alt': {
++    id: 'learn.lockPaywall.example.alt',
++    defaultMessage: 'Example Certificate',
++    description: 'Alternate text displayed when the example certificate image cannot be displayed.',
++  },
++});
++
++export default messages;
+diff --git a/src/data/api.js b/src/data/api.js
+index e929703..b45b628 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -5,6 +5,7 @@ import { logError } from '@edx/frontend-platform/logging';
+ 
+ function normalizeMetadata(metadata) {
+   return {
++    contentTypeGatingEnabled: metadata.content_type_gating_enabled,
+     // TODO: TNL-7185: return course expired _date_, instead of _message_
+     courseExpiredMessage: metadata.course_expired_message,
+     id: metadata.id,
+@@ -66,6 +67,7 @@ function normalizeBlocks(courseId, blocks) {
+         break;
+       case 'vertical':
+         models.units[block.id] = {
++          graded: block.graded,
+           id: block.id,
+           title: block.display_name,
+           lmsWebUrl: block.lms_web_url,
+@@ -112,7 +114,7 @@ export async function getCourseBlocks(courseId) {
+   url.searchParams.append('course_id', courseId);
+   url.searchParams.append('username', username);
+   url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children,show_gated_sections');
++  url.searchParams.append('requested_fields', 'children,show_gated_sections,graded');
+ 
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+   return normalizeBlocks(courseId, data.blocks);
+-- 
+2.34.1
+

@@ -1,0 +1,28 @@
+From 46e459aaf30d4d94d64f372aaf0fc7a292ebb0bd Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Fri, 11 Jun 2021 12:05:40 -0400
+Subject: [PATCH 0493/1021] fix: update progress tab assignment policy logic
+ (#482)
+
+---
+ src/course-home/data/api.js | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index e85a9ae..e99baaf 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -47,6 +47,10 @@ function normalizeAssignmentPolicies(assignmentPolicies, sectionScores) {
+         numAssignmentsCreated,
+       } = gradeByAssignmentType[assignmentType];
+ 
++      if (!numPointsPossible) {
++        return;
++      }
++
+       numAssignmentsCreated++;
+       if (numAssignmentsCreated <= gradeByAssignmentType[assignmentType].numTotalExpectedAssignments) {
+         // Remove a placeholder grade so long as the number of recorded created assignments is less than the number
+-- 
+2.34.1
+

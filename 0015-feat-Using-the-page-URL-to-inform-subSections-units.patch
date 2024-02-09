@@ -1,0 +1,257 @@
+From 76ced075134536ef94d006e43016ddbdd615924a Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 6 Jan 2020 16:32:45 -0500
+Subject: [PATCH 0015/1021] feat: Using the page URL to inform
+ subSections/units.
+
+---
+ src/index.jsx                                 |  3 +-
+ src/learning-sequence/Breadcrumbs.jsx         | 59 +++++++++++++++++++
+ .../LearningSequencePage.jsx                  | 37 ++++++++----
+ .../SubSectionNavigation.jsx                  |  2 +-
+ src/learning-sequence/api.js                  | 17 ++++--
+ 5 files changed, 98 insertions(+), 20 deletions(-)
+ create mode 100644 src/learning-sequence/Breadcrumbs.jsx
+
+diff --git a/src/index.jsx b/src/index.jsx
+index 862943e..acf3755 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -25,7 +25,8 @@ subscribe(APP_READY, () => {
+           path="/"
+           render={() => <Link to="/course/course-v1%3AedX%2BDemoX%2BDemo_Course/0">Visit Demo Course</Link>}
+         />
+-        <Route path="/course/:courseId/:blockIndex" component={LearningSequencePage} />
++        <Route path="/course/:courseId/:subSectionId/:unitId" component={LearningSequencePage} />
++        <Route path="/course/:courseId" component={LearningSequencePage} />
+       </Switch>
+       <Footer />
+     </AppProvider>,
+diff --git a/src/learning-sequence/Breadcrumbs.jsx b/src/learning-sequence/Breadcrumbs.jsx
+new file mode 100644
+index 0000000..1828bab
+--- /dev/null
++++ b/src/learning-sequence/Breadcrumbs.jsx
+@@ -0,0 +1,59 @@
++/* eslint-disable react/no-array-index-key */
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
++
++const Breadcrumbs = ({
++  links, activeLabel, spacer, clickHandler,
++}) => {
++  const linkCount = links.length;
++
++  return (
++    <nav aria-label="breadcrumb">
++      <ol className="list-inline">
++        {links.map(({ url, label }, i) => (
++          <>
++            <li key={url} className="list-inline-item">
++              <a href={url} {...(clickHandler && { onClick: clickHandler })}>{label}</a>
++            </li>
++            {(activeLabel || ((i + 1) < linkCount)) &&
++              <li className="list-inline-item" role="presentation" aria-label="spacer">
++                {spacer || <FontAwesomeIcon key={`spacer-${i}`} icon={faChevronRight} />}
++              </li>
++            }
++          </>
++        ))}
++        {activeLabel && <li className="list-inline-item" key="active">{activeLabel}</li>}
++      </ol>
++    </nav>
++  );
++};
++
++Breadcrumbs.propTypes = {
++  /** an array of objects with the properties `label` and `url` as strings. */
++  links: PropTypes.arrayOf(PropTypes.shape({
++    label: PropTypes.string,
++    url: PropTypes.string,
++  })).isRequired,
++  /** allows to add a label that is not a link to the end of the breadcrumb.
++   * Defaults to `undefined`.
++ */
++  activeLabel: PropTypes.string,
++  /** allows to add a custom element between the breadcrumb items.
++   * Defaults to `>` rendered using the `Icon` component. */
++  spacer: PropTypes.element,
++  /** allows to add a custom function to be called `onClick` of a breadcrumb link.
++   * The use case for this is for adding custom analytics to the component. */
++  clickHandler: PropTypes.func,
++};
++
++Breadcrumbs.defaultProps = {
++  activeLabel: undefined,
++  spacer: undefined,
++  clickHandler: undefined,
++};
++
++export default Breadcrumbs;
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+index 8bf9ac0..6880891 100644
+--- a/src/learning-sequence/LearningSequencePage.jsx
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -4,12 +4,12 @@ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { getConfig, history } from '@edx/frontend-platform';
+ import { AppContext } from '@edx/frontend-platform/react';
+-import { Breadcrumb } from '@edx/paragon';
+ 
+ import PageLoading from './PageLoading';
+ import messages from './messages';
+ import SubSectionNavigation from './SubSectionNavigation';
+ import { loadCourseSequence, findBlockAncestry, loadSubSectionMetadata } from './api';
++import Breadcrumbs from './Breadcrumbs';
+ 
+ class LearningSequencePage extends Component {
+   constructor(props, context) {
+@@ -30,7 +30,7 @@ class LearningSequencePage extends Component {
+   }
+ 
+   componentDidMount() {
+-    loadCourseSequence(this.props.match.params.courseId, null, this.context.authenticatedUser.username)
++    loadCourseSequence(this.props.match.params.courseId, this.props.match.params.subSectionId, this.props.match.params.unitId, this.context.authenticatedUser.username)
+       .then(({
+         blocks, courseBlockId, subSectionIds, subSectionMetadata, units, unitId,
+       }) => {
+@@ -47,6 +47,16 @@ class LearningSequencePage extends Component {
+       });
+   }
+ 
++  componentDidUpdate(prevProps, prevState) {
++    if (
++      this.props.match.params.courseId !== prevProps.match.params.courseId ||
++      this.state.subSectionId !== prevState.subSectionId ||
++      this.state.unitId !== prevState.unitId
++    ) {
++      history.push(`/course/${this.props.match.params.courseId}/${this.state.subSectionId}/${this.state.unitId}`);
++    }
++  }
++
+   handlePreviousClick = () => {
+     const index = this.state.subSectionMetadata.unitIds.indexOf(this.state.unitId);
+     if (index > 0) {
+@@ -58,7 +68,7 @@ class LearningSequencePage extends Component {
+       if (subSectionIndex > 0) {
+         const previousSubSectionId = this.state.subSectionIds[subSectionIndex - 1];
+ 
+-        loadSubSectionMetadata(this.props.match.params.courseId, previousSubSectionId).then(({ subSectionMetadata, units, unitId }) => {
++        loadSubSectionMetadata(this.props.match.params.courseId, previousSubSectionId, { last: true }).then(({ subSectionMetadata, units, unitId }) => {
+           this.setState({
+             subSectionId: subSectionMetadata.itemId,
+             subSectionMetadata,
+@@ -86,14 +96,15 @@ class LearningSequencePage extends Component {
+       if (subSectionIndex < this.state.subSectionIds.length - 1) {
+         const nextSubSectionId = this.state.subSectionIds[subSectionIndex + 1];
+ 
+-        loadSubSectionMetadata(this.props.match.params.courseId, nextSubSectionId).then(({ subSectionMetadata, units, unitId }) => {
+-          this.setState({
+-            subSectionId: subSectionMetadata.itemId,
+-            subSectionMetadata,
+-            units,
+-            unitId,
++        loadSubSectionMetadata(this.props.match.params.courseId, nextSubSectionId, { first: true })
++          .then(({ subSectionMetadata, units, unitId }) => {
++            this.setState({
++              subSectionId: subSectionMetadata.itemId,
++              subSectionMetadata,
++              units,
++              unitId,
++            });
+           });
+-        });
+       } else {
+         console.log('we are at the end!');
+       }
+@@ -125,14 +136,13 @@ class LearningSequencePage extends Component {
+       <main >
+         <div className="container-fluid">
+           <h1>{course.displayName}</h1>
+-          <Breadcrumb
++          <Breadcrumbs
+             links={[
+               { label: course.displayName, url: global.location.href },
+               { label: chapter.displayName, url: global.location.href },
+               { label: subSection.displayName, url: global.location.href },
+             ]}
+             activeLabel={currentUnit.pageTitle}
+-            spacer={<span>&gt;</span>}
+           />
+           <SubSectionNavigation
+             units={this.state.units}
+@@ -161,7 +171,8 @@ LearningSequencePage.propTypes = {
+   match: PropTypes.shape({
+     params: PropTypes.shape({
+       courseId: PropTypes.string.isRequired,
+-      blockIndex: PropTypes.string.isRequired,
++      subSectionId: PropTypes.string,
++      unitId: PropTypes.string,
+     }).isRequired,
+   }).isRequired,
+   intl: intlShape.isRequired,
+diff --git a/src/learning-sequence/SubSectionNavigation.jsx b/src/learning-sequence/SubSectionNavigation.jsx
+index 99076f9..95f86b7 100644
+--- a/src/learning-sequence/SubSectionNavigation.jsx
++++ b/src/learning-sequence/SubSectionNavigation.jsx
+@@ -70,7 +70,7 @@ SubSectionNavigation.propTypes = {
+   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+   units: PropTypes.objectOf(PropTypes.shape({
+     pageTitle: PropTypes.string.isRequired,
+-    type: PropTypes.oneOf('video', 'other', 'vertical', 'problem').isRequired,
++    type: PropTypes.oneOf(['video', 'other', 'vertical', 'problem']).isRequired,
+   })).isRequired,
+   activeUnitId: PropTypes.string.isRequired,
+   unitClickHandler: PropTypes.func.isRequired,
+diff --git a/src/learning-sequence/api.js b/src/learning-sequence/api.js
+index ab48694..6c3e7ff 100644
+--- a/src/learning-sequence/api.js
++++ b/src/learning-sequence/api.js
+@@ -3,7 +3,7 @@
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+ 
+-export async function loadCourseSequence(courseId, subSectionId, username) {
++export async function loadCourseSequence(courseId, subSectionId, urlUnitId, username) {
+   const blocksData = await getCourseBlocks(courseId, username);
+   const courseBlockId = blocksData.root;
+   const blocks = createBlocksMap(blocksData.blocks);
+@@ -12,6 +12,7 @@ export async function loadCourseSequence(courseId, subSectionId, username) {
+   const { subSectionMetadata, units, unitId } = await loadSubSectionMetadata(
+     courseId,
+     defaultedSubSectionId,
++    { unitId: urlUnitId },
+   );
+ 
+   return {
+@@ -37,13 +38,19 @@ async function getCourseBlocks(courseId, username) {
+   return data;
+ }
+ 
+-export async function loadSubSectionMetadata(courseId, subSectionId) {
++export async function loadSubSectionMetadata(courseId, subSectionId, {
++  first,
++  last,
++  unitId: urlUnitId,
++}) {
+   let subSectionMetadata = await getSubSectionMetadata(courseId, subSectionId);
+   subSectionMetadata = camelCaseObject(subSectionMetadata);
+   subSectionMetadata.unitIds = subSectionMetadata.items.map(item => item.id);
+-  const unitId = subSectionMetadata.position ?
+-    subSectionMetadata.items[subSectionMetadata.position - 1].id :
+-    subSectionMetadata.items[0].id;
++  let position = subSectionMetadata.position - 1; // metadata's position is 1's indexed
++  position = first ? 0 : position;
++  position = last ? subSectionMetadata.unitIds.length - 1 : position;
++  position = urlUnitId ? subSectionMetadata.unitIds.indexOf(urlUnitId) : position;
++  const unitId = subSectionMetadata.items[position].id;
+   const units = createUnitsMap(subSectionMetadata.items);
+ 
+   return {
+-- 
+2.34.1
+

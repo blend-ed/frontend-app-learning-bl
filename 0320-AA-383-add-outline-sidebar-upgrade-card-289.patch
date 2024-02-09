@@ -1,0 +1,483 @@
+From 0cb97db7eb231d2347a7a44c9e4ad2cc75891c74 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 8 Dec 2020 10:58:57 -0500
+Subject: [PATCH 0320/1021] AA-383: add outline sidebar upgrade card (#289)
+
+Also adds the course sock to the outline page.
+---
+ .../__factories__/outlineTabData.factory.js   |   9 ++
+ .../data/__snapshots__/redux.test.js.snap     |   9 ++
+ src/course-home/data/api.js                   |   4 +
+ src/course-home/outline-tab/OutlineTab.jsx    |  13 ++-
+ src/course-home/outline-tab/messages.js       |  17 ++++
+ .../outline-tab/widgets/CourseDates.jsx       |   2 +-
+ .../outline-tab/widgets/CourseHandouts.jsx    |   2 +-
+ .../outline-tab/widgets/CourseTools.jsx       |   2 +-
+ .../widgets/UpdateGoalSelector.jsx            |   2 +-
+ .../outline-tab/widgets/UpgradeCard.jsx       |  82 ++++++++++++++++++
+ .../outline-tab/widgets/UpgradeCard.scss      |   4 +
+ src/courseware/course/Course.jsx              |   6 +-
+ .../course-sock/CourseSock.jsx                |  19 +++-
+ .../course-sock/CourseSock.test.jsx           |   2 +-
+ .../course-sock/assets/learner-quote.png      | Bin
+ .../course-sock/assets/learner-quote2.png     | Bin
+ .../course => generic}/course-sock/index.js   |   0
+ src/index.scss                                |   1 +
+ 18 files changed, 163 insertions(+), 11 deletions(-)
+ create mode 100644 src/course-home/outline-tab/widgets/UpgradeCard.jsx
+ create mode 100644 src/course-home/outline-tab/widgets/UpgradeCard.scss
+ rename src/{courseware/course => generic}/course-sock/CourseSock.jsx (94%)
+ rename src/{courseware/course => generic}/course-sock/CourseSock.test.jsx (97%)
+ rename src/{courseware/course => generic}/course-sock/assets/learner-quote.png (100%)
+ rename src/{courseware/course => generic}/course-sock/assets/learner-quote2.png (100%)
+ rename src/{courseware/course => generic}/course-sock/index.js (100%)
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 6cc4faf..b3faf6d 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -25,7 +25,16 @@ Factory.define('outlineTabData')
+     has_visited_course: false,
+     url: `${host}/courses/${courseId}/jump_to/block-v1:edX+Test+Block@12345abcde`,
+   }))
++  .attr('verified_mode', ['host'], (host) => ({
++    access_expiration_date: '2050-01-01T12:00:00',
++    currency: 'USD',
++    currency_symbol: '$',
++    price: 149,
++    sku: 'ABCD1234',
++    upgrade_url: `${host}/dashboard`,
++  }))
+   .attrs({
++    can_show_upgrade_sock: true,
+     course_expired_html: null,
+     course_goals: {
+       goal_options: [],
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 9aec514..5ea68ed 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -339,6 +339,7 @@ Object {
+     },
+     "outline": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "canShowUpgradeSock": true,
+         "courseBlocks": Object {
+           "courses": Object {
+             "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
+@@ -407,6 +408,14 @@ Object {
+           "hasVisitedCourse": false,
+           "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+Test+Block@12345abcde",
+         },
++        "verifiedMode": Object {
++          "accessExpirationDate": "2050-01-01T12:00:00",
++          "currency": "USD",
++          "currencySymbol": "$",
++          "price": 149,
++          "sku": "ABCD1234",
++          "upgradeUrl": "http://localhost:18000/dashboard",
++        },
+         "welcomeMessageHtml": "<p>Welcome to this course!</p>",
+       },
+     },
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 9e47a6f..c22bce0 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -141,6 +141,7 @@ export async function getOutlineTabData(courseId) {
+   const {
+     data,
+   } = tabData;
++  const canShowUpgradeSock = data.can_show_upgrade_sock;
+   const courseBlocks = data.course_blocks ? normalizeOutlineBlocks(courseId, data.course_blocks.blocks) : {};
+   const courseGoals = camelCaseObject(data.course_goals);
+   const courseExpiredHtml = data.course_expired_html;
+@@ -152,9 +153,11 @@ export async function getOutlineTabData(courseId) {
+   const hasEnded = data.has_ended;
+   const offerHtml = data.offer_html;
+   const resumeCourse = camelCaseObject(data.resume_course);
++  const verifiedMode = camelCaseObject(data.verified_mode);
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+   return {
++    canShowUpgradeSock,
+     courseBlocks,
+     courseGoals,
+     courseExpiredHtml,
+@@ -166,6 +169,7 @@ export async function getOutlineTabData(courseId) {
+     hasEnded,
+     offerHtml,
+     resumeCourse,
++    verifiedMode,
+     welcomeMessageHtml,
+   };
+ }
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 19f4651..5fc4a95 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React, { useRef, useState } from 'react';
+ import { useSelector } from 'react-redux';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+@@ -8,6 +8,7 @@ import { AlertList } from '../../generic/user-messages';
+ import CourseDates from './widgets/CourseDates';
+ import CourseGoalCard from './widgets/CourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
++import CourseSock from '../../generic/course-sock';
+ import CourseTools from './widgets/CourseTools';
+ import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ import { fetchOutlineTab } from '../data';
+@@ -15,6 +16,7 @@ import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ import Section from './Section';
+ import UpdateGoalSelector from './widgets/UpdateGoalSelector';
++import UpgradeCard from './widgets/UpgradeCard';
+ import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
+ import useCertificateAvailableAlert from './alerts/certificate-available-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+@@ -41,6 +43,7 @@ function OutlineTab({ intl }) {
+   } = useModel('courses', courseId);
+ 
+   const {
++    canShowUpgradeSock,
+     courseBlocks: {
+       courses,
+       sections,
+@@ -60,6 +63,7 @@ function OutlineTab({ intl }) {
+       url: resumeCourseUrl,
+     },
+     offerHtml,
++    verifiedMode,
+   } = useModel('outline', courseId);
+ 
+   const [courseGoalToDisplay, setCourseGoalToDisplay] = useState(selectedGoal);
+@@ -79,6 +83,8 @@ function OutlineTab({ intl }) {
+ 
+   const rootCourseId = courses && Object.keys(courses)[0];
+ 
++  const courseSock = useRef(null);
++
+   return (
+     <>
+       <AlertList
+@@ -172,6 +178,10 @@ function OutlineTab({ intl }) {
+           <CourseTools
+             courseId={courseId}
+           />
++          <UpgradeCard
++            courseId={courseId}
++            onLearnMore={canShowUpgradeSock ? () => { courseSock.current.showToUser(); } : null}
++          />
+           <CourseDates
+             start={start}
+             end={end}
+@@ -186,6 +196,7 @@ function OutlineTab({ intl }) {
+           />
+         </div>
+       </div>
++      {canShowUpgradeSock && <CourseSock ref={courseSock} verifiedMode={verifiedMode} />}
+     </>
+   );
+ }
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index fc10d2f..f9036f4 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -62,6 +62,10 @@ const messages = defineMessages({
+     defaultMessage: 'Incomplete section',
+     description: 'Text used to describe the gray checkmark icon in front of a section title',
+   },
++  learnMore: {
++    id: 'learning.outline.learnMore',
++    defaultMessage: 'Learn More',
++  },
+   openSection: {
+     id: 'learning.outline.altText.openSection',
+     defaultMessage: 'Open',
+@@ -83,6 +87,19 @@ const messages = defineMessages({
+     id: 'learning.outline.tools',
+     defaultMessage: 'Course Tools',
+   },
++  upgradeButton: {
++    id: 'learning.outline.upgradeButton',
++    defaultMessage: 'Upgrade ({symbol}{price})',
++  },
++  upgradeTitle: {
++    id: 'learning.outline.upgradeTitle',
++    defaultMessage: 'Pursue a verified certificate',
++  },
++  certAlt: {
++    id: 'learning.outline.certificateAlt',
++    defaultMessage: 'Example Certificate',
++    description: 'Alternate text displayed when the example certificate image cannot be displayed.',
++  },
+   welcomeMessage: {
+     id: 'learning.outline.welcomeMessage',
+     defaultMessage: 'Welcome Message',
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index d8dbb25..4db2ecb 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -17,7 +17,7 @@ function CourseDates({ courseId, intl }) {
+   } = useModel('outline', courseId);
+ 
+   return (
+-    <section className="mb-3">
++    <section className="mb-4">
+       <h2 className="h6">{intl.formatMessage(messages.dates)}</h2>
+       {courseDateBlocks.map((courseDateBlock) => (
+         <DateSummary
+diff --git a/src/course-home/outline-tab/widgets/CourseHandouts.jsx b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+index d709827..0530d5f 100644
+--- a/src/course-home/outline-tab/widgets/CourseHandouts.jsx
++++ b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+@@ -17,7 +17,7 @@ function CourseHandouts({ courseId, intl }) {
+   }
+ 
+   return (
+-    <section className="mb-3">
++    <section className="mb-4">
+       <h2 className="h6">{intl.formatMessage(messages.handouts)}</h2>
+       <LmsHtmlFragment
+         html={handoutsHtml}
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 2012dab..ffbc788 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -54,7 +54,7 @@ function CourseTools({ courseId, intl }) {
+   };
+ 
+   return (
+-    <section className="mb-3">
++    <section className="mb-4">
+       <h2 className="h6">{intl.formatMessage(messages.tools)}</h2>
+       {courseTools.map((courseTool) => (
+         <div key={courseTool.analyticsId}>
+diff --git a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+index 5134d71..440ed21 100644
+--- a/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
++++ b/src/course-home/outline-tab/widgets/UpdateGoalSelector.jsx
+@@ -36,7 +36,7 @@ function UpdateGoalSelector({
+ 
+   return (
+     <>
+-      <section className="mb-3">
++      <section className="mb-4">
+         <div className="row w-100 m-0">
+           <div className="col-12 p-0">
+             <label className="h6 m-0" htmlFor="edit-goal-selector">
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+new file mode 100644
+index 0000000..8c94d18
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+@@ -0,0 +1,82 @@
++import React, { useEffect } from 'react';
++import PropTypes from 'prop-types';
++
++import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button } from '@edx/paragon';
++
++import messages from '../messages';
++import { useModel } from '../../../generic/model-store';
++import VerifiedCert from '../../../generic/assets/edX_verified_certificate.png';
++
++function UpgradeCard({ courseId, intl, onLearnMore }) {
++  const { org } = useModel('courses', courseId);
++  const {
++    verifiedMode,
++  } = useModel('outline', courseId);
++
++  if (!verifiedMode) {
++    return null;
++  }
++
++  const eventProperties = {
++    org_key: org,
++    courserun_key: courseId,
++  };
++
++  useEffect(() => {
++    sendTrackingLogEvent('edx.bi.course.upgrade.sidebarupsell.displayed', eventProperties);
++  });
++
++  const logClick = () => {
++    sendTrackingLogEvent('edx.bi.course.upgrade.sidebarupsell.clicked', eventProperties);
++    sendTrackingLogEvent('edx.course.enrollment.upgrade.clicked', {
++      location: 'sidebar-message',
++    });
++  };
++
++  return (
++    <section className="mb-4 p-4 outline-sidebar-upgrade-card">
++      <h2 className="h6" id="outline-sidebar-upgrade-header">{intl.formatMessage(messages.upgradeTitle)}</h2>
++      <img
++        alt={intl.formatMessage(messages.certAlt)}
++        src={VerifiedCert}
++        style={{ width: '124px' }}
++      />
++      <div className="float-right d-flex flex-column align-items-center">
++        <Button
++          variant="success"
++          href={verifiedMode.upgradeUrl}
++          onClick={logClick}
++        >
++          {intl.formatMessage(messages.upgradeButton, {
++            price: verifiedMode.price,
++            symbol: verifiedMode.currencySymbol,
++          })}
++        </Button>
++        {onLearnMore && (
++          <Button
++            variant="link"
++            size="sm"
++            onClick={onLearnMore}
++            aria-labelledby="outline-sidebar-upgrade-header"
++          >
++            {intl.formatMessage(messages.learnMore)}
++          </Button>
++        )}
++      </div>
++    </section>
++  );
++}
++
++UpgradeCard.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  intl: intlShape.isRequired,
++  onLearnMore: PropTypes.func,
++};
++
++UpgradeCard.defaultProps = {
++  onLearnMore: null,
++};
++
++export default injectIntl(UpgradeCard);
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.scss b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+new file mode 100644
+index 0000000..5bab413
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.scss
+@@ -0,0 +1,4 @@
++.outline-sidebar-upgrade-card {
++  border: 1px solid theme-color("gray", "border");
++  border-top: 5px solid theme-color("success", "default");
++}
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 5c18092..dd65674 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -11,9 +11,9 @@ import useOfferAlert from '../../alerts/offer-alert';
+ import Sequence from './sequence';
+ 
+ import { CelebrationModal, shouldCelebrateOnSectionLoad } from './celebration';
+-import CourseBreadcrumbs from './CourseBreadcrumbs';
+-import CourseSock from './course-sock';
+ import ContentTools from './content-tools';
++import CourseBreadcrumbs from './CourseBreadcrumbs';
++import CourseSock from '../../generic/course-sock';
+ import { useModel } from '../../generic/model-store';
+ 
+ function Course({
+@@ -83,7 +83,7 @@ function Course({
+           open
+         />
+       )}
+-      {canShowUpgradeSock && verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
++      {canShowUpgradeSock && <CourseSock verifiedMode={verifiedMode} />}
+       <ContentTools course={course} />
+     </>
+   );
+diff --git a/src/courseware/course/course-sock/CourseSock.jsx b/src/generic/course-sock/CourseSock.jsx
+similarity index 94%
+rename from src/courseware/course/course-sock/CourseSock.jsx
+rename to src/generic/course-sock/CourseSock.jsx
+index 9fd7e7f..159db79 100644
+--- a/src/courseware/course/course-sock/CourseSock.jsx
++++ b/src/generic/course-sock/CourseSock.jsx
+@@ -4,13 +4,14 @@ import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import LearnerQuote1 from './assets/learner-quote.png';
+ import LearnerQuote2 from './assets/learner-quote2.png';
+-import VerifiedCert from '../../../generic/assets/edX_verified_certificate.png';
++import VerifiedCert from '../assets/edX_verified_certificate.png';
+ 
+ export default class CourseSock extends Component {
+   constructor(props) {
+     super(props);
+     this.verifiedMode = props.verifiedMode;
+     this.state = { showUpsell: false };
++    this.sockElement = React.createRef();
+   }
+ 
+   handleClick = () => {
+@@ -19,10 +20,24 @@ export default class CourseSock extends Component {
+     }));
+   }
+ 
++  showToUser = () => {
++    this.setState({
++      showUpsell: true,
++    }, () => {
++      if (this.sockElement.current) {
++        this.sockElement.current.scrollIntoView({ behavior: 'smooth' });
++      }
++    });
++  }
++
+   render() {
++    if (!this.verifiedMode) {
++      return null;
++    }
++
+     const buttonClass = this.state.showUpsell ? 'btn-success' : 'btn-outline-success';
+     return (
+-      <div className="verification-sock container py-5">
++      <div ref={this.sockElement} className="verification-sock container py-5">
+         <div className="d-flex justify-content-center">
+           <button type="button" aria-expanded="false" className={`btn ${buttonClass}`} onClick={this.handleClick}>
+             <FormattedMessage
+diff --git a/src/courseware/course/course-sock/CourseSock.test.jsx b/src/generic/course-sock/CourseSock.test.jsx
+similarity index 97%
+rename from src/courseware/course/course-sock/CourseSock.test.jsx
+rename to src/generic/course-sock/CourseSock.test.jsx
+index e3083cc..5ee1197 100644
+--- a/src/courseware/course/course-sock/CourseSock.test.jsx
++++ b/src/generic/course-sock/CourseSock.test.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import {
+   render, screen, fireEvent, initializeMockApp,
+-} from '../../../setupTest';
++} from '../../setupTest';
+ import CourseSock from './CourseSock';
+ 
+ describe('Course Sock', () => {
+diff --git a/src/courseware/course/course-sock/assets/learner-quote.png b/src/generic/course-sock/assets/learner-quote.png
+similarity index 100%
+rename from src/courseware/course/course-sock/assets/learner-quote.png
+rename to src/generic/course-sock/assets/learner-quote.png
+diff --git a/src/courseware/course/course-sock/assets/learner-quote2.png b/src/generic/course-sock/assets/learner-quote2.png
+similarity index 100%
+rename from src/courseware/course/course-sock/assets/learner-quote2.png
+rename to src/generic/course-sock/assets/learner-quote2.png
+diff --git a/src/courseware/course/course-sock/index.js b/src/generic/course-sock/index.js
+similarity index 100%
+rename from src/courseware/course/course-sock/index.js
+rename to src/generic/course-sock/index.js
+diff --git a/src/index.scss b/src/index.scss
+index 2e31126..3a48727 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -347,3 +347,4 @@
+ @import 'courseware/course/content-tools/contentTools.scss';
+ @import 'course-home/dates-tab/Badge.scss';
+ @import 'course-home/dates-tab/Day.scss';
++@import 'course-home/outline-tab/widgets/UpgradeCard.scss';
+-- 
+2.34.1
+

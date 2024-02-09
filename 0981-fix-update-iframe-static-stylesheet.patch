@@ -1,0 +1,31 @@
+From 69ff5463b3b2f8499ce6b0c00f59755950dbfe14 Mon Sep 17 00:00:00 2001
+From: Leangseu Kim <lkim@edx.org>
+Date: Tue, 24 Jan 2023 15:18:48 -0500
+Subject: [PATCH 0981/1021] fix: update iframe static stylesheet
+
+---
+ .../outline-tab => public/static}/LmsHtmlFragment.css           | 0
+ src/course-home/outline-tab/LmsHtmlFragment.jsx                 | 2 +-
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename {src/course-home/outline-tab => public/static}/LmsHtmlFragment.css (100%)
+
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.css b/public/static/LmsHtmlFragment.css
+similarity index 100%
+rename from src/course-home/outline-tab/LmsHtmlFragment.css
+rename to public/static/LmsHtmlFragment.css
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.jsx b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+index 5385d38..0a525f2 100644
+--- a/src/course-home/outline-tab/LmsHtmlFragment.jsx
++++ b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+@@ -14,7 +14,7 @@ export default function LmsHtmlFragment({
+       <head>
+         <base href="${getConfig().LMS_BASE_URL}" target="_parent">
+         <link rel="stylesheet" href="/static/${getConfig().LEGACY_THEME_NAME ? `${getConfig().LEGACY_THEME_NAME}/` : ''}css/bootstrap/lms-main.css">
+-        <link rel="stylesheet" type="text/css" href="${getConfig().BASE_URL}/src/course-home/outline-tab/LmsHtmlFragment.css">
++        <link rel="stylesheet" type="text/css" href="${getConfig().BASE_URL}/static/LmsHtmlFragment.css">
+       </head>
+       <body class="${className}">${html}</body>
+       <script>
+-- 
+2.34.1
+

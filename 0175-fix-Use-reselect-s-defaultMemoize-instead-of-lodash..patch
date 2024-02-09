@@ -1,0 +1,128 @@
+From be0ee18519fab6a15eac2cb8461b6a4eed9e0de5 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Wed, 22 Jul 2020 10:19:53 -0400
+Subject: [PATCH 0175/1021] =?UTF-8?q?fix:=20Use=20reselect=E2=80=99s=20def?=
+ =?UTF-8?q?aultMemoize=20instead=20of=20lodash.memoize=20(#120)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* fix: Use reselect’s defaultMemoize instead of lodash.memoize
+
+Lodash memoize doesn’t examine all parameters when deciding to memoize, apparently, meaning it doesn’t re-call the function if any parameter except the first changes.
+
+More here: https://dev.to/nioufe/you-should-not-use-lodash-for-memoization-3441
+
+* Fixing test setup.  Improper use of sequenceMetadata factory!
+
+Two problems:
+
+One, we weren’t properly passing the courseId into our sequenceMetadata factories, so it was differing than the one defined in courseMetadata.  This didn’t manifest until now because we weren’t using the one from sequenceMetadata until this memoization fix!
+
+Two, I’d updated the options for sequenceMetadata to have a “unitBlocks” option, but didn’t update all the usages of the old “unitBlock” option.  This meant it was manually creating its own unit instead of inheriting the one from courseBlocks, resulting in a different ID.
+---
+ package.json                                              | 4 ++--
+ src/courseware/CoursewareContainer.jsx                    | 2 +-
+ src/courseware/CoursewareContainer.test.jsx               | 8 ++++----
+ .../data/__factories__/sequenceMetadata.factory.js        | 7 ++++++-
+ src/courseware/data/redux.test.js                         | 4 ++--
+ 5 files changed, 15 insertions(+), 10 deletions(-)
+
+diff --git a/package.json b/package.json
+index d6627b0..c6387e5 100644
+--- a/package.json
++++ b/package.json
+@@ -46,7 +46,6 @@
+     "@reduxjs/toolkit": "^1.2.3",
+     "classnames": "^2.2.6",
+     "core-js": "^3.6.2",
+-    "lodash.memoize": "^4.1.2",
+     "prop-types": "^15.7.2",
+     "react": "^16.12.0",
+     "react-break": "^1.3.2",
+@@ -57,7 +56,8 @@
+     "react-router-dom": "^5.1.2",
+     "react-share": "^4.1.0",
+     "redux": "^4.0.5",
+-    "regenerator-runtime": "^0.13.3"
++    "regenerator-runtime": "^0.13.3",
++    "reselect": "^4.0.0"
+   },
+   "devDependencies": {
+     "@edx/frontend-build": "^5.0.6",
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index c0edca7..bb7d5a9 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -4,8 +4,8 @@ import { connect } from 'react-redux';
+ import { history } from '@edx/frontend-platform';
+ import { getLocale } from '@edx/frontend-platform/i18n';
+ import { Redirect } from 'react-router';
+-import memoize from 'lodash.memoize';
+ import { createSelector } from '@reduxjs/toolkit';
++import { defaultMemoize as memoize } from 'reselect';
+ 
+ import {
+   checkBlockCompletion,
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 310cac0..26b9a57 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -82,8 +82,8 @@ describe('CoursewareContainer', () => {
+     const { courseBlocks, unitBlock, sequenceBlock } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
+     const sequenceMetadata = Factory.build(
+       'sequenceMetadata',
+-      { courseId },
+-      { unitBlock, sequenceBlock },
++      {},
++      { courseId, unitBlocks: [unitBlock], sequenceBlock },
+     );
+ 
+     const courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
+@@ -149,8 +149,8 @@ describe('CoursewareContainer', () => {
+       const { courseBlocks, unitBlock, sequenceBlock } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
+       const sequenceMetadata = Factory.build(
+         'sequenceMetadata',
+-        { courseId },
+-        { unitBlock, sequenceBlock },
++        {},
++        { courseId, unitBlocks: [unitBlock], sequenceBlock },
+       );
+ 
+       const forbiddenCourseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index 04d672b..0735672 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -3,7 +3,12 @@ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dep
+ import './block.factory';
+ 
+ Factory.define('sequenceMetadata')
+-  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .option('courseId', (courseId) => {
++    if (courseId) {
++      return courseId;
++    }
++    throw new Error('courseId must be specified for sequenceMetadata factory.');
++  })
+   // An array of units
+   .option('unitBlocks', ['courseId'], courseId => ([
+     Factory.build(
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index 32bfed8..79d6094 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -28,8 +28,8 @@ describe('Data layer integration tests', () => {
+   const { courseBlocks, unitBlock, sequenceBlock } = buildSimpleCourseBlocks(courseId);
+   const sequenceMetadata = Factory.build(
+     'sequenceMetadata',
+-    { courseId },
+-    { unitBlocks: [unitBlock], sequenceBlock },
++    {},
++    { courseId, unitBlocks: [unitBlock], sequenceBlock },
+   );
+ 
+   const courseUrl = `${courseBaseUrl}/${courseId}`;
+-- 
+2.34.1
+

@@ -1,0 +1,46 @@
+From 97f335be627a2a594e4f6a792ee23b468bac4211 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 12 May 2020 12:20:29 -0700
+Subject: [PATCH 0118/1021] Show course-sock only when the API says so
+
+---
+ src/courseware/course/Course.jsx | 3 ++-
+ src/data/api.js                  | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index e5b175b..d294a04 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -60,6 +60,7 @@ function Course({
+ 
+   if (courseStatus === 'loaded') {
+     const {
++      canShowUpgradeSock,
+       org, number, title, isStaff, tabs, verifiedMode,
+     } = course;
+     return (
+@@ -107,7 +108,7 @@ function Course({
+             nextSequenceHandler={nextSequenceHandler}
+             previousSequenceHandler={previousSequenceHandler}
+           />
+-          {verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
++          {canShowUpgradeSock && verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
+           <ContentTools course={course} />
+         </div>
+       </>
+diff --git a/src/data/api.js b/src/data/api.js
+index f8f3545..c59ad83 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -5,6 +5,7 @@ import { logError } from '@edx/frontend-platform/logging';
+ 
+ function normalizeMetadata(metadata) {
+   return {
++    canShowUpgradeSock: metadata.can_show_upgrade_sock,
+     contentTypeGatingEnabled: metadata.content_type_gating_enabled,
+     // TODO: TNL-7185: return course expired _date_, instead of _message_
+     courseExpiredMessage: metadata.course_expired_message,
+-- 
+2.34.1
+

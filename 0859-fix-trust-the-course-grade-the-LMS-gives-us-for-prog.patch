@@ -1,0 +1,222 @@
+From 7e19af44da570d3fb255e39eeacd518da8ff2693 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 11 Mar 2022 09:29:39 -0500
+Subject: [PATCH 0859/1021] fix: trust the course grade the LMS gives us for
+ progress page
+
+Rather than recompute it ourselves. Now that the backend is fixed
+to consider only visible grades for the course grade, we don't need
+to try to work around its logic (which is more accurate/consistent
+in general).
+
+AA-1217
+---
+ .../data/__snapshots__/redux.test.js.snap     |  1 -
+ src/course-home/data/api.js                   | 10 ---
+ .../progress-tab/ProgressTab.test.jsx         | 63 +++----------------
+ .../course-grade/CurrentGradeTooltip.jsx      |  4 +-
+ .../grades/course-grade/GradeBar.jsx          |  4 +-
+ .../grade-summary/GradeSummaryTableFooter.jsx |  4 +-
+ 6 files changed, 16 insertions(+), 70 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 6ecca1d..869c21a 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -605,7 +605,6 @@ Object {
+           "isPassing": true,
+           "letterGrade": "pass",
+           "percent": 1,
+-          "visiblePercent": 1,
+         },
+         "courseId": "course-v1:edX+DemoX+Demo_Course",
+         "creditCourseRequirements": null,
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index c60d41c..1fa121d 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -239,16 +239,6 @@ export async function getProgressTabData(courseId, targetUserId) {
+       camelCasedData.sectionScores,
+     );
+ 
+-    // Accumulate the weighted grades by assignment type to calculate the learner facing grade. The grades within
+-    // assignmentPolicies have been filtered by what's visible to the learner.
+-    camelCasedData.courseGrade.visiblePercent = camelCasedData.gradingPolicy.assignmentPolicies
+-      ? camelCasedData.gradingPolicy.assignmentPolicies.reduce(
+-        (accumulator, assignment) => accumulator + assignment.weightedGrade, 0,
+-      ) : camelCasedData.courseGrade.percent;
+-
+-    camelCasedData.courseGrade.isPassing = camelCasedData.courseGrade.visiblePercent
+-      >= Math.min(...Object.values(data.grading_policy.grade_range));
+-
+     // We replace gradingPolicy.gradeRange with the original data to preserve the intended casing for the grade.
+     // For example, if a grade range key is "A", we do not want it to be camel cased (i.e. "A" would become "a")
+     // in order to preserve a course team's desired grade formatting.
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 9f6fedb..aa9c1ff 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -133,6 +133,8 @@ describe('Progress Tab', () => {
+       });
+       await fetchAndRender();
+       expect(screen.queryByRole('button', { name: 'Grade range tooltip' })).not.toBeInTheDocument();
++      expect(screen.getByTestId('currentGradeTooltipContent').innerHTML).toEqual('50%');
++      expect(screen.getByTestId('gradeSummaryFooterTotalWeightedGrade').innerHTML).toEqual('50%');
+       expect(screen.getByText('A weighted grade of 75% is required to pass in this course')).toBeInTheDocument();
+     });
+ 
+@@ -166,6 +168,8 @@ describe('Progress Tab', () => {
+       });
+       await fetchAndRender();
+       expect(screen.getByRole('button', { name: 'Grade range tooltip' }));
++      expect(screen.getByTestId('currentGradeTooltipContent').innerHTML).toEqual('0%');
++      expect(screen.getByTestId('gradeSummaryFooterTotalWeightedGrade').innerHTML).toEqual('0%');
+       expect(screen.getByText('A weighted grade of 80% is required to pass in this course')).toBeInTheDocument();
+     });
+ 
+@@ -213,6 +217,8 @@ describe('Progress Tab', () => {
+       });
+       await fetchAndRender();
+       expect(screen.getByRole('button', { name: 'Grade range tooltip' }));
++      expect(screen.getByTestId('currentGradeTooltipContent').innerHTML).toEqual('80%');
++      expect(screen.getByTestId('gradeSummaryFooterTotalWeightedGrade').innerHTML).toEqual('80%');
+       expect(await screen.findByText('You’re currently passing this course with a grade of B (80-90%)')).toBeInTheDocument();
+     });
+ 
+@@ -442,9 +448,8 @@ describe('Progress Tab', () => {
+       expect(screen.queryAllByTestId('blocked-icon')).toHaveLength(4);
+     });
+ 
+-    it('renders correct current grade tooltip when showGrades is false', async () => {
+-      // The learner has a 50% on the first assignment and a 100% on the second, making their grade a 75%
+-      // The second assignment has showGrades set to false, so the grade reflected to the learner should be 50%.
++    it('does not render subsections for which showGrades is false', async () => {
++      // The second assignment has showGrades set to false, so it should not be shown.
+       setTabData({
+         section_scores: [
+           {
+@@ -486,10 +491,8 @@ describe('Progress Tab', () => {
+       });
+ 
+       await fetchAndRender();
+-      expect(screen.getByTestId('currentGradeTooltipContent').innerHTML).toEqual('50%');
+-      // Although the learner's true grade is passing, we should expect this to reflect the grade that's
+-      // visible to them, which is non-passing
+-      expect(screen.getByText('A weighted grade of 75% is required to pass in this course')).toBeInTheDocument();
++      expect(screen.getByText('First subsection')).toBeInTheDocument();
++      expect(screen.queryByText('Second subsection')).not.toBeInTheDocument();
+     });
+ 
+     it('renders correct title when credit information is available', async () => {
+@@ -661,52 +664,6 @@ describe('Progress Tab', () => {
+       expect(screen.getByRole('row', { name: 'Exam 50% 0% 0%' })).toBeInTheDocument();
+     });
+ 
+-    it('renders correct total weighted grade when showGrades is false', async () => {
+-      // The learner has a 50% on the first assignment and a 100% on the second, making their grade a 75%
+-      // The second assignment has showGrades set to false, so the grade reflected to the learner should be 50%.
+-      setTabData({
+-        section_scores: [
+-          {
+-            display_name: 'First section',
+-            subsections: [
+-              {
+-                assignment_type: 'Homework',
+-                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
+-                display_name: 'First subsection',
+-                has_graded_assignment: true,
+-                num_points_earned: 1,
+-                num_points_possible: 2,
+-                percent_graded: 1.0,
+-                show_correctness: 'always',
+-                show_grades: true,
+-                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
+-              },
+-            ],
+-          },
+-          {
+-            display_name: 'Second section',
+-            subsections: [
+-              {
+-                assignment_type: 'Homework',
+-                display_name: 'Second subsection',
+-                learner_has_access: true,
+-                has_graded_assignment: true,
+-                num_points_earned: 1,
+-                num_points_possible: 1,
+-                percent_graded: 1.0,
+-                show_correctness: 'always',
+-                show_grades: false,
+-                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection',
+-              },
+-            ],
+-          },
+-        ],
+-      });
+-
+-      await fetchAndRender();
+-      expect(screen.getByTestId('gradeSummaryFooterTotalWeightedGrade').innerHTML).toEqual('50%');
+-    });
+-
+     it('renders override notice', async () => {
+       setTabData({
+         section_scores: [
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index e500429..cd63718 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -19,11 +19,11 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+   const {
+     courseGrade: {
+       isPassing,
+-      visiblePercent,
++      percent,
+     },
+   } = useModel('progress', courseId);
+ 
+-  const currentGrade = Number((visiblePercent * 100).toFixed(0));
++  const currentGrade = Number((percent * 100).toFixed(0));
+ 
+   let currentGradeDirection = currentGrade < 50 ? '' : '-';
+ 
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index c605cbd..fb8b707 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -17,12 +17,12 @@ function GradeBar({ intl, passingGrade }) {
+   const {
+     courseGrade: {
+       isPassing,
+-      visiblePercent,
++      percent,
+     },
+     gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+ 
+-  const currentGrade = Number((visiblePercent * 100).toFixed(0));
++  const currentGrade = Number((percent * 100).toFixed(0));
+ 
+   const lockedTooltipClassName = gradesFeatureIsFullyLocked ? 'locked-overlay' : '';
+ 
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+index 91a052c..c6ec0a3 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+@@ -15,12 +15,12 @@ function GradeSummaryTableFooter({ intl }) {
+   const {
+     courseGrade: {
+       isPassing,
+-      visiblePercent,
++      percent,
+     },
+   } = useModel('progress', courseId);
+ 
+   const bgColor = isPassing ? 'bg-success-100' : 'bg-warning-100';
+-  const totalGrade = (visiblePercent * 100).toFixed(0);
++  const totalGrade = (percent * 100).toFixed(0);
+ 
+   return (
+     <DataTable.TableFooter className={`border-top border-primary ${bgColor}`}>
+-- 
+2.34.1
+

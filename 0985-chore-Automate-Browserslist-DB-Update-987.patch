@@ -1,0 +1,35 @@
+From 263c486330dfa1db03fa67e7e3f51e6ae2eb086d Mon Sep 17 00:00:00 2001
+From: Muhammad Abdullah Waheed
+ <42172960+abdullahwaheed@users.noreply.github.com>
+Date: Tue, 31 Jan 2023 17:41:10 +0500
+Subject: [PATCH 0985/1021] chore: Automate Browserslist DB Update (#987)
+
+* feat: added cron github action to auto update brwoserlist DB periodically
+
+* refactor: used a shared script to update broswerslist DB, create PR and automerge it
+---
+ .github/workflows/update-browserslist-db.yml | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 .github/workflows/update-browserslist-db.yml
+
+diff --git a/.github/workflows/update-browserslist-db.yml b/.github/workflows/update-browserslist-db.yml
+new file mode 100644
+index 0000000..db4346e
+--- /dev/null
++++ b/.github/workflows/update-browserslist-db.yml
+@@ -0,0 +1,12 @@
++name: Update Browserslist DB
++on:
++  schedule:
++    - cron:  '0 0 * * 1'
++  workflow_dispatch:
++
++jobs:
++  update-browserslist:
++    uses: openedx/.github/.github/workflows/update-browserslist-db.yml@master
++
++    secrets:
++        requirements_bot_github_token: ${{ secrets.requirements_bot_github_token }}
+-- 
+2.34.1
+

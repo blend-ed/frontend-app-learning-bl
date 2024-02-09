@@ -1,0 +1,240 @@
+From 86a4cf9af76a2527afcad2a14818075d30603f79 Mon Sep 17 00:00:00 2001
+From: "Albert (AJ) St. Aubin" <astaubin@edx.org>
+Date: Wed, 23 Jun 2021 10:52:54 -0400
+Subject: [PATCH 0534/1021] feat: Added the Request Certificate Alert
+
+[MICROBA-678]
+
+When a certificate is in a unexpected state (i.e. notpassing with a
+passing grade) this alert will allow the user to attempt to resolve the
+issue on their own. It will run the code that checks the certificates
+status. It requires that the course is configured to allow users to
+Request Certificates though.
+---
+ .../outline-tab/OutlineTab.test.jsx           | 27 +++++++++++++++++
+ .../CertificateStatusAlert.jsx                | 30 +++++++++++++++----
+ .../alerts/certificate-status-alert/hooks.js  | 29 +++++++++---------
+ 3 files changed, 65 insertions(+), 21 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 138db7b..5ea7a37 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -763,6 +763,33 @@ describe('Outline Tab', () => {
+     });
+   });
+ 
++  describe('Requesting Certificate Alert', () => {
++    it('appears', async () => {
++      const now = new Date();
++      const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
++      setMetadata({ is_enrolled: true });
++      setTabData({
++        cert_data: {
++          cert_status: CERT_STATUS_TYPE.REQUESTING,
++          cert_web_view_url: null,
++          certificate_available_date: null,
++          download_url: null,
++        },
++      }, {
++        date_blocks: [
++          {
++            date_type: 'course-end-date',
++            date: yesterday.toISOString(),
++            title: 'End',
++          },
++        ],
++      });
++      await fetchAndRender();
++      expect(screen.queryByText('Congratulations! Your certificate is ready.')).toBeInTheDocument();
++      expect(screen.queryByText('Request certificate')).toBeInTheDocument();
++    });
++  });
++
+   describe('Certificate (pdf) Complete Alert', () => {
+     it('appears', async () => {
+       const now = new Date();
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+index ac375ac..7e9c069 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+@@ -7,23 +7,29 @@ import {
+   intlShape,
+ } from '@edx/frontend-platform/i18n';
+ import { Alert, Button } from '@edx/paragon';
++import { useDispatch } from 'react-redux';
++
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faCheckCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+ import { getConfig } from '@edx/frontend-platform';
+ import certMessages from './messages';
+ import certStatusMessages from '../../../progress-tab/certificate-status/messages';
++import { requestCert } from '../../../data/thunks';
+ 
+ export const CERT_STATUS_TYPE = {
+   EARNED_NOT_AVAILABLE: 'earned_but_not_available',
+   DOWNLOADABLE: 'downloadable',
++  REQUESTING: 'requesting',
+   UNVERIFIED: 'unverified',
+ };
+ 
+ function CertificateStatusAlert({ intl, payload }) {
++  const dispatch = useDispatch();
+   const {
+     certificateAvailableDate,
+-    certStatusType,
++    certStatus,
+     courseEndDate,
++    courseId,
+     certURL,
+     isWebCert,
+     userTimezone,
+@@ -38,7 +44,7 @@ function CertificateStatusAlert({ intl, payload }) {
+       icon: faCheckCircle,
+       iconClassName: 'alert-icon text-success-500',
+     };
+-    if (certStatusType === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
++    if (certStatus === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
+       const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+       const certificateAvailableDateFormatted = <FormattedDate value={certificateAvailableDate} day="numeric" month="long" year="numeric" />;
+       const courseEndDateFormatted = <FormattedDate value={courseEndDate} day="numeric" month="long" year="numeric" />;
+@@ -57,7 +63,7 @@ function CertificateStatusAlert({ intl, payload }) {
+           />
+         </p>
+       );
+-    } else if (certStatusType === CERT_STATUS_TYPE.DOWNLOADABLE) {
++    } else if (certStatus === CERT_STATUS_TYPE.DOWNLOADABLE) {
+       alertProps.header = intl.formatMessage(certMessages.certStatusDownloadableHeader);
+       if (isWebCert) {
+         alertProps.buttonMessage = intl.formatMessage(certStatusMessages.viewableButton);
+@@ -66,6 +72,12 @@ function CertificateStatusAlert({ intl, payload }) {
+       }
+       alertProps.buttonVisible = true;
+       alertProps.buttonLink = certURL;
++    } else if (certStatus === CERT_STATUS_TYPE.REQUESTING) {
++      alertProps.header = intl.formatMessage(certMessages.certStatusDownloadableHeader);
++      alertProps.buttonMessage = intl.formatMessage(certStatusMessages.requestableButton);
++      alertProps.buttonVisible = true;
++      alertProps.buttonLink = '';
++      alertProps.buttonAction = () => { dispatch(requestCert(courseId)); };
+     }
+     return alertProps;
+   };
+@@ -86,9 +98,10 @@ function CertificateStatusAlert({ intl, payload }) {
+   };
+ 
+   let alertProps = {};
+-  switch (certStatusType) {
++  switch (certStatus) {
+     case CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE:
+     case CERT_STATUS_TYPE.DOWNLOADABLE:
++    case CERT_STATUS_TYPE.REQUESTING:
+       alertProps = renderCertAwardedStatus();
+       break;
+     case CERT_STATUS_TYPE.UNVERIFIED:
+@@ -106,8 +119,9 @@ function CertificateStatusAlert({ intl, payload }) {
+         iconClassName,
+         icon,
+         header,
+-        buttonLink,
+         body,
++        buttonAction,
++        buttonLink,
+         buttonMessage,
+       }) => (
+         <Alert variant={variant}>
+@@ -122,6 +136,9 @@ function CertificateStatusAlert({ intl, payload }) {
+                 <Button
+                   variant="primary"
+                   href={buttonLink}
++                  onClick={() => {
++                    if (buttonAction) { buttonAction(); }
++                  }}
+                 >
+                   {buttonMessage}
+                 </Button>
+@@ -139,8 +156,9 @@ CertificateStatusAlert.propTypes = {
+   intl: intlShape.isRequired,
+   payload: PropTypes.shape({
+     certificateAvailableDate: PropTypes.string,
+-    certStatusType: PropTypes.string,
++    certStatus: PropTypes.string,
+     courseEndDate: PropTypes.string,
++    courseId: PropTypes.string,
+     certURL: PropTypes.string,
+     isWebCert: PropTypes.bool,
+     userTimezone: PropTypes.string,
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+index 2f2f130..35ad4ad 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+@@ -3,29 +3,28 @@ import React, { useMemo } from 'react';
+ import { getConfig } from '@edx/frontend-platform';
+ import { useAlert } from '../../../../generic/user-messages';
+ import { useModel } from '../../../../generic/model-store';
++
+ import { CERT_STATUS_TYPE } from './CertificateStatusAlert';
+ 
+ const CertificateStatusAlert = React.lazy(() => import('./CertificateStatusAlert'));
+ 
+ function verifyCertStatusType(status) {
+-  // This method will only return cert statuses when we want to alert on them.
+-  // It should be modified when we want to alert on a new status type.
+-  if (status === CERT_STATUS_TYPE.DOWNLOADABLE) {
+-    return CERT_STATUS_TYPE.DOWNLOADABLE;
+-  }
+-  if (status === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
+-    return CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE;
+-  }
+-  if (status === CERT_STATUS_TYPE.UNVERIFIED) {
+-    return CERT_STATUS_TYPE.UNVERIFIED;
++  switch (status) {
++    case CERT_STATUS_TYPE.DOWNLOADABLE:
++    case CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE:
++    case CERT_STATUS_TYPE.REQUESTING:
++    case CERT_STATUS_TYPE.UNVERIFIED:
++      return true;
++    default:
++      return false;
+   }
+-  return '';
+ }
+ 
+ function useCertificateStatusAlert(courseId) {
+   const {
+     isEnrolled,
+   } = useModel('courseHomeMeta', courseId);
++
+   const {
+     datesWidget: {
+       courseDateBlocks,
+@@ -41,7 +40,6 @@ function useCertificateStatusAlert(courseId) {
+     downloadUrl,
+   } = certData || {};
+   const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+-  const certStatusType = verifyCertStatusType(certStatus);
+   const isWebCert = downloadUrl === null;
+ 
+   let certURL = '';
+@@ -51,14 +49,15 @@ function useCertificateStatusAlert(courseId) {
+     // PDF Certificate
+     certURL = downloadUrl;
+   }
+-  const hasCertStatus = certStatusType !== '';
++  const hasAlertingCertStatus = verifyCertStatusType(certStatus);
+ 
+   // Only show if there is a known cert status that we want provide status on.
+-  const isVisible = isEnrolled && hasCertStatus;
++  const isVisible = isEnrolled && hasAlertingCertStatus;
+   const payload = {
+     certificateAvailableDate,
+     certURL,
+-    certStatusType,
++    certStatus,
++    courseId,
+     courseEndDate: endBlock && endBlock.date,
+     userTimezone,
+     isWebCert,
+-- 
+2.34.1
+

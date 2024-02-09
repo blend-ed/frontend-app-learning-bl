@@ -1,0 +1,183 @@
+From f6aebc7d2907575dcceb3f994cda27dd4c8d4b83 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Tue, 6 Oct 2020 10:42:48 -0700
+Subject: [PATCH 0273/1021] AA-389: Updating Routing for CourseExit Page (#234)
+
+The CourseExit page uses the TabContainer because it seems to be a better solution
+than adding it into the paths for the CoursewareContainer, despite the CoursewareContainer
+already doing the correct fetch. The reason for this is because within the
+CoursewareContainer, it would still be necessary to check for the /course-exit path (due
+to the CoursewareContainer trying to greedily match sequenceId (read: it will try and
+look up 'course-exit' as a sequence)). That effectively defeats the purpose of using the
+routing in the first place so instead, we place it in a TabContainer.
+
+The InstructorToolbar didMount logic became necessary once we had a page (CourseExit) that does a redirect on a quick exit.
+As a result, it unmouunts the InstructorToolbar (which will be remounted by the new component),
+but the InstructorToolbar's MasqueradeWidget has an outgoing request. Since it is unmounted
+during that time, it raises an error about a potential memory leak. By stopping the render
+when the InstructorToolbar is unmounted, we avoid the memory leak.
+---
+ src/course-home/dates-tab/DatesTab.test.jsx     |  2 +-
+ src/index.jsx                                   |  2 +-
+ src/instructor-toolbar/InstructorToolbar.jsx    | 17 +++++++++++------
+ .../masquerade-widget/MasqueradeWidget.jsx      |  9 +--------
+ src/tab-page/TabContainer.jsx                   |  9 ++-------
+ src/tab-page/TabContainer.test.jsx              |  1 +
+ 6 files changed, 17 insertions(+), 23 deletions(-)
+
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index 03bf7f2..d385143 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -26,7 +26,7 @@ describe('DatesTab', () => {
+     <AppProvider store={store}>
+       <UserMessagesProvider>
+         <Route path="/course/:courseId/dates">
+-          <TabContainer tab="dates" fetch={fetchDatesTab}>
++          <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
+             <DatesTab />
+           </TabContainer>
+         </Route>
+diff --git a/src/index.jsx b/src/index.jsx
+index f4251c3..de7b7bc 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -52,7 +52,7 @@ subscribe(APP_READY, () => {
+             </TabContainer>
+           </Route>
+           <Route path="/course/:courseId/course-exit">
+-            <TabContainer tab="exit" fetch={fetchCourse} isExitPage>
++            <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
+               <CourseExit />
+             </TabContainer>
+           </Route>
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 10ecc38..766d7f7 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -36,11 +36,19 @@ function getStudioUrl(courseId, unitId) {
+ }
+ 
+ export default function InstructorToolbar(props) {
++  // This didMount logic became necessary once we had a page that does a redirect on a quick exit.
++  // As a result, it unmounts the InstructorToolbar (which will be remounted by the new component),
++  // but the InstructorToolbar's MasqueradeWidget has an outgoing request. Since it is unmounted
++  // during that time, it raises an error about a potential memory leak. By stopping the render
++  // when the InstructorToolbar is unmounted, we avoid the memory leak.
++  // NOTE: This was originally added because of the CourseExit page redirect. Once that page stops
++  //   doing a redirect because a CourseExit experience exists for all learners, this could be removed
+   const [didMount, setDidMount] = useState(false);
+   useEffect(() => {
+     setDidMount(true);
++    // Returning this function here will run setDidMount(false) when this component is unmounted
+     return () => setDidMount(false);
+-  }, []);
++  });
+ 
+   const {
+     courseId,
+@@ -58,10 +66,7 @@ export default function InstructorToolbar(props) {
+   const urlStudio = getStudioUrl(courseId, unitId);
+   const [masqueradeErrorMessage, showMasqueradeError] = useState(null);
+ 
+-  if (!didMount) {
+-    return null;
+-  }
+-  return (
++  return (!didMount ? null : (
+     <div>
+       <div className="bg-primary text-white">
+         <div className="container-fluid py-3 d-md-flex justify-content-end align-items-start">
+@@ -102,7 +107,7 @@ export default function InstructorToolbar(props) {
+         </div>
+       )}
+     </div>
+-  );
++  ));
+ }
+ 
+ InstructorToolbar.propTypes = {
+diff --git a/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+index d8dd78b..1255a57 100644
+--- a/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
++++ b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+@@ -16,8 +16,6 @@ import {
+ import messages from './messages';
+ 
+ class MasqueradeWidget extends Component {
+-  isMounted = false;
+-
+   constructor(props) {
+     super(props);
+     this.courseId = props.courseId;
+@@ -31,9 +29,8 @@ class MasqueradeWidget extends Component {
+   }
+ 
+   componentDidMount() {
+-    this.isMounted = true;
+     getMasqueradeOptions(this.courseId).then((data) => {
+-      if (data.success && this.isMounted) {
++      if (data.success) {
+         this.onSuccess(data);
+       } else {
+         // This was explicitly denied by the backend;
+@@ -50,10 +47,6 @@ class MasqueradeWidget extends Component {
+     });
+   }
+ 
+-  componentWillUnmount() {
+-    this.isMounted = false;
+-  }
+-
+   onError(message) {
+     this.props.onError(message);
+   }
+diff --git a/src/tab-page/TabContainer.jsx b/src/tab-page/TabContainer.jsx
+index 2de5368..ed634b3 100644
+--- a/src/tab-page/TabContainer.jsx
++++ b/src/tab-page/TabContainer.jsx
+@@ -9,8 +9,8 @@ export default function TabContainer(props) {
+   const {
+     children,
+     fetch,
++    slice,
+     tab,
+-    isExitPage,
+   } = props;
+ 
+   const { courseId: courseIdFromUrl } = useParams();
+@@ -22,7 +22,6 @@ export default function TabContainer(props) {
+ 
+   // The courseId from the store is the course we HAVE loaded.  If the URL changes,
+   // we don't want the application to adjust to it until it has actually loaded the new data.
+-  const slice = isExitPage ? 'courseware' : 'courseHome';
+   const {
+     courseId,
+     courseStatus,
+@@ -42,10 +41,6 @@ export default function TabContainer(props) {
+ TabContainer.propTypes = {
+   children: PropTypes.node.isRequired,
+   fetch: PropTypes.func.isRequired,
+-  isExitPage: PropTypes.bool,
++  slice: PropTypes.string.isRequired,
+   tab: PropTypes.string.isRequired,
+ };
+-
+-TabContainer.defaultProps = {
+-  isExitPage: false,
+-};
+diff --git a/src/tab-page/TabContainer.test.jsx b/src/tab-page/TabContainer.test.jsx
+index ef973e5..1a6ede0 100644
+--- a/src/tab-page/TabContainer.test.jsx
++++ b/src/tab-page/TabContainer.test.jsx
+@@ -17,6 +17,7 @@ describe('Tab Container', () => {
+     children: [],
+     fetch: mockFetch,
+     tab: 'dummy',
++    slice: 'courseware',
+   };
+   let courseId;
+ 
+-- 
+2.34.1
+

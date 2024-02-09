@@ -1,0 +1,103 @@
+From 637af82873c9e1330585a9f11a1fbdb5d61c6d1f Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 17 Jan 2020 11:23:27 -0500
+Subject: [PATCH 0047/1021] Passing org, course number, and course name to the
+ CourseHeader.
+
+---
+ src/courseware/CourseContainer.jsx     |  3 +++
+ src/courseware/course/Course.jsx       | 11 +++++++++--
+ src/courseware/course/CourseHeader.jsx | 15 +++++++++++----
+ 3 files changed, 23 insertions(+), 6 deletions(-)
+
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index 6a78313..6ecb08f 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -81,6 +81,9 @@ function CourseContainer(props) {
+ 
+   return metadata && (
+     <Course
++      courseOrg={metadata.org}
++      courseNumber={metadata.number}
++      courseName={metadata.name}
+       courseUsageKey={courseUsageKey}
+       courseId={courseId}
+       sequenceId={sequenceId}
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 6625e1c..37b4d22 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -10,7 +10,7 @@ import CourseHeader from './CourseHeader';
+ import CourseTabsNavigation from './CourseTabsNavigation';
+ 
+ export default function Course({
+-  courseUsageKey, courseId, sequenceId, unitId, models, tabs,
++  courseOrg, courseNumber, courseName, courseUsageKey, courseId, sequenceId, unitId, models, tabs,
+ }) {
+   const nextSequenceHandler = useCallback(() => {
+     const sequenceIds = createSequenceIdList(models, courseId);
+@@ -36,7 +36,11 @@ export default function Course({
+ 
+   return (
+     <>
+-      <CourseHeader courseId={courseId} models={models} />
++      <CourseHeader
++        courseOrg={courseOrg}
++        courseNumber={courseNumber}
++        courseName={courseName}
++      />
+       <main className="d-flex flex-column flex-grow-1">
+         <div className="container-fluid">
+           <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug="courseware" />
+@@ -65,6 +69,9 @@ export default function Course({
+ }
+ 
+ Course.propTypes = {
++  courseOrg: PropTypes.string.isRequired,
++  courseNumber: PropTypes.string.isRequired,
++  courseName: PropTypes.string.isRequired,
+   courseUsageKey: PropTypes.string.isRequired,
+   courseId: PropTypes.string.isRequired,
+   sequenceId: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/CourseHeader.jsx b/src/courseware/course/CourseHeader.jsx
+index 3c3dbe3..ee0c59d 100644
+--- a/src/courseware/course/CourseHeader.jsx
++++ b/src/courseware/course/CourseHeader.jsx
+@@ -24,9 +24,10 @@ LinkedLogo.propTypes = {
+   alt: PropTypes.string.isRequired,
+ };
+ 
+-export default function CourseHeader({ courseId, models }) {
++export default function CourseHeader({
++  courseOrg, courseNumber, courseName,
++}) {
+   const { authenticatedUser } = useContext(AppContext);
+-  const course = models[courseId];
+   return (
+     <header className="container-fluid py-2 d-flex align-items-center border-bottom border-primary">
+       <LinkedLogo
+@@ -36,8 +37,8 @@ export default function CourseHeader({ courseId, models }) {
+         alt={getConfig().SITE_NAME}
+       />
+       <div className="flex-grow-1" style={{ lineHeight: 1 }}>
+-        <span className="d-block small m-0">edX DemoX</span>
+-        <span className="d-block m-0 font-weight-bold">{course.displayName}</span>
++        <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
++        <span className="d-block m-0 font-weight-bold">{courseName}</span>
+       </div>
+ 
+       <Dropdown>
+@@ -56,3 +57,9 @@ export default function CourseHeader({ courseId, models }) {
+     </header>
+   );
+ }
++
++CourseHeader.propTypes = {
++  courseOrg: PropTypes.string.isRequired,
++  courseNumber: PropTypes.string.isRequired,
++  courseName: PropTypes.string.isRequired,
++};
+-- 
+2.34.1
+

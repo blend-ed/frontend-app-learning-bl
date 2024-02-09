@@ -1,0 +1,26 @@
+From 175675da558a474b50074a7f3ac3df567688caaf Mon Sep 17 00:00:00 2001
+From: Carla Duarte <ciduarte@wpi.edu>
+Date: Thu, 23 Jul 2020 16:01:46 -0400
+Subject: [PATCH 0178/1021] AA-127: Fix outline tab redirect URL (#122)
+
+Co-authored-by: Carla Duarte <cduarte@edx.org>
+---
+ src/course-home/data/api.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 8c15eb1..3670773 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -59,7 +59,7 @@ export async function getOutlineTabData(courseId) {
+   } catch (error) {
+     const { httpErrorStatus } = error && error.customAttributes;
+     if (httpErrorStatus === 404) {
+-      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/home`);
++      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/course/`);
+       return {};
+     }
+     throw error;
+-- 
+2.34.1
+

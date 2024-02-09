@@ -1,0 +1,106 @@
+From aeb6a3ebb411b7d2038a73d6e0e9abcda7abbf85 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 20 Oct 2020 15:20:10 -0400
+Subject: [PATCH 0291/1021] Revert "Revert "AA-403: use PageRoute, not Route
+ (#252)" (#253)" (#254)
+
+This reverts commit e2aa00b16d1c7aa45bd480dff061ca1f012d31bf.
+---
+ .../CoursewareRedirectLandingPage.jsx         |  9 +++----
+ src/index.jsx                                 | 24 +++++++++----------
+ 2 files changed, 17 insertions(+), 16 deletions(-)
+
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index f27ad73..246a540 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -1,7 +1,8 @@
+ import React from 'react';
+-import { Switch, Route, useRouteMatch } from 'react-router';
++import { Switch, useRouteMatch } from 'react-router';
+ import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
++import { PageRoute } from '@edx/frontend-platform/react';
+ 
+ import PageLoading from '../generic/PageLoading';
+ import CoursewareRedirect from './CoursewareRedirect';
+@@ -20,17 +21,17 @@ export default () => {
+       />
+ 
+       <Switch>
+-        <Route
++        <PageRoute
+           path={`${path}/courseware/:courseId/unit/:unitId`}
+           component={CoursewareRedirect}
+         />
+-        <Route
++        <PageRoute
+           path={`${path}/course-home/:courseId`}
+           render={({ match }) => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/course/`);
+           }}
+         />
+-        <Route
++        <PageRoute
+           path={`${path}/dashboard`}
+           render={({ location }) => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}/dashboard${location.search}`);
+diff --git a/src/index.jsx b/src/index.jsx
+index c764162..1b6cb83 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -5,10 +5,10 @@ import {
+   APP_INIT_ERROR, APP_READY, subscribe, initialize,
+   mergeConfig,
+ } from '@edx/frontend-platform';
+-import { AppProvider, ErrorPage } from '@edx/frontend-platform/react';
++import { AppProvider, ErrorPage, PageRoute } from '@edx/frontend-platform/react';
+ import React from 'react';
+ import ReactDOM from 'react-dom';
+-import { Route, Switch } from 'react-router-dom';
++import { Switch } from 'react-router-dom';
+ 
+ import { messages as headerMessages } from '@edx/frontend-component-header';
+ import Footer, { messages as footerMessages } from '@edx/frontend-component-footer';
+@@ -35,28 +35,28 @@ subscribe(APP_READY, () => {
+     <AppProvider store={initializeStore()}>
+       <UserMessagesProvider>
+         <Switch>
+-          <Route path="/redirect" component={CoursewareRedirectLandingPage} />
+-          <Route path="/course/:courseId/home">
++          <PageRoute path="/redirect" component={CoursewareRedirectLandingPage} />
++          <PageRoute path="/course/:courseId/home">
+             <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
+               <OutlineTab />
+             </TabContainer>
+-          </Route>
+-          <Route path="/course/:courseId/dates">
++          </PageRoute>
++          <PageRoute path="/course/:courseId/dates">
+             <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
+               <DatesTab />
+             </TabContainer>
+-          </Route>
+-          <Route path="/course/:courseId/progress">
++          </PageRoute>
++          <PageRoute path="/course/:courseId/progress">
+             <TabContainer tab="progress" fetch={fetchProgressTab} slice="courseHome">
+               <ProgressTab />
+             </TabContainer>
+-          </Route>
+-          <Route path="/course/:courseId/course-exit">
++          </PageRoute>
++          <PageRoute path="/course/:courseId/course-exit">
+             <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
+               <CourseExit />
+             </TabContainer>
+-          </Route>
+-          <Route
++          </PageRoute>
++          <PageRoute
+             path={[
+               '/course/:courseId/:sequenceId/:unitId',
+               '/course/:courseId/:sequenceId',
+-- 
+2.34.1
+

@@ -1,0 +1,579 @@
+From e0e53f24f15fa647385d683780b099a424d34258 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Fri, 23 Oct 2020 10:01:42 -0700
+Subject: [PATCH 0293/1021] AA-397: Course Exit Tests (#257)
+
+This also renames the CourseExit url from /course/{course_id}/course-exit
+to /course/{course_id}/course-end for better UX.
+---
+ src/courseware/course/Course.test.jsx         |  15 --
+ .../course/course-exit/CourseCelebration.jsx  |  49 +++---
+ .../course/course-exit/CourseExit.jsx         |   5 +-
+ .../course/course-exit/CourseExit.test.jsx    | 148 ++++++++++++++++++
+ .../course/course-exit/CourseNonPassing.jsx   |   8 +-
+ src/courseware/course/sequence/Sequence.jsx   |   2 +-
+ .../SequenceNavigation.jsx                    |   2 +-
+ .../SequenceNavigation.test.jsx               |  36 +++++
+ .../sequence-navigation/UnitNavigation.jsx    |   2 +-
+ .../UnitNavigation.test.jsx                   |  44 +++++-
+ .../__factories__/courseMetadata.factory.js   |   6 +-
+ src/index.jsx                                 |   2 +-
+ src/setupTest.js                              |  16 ++
+ 13 files changed, 277 insertions(+), 58 deletions(-)
+ create mode 100644 src/courseware/course/course-exit/CourseExit.test.jsx
+
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index ea11ef2..2b0faca 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -57,21 +57,6 @@ describe('Course', () => {
+     jest.spyOn(console, 'warn').mockImplementation(() => {});
+     jest.spyOn(console, 'error').mockImplementation(() => {});
+ 
+-    // Mock media queries, because `Celebration` modal uses `react-break` for responsive breakpoints.
+-    Object.defineProperty(window, 'matchMedia', {
+-      writable: true,
+-      value: jest.fn().mockImplementation(query => ({
+-        matches: false,
+-        media: query,
+-        onchange: null,
+-        addListener: jest.fn(), // deprecated
+-        removeListener: jest.fn(), // deprecated
+-        addEventListener: jest.fn(),
+-        removeEventListener: jest.fn(),
+-        dispatchEvent: jest.fn(),
+-      })),
+-    });
+-
+     const courseMetadata = Factory.build('courseMetadata', { celebrations: { firstSection: true } });
+     const testStore = await initializeTestStore({ courseMetadata }, false);
+     const { courseware, models } = testStore.getState();
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 8717351..2b09972 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -5,8 +5,7 @@ import {
+ } from '@edx/frontend-platform/i18n';
+ import { layoutGenerator } from 'react-break';
+ import { Helmet } from 'react-helmet';
+-import { useDispatch } from 'react-redux';
+-import { useParams } from 'react-router-dom';
++import { useDispatch, useSelector } from 'react-redux';
+ import { LinkedinIcon } from 'react-share';
+ import { Alert, Button, Hyperlink } from '@edx/paragon';
+ import { getConfig } from '@edx/frontend-platform';
+@@ -32,7 +31,7 @@ function CourseCelebration({ intl }) {
+   const OnMobile = layout.is('mobile');
+   const OnAtLeastTablet = layout.isAtLeast('tablet');
+ 
+-  const { courseId } = useParams();
++  const { courseId } = useSelector(state => state.courseware);
+   const dispatch = useDispatch();
+   const {
+     certificateData,
+@@ -95,14 +94,16 @@ function CourseCelebration({ intl }) {
+     case 'downloadable':
+       title = intl.formatMessage(messages.certificateHeaderDownloadable);
+       message = (
+-        <FormattedMessage
+-          id="courseCelebration.certificateBody.available"
+-          defaultMessage="
+-            Showcase your accomplishment on LinkedIn or your resumé today.
+-            You can download your certificate now and access it any time from your
+-            {dashboardLink} and {profileLink}."
+-          values={{ dashboardLink, profileLink }}
+-        />
++        <p>
++          <FormattedMessage
++            id="courseCelebration.certificateBody.available"
++            defaultMessage="
++              Showcase your accomplishment on LinkedIn or your resumé today.
++              You can download your certificate now and access it any time from your
++              {dashboardLink} and {profileLink}."
++            values={{ dashboardLink, profileLink }}
++          />
++        </p>
+       );
+       if (certWebViewUrl) {
+         buttonLocation = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
+@@ -117,7 +118,7 @@ function CourseCelebration({ intl }) {
+       title = intl.formatMessage(messages.certificateHeaderNotAvailable);
+       message = (
+         <>
+-          <div className="mb-2">
++          <p>
+             <FormattedMessage
+               id="courseCelebration.certificateBody.notAvailable.endDate"
+               defaultMessage="After this course officially ends on {endDate}, you will receive an
+@@ -125,15 +126,15 @@ function CourseCelebration({ intl }) {
+                 to showcase your accomplishment on LinkedIn or your resumé."
+               values={{ endDate }}
+             />
+-          </div>
+-          <div className="mb-2">
++          </p>
++          <p>
+             <FormattedMessage
+               id="courseCelebration.certificateBody.notAvailable.accessCertificate"
+               defaultMessage="You will be able to access your certificate any time from your
+                 {dashboardLink} and {profileLink}."
+               values={{ dashboardLink, profileLink }}
+             />
+-          </div>
++          </p>
+         </>
+       );
+       break;
+@@ -141,7 +142,7 @@ function CourseCelebration({ intl }) {
+     case 'requesting':
+       buttonText = intl.formatMessage(messages.requestCertificateButton);
+       title = intl.formatMessage(messages.certificateHeaderRequestable);
+-      message = intl.formatMessage(messages.requestCertificateBodyText);
++      message = (<p>{intl.formatMessage(messages.requestCertificateBodyText)}</p>);
+       break;
+     case 'unverified':
+       buttonText = intl.formatMessage(messages.verifyIdentityButton);
+@@ -149,12 +150,14 @@ function CourseCelebration({ intl }) {
+       title = intl.formatMessage(messages.certificateHeaderUnverified);
+       // todo: check for idVerificationSupportLink null
+       message = (
+-        <FormattedMessage
+-          id="courseCelebration.certificateBody.unverified"
+-          defaultMessage="In order to generate a certificate, you must complete ID verification.
+-            {idVerificationSupportLink} now."
+-          values={{ idVerificationSupportLink }}
+-        />
++        <p>
++          <FormattedMessage
++            id="courseCelebration.certificateBody.unverified"
++            defaultMessage="In order to generate a certificate, you must complete ID verification.
++              {idVerificationSupportLink} now."
++            values={{ idVerificationSupportLink }}
++          />
++        </p>
+       );
+       break;
+     default:
+@@ -194,7 +197,7 @@ function CourseCelebration({ intl }) {
+           <Alert variant="primary" className="row w-100 m-0">
+             <div className="col order-1 order-md-0 pl-0 pr-0 pr-md-5">
+               <div className="h4">{title}</div>
+-              <p>{message}</p>
++              {message}
+               {/* The requesting status needs a different button because it does a POST instead of a GET */}
+               {certStatus === 'requesting' && (
+                 <Button
+diff --git a/src/courseware/course/course-exit/CourseExit.jsx b/src/courseware/course/course-exit/CourseExit.jsx
+index 7deeeb7..c008590 100644
+--- a/src/courseware/course/course-exit/CourseExit.jsx
++++ b/src/courseware/course/course-exit/CourseExit.jsx
+@@ -3,7 +3,8 @@ import React from 'react';
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Button } from '@edx/paragon';
+-import { Redirect, useParams } from 'react-router-dom';
++import { useSelector } from 'react-redux';
++import { Redirect } from 'react-router-dom';
+ 
+ import CourseCelebration from './CourseCelebration';
+ import CourseNonPassing from './CourseNonPassing';
+@@ -11,7 +12,7 @@ import { COURSE_EXIT_MODES, getCourseExitMode } from './utils';
+ import messages from './messages';
+ 
+ function CourseExit({ intl }) {
+-  const { courseId } = useParams();
++  const { courseId } = useSelector(state => state.courseware);
+   const mode = getCourseExitMode(courseId);
+ 
+   let body = null;
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+new file mode 100644
+index 0000000..01b86c9
+--- /dev/null
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -0,0 +1,148 @@
++import React from 'react';
++import MockAdapter from 'axios-mock-adapter';
++import { Factory } from 'rosie';
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++
++import { fetchCourse } from '../../data';
++import buildSimpleCourseBlocks from '../../data/__factories__/courseBlocks.factory';
++import {
++  initializeMockApp, logUnhandledRequests, render, screen,
++} from '../../../setupTest';
++import initializeStore from '../../../store';
++import executeThunk from '../../../utils';
++import CourseCelebration from './CourseCelebration';
++import CourseExit from './CourseExit';
++import CourseNonPassing from './CourseNonPassing';
++
++initializeMockApp();
++jest.mock('@edx/frontend-platform/analytics');
++
++describe('Course Exit Pages', () => {
++  let axiosMock;
++  const store = initializeStore();
++  const defaultMetadata = Factory.build('courseMetadata', {
++    user_has_passing_grade: true,
++    end: '2014-02-05T05:00:00Z',
++  });
++  const defaultCourseBlocks = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name);
++
++  const courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${defaultMetadata.id}`;
++  const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
++
++  function setMetadata(attributes) {
++    const courseMetadata = { ...defaultMetadata, ...attributes };
++    axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++  }
++
++  async function fetchAndRender(component) {
++    await executeThunk(fetchCourse(defaultMetadata.id), store.dispatch);
++    render(component, { store });
++  }
++
++  beforeEach(() => {
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
++    axiosMock.onGet(courseBlocksUrlRegExp).reply(200, defaultCourseBlocks);
++
++    logUnhandledRequests(axiosMock);
++  });
++
++  describe('Course Exit routing', () => {
++    it('Routes to celebration for a celebration status', async () => {
++      setMetadata({
++        certificate_data: {
++          cert_status: 'downloadable',
++          cert_web_view_url: '/certificates/cooluuidgoeshere',
++        },
++      });
++      await fetchAndRender(<CourseExit />);
++      expect(screen.getByText('Congratulations!')).toBeInTheDocument();
++    });
++
++    it('Routes to Non-passing experience for a learner with non-passing grade', async () => {
++      setMetadata({
++        certificate_data: {
++          cert_status: 'unverified',
++        },
++        user_has_passing_grade: false,
++      });
++      await fetchAndRender(<CourseExit />);
++      expect(screen.getByText('You’ve reached the end of the course!')).toBeInTheDocument();
++    });
++
++    it('Redirects if it does not match any statuses', async () => {
++      await fetchAndRender(<CourseExit />);
++      expect(global.location.href).toEqual(`http://localhost/course/${defaultMetadata.id}`);
++    });
++  });
++
++  describe('Course Celebration Experience', () => {
++    it('Displays download link', async () => {
++      setMetadata({
++        certificate_data: {
++          cert_status: 'downloadable',
++          download_url: 'fake.download.url',
++        },
++      });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByRole('link', { name: 'Download my certificate' })).toBeInTheDocument();
++    });
++
++    it('Displays webview link', async () => {
++      setMetadata({
++        certificate_data: {
++          cert_status: 'downloadable',
++          cert_web_view_url: '/certificates/cooluuidgoeshere',
++        },
++      });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByRole('link', { name: 'View my certificate' })).toBeInTheDocument();
++      expect(screen.getByRole('img', { name: 'Sample certificate' })).toBeInTheDocument();
++    });
++
++    it('Displays certificate is earned but unavailable message', async () => {
++      setMetadata({ certificate_data: { cert_status: 'earned_but_not_available' } });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByText('Your certificate will be available soon!')).toBeInTheDocument();
++    });
++
++    it('Displays request certificate link', async () => {
++      setMetadata({ certificate_data: { cert_status: 'requesting' } });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByRole('button', { name: 'Request certificate' })).toBeInTheDocument();
++    });
++
++    it('Displays verify identity link', async () => {
++      setMetadata({
++        certificate_data: { cert_status: 'unverified' },
++        verify_identity_url: `${getConfig().LMS_BASE_URL}/verify_student/verify-now/${defaultMetadata.id}/`,
++      });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByRole('link', { name: 'Verify ID now' })).toBeInTheDocument();
++      expect(screen.queryByRole('img', { name: 'Sample certificate' })).not.toBeInTheDocument();
++    });
++
++    it('Displays LinkedIn Add to Profile button', async () => {
++      setMetadata({
++        certificate_data: {
++          cert_status: 'downloadable',
++          cert_web_view_url: '/certificates/cooluuidgoeshere',
++        },
++        linkedin_add_to_profile_url: 'https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&params',
++      });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByRole('link', { name: 'View my certificate' })).toBeInTheDocument();
++      expect(screen.getByRole('link', { name: 'Add to LinkedIn profile' })).toBeInTheDocument();
++    });
++  });
++
++  describe('Course Non-passing Experience', () => {
++    it('Displays link to progress tab', async () => {
++      setMetadata({ user_has_passing_grade: false });
++      await fetchAndRender(<CourseNonPassing />);
++      expect(screen.getByText('You’ve reached the end of the course!')).toBeInTheDocument();
++      expect(screen.getByRole('link', { name: 'View grades' })).toBeInTheDocument();
++    });
++  });
++});
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index d438ed4..d8721d8 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -1,10 +1,8 @@
+ import React from 'react';
+ 
+-import {
+-  injectIntl, intlShape,
+-} from '@edx/frontend-platform/i18n';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Helmet } from 'react-helmet';
+-import { useParams } from 'react-router-dom';
++import { useSelector } from 'react-redux';
+ import { Alert, Button } from '@edx/paragon';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+@@ -14,7 +12,7 @@ import DashboardFootnote from './DashboardFootnote';
+ import messages from './messages';
+ 
+ function CourseNonPassing({ intl }) {
+-  const { courseId } = useParams();
++  const { courseId } = useSelector(state => state.courseware);
+   const { tabs } = useModel('courses', courseId);
+ 
+   // Get progress tab link for 'view grades' button
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 2fe1cff..a4ba8bb 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -129,7 +129,7 @@ function Sequence({
+ 
+   const gated = sequence && sequence.gatedContent !== undefined && sequence.gatedContent.gated;
+   const goToCourseExitPage = () => {
+-    history.push(`/course/${courseId}/course-exit`);
++    history.push(`/course/${courseId}/course-end`);
+   };
+ 
+   if (sequenceStatus === 'loaded') {
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 8bccba2..6c5aaf5 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -60,7 +60,7 @@ function SequenceNavigation({
+   const renderNextButton = () => {
+     const exitText = getCourseExitText(courseId, intl);
+     const buttonOnClick = isLastUnit ? goToCourseExitPage : nextSequenceHandler;
+-    const buttonText = isLastUnit && exitText ? exitText : intl.formatMessage(messages.nextButton);
++    const buttonText = (isLastUnit && exitText) ? exitText : intl.formatMessage(messages.nextButton);
+     const disabled = isLastUnit && !exitText;
+     return (
+       <Button variant="link" className="next-btn" onClick={buttonOnClick} disabled={disabled}>
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index a71328b..567fa54 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -108,6 +108,42 @@ describe('Sequence Navigation', () => {
+     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
+   });
+ 
++  it('displays end of course message instead of the "Next" button as needed', async () => {
++    const testMetadata = { ...courseMetadata, certificate_data: { cert_status: 'notpassing' } };
++    const testStore = await initializeTestStore({ courseMetadata: testMetadata, unitBlocks }, false);
++    // Have to refetch the sequenceId since the new store generates new sequences
++    const { courseware } = testStore.getState();
++    const testData = { ...mockData, sequenceId: courseware.sequenceId };
++
++    render(
++      <SequenceNavigation {...testData} unitId={unitBlocks[unitBlocks.length - 1].id} />,
++      { store: testStore },
++    );
++
++    expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
++    expect(screen.getByRole('button', { name: /next \(end of course\)/i })).toBeEnabled();
++  });
++
++  it('displays complete course message instead of the "Next" button as needed', async () => {
++    const testMetadata = {
++      ...courseMetadata,
++      certificate_data: { cert_status: 'downloadable' },
++      user_has_passing_grade: true,
++    };
++    const testStore = await initializeTestStore({ courseMetadata: testMetadata, unitBlocks }, false);
++    // Have to refetch the sequenceId since the new store generates new sequences
++    const { courseware } = testStore.getState();
++    const testData = { ...mockData, sequenceId: courseware.sequenceId };
++
++    render(
++      <SequenceNavigation {...testData} unitId={unitBlocks[unitBlocks.length - 1].id} />,
++      { store: testStore },
++    );
++
++    expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
++    expect(screen.getByRole('button', { name: /Complete the course/i })).toBeEnabled();
++  });
++
+   it('handles "Previous" and "Next" click', () => {
+     const previousSequenceHandler = jest.fn();
+     const nextSequenceHandler = jest.fn();
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+index e6daa9d..d8ba27b 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+@@ -25,7 +25,7 @@ function UnitNavigation({
+   const renderNextButton = () => {
+     const exitText = getCourseExitText(courseId, intl);
+     const buttonOnClick = isLastUnit ? goToCourseExitPage : onClickNext;
+-    const buttonText = isLastUnit && exitText ? exitText : intl.formatMessage(messages.nextButton);
++    const buttonText = (isLastUnit && exitText) ? exitText : intl.formatMessage(messages.nextButton);
+     const disabled = isLastUnit && !exitText;
+     return (
+       <Button variant="outline-primary" className="next-button" onClick={buttonOnClick} disabled={disabled}>
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+index 8adb09d..fe89176 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+@@ -7,11 +7,7 @@ import UnitNavigation from './UnitNavigation';
+ 
+ describe('Unit Navigation', () => {
+   let mockData;
+-  const courseMetadata = Factory.build('courseMetadata', {
+-    certificate_data: {
+-      cert_status: 'notpassing', // some interesting status that will trigger the last unit button to be active
+-    },
+-  });
++  const courseMetadata = Factory.build('courseMetadata');
+   const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
+     'block',
+     { type: 'vertical' },
+@@ -77,10 +73,46 @@ describe('Unit Navigation', () => {
+     expect(screen.getByRole('button', { name: /next/i })).toBeEnabled();
+   });
+ 
+-  it('displays end of course message instead of the "Next" button as needed', () => {
++  it('has the "Next" button disabled for the last unit in the sequence if there is no Exit Page', () => {
+     render(<UnitNavigation {...mockData} unitId={unitBlocks[unitBlocks.length - 1].id} />);
+ 
++    expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
++    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
++  });
++
++  it('displays end of course message instead of the "Next" button as needed', async () => {
++    const testCourseMetadata = { ...courseMetadata, certificate_data: { cert_status: 'notpassing' } };
++    const testStore = await initializeTestStore({ courseMetadata: testCourseMetadata, unitBlocks }, false);
++    // Have to refetch the sequenceId since the new store generates new sequences
++    const { courseware } = testStore.getState();
++    const testData = { ...mockData, sequenceId: courseware.sequenceId };
++
++    render(
++      <UnitNavigation {...testData} unitId={unitBlocks[unitBlocks.length - 1].id} />,
++      { store: testStore },
++    );
++
+     expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
+     expect(screen.getByRole('button', { name: /next \(end of course\)/i })).toBeEnabled();
+   });
++
++  it('displays complete course message instead of the "Next" button as needed', async () => {
++    const testCourseMetadata = {
++      ...courseMetadata,
++      certificate_data: { cert_status: 'downloadable' },
++      user_has_passing_grade: true,
++    };
++    const testStore = await initializeTestStore({ courseMetadata: testCourseMetadata, unitBlocks }, false);
++    // Have to refetch the sequenceId since the new store generates new sequences
++    const { courseware } = testStore.getState();
++    const testData = { ...mockData, sequenceId: courseware.sequenceId };
++
++    render(
++      <UnitNavigation {...testData} unitId={unitBlocks[unitBlocks.length - 1].id} />,
++      { store: testStore },
++    );
++
++    expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
++    expect(screen.getByRole('button', { name: /Complete the course/i })).toBeEnabled();
++  });
+ });
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index c89e616..4647ac3 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -53,9 +53,9 @@ Factory.define('courseMetadata')
+     enroll_alert: null,
+     course_exit_page_is_active: true,
+     user_has_passing_grade: false,
+-    certificate_data: {
+-      cert_status: 'audit_passing',
+-    },
++    certificate_data: null,
++    verify_identity_url: null,
++    linkedin_add_to_profile_url: null,
+   }).attr(
+     'tabs', ['tabs', 'id'], (passedTabs, id) => {
+       if (passedTabs) {
+diff --git a/src/index.jsx b/src/index.jsx
+index 1b6cb83..e3f63a0 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -51,7 +51,7 @@ subscribe(APP_READY, () => {
+               <ProgressTab />
+             </TabContainer>
+           </PageRoute>
+-          <PageRoute path="/course/:courseId/course-exit">
++          <PageRoute path="/course/:courseId/course-end">
+             <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
+               <CourseExit />
+             </TabContainer>
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 349ed6d..269ce6d 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -36,6 +36,22 @@ window.getComputedStyle = jest.fn(() => ({
+   getPropertyValue: jest.fn(),
+ }));
+ 
++// Mock media queries because any component that uses `react-break` for responsive breakpoints will
++// run into `TypeError: window.matchMedia is not a function`. This avoids that for all of our tests now.
++Object.defineProperty(window, 'matchMedia', {
++  writable: true,
++  value: jest.fn().mockImplementation(query => ({
++    matches: false,
++    media: query,
++    onchange: null,
++    addListener: jest.fn(), // deprecated
++    removeListener: jest.fn(), // deprecated
++    addEventListener: jest.fn(),
++    removeEventListener: jest.fn(),
++    dispatchEvent: jest.fn(),
++  })),
++});
++
+ export const authenticatedUser = {
+   userId: 'abc123',
+   username: 'Mock User',
+-- 
+2.34.1
+

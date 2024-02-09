@@ -1,0 +1,55 @@
+From 29b234e2f03b0a413f96adcf090e95555733e101 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Wed, 6 May 2020 12:59:17 -0400
+Subject: [PATCH 0116/1021] Scroll to top when the sequenceId or unitId changes
+ (#63)
+
+* Scroll to top when the sequenceId or unitId changes
+
+* Add a spinner to the unit.
+---
+ src/courseware/course/sequence/SequenceContent.jsx | 7 ++++++-
+ src/courseware/course/sequence/Unit.jsx            | 5 +++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index 5323961..6f72db2 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -1,4 +1,4 @@
+-import React, { Suspense } from 'react';
++import React, { Suspense, useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import PageLoading from '../../../PageLoading';
+@@ -14,6 +14,11 @@ function SequenceContent({
+ }) {
+   const sequence = useModel('sequences', sequenceId);
+ 
++  // Go back to the top of the page whenever the unit or sequence changes.
++  useEffect(() => {
++    global.scrollTo(0, 0);
++  }, [sequenceId, unitId]);
++
+   if (gated) {
+     return (
+       <Suspense
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index dbe8780..8331c54 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -117,6 +117,11 @@ function Unit({
+           />
+         </Suspense>
+       )}
++      {!hasLoaded && (
++        <PageLoading
++          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++        />
++      )}
+       <div className="unit-iframe-wrapper">
+         <iframe
+           id="unit-iframe"
+-- 
+2.34.1
+

@@ -1,0 +1,32 @@
+From 907892e7bb1263d6b9b56d8acc7fe57abd34cbdd Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 4 Jan 2022 15:07:48 -0500
+Subject: [PATCH 0773/1021] fix: don't log errors when we ask for sequence
+ metadata for units (#790)
+
+---
+ src/courseware/data/thunks.js | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 3ab19c1..846b37d 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -229,7 +229,13 @@ export function fetchSequence(sequenceId) {
+         dispatch(fetchSequenceSuccess({ sequenceId }));
+       }
+     } catch (error) {
+-      logError(error);
++      // Some errors are expected - for example, CoursewareContainer may request sequence metadata for a unit and rely
++      // on the request failing to notice that it actually does have a unit (mostly so it doesn't have to know anything
++      // about the opaque key structure). In such cases, the backend gives us a 422.
++      const isExpected = error.response && error.response.status === 422;
++      if (!isExpected) {
++        logError(error);
++      }
+       dispatch(fetchSequenceFailure({ sequenceId }));
+     }
+   };
+-- 
+2.34.1
+

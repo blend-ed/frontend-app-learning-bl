@@ -1,0 +1,208 @@
+From 9ef3787d4bd867e41e85fdd9a9c1fd0b899dbff6 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 25 Jan 2021 12:41:32 -0500
+Subject: [PATCH 0374/1021] AA-410: Make sure alerts are cleaned up after being
+ added (#324)
+
+---
+ src/alerts/access-expiration-alert/hooks.js   |  6 ++++-
+ src/alerts/offer-alert/hooks.js               |  6 ++++-
+ .../course-end-alert/CourseEndAlert.jsx       |  3 +--
+ .../alerts/course-end-alert/hooks.js          |  1 -
+ .../course-start-alert/CourseStartAlert.jsx   |  3 +--
+ .../alerts/course-start-alert/hooks.js        | 12 ++++-----
+ src/generic/user-messages/hooks.js            | 26 +++++++++----------
+ 7 files changed, 30 insertions(+), 27 deletions(-)
+
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+index 757ed00..7a99400 100644
+--- a/src/alerts/access-expiration-alert/hooks.js
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -5,10 +5,14 @@ const AccessExpirationAlert = React.lazy(() => import('./AccessExpirationAlert')
+ 
+ function useAccessExpirationAlert(accessExpiration, userTimezone, topic) {
+   const isVisible = !!accessExpiration; // If it exists, show it.
++  const payload = {
++    accessExpiration,
++    userTimezone,
++  };
+ 
+   useAlert(isVisible, {
+     code: 'clientAccessExpirationAlert',
+-    payload: useMemo(() => ({ accessExpiration, userTimezone }), [accessExpiration, userTimezone]),
++    payload: useMemo(() => payload, Object.values(payload).sort()),
+     topic,
+   });
+ 
+diff --git a/src/alerts/offer-alert/hooks.js b/src/alerts/offer-alert/hooks.js
+index 5f4454a..318cf64 100644
+--- a/src/alerts/offer-alert/hooks.js
++++ b/src/alerts/offer-alert/hooks.js
+@@ -5,11 +5,15 @@ const OfferAlert = React.lazy(() => import('./OfferAlert'));
+ 
+ export function useOfferAlert(offer, userTimezone, topic) {
+   const isVisible = !!offer; // if it exists, show it.
++  const payload = {
++    offer,
++    userTimezone,
++  };
+ 
+   useAlert(isVisible, {
+     code: 'clientOfferAlert',
+     topic,
+-    payload: useMemo(() => ({ offer, userTimezone }), [offer, userTimezone]),
++    payload: useMemo(() => payload, Object.values(payload).sort()),
+   });
+ 
+   return { clientOfferAlert: OfferAlert };
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+index baa7c1b..858ff49 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+@@ -13,7 +13,6 @@ const DAY_MS = 24 * 60 * 60 * 1000; // in ms
+ 
+ function CourseEndAlert({ payload }) {
+   const {
+-    delta,
+     description,
+     endDate,
+     userTimezone,
+@@ -30,6 +29,7 @@ function CourseEndAlert({ payload }) {
+   );
+ 
+   let msg;
++  const delta = new Date(endDate) - new Date();
+   if (delta < DAY_MS) {
+     const courseEndTime = (
+       <FormattedTime
+@@ -88,7 +88,6 @@ function CourseEndAlert({ payload }) {
+ 
+ CourseEndAlert.propTypes = {
+   payload: PropTypes.shape({
+-    delta: PropTypes.number,
+     description: PropTypes.string,
+     endDate: PropTypes.string,
+     userTimezone: PropTypes.string,
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/hooks.js b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+index 3f6879b..4423bad 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+@@ -24,7 +24,6 @@ export function useCourseEndAlert(courseId) {
+   const delta = endBlock ? endDate - new Date() : 0;
+   const isVisible = isEnrolled && endBlock && delta > 0 && delta < WARNING_PERIOD_MS;
+   const payload = {
+-    delta,
+     description: endBlock && endBlock.description,
+     endDate: endBlock && endBlock.date,
+     userTimezone,
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+index e1d78fb..8b69d66 100644
+--- a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+@@ -13,7 +13,6 @@ const DAY_MS = 24 * 60 * 60 * 1000; // in ms
+ 
+ function CourseStartAlert({ payload }) {
+   const {
+-    delta,
+     startDate,
+     userTimezone,
+   } = payload;
+@@ -28,6 +27,7 @@ function CourseStartAlert({ payload }) {
+     />
+   );
+ 
++  const delta = new Date(startDate) - new Date();
+   if (delta < DAY_MS) {
+     return (
+       <Alert type={ALERT_TYPES.INFO}>
+@@ -88,7 +88,6 @@ function CourseStartAlert({ payload }) {
+ 
+ CourseStartAlert.propTypes = {
+   payload: PropTypes.shape({
+-    delta: PropTypes.number,
+     startDate: PropTypes.string,
+     userTimezone: PropTypes.string,
+   }).isRequired,
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/hooks.js b/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+index 2f9545f..3d27531 100644
+--- a/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import React, { useMemo } from 'react';
+ import { useAlert } from '../../../../generic/user-messages';
+ import { useModel } from '../../../../generic/model-store';
+ 
+@@ -18,14 +18,14 @@ function useCourseStartAlert(courseId) {
+   const startBlock = courseDateBlocks.find(b => b.dateType === 'course-start-date');
+   const delta = startBlock ? new Date(startBlock.date) - new Date() : 0;
+   const isVisible = isEnrolled && startBlock && delta > 0;
++  const payload = {
++    startDate: startBlock && startBlock.date,
++    userTimezone,
++  };
+ 
+   useAlert(isVisible, {
+     code: 'clientCourseStartAlert',
+-    payload: {
+-      delta,
+-      startDate: startBlock && startBlock.date,
+-      userTimezone,
+-    },
++    payload: useMemo(() => payload, Object.values(payload).sort()),
+     topic: 'outline-course-alerts',
+   });
+ 
+diff --git a/src/generic/user-messages/hooks.js b/src/generic/user-messages/hooks.js
+index 97ce79b..64d320f 100644
+--- a/src/generic/user-messages/hooks.js
++++ b/src/generic/user-messages/hooks.js
+@@ -1,12 +1,11 @@
+ /* eslint-disable import/prefer-default-export */
+-import { useContext, useState, useEffect } from 'react';
++import { useContext, useEffect } from 'react';
+ import UserMessagesContext from './UserMessagesContext';
+ 
+ export function useAlert(isVisible, {
+   code, text, topic, type, payload, dismissible,
+ }) {
+   const { add, remove } = useContext(UserMessagesContext);
+-  const [alertId, setAlertId] = useState(null);
+ 
+   // Please note:
+   // The deps list [isVisible, code, ... etc.] in this `useEffect` call prevents the
+@@ -18,20 +17,19 @@ export function useAlert(isVisible, {
+   // We hope to address the underlying issue in TNL-7418.
+   // In the mean time, you may follow the pattern that `useAccessExpirationAlert`
+   // establishes: memoize the payload so that the exact same object is used if the
+-  // payload has not changed.
++  // payload has not changed. And don't put values based off of now() in your payload, as
++  // that breaks memoization.
+   useEffect(() => {
+-    if (isVisible && alertId === null) {
+-      setAlertId(add({
+-        code, text, topic, type, payload, dismissible,
+-      }));
+-    } else if (!isVisible && alertId !== null) {
+-      remove(alertId);
+-      setAlertId(null);
++    if (!isVisible) {
++      return undefined;
+     }
++
++    const cleanupId = add({
++      code, text, topic, type, payload, dismissible,
++    });
++
+     return () => {
+-      if (alertId !== null) {
+-        remove(alertId);
+-      }
++      remove(cleanupId);
+     };
+-  }, [isVisible, code, text, topic, type, dismissible, payload]);
++  }, [isVisible, code, text, topic, type, payload, dismissible]);
+ }
+-- 
+2.34.1
+

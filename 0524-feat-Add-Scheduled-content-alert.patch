@@ -1,0 +1,235 @@
+From 83151d291c610756253e8132af433a8443b115be Mon Sep 17 00:00:00 2001
+From: Thomas Tracy <contact@tjtracy.com>
+Date: Thu, 1 Jul 2021 15:27:21 -0400
+Subject: [PATCH 0524/1021] feat: Add Scheduled content alert
+
+Adds a new alert to the outline page that informs the learner of content
+coming soon to the course.
+---
+ .../__factories__/outlineTabData.factory.js   |  1 +
+ .../data/__snapshots__/redux.test.js.snap     |  2 ++
+ src/course-home/data/api.js                   |  3 ++
+ src/course-home/outline-tab/OutlineTab.jsx    |  3 ++
+ .../outline-tab/OutlineTab.test.jsx           | 21 ++++++++++++
+ .../ScheduledCotentAlert.jsx                  | 33 +++++++++++++++++++
+ .../alerts/scheduled-content-alert/hooks.js   | 20 +++++++++++
+ .../alerts/scheduled-content-alert/index.js   |  1 +
+ .../__factories__/courseBlocks.factory.js     |  7 +++-
+ 9 files changed, 90 insertions(+), 1 deletion(-)
+ create mode 100644 src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
+ create mode 100644 src/course-home/outline-tab/alerts/scheduled-content-alert/hooks.js
+ create mode 100644 src/course-home/outline-tab/alerts/scheduled-content-alert/index.js
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 21a9ecd..0a740c3 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -29,6 +29,7 @@ Factory.define('outlineTabData')
+     upgrade_url: `${host}/dashboard`,
+   }))
+   .attrs({
++    has_scheduled_content: null,
+     access_expiration: null,
+     can_show_upgrade_sock: false,
+     cert_data: {
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 7a8a20b..e2cabda 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -380,6 +380,7 @@ Object {
+             "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
+               "effortActivities": undefined,
+               "effortTime": undefined,
++              "hasScheduledContent": false,
+               "id": "course-v1:edX+DemoX+Demo_Course_1",
+               "sectionIds": Array [
+                 "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+@@ -448,6 +449,7 @@ Object {
+         },
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "hasEnded": undefined,
++        "hasScheduledContent": null,
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "offer": null,
+         "resumeCourse": Object {
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 73fa35a..c3d3ba5 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -116,6 +116,7 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+           id: courseId,
+           title: block.display_name,
+           sectionIds: block.children || [],
++          hasScheduledContent: block.has_scheduled_content,
+         };
+         break;
+ 
+@@ -316,6 +317,7 @@ export async function getOutlineTabData(courseId) {
+   const datesWidget = camelCaseObject(data.dates_widget);
+   const enrollAlert = camelCaseObject(data.enroll_alert);
+   const handoutsHtml = data.handouts_html;
++  const hasScheduledContent = data.has_scheduled_content;
+   const hasEnded = data.has_ended;
+   const offer = camelCaseObject(data.offer);
+   const resumeCourse = camelCaseObject(data.resume_course);
+@@ -334,6 +336,7 @@ export async function getOutlineTabData(courseId) {
+     datesWidget,
+     enrollAlert,
+     handoutsHtml,
++    hasScheduledContent,
+     hasEnded,
+     offer,
+     resumeCourse,
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index d7d6571..a6183bf 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -23,6 +23,7 @@ import useCertificateAvailableAlert from './alerts/certificate-status-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+ import useCourseStartAlert from './alerts/course-start-alert';
+ import usePrivateCourseAlert from './alerts/private-course-alert';
++import useScheduledContentAlert from './alerts/scheduled-content-alert';
+ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+ import ProctoringInfoPanel from './widgets/ProctoringInfoPanel';
+@@ -90,6 +91,7 @@ function OutlineTab({ intl }) {
+   const courseEndAlert = useCourseEndAlert(courseId);
+   const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
+   const privateCourseAlert = usePrivateCourseAlert(courseId);
++  const scheduledContentAlert = useScheduledContentAlert(courseId);
+ 
+   const rootCourseId = courses && Object.keys(courses)[0];
+ 
+@@ -152,6 +154,7 @@ function OutlineTab({ intl }) {
+                 ...certificateAvailableAlert,
+                 ...courseEndAlert,
+                 ...courseStartAlert,
++                ...scheduledContentAlert,
+               }}
+             />
+             )}
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index a0b81b5..7a6f7bc 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -694,6 +694,27 @@ describe('Outline Tab', () => {
+         expect(screen.queryByText('Verify your identity to earn a certificate!')).toBeInTheDocument();
+       });
+     });
++
++    describe('Scheduled Content Alert', () => {
++      it('appears correctly', async () => {
++        const now = new Date();
++        const { courseBlocks } = await buildMinimalCourseBlocks(courseId, 'Title', { hasScheduledContent: true });
++        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
++        setMetadata({ is_enrolled: true });
++        setTabData({
++          course_blocks: { blocks: courseBlocks.blocks },
++          date_blocks: [
++            {
++              date_type: 'course-end-date',
++              date: tomorrow.toISOString(),
++              title: 'End',
++            },
++          ],
++        });
++        await fetchAndRender();
++        expect(screen.queryByText('More content is coming soon!')).toBeInTheDocument();
++      });
++    });
+   });
+ 
+   describe('Certificate (web) Complete Alert', () => {
+diff --git a/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx b/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
+new file mode 100644
+index 0000000..68287fe
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
+@@ -0,0 +1,33 @@
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++import { Alert, Button } from '@edx/paragon';
++import React from 'react';
++
++const ScheduledContentAlert = () => (
++  <Alert variant="info">
++    <div className="row justify-content-between align-items-center">
++      <div className="col-lg-7">
++
++        <Alert.Heading>
++          <FormattedMessage
++            id="learning.outline.alert.scheduled-content.heading"
++            defaultMessage="More content is coming soon!"
++          />
++        </Alert.Heading>
++        <FormattedMessage
++          id="learning.outline.alert.scheduled-content.body"
++          defaultMessage="This course will have more content released at a future date. look out for email updates or check back on this course for updates."
++        />
++      </div>
++      <div className="m-auto m-lg-0 pr-lg-3">
++        <Button>
++          <FormattedMessage
++            id="learning.outline.alert.scheduled-content.button"
++            defaultMessage="View Course Schedule"
++          />
++        </Button>
++      </div>
++    </div>
++  </Alert>
++);
++
++export default ScheduledContentAlert;
+diff --git a/src/course-home/outline-tab/alerts/scheduled-content-alert/hooks.js b/src/course-home/outline-tab/alerts/scheduled-content-alert/hooks.js
+new file mode 100644
+index 0000000..6cb7e7b
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/scheduled-content-alert/hooks.js
+@@ -0,0 +1,20 @@
++import React from 'react';
++
++import { useAlert } from '../../../../generic/user-messages';
++import { useModel } from '../../../../generic/model-store';
++
++const ScheduledContentAlert = React.lazy(() => import('./ScheduledCotentAlert'));
++
++const useScheduledContentAlert = (courseId) => {
++  const { courseBlocks: { courses } } = useModel('outline', courseId);
++  const hasScheduledContent = !!Object.values(courses).find(course => course.hasScheduledContent === true);
++  const { isEnrolled } = useModel('courseHomeMeta', courseId);
++  useAlert(hasScheduledContent && isEnrolled, {
++    code: 'ScheduledContentAlert',
++    topic: 'outline-course-alerts',
++  });
++
++  return { ScheduledContentAlert };
++};
++
++export default useScheduledContentAlert;
+diff --git a/src/course-home/outline-tab/alerts/scheduled-content-alert/index.js b/src/course-home/outline-tab/alerts/scheduled-content-alert/index.js
+new file mode 100644
+index 0000000..ed12eb0
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/scheduled-content-alert/index.js
+@@ -0,0 +1 @@
++export { default } from './hooks';
+diff --git a/src/shared/data/__factories__/courseBlocks.factory.js b/src/shared/data/__factories__/courseBlocks.factory.js
+index 79a5493..24d25a3 100644
+--- a/src/shared/data/__factories__/courseBlocks.factory.js
++++ b/src/shared/data/__factories__/courseBlocks.factory.js
+@@ -124,7 +124,12 @@ export function buildMinimalCourseBlocks(courseId, title, options = {}) {
+   )];
+   const courseBlock = options.courseBlock || Factory.build(
+     'block',
+-    { type: 'course', display_name: title, children: sectionBlocks.map(block => block.id) },
++    {
++      type: 'course',
++      display_name: title,
++      has_scheduled_content: options.hasScheduledContent || false,
++      children: sectionBlocks.map(block => block.id),
++    },
+     { courseId },
+   );
+   return {
+-- 
+2.34.1
+

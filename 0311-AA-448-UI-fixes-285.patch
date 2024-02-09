@@ -1,0 +1,64 @@
+From 2d56bc5953b84348980104d73e239d7d0a856c00 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Wed, 2 Dec 2020 04:59:16 -0800
+Subject: [PATCH 0311/1021] AA-448: UI fixes (#285)
+
+LinkedIn button size and single column for view grades button in mobile
+---
+ .../course/course-exit/CourseCelebration.jsx  |  2 +-
+ .../course/course-exit/CourseNonPassing.jsx   | 26 ++++++++++---------
+ 2 files changed, 15 insertions(+), 13 deletions(-)
+
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index fd62f7d..5be1162 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -282,7 +282,7 @@ function CourseCelebration({ intl }) {
+                   onClick={() => logClick(courseId, administrator, 'linkedin_add_to_profile')}
+                   style={{ backgroundColor: LINKEDIN_BLUE, padding: '0.25rem 1.25rem 0.25rem 0.5rem' }}
+                 >
+-                  <LinkedinIcon bgStyle={{ fill: 'white' }} className="mr-2" iconFillColor={LINKEDIN_BLUE} round size={28} />
++                  <LinkedinIcon bgStyle={{ fill: 'white' }} className="mr-2" iconFillColor={LINKEDIN_BLUE} round size={24} />
+                   {`${intl.formatMessage(messages.linkedinAddToProfileButton)}`}
+                 </Button>
+               )}
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index bff7f6f..dd63b33 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -33,18 +33,20 @@ function CourseNonPassing({ intl }) {
+         <div className="col-12 p-0 h2 text-center">
+           { intl.formatMessage(messages.endOfCourseHeader) }
+         </div>
+-        <Alert variant="primary" className="col col-lg-10 mt-4 d-flex align-items-start">
+-          <div className="flex-grow-1 mr-5">{ intl.formatMessage(messages.endOfCourseDescription) }</div>
+-          {progressLink && (
+-            <Button
+-              variant="primary"
+-              className="flex-shrink-0"
+-              href={progressLink}
+-              onClick={() => logClick(courseId, administrator, 'view_grades')}
+-            >
+-              {intl.formatMessage(messages.viewGradesButton)}
+-            </Button>
+-          )}
++        <Alert variant="primary" className="col col-lg-10 mt-4 d-flex">
++          <div className="row align-items-start">
++            <div className="flex-grow-1 col-sm">{ intl.formatMessage(messages.endOfCourseDescription) }</div>
++            {progressLink && (
++              <Button
++                variant="primary"
++                className="flex-shrink-0 mt-3 mt-sm-0 mb-1 mb-sm-0 ml-2 ml-sm-5"
++                href={progressLink}
++                onClick={() => logClick(courseId, administrator, 'view_grades')}
++              >
++                {intl.formatMessage(messages.viewGradesButton)}
++              </Button>
++            )}
++          </div>
+         </Alert>
+         <DashboardFootnote />
+       </div>
+-- 
+2.34.1
+

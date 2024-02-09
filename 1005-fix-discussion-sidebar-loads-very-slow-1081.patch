@@ -1,0 +1,123 @@
+From 39d89bee9e3f42cedef4784d076a0f5787fb0316 Mon Sep 17 00:00:00 2001
+From: Muhammad Adeel Tajamul
+ <77053848+muhammadadeeltajamul@users.noreply.github.com>
+Date: Mon, 13 Mar 2023 05:40:23 +0500
+Subject: [PATCH 1005/1021] fix: discussion sidebar loads very slow (#1081)
+
+---
+ src/courseware/course/Course.test.jsx         |  4 +--
+ .../course/sequence/Sequence.test.jsx         |  6 ++---
+ src/courseware/course/sidebar/Sidebar.jsx     | 27 +++++++++----------
+ .../course/sidebar/common/SidebarBase.jsx     |  3 ++-
+ .../discussions/DiscussionsSidebar.jsx        |  1 +
+ 5 files changed, 20 insertions(+), 21 deletions(-)
+
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 2dc15bd..4eeb4f2 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -117,10 +117,10 @@ describe('Course', () => {
+     render(<Course {...mockData} />);
+     expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"open"');
+     const notificationShowButton = await screen.findByRole('button', { name: /Show notification tray/i });
+-    expect(screen.queryByRole('region', { name: /notification tray/i })).toBeInTheDocument();
++    expect(screen.queryByRole('region', { name: /notification tray/i })).not.toHaveClass('d-none');
+     fireEvent.click(notificationShowButton);
+     expect(sessionStorage.getItem(`notificationTrayStatus.${mockData.courseId}`)).toBe('"closed"');
+-    expect(screen.queryByRole('region', { name: /notification tray/i })).not.toBeInTheDocument();
++    expect(screen.queryByRole('region', { name: /notification tray/i })).toHaveClass('d-none');
+   });
+ 
+   it('handles reload persisting notification tray status', async () => {
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index d771d97..8c07f98 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -74,8 +74,8 @@ describe('Sequence', () => {
+     );
+ 
+     await waitFor(() => expect(screen.queryByText('Loading locked content messaging...')).toBeInTheDocument());
+-    // `Previous`, `Active`, `Next` and `Prerequisite` buttons.
+-    expect(screen.getAllByRole('button').length).toEqual(4);
++    // `Previous`, `Active`, `Next`, `Prerequisite` and `Close Tray` buttons.
++    expect(screen.getAllByRole('button').length).toEqual(5);
+ 
+     expect(screen.getByText('Content Locked')).toBeInTheDocument();
+     const unitContainer = container.querySelector('.unit-container');
+@@ -126,7 +126,7 @@ describe('Sequence', () => {
+     render(<Sequence {...mockData} />);
+     expect(await screen.findByText('Loading learning sequence...')).toBeInTheDocument();
+     // Renders navigation buttons plus one button for each unit.
+-    expect(screen.getAllByRole('button')).toHaveLength(3 + unitBlocks.length);
++    expect(screen.getAllByRole('button')).toHaveLength(4 + unitBlocks.length);
+ 
+     loadUnit();
+     await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+diff --git a/src/courseware/course/sidebar/Sidebar.jsx b/src/courseware/course/sidebar/Sidebar.jsx
+index 7acfa52..94511ab 100644
+--- a/src/courseware/course/sidebar/Sidebar.jsx
++++ b/src/courseware/course/sidebar/Sidebar.jsx
+@@ -1,18 +1,15 @@
+-import React, { useContext } from 'react';
+-import SidebarContext from './SidebarContext';
+-import { SIDEBARS } from './sidebars';
++import React from 'react';
++import { SIDEBAR_ORDER, SIDEBARS } from './sidebars';
+ 
+-const Sidebar = () => {
+-  const {
+-    currentSidebar,
+-  } = useContext(SidebarContext);
+-  if (!currentSidebar) {
+-    return null;
+-  }
+-  const CurrentSidebar = SIDEBARS[currentSidebar].Sidebar;
+-  return (
+-    <CurrentSidebar />
+-  );
+-};
++const Sidebar = () => (
++  <>
++    {
++      SIDEBAR_ORDER.map((sideBarId) => {
++        const SidebarToRender = SIDEBARS[sideBarId].Sidebar;
++        return <SidebarToRender />;
++      })
++    }
++  </>
++);
+ 
+ export default Sidebar;
+diff --git a/src/courseware/course/sidebar/common/SidebarBase.jsx b/src/courseware/course/sidebar/common/SidebarBase.jsx
+index a1c6651..2e2e44f 100644
+--- a/src/courseware/course/sidebar/common/SidebarBase.jsx
++++ b/src/courseware/course/sidebar/common/SidebarBase.jsx
+@@ -34,11 +34,12 @@ const SidebarBase = ({
+ 
+   useEventListener('message', receiveMessage);
+ 
+-  return currentSidebar === sidebarId && (
++  return (
+     <section
+       className={classNames('ml-0 ml-lg-4 border border-light-400 rounded-sm h-auto align-top', {
+         'bg-white m-0 border-0 fixed-top vh-100 rounded-0': shouldDisplayFullScreen,
+         'min-vh-100': !shouldDisplayFullScreen,
++        'd-none': currentSidebar !== sidebarId,
+       }, className)}
+       style={{ width: shouldDisplayFullScreen ? '100%' : width }}
+       aria-label={ariaLabel}
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+index b7d063d..3e98d46 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -35,6 +35,7 @@ const DiscussionsSidebar = ({ intl }) => {
+         className="d-flex w-100 h-100 border-0"
+         title={intl.formatMessage(messages.discussionsTitle)}
+         allow="clipboard-write"
++        loading="lazy"
+       />
+     </SidebarBase>
+   );
+-- 
+2.34.1
+

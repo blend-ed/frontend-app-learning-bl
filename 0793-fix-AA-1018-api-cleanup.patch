@@ -1,0 +1,46 @@
+From 64b0c03d307b3d6a93ae6fd025bd525a30df1f13 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Mon, 31 Jan 2022 09:43:25 -0500
+Subject: [PATCH 0793/1021] fix: [AA-1018] api cleanup
+
+couple of minor fixes from reviews
+---
+ .../data/__factories__/courseMetadata.factory.js          | 8 --------
+ src/tab-page/LoadedTabPage.test.jsx                       | 2 +-
+ 2 files changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index a8ca74a..90c71e4 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -39,14 +39,6 @@ Factory.define('courseMetadata')
+     },
+     show_calculator: false,
+     license: 'all-rights-reserved',
+-    course_access: {
+-      has_access: true,
+-      user_fragment: null,
+-      developer_message: null,
+-      user_message: null,
+-      error_code: null,
+-      additional_context_user_message: null,
+-    },
+     notes: {
+       visible: true,
+       enabled: false,
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+index 54d59c3..b4c3f99 100644
+--- a/src/tab-page/LoadedTabPage.test.jsx
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -24,7 +24,7 @@ describe('Loaded Tab Page', () => {
+   });
+ 
+   it('shows Instructor Toolbar if original user is staff', async () => {
+-    const courseMetadata = Factory.build('courseMetadata', { original_user_is_staff: true });
++    const courseMetadata = Factory.build('courseMetadata');
+     const courseHomeMetadata = Factory.build('courseHomeMetadata', { original_user_is_staff: true });
+     const testStore = await initializeTestStore(
+       {
+-- 
+2.34.1
+

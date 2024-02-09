@@ -1,0 +1,261 @@
+From fda9ab6bce91c953b58edc39c9cdf1ff47a41031 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Wed, 1 Sep 2021 12:21:43 -0400
+Subject: [PATCH 0635/1021] Feat: [AA-950] Streak discount productization
+ (#623)
+
+- Remove Jira tag from StreakCelebrationCouponEnabled prop
+- Remove "experiment" from streak discount vars
+- Cleaned up warning in unit test
+- Added mock function for closeStreakCelebration
+- Set End Date to 2 weeks from current date
+- Updated unit tests
+- Fixed naming issues
+- Added official coupon code
+- Cast isStreakCelebrationOpen to boolean
+
+Co-authored-by: cdeery <cdeery@edx.edu>
+---
+ .../data/pact-tests/lmsPact.test.jsx          |  4 ++--
+ .../data/pact-tests/lmsPact.test.jsx          |  4 ++--
+ src/pacts/frontend-app-learning-lms.json      |  8 ++++----
+ .../StreakCelebrationModal.jsx                | 20 +++++++++----------
+ .../StreakCelebrationModal.test.jsx           |  8 +++++---
+ src/tab-page/LoadedTabPage.jsx                |  6 +++---
+ 6 files changed, 26 insertions(+), 24 deletions(-)
+
+diff --git a/src/course-home/data/pact-tests/lmsPact.test.jsx b/src/course-home/data/pact-tests/lmsPact.test.jsx
+index 580ff4b..3563444 100644
+--- a/src/course-home/data/pact-tests/lmsPact.test.jsx
++++ b/src/course-home/data/pact-tests/lmsPact.test.jsx
+@@ -62,7 +62,7 @@ describe('Course Home Service', () => {
+             celebrations: like({
+               first_section: false,
+               streak_length_to_celebrate: null,
+-              streak_discount_experiment_enabled: false,
++              streak_discount_enabled: false,
+             }),
+             course_access: {
+               has_access: boolean(true),
+@@ -110,7 +110,7 @@ describe('Course Home Service', () => {
+         celebrations: {
+           firstSection: false,
+           streakLengthToCelebrate: null,
+-          streakDiscountExperimentEnabled: false,
++          streakDiscountEnabled: false,
+         },
+         courseAccess: {
+           hasAccess: true,
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index b50e0e6..60f5950 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -201,7 +201,7 @@ describe('Courseware Service', () => {
+             celebrations: {
+               first_section: boolean(false),
+               streak_length_to_celebrate: null,
+-              streak_discount_experiment_enabled: boolean(false),
++              streak_discount_enabled: boolean(false),
+             },
+             user_has_passing_grade: boolean(false),
+             course_exit_page_is_active: boolean(false),
+@@ -279,7 +279,7 @@ describe('Courseware Service', () => {
+         celebrations: {
+           firstSection: false,
+           streakLengthToCelebrate: null,
+-          streakDiscountExperimentEnabled: false,
++          streakDiscountEnabled: false,
+         },
+         userHasPassingGrade: false,
+         courseExitPageIsActive: false,
+diff --git a/src/pacts/frontend-app-learning-lms.json b/src/pacts/frontend-app-learning-lms.json
+index e176d55..100a02e 100644
+--- a/src/pacts/frontend-app-learning-lms.json
++++ b/src/pacts/frontend-app-learning-lms.json
+@@ -31,7 +31,7 @@
+           "celebrations": {
+             "first_section": false,
+             "streak_length_to_celebrate": null,
+-            "streak_discount_experiment_enabled": false
++            "streak_discount_enabled": false
+           },
+           "course_access": {
+             "has_access": true,
+@@ -298,7 +298,7 @@
+           "celebrations": {
+             "first_section": false,
+             "streak_length_to_celebrate": null,
+-            "streak_discount_experiment_enabled": false
++            "streak_discount_enabled": false
+           },
+           "user_has_passing_grade": false,
+           "course_exit_page_is_active": false,
+@@ -434,7 +434,7 @@
+           "$.body.celebrations.first_section": {
+             "match": "type"
+           },
+-          "$.body.celebrations.streak_discount_experiment_enabled": {
++          "$.body.celebrations.streak_discount_enabled": {
+             "match": "type"
+           },
+           "$.body.user_has_passing_grade": {
+@@ -637,4 +637,4 @@
+       "version": "2.0.0"
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index 722be5d..f8fac94 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -43,7 +43,7 @@ function getRandomFactoid(intl, streakLength) {
+ 
+ function StreakModal({
+   courseId, metadataModel, streakLengthToCelebrate, intl, isStreakCelebrationOpen,
+-  closeStreakCelebration, AA759ExperimentEnabled, verifiedMode, ...rest
++  closeStreakCelebration, StreakDiscountCouponEnabled, verifiedMode, ...rest
+ }) {
+   if (!isStreakCelebrationOpen) {
+     return null;
+@@ -82,7 +82,7 @@ function StreakModal({
+   let offer;
+ 
+   if (verifiedMode) {
+-    upgradeUrl = `${verifiedMode.upgradeUrl}&code=3DayStreak`;
++    upgradeUrl = `${verifiedMode.upgradeUrl}&code=ZGY11119949`;
+     mode = {
+       currencySymbol: verifiedMode.currencySymbol,
+       price: verifiedMode.price,
+@@ -125,7 +125,7 @@ function StreakModal({
+             <img src={StreakDesktopImage} alt="" className="img-fluid" />
+           </OnDesktop>
+         </p>
+-        { !AA759ExperimentEnabled && (
++        { !StreakDiscountCouponEnabled && (
+           <div className="d-flex py-3 bg-light-300">
+             <Icon className="col-small ml-3" src={Lightbulb} />
+             <div className="col-11 factoid-wrapper">
+@@ -133,7 +133,7 @@ function StreakModal({
+             </div>
+           </div>
+         )}
+-        { AA759ExperimentEnabled && (
++        { StreakDiscountCouponEnabled && (
+           <Alert variant="success" className="px-0">
+             <div className="d-flex">
+               <Icon className="col-small ml-3 text-success-500" src={MoneyFilled} />
+@@ -141,10 +141,10 @@ function StreakModal({
+                 <b>{intl.formatMessage(messages.congratulations)}</b>
+                 &nbsp;{intl.formatMessage(messages.streakDiscountMessage)}&nbsp;
+                 <FormattedMessage
+-                  id="learning.streakCelebration.streakAA759EndDateMessage"
++                  id="learning.streakCelebration.streakCelebrationCouponEndDateMessage"
+                   defaultMessage="Ends {date}."
+                   values={{
+-                    date: new Date('2021-7-20 00:00').toLocaleDateString({ timeZone: 'UTC' }),
++                    date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString({ timeZone: 'UTC' }),
+                   }}
+                 />
+               </div>
+@@ -153,7 +153,7 @@ function StreakModal({
+         )}
+       </ModalDialog.Body>
+       <ModalDialog.Footer className="modal-footer d-block">
+-        { AA759ExperimentEnabled && (
++        { StreakDiscountCouponEnabled && (
+           <>
+             <OnMobile>
+               <UpgradeNowButton
+@@ -180,7 +180,7 @@ function StreakModal({
+             </OnDesktop>
+           </>
+         )}
+-        { !AA759ExperimentEnabled && (
++        { !StreakDiscountCouponEnabled && (
+           <ModalDialog.CloseButton className="px-5" variant="primary"><CloseText /></ModalDialog.CloseButton>
+         )}
+       </ModalDialog.Footer>
+@@ -192,7 +192,7 @@ StreakModal.defaultProps = {
+   isStreakCelebrationOpen: false,
+   streakLengthToCelebrate: -1,
+   verifiedMode: {},
+-  AA759ExperimentEnabled: false,
++  StreakDiscountCouponEnabled: false,
+ };
+ 
+ StreakModal.propTypes = {
+@@ -202,7 +202,7 @@ StreakModal.propTypes = {
+   intl: intlShape.isRequired,
+   isStreakCelebrationOpen: PropTypes.bool,
+   closeStreakCelebration: PropTypes.func.isRequired,
+-  AA759ExperimentEnabled: PropTypes.bool,
++  StreakDiscountCouponEnabled: PropTypes.bool,
+   verifiedMode: PropTypes.shape({
+     currencySymbol: PropTypes.string,
+     price: PropTypes.number,
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index 99674fb..a89b0b1 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -18,6 +18,7 @@ describe('Loaded Tab Page', () => {
+     const courseMetadata = Factory.build('courseMetadata', { celebrations: { streakLengthToCelebrate: 3 } });
+     mockData.courseId = courseMetadata.id;
+     mockData.verifiedMode = courseMetadata.verifiedMode;
++    mockData.closeStreakCelebration = jest.fn();
+     const testStore = await initializeTestStore({ courseMetadata }, false);
+     render(<StreakModal {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+ 
+@@ -31,7 +32,7 @@ describe('Loaded Tab Page', () => {
+     });
+   });
+ 
+-  it('shows streak celebration modal AA-759 experiment', async () => {
++  it('shows streak celebration discount modal', async () => {
+     Object.defineProperty(window, 'matchMedia', {
+       writable: true,
+       value: jest.fn().mockImplementation(query => {
+@@ -51,11 +52,12 @@ describe('Loaded Tab Page', () => {
+     const courseMetadata = Factory.build('courseMetadata', { celebrations: { shouldCelebrateStreak: 3 } });
+     mockData.courseId = courseMetadata.id;
+     mockData.verifiedMode = courseMetadata.verifiedMode;
+-    mockData.AA759ExperimentEnabled = true;
++    mockData.StreakDiscountCouponEnabled = true;
+     const testStore = await initializeTestStore({ courseMetadata }, false);
+     render(<StreakModal {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++    const endDateText = `Ends ${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString({ timeZone: 'UTC' })}.`;
+     expect(screen.getByText('You’ve unlocked a 15% off discount when you upgrade this course for a limited time only.')).toBeInTheDocument();
+-    expect(screen.getByText('Ends 7/20/2021.')).toBeInTheDocument();
++    expect(screen.getByText(endDateText)).toBeInTheDocument();
+     expect(screen.getByText('Continue with course')).toBeInTheDocument();
+   });
+ });
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index b901b4d..e64e7f6 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -37,7 +37,7 @@ function LoadedTabPage({
+   const activeTab = tabs.filter(tab => tab.slug === activeTabSlug)[0];
+ 
+   const streakLengthToCelebrate = celebrations && celebrations.streakLengthToCelebrate;
+-  const AA759ExperimentEnabled = celebrations && celebrations.streakDiscountExperimentEnabled && verifiedMode;
++  const StreakDiscountCouponEnabled = celebrations && celebrations.streakDiscountEnabled && verifiedMode;
+   const [isStreakCelebrationOpen,, closeStreakCelebration] = useToggle(streakLengthToCelebrate);
+ 
+   return (
+@@ -56,9 +56,9 @@ function LoadedTabPage({
+         courseId={courseId}
+         metadataModel={metadataModel}
+         streakLengthToCelebrate={streakLengthToCelebrate}
+-        isStreakCelebrationOpen={isStreakCelebrationOpen}
++        isStreakCelebrationOpen={!!isStreakCelebrationOpen}
+         closeStreakCelebration={closeStreakCelebration}
+-        AA759ExperimentEnabled={AA759ExperimentEnabled}
++        StreakDiscountCouponEnabled={StreakDiscountCouponEnabled}
+         verifiedMode={verifiedMode}
+       />
+       <main id="main-content" className="d-flex flex-column flex-grow-1">
+-- 
+2.34.1
+

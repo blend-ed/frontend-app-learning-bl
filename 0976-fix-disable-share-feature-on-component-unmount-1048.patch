@@ -1,0 +1,38 @@
+From 0c74bb5106cd2b6a77e7e847ac14e080f50604c4 Mon Sep 17 00:00:00 2001
+From: Ben Warzeski <bwarzeski@edx.org>
+Date: Fri, 20 Jan 2023 09:07:18 -0500
+Subject: [PATCH 0976/1021] fix: disable share feature on component unmount
+ (#1048)
+
+* fix: disable share feature on component unmount
+
+* chore: make sure useEffect run only once
+
+Co-authored-by: Leangseu Kim <lkim@edx.org>
+---
+ src/courseware/course/share/ShareButton.jsx | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/courseware/course/share/ShareButton.jsx b/src/courseware/course/share/ShareButton.jsx
+index d981e1b..3cd9eb4 100644
+--- a/src/courseware/course/share/ShareButton.jsx
++++ b/src/courseware/course/share/ShareButton.jsx
+@@ -1,3 +1,4 @@
++import React from 'react';
+ import { PropTypes } from 'prop-types';
+ import { useIntl } from '@edx/frontend-platform/i18n';
+ import { TwitterShareButton, TwitterIcon } from 'react-share';
+@@ -19,6 +20,10 @@ const ShareTwitterIcon = () => (
+ function ShareButton({ url }) {
+   const { formatMessage } = useIntl();
+ 
++  React.useEffect(() => () => {
++    window.expSocialShareEnabled = false;
++  }, []);
++
+   const twitterUrl = stringifyUrl({
+     url,
+     query: {
+-- 
+2.34.1
+

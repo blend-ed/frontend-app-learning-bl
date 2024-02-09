@@ -1,0 +1,664 @@
+From 58543a34b335bfb03704037e2a78330ab69544c7 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 22 Jan 2021 15:28:16 -0500
+Subject: [PATCH 0371/1021] Separate courses redux model into courseHomeMeta
+ and coursewareMeta (#348)
+
+---
+ src/alerts/enrollment-alert/hooks.js               |  4 ++--
+ .../data/__snapshots__/redux.test.js.snap          |  4 ++--
+ src/course-home/data/thunks.js                     |  2 +-
+ .../dates-banner/DatesBannerContainer.jsx          |  2 +-
+ src/course-home/outline-tab/OutlineTab.jsx         |  4 ++--
+ .../alerts/certificate-available-alert/hooks.js    |  2 +-
+ .../outline-tab/alerts/course-end-alert/hooks.js   |  2 +-
+ .../outline-tab/alerts/course-start-alert/hooks.js |  2 +-
+ .../private-course-alert/PrivateCourseAlert.jsx    | 14 +++++++-------
+ .../alerts/private-course-alert/hooks.js           |  6 +++---
+ .../alerts/private-course-alert/index.js           |  0
+ .../alerts/private-course-alert/messages.js        |  0
+ .../outline-tab/widgets/CourseTools.jsx            |  2 +-
+ .../outline-tab/widgets/UpgradeCard.jsx            |  2 +-
+ src/courseware/CoursewareContainer.jsx             |  3 ++-
+ src/courseware/course/Course.jsx                   |  2 +-
+ src/courseware/course/Course.test.jsx              |  2 +-
+ src/courseware/course/CourseBreadcrumbs.jsx        |  2 +-
+ .../course/celebration/CelebrationModal.jsx        |  2 +-
+ src/courseware/course/celebration/utils.jsx        |  2 +-
+ .../course/course-exit/CatalogSuggestion.jsx       |  2 +-
+ .../course/course-exit/CourseCelebration.jsx       |  2 +-
+ .../course/course-exit/CourseInProgress.jsx        |  2 +-
+ .../course/course-exit/CourseNonPassing.jsx        |  2 +-
+ .../course/course-exit/DashboardFootnote.jsx       |  2 +-
+ .../course/course-exit/UpgradeFootnote.jsx         |  2 +-
+ src/courseware/course/course-exit/utils.js         |  2 +-
+ src/courseware/course/sequence/Sequence.jsx        |  2 +-
+ src/courseware/course/sequence/Unit.jsx            |  2 +-
+ .../lock-paywall-value-prop/LockPaywall.jsx        |  2 +-
+ .../lock-paywall-value-prop/LockPaywall.test.jsx   |  6 +++++-
+ .../course/sequence/lock-paywall/LockPaywall.jsx   |  2 +-
+ .../sequence/lock-paywall/LockPaywall.test.jsx     |  6 +++++-
+ src/courseware/data/redux.test.js                  |  4 ++--
+ src/courseware/data/selectors.js                   |  2 +-
+ src/courseware/data/thunks.js                      |  4 ++--
+ src/courseware/social-share/SocialIcons.jsx        |  2 +-
+ src/tab-page/LoadedTabPage.jsx                     |  7 ++++++-
+ src/tab-page/LoadedTabPage.test.jsx                |  2 +-
+ 39 files changed, 64 insertions(+), 50 deletions(-)
+ rename src/{ => course-home/outline-tab}/alerts/private-course-alert/PrivateCourseAlert.jsx (87%)
+ rename src/{ => course-home/outline-tab}/alerts/private-course-alert/hooks.js (87%)
+ rename src/{ => course-home/outline-tab}/alerts/private-course-alert/index.js (100%)
+ rename src/{ => course-home/outline-tab}/alerts/private-course-alert/messages.js (100%)
+
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index 7c6ec8d..f880db8 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -13,7 +13,7 @@ const EnrollmentAlert = React.lazy(() => import('./EnrollmentAlert'));
+ 
+ export function useEnrollmentAlert(courseId) {
+   const { authenticatedUser } = useContext(AppContext);
+-  const course = useModel('courses', courseId);
++  const course = useModel('courseHomeMeta', courseId);
+   const outline = useModel('outline', courseId);
+   const enrolledUser = course && course.isEnrolled !== undefined && course.isEnrolled;
+   const privateOutline = outline && outline.courseBlocks && !outline.courseBlocks.courses;
+@@ -28,7 +28,7 @@ export function useEnrollmentAlert(courseId) {
+     canEnroll: outline && outline.enrollAlert ? outline.enrollAlert.canEnroll : false,
+     courseId,
+     extraText: outline && outline.enrollAlert ? outline.enrollAlert.extraText : '',
+-    isStaff: course.isStaff,
++    isStaff: course && course.isStaff,
+   };
+ 
+   useAlert(isVisible, {
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 1ba0c36..585552c 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -16,7 +16,7 @@ Object {
+     "sequenceStatus": "loading",
+   },
+   "models": Object {
+-    "courses": Object {
++    "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+@@ -301,7 +301,7 @@ Object {
+     "sequenceStatus": "loading",
+   },
+   "models": Object {
+-    "courses": Object {
++    "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index 4c8f66f..df2fd4f 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -39,7 +39,7 @@ export function fetchTab(courseId, tab, getTabData) {
+ 
+       if (fetchedCourseHomeCourseMetadata) {
+         dispatch(addModel({
+-          modelType: 'courses',
++          modelType: 'courseHomeMeta',
+           model: {
+             id: courseId,
+             ...courseHomeCourseMetadataResult.value,
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index dfbe4fb..21ab82b 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -27,7 +27,7 @@ function DatesBannerContainer({
+ 
+   const {
+     isSelfPaced,
+-  } = useModel('courses', courseId);
++  } = useModel('courseHomeMeta', courseId);
+ 
+   const dispatch = useDispatch();
+   const hasDeadlines = courseDateBlocks.some(x => x.dateType === 'assignment-due-date');
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index b349e45..0b10ed5 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -22,7 +22,7 @@ import useCertificateAvailableAlert from './alerts/certificate-available-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+ import useCourseStartAlert from './alerts/course-start-alert';
+ import useOfferAlert from '../../alerts/offer-alert';
+-import usePrivateCourseAlert from '../../alerts/private-course-alert';
++import usePrivateCourseAlert from './alerts/private-course-alert';
+ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+ import ProctoringInfoPanel from './widgets/ProctoringInfoPanel';
+@@ -34,7 +34,7 @@ function OutlineTab({ intl }) {
+ 
+   const {
+     title,
+-  } = useModel('courses', courseId);
++  } = useModel('courseHomeMeta', courseId);
+ 
+   const {
+     accessExpiration,
+diff --git a/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+index 20589bd..ea83d37 100644
+--- a/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+@@ -9,7 +9,7 @@ const CertificateAvailableAlert = React.lazy(() => import('./CertificateAvailabl
+ function useCertificateAvailableAlert(courseId) {
+   const {
+     isEnrolled,
+-  } = useModel('courses', courseId);
++  } = useModel('courseHomeMeta', courseId);
+   const {
+     datesWidget: {
+       courseDateBlocks,
+diff --git a/src/course-home/outline-tab/alerts/course-end-alert/hooks.js b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+index 09a8582..3f6879b 100644
+--- a/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+@@ -11,7 +11,7 @@ const WARNING_PERIOD_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+ export function useCourseEndAlert(courseId) {
+   const {
+     isEnrolled,
+-  } = useModel('courses', courseId);
++  } = useModel('courseHomeMeta', courseId);
+   const {
+     datesWidget: {
+       courseDateBlocks,
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/hooks.js b/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+index 1f38715..2f9545f 100644
+--- a/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+@@ -7,7 +7,7 @@ const CourseStartAlert = React.lazy(() => import('./CourseStartAlert'));
+ function useCourseStartAlert(courseId) {
+   const {
+     isEnrolled,
+-  } = useModel('courses', courseId);
++  } = useModel('courseHomeMeta', courseId);
+   const {
+     datesWidget: {
+       courseDateBlocks,
+diff --git a/src/alerts/private-course-alert/PrivateCourseAlert.jsx b/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+similarity index 87%
+rename from src/alerts/private-course-alert/PrivateCourseAlert.jsx
+rename to src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+index b200fd5..b555652 100644
+--- a/src/alerts/private-course-alert/PrivateCourseAlert.jsx
++++ b/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+@@ -7,12 +7,12 @@ import { Button, Hyperlink } from '@edx/paragon';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+ 
+-import { Alert } from '../../generic/user-messages';
+-import enrollmentMessages from '../enrollment-alert/messages';
+-import genericMessages from '../../generic/messages';
+-import outlineMessages from '../../course-home/outline-tab/messages';
+-import { useEnrollClickHandler } from '../enrollment-alert/hooks';
+-import { useModel } from '../../generic/model-store';
++import { Alert } from '../../../../generic/user-messages';
++import enrollmentMessages from '../../../../alerts/enrollment-alert/messages';
++import genericMessages from '../../../../generic/messages';
++import outlineMessages from '../../messages';
++import { useEnrollClickHandler } from '../../../../alerts/enrollment-alert/hooks';
++import { useModel } from '../../../../generic/model-store';
+ 
+ function PrivateCourseAlert({ intl, payload }) {
+   const {
+@@ -23,7 +23,7 @@ function PrivateCourseAlert({ intl, payload }) {
+ 
+   const {
+     title,
+-  } = useModel('courses', courseId);
++  } = useModel('courseHomeMeta', courseId);
+ 
+   const { enrollClickHandler, loading } = useEnrollClickHandler(
+     courseId,
+diff --git a/src/alerts/private-course-alert/hooks.js b/src/course-home/outline-tab/alerts/private-course-alert/hooks.js
+similarity index 87%
+rename from src/alerts/private-course-alert/hooks.js
+rename to src/course-home/outline-tab/alerts/private-course-alert/hooks.js
+index 24c7245..ec5efc5 100644
+--- a/src/alerts/private-course-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/private-course-alert/hooks.js
+@@ -1,14 +1,14 @@
+ /* eslint-disable import/prefer-default-export */
+ import React, { useContext, useMemo } from 'react';
+ import { AppContext } from '@edx/frontend-platform/react';
+-import { ALERT_TYPES, useAlert } from '../../generic/user-messages';
+-import { useModel } from '../../generic/model-store';
++import { ALERT_TYPES, useAlert } from '../../../../generic/user-messages';
++import { useModel } from '../../../../generic/model-store';
+ 
+ const PrivateCourseAlert = React.lazy(() => import('./PrivateCourseAlert'));
+ 
+ export function usePrivateCourseAlert(courseId) {
+   const { authenticatedUser } = useContext(AppContext);
+-  const course = useModel('courses', courseId);
++  const course = useModel('courseHomeMeta', courseId);
+   const outline = useModel('outline', courseId);
+   const enrolledUser = course && course.isEnrolled !== undefined && course.isEnrolled;
+   const privateOutline = outline && outline.courseBlocks && !outline.courseBlocks.courses;
+diff --git a/src/alerts/private-course-alert/index.js b/src/course-home/outline-tab/alerts/private-course-alert/index.js
+similarity index 100%
+rename from src/alerts/private-course-alert/index.js
+rename to src/course-home/outline-tab/alerts/private-course-alert/index.js
+diff --git a/src/alerts/private-course-alert/messages.js b/src/course-home/outline-tab/alerts/private-course-alert/messages.js
+similarity index 100%
+rename from src/alerts/private-course-alert/messages.js
+rename to src/course-home/outline-tab/alerts/private-course-alert/messages.js
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 4464a50..3648570 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -14,7 +14,7 @@ import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+ function CourseTools({ courseId, intl }) {
+-  const { org } = useModel('courses', courseId);
++  const { org } = useModel('courseHomeMeta', courseId);
+   const {
+     courseTools,
+   } = useModel('outline', courseId);
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+index 21ac6f3..a9c9a60 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+@@ -11,7 +11,7 @@ import { UpgradeButton } from '../../../generic/upgrade-button';
+ import VerifiedCert from '../../../generic/assets/edX_certificate.png';
+ 
+ function UpgradeCard({ courseId, intl, onLearnMore }) {
+-  const { org } = useModel('courses', courseId);
++  const { org } = useModel('courseHomeMeta', courseId);
+   const {
+     offer,
+     verifiedMode,
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index ce9b70c..75dd653 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -234,6 +234,7 @@ class CoursewareContainer extends Component {
+         courseId={courseId}
+         unitId={routeUnitId}
+         courseStatus={courseStatus}
++        metadataModel="coursewareMeta"
+       >
+         <Course
+           courseId={courseId}
+@@ -296,7 +297,7 @@ CoursewareContainer.defaultProps = {
+ };
+ 
+ const currentCourseSelector = createSelector(
+-  (state) => state.models.courses || {},
++  (state) => state.models.coursewareMeta || {},
+   (state) => state.courseware.courseId,
+   (coursesById, courseId) => (coursesById[courseId] ? coursesById[courseId] : null),
+ );
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 1e58f26..df092f3 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -24,7 +24,7 @@ function Course({
+   previousSequenceHandler,
+   unitNavigationHandler,
+ }) {
+-  const course = useModel('courses', courseId);
++  const course = useModel('coursewareMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const section = useModel('sections', sequence ? sequence.sectionId : null);
+ 
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index dd9af22..fee1d3e 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -46,7 +46,7 @@ describe('Course', () => {
+     const { models } = store.getState();
+     const sequence = models.sequences[mockData.sequenceId];
+     const section = models.sections[sequence.sectionId];
+-    const course = models.courses[mockData.courseId];
++    const course = models.coursewareMeta[mockData.courseId];
+     expect(document.title).toMatch(
+       `${sequence.title} | ${section.title} | ${course.title} | edX`,
+     );
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index febfdad..b6e7b5a 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -40,7 +40,7 @@ export default function CourseBreadcrumbs({
+   REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
+   isREV1512FlyoverVisible, /* This line should be reverted after the REV1512 experiment */
+ }) {
+-  const course = useModel('courses', courseId);
++  const course = useModel('coursewareMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const section = useModel('sections', sectionId);
+   const courseStatus = useSelector(state => state.courseware.courseStatus);
+diff --git a/src/courseware/course/celebration/CelebrationModal.jsx b/src/courseware/course/celebration/CelebrationModal.jsx
+index 309a9cb..c38f0b8 100644
+--- a/src/courseware/course/celebration/CelebrationModal.jsx
++++ b/src/courseware/course/celebration/CelebrationModal.jsx
+@@ -14,7 +14,7 @@ import { useModel } from '../../../generic/model-store';
+ function CelebrationModal({
+   courseId, intl, open, ...rest
+ }) {
+-  const { org } = useModel('courses', courseId);
++  const { org } = useModel('coursewareMeta', courseId);
+ 
+   const layout = layoutGenerator({
+     mobile: 0,
+diff --git a/src/courseware/course/celebration/utils.jsx b/src/courseware/course/celebration/utils.jsx
+index 295f947..b482c28 100644
+--- a/src/courseware/course/celebration/utils.jsx
++++ b/src/courseware/course/celebration/utils.jsx
+@@ -52,7 +52,7 @@ function shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFir
+ 
+     // Update our local copy of course data from LMS
+     dispatch(updateModel({
+-      modelType: 'courses',
++      modelType: 'coursewareMeta',
+       model: {
+         id: courseId,
+         celebrations: {
+diff --git a/src/courseware/course/course-exit/CatalogSuggestion.jsx b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+index 1ee21d8..a1fb5c3 100644
+--- a/src/courseware/course/course-exit/CatalogSuggestion.jsx
++++ b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+@@ -18,7 +18,7 @@ import { logClick } from './utils';
+ 
+ function CatalogSuggestion({ intl, variant }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org } = useModel('courses', courseId);
++  const { org } = useModel('coursewareMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   const searchOurCatalogLink = (
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 074c534..035854a 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -51,7 +51,7 @@ function CourseCelebration({ intl }) {
+     verifiedMode,
+     verifyIdentityUrl,
+     verificationStatus,
+-  } = useModel('courses', courseId);
++  } = useModel('coursewareMeta', courseId);
+ 
+   const {
+     certStatus,
+diff --git a/src/courseware/course/course-exit/CourseInProgress.jsx b/src/courseware/course/course-exit/CourseInProgress.jsx
+index eaf1f19..96132f9 100644
+--- a/src/courseware/course/course-exit/CourseInProgress.jsx
++++ b/src/courseware/course/course-exit/CourseInProgress.jsx
+@@ -16,7 +16,7 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseInProgress({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org, tabs, title } = useModel('courses', courseId);
++  const { org, tabs, title } = useModel('coursewareMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get dates tab link for 'view course schedule' button
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index 028b8f1..5ee55c4 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -16,7 +16,7 @@ import { logClick, logVisit } from './utils';
+ 
+ function CourseNonPassing({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org, tabs, title } = useModel('courses', courseId);
++  const { org, tabs, title } = useModel('coursewareMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   // Get progress tab link for 'view grades' button
+diff --git a/src/courseware/course/course-exit/DashboardFootnote.jsx b/src/courseware/course/course-exit/DashboardFootnote.jsx
+index 512a816..c6e3a10 100644
+--- a/src/courseware/course/course-exit/DashboardFootnote.jsx
++++ b/src/courseware/course/course-exit/DashboardFootnote.jsx
+@@ -18,7 +18,7 @@ import { logClick } from './utils';
+ 
+ function DashboardFootnote({ intl, variant }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org } = useModel('courses', courseId);
++  const { org } = useModel('coursewareMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   const dashboardLink = (
+diff --git a/src/courseware/course/course-exit/UpgradeFootnote.jsx b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+index 6d6f0ee..0cfb46d 100644
+--- a/src/courseware/course/course-exit/UpgradeFootnote.jsx
++++ b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+@@ -16,7 +16,7 @@ import { useModel } from '../../../generic/model-store';
+ 
+ function UpgradeFootnote({ deadline, href, intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+-  const { org } = useModel('courses', courseId);
++  const { org } = useModel('coursewareMeta', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   const upgradeLink = (
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index 8975654..b4ce4c7 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -33,7 +33,7 @@ function getCourseExitMode(courseId) {
+     hasScheduledContent,
+     isEnrolled,
+     userHasPassingGrade,
+-  } = useModel('courses', courseId);
++  } = useModel('coursewareMeta', courseId);
+ 
+   const authenticatedUser = getAuthenticatedUser();
+ 
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 5a4018f..75ab27d 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -193,7 +193,7 @@ function Sequence({
+   REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
+   toggleREV1512Flyover, /* This line should be reverted after the REV1512 experiment */
+ }) {
+-  const course = useModel('courses', courseId);
++  const course = useModel('coursewareMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 43ced92..a45b4d9 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -81,7 +81,7 @@ function Unit({
+   };
+ 
+   const unit = useModel('units', id);
+-  const course = useModel('courses', courseId);
++  const course = useModel('coursewareMeta', courseId);
+   const {
+     contentTypeGatingEnabled,
+   } = course;
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
+index d700fe6..0501c7d 100644
+--- a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.jsx
+@@ -17,7 +17,7 @@ import './LockPaywall.scss';
+ function LockPaywall({
+   courseId,
+ }) {
+-  const course = useModel('courses', courseId);
++  const course = useModel('coursewareMeta', courseId);
+   const {
+     verifiedMode,
+   } = course;
+diff --git a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
+index 2666f96..11fe281 100644
+--- a/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
++++ b/src/courseware/course/sequence/lock-paywall-value-prop/LockPaywall.test.jsx
+@@ -23,7 +23,11 @@ describe('Lock Paywall', () => {
+   });
+ 
+   it('displays unlock link with price', () => {
+-    const { currencySymbol, price, upgradeUrl } = store.getState().models.courses[mockData.courseId].verifiedMode;
++    const {
++      currencySymbol,
++      price,
++      upgradeUrl,
++    } = store.getState().models.coursewareMeta[mockData.courseId].verifiedMode;
+     render(<LockPaywall {...mockData} />);
+ 
+     const upgradeLink = screen.getByRole('link', { name: `Upgrade for ${currencySymbol}${price}` });
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index 52664c6..31565c2 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -12,7 +12,7 @@ function LockPaywall({
+   intl,
+   courseId,
+ }) {
+-  const course = useModel('courses', courseId);
++  const course = useModel('coursewareMeta', courseId);
+   const {
+     verifiedMode,
+   } = course;
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+index 3e97812..3f85504 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+@@ -22,7 +22,11 @@ describe('Lock Paywall', () => {
+   });
+ 
+   it('displays unlock link with price', () => {
+-    const { currencySymbol, price, upgradeUrl } = store.getState().models.courses[mockData.courseId].verifiedMode;
++    const {
++      currencySymbol,
++      price,
++      upgradeUrl,
++    } = store.getState().models.coursewareMeta[mockData.courseId].verifiedMode;
+     render(<LockPaywall {...mockData} />);
+ 
+     const upgradeLink = screen.getByRole('link', { name: `Upgrade to unlock (${currencySymbol}${price})` });
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index d3837e5..c7b0e04 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -81,7 +81,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.courseStatus).toEqual('denied');
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.courses[forbiddenCourseMetadata.id].canLoadCourseware).not.toBeUndefined();
++      expect(state.models.coursewareMeta[forbiddenCourseMetadata.id].canLoadCourseware).not.toBeUndefined();
+     });
+ 
+     it('Should fetch, normalize, and save metadata', async () => {
+@@ -98,7 +98,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.courses[courseId].canLoadCourseware).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].canLoadCourseware).not.toBeUndefined();
+     });
+   });
+ 
+diff --git a/src/courseware/data/selectors.js b/src/courseware/data/selectors.js
+index bec708a..537d2dd 100644
+--- a/src/courseware/data/selectors.js
++++ b/src/courseware/data/selectors.js
+@@ -3,7 +3,7 @@ export function sequenceIdsSelector(state) {
+   if (state.courseware.courseStatus !== 'loaded') {
+     return [];
+   }
+-  const { sectionIds = [] } = state.models.courses[state.courseware.courseId];
++  const { sectionIds = [] } = state.models.coursewareMeta[state.courseware.courseId];
+ 
+   const sequenceIds = sectionIds
+     .flatMap(sectionId => state.models.sections[sectionId].sequenceIds);
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 6092b2e..f89bae2 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -28,7 +28,7 @@ export function fetchCourse(courseId) {
+     ]).then(([courseMetadataResult, courseBlocksResult]) => {
+       if (courseMetadataResult.status === 'fulfilled') {
+         dispatch(addModel({
+-          modelType: 'courses',
++          modelType: 'coursewareMeta',
+           model: courseMetadataResult.value,
+         }));
+       }
+@@ -40,7 +40,7 @@ export function fetchCourse(courseId) {
+ 
+         // This updates the course with a sectionIds array from the blocks data.
+         dispatch(updateModelsMap({
+-          modelType: 'courses',
++          modelType: 'coursewareMeta',
+           modelsMap: courses,
+         }));
+         dispatch(addModelsMap({
+diff --git a/src/courseware/social-share/SocialIcons.jsx b/src/courseware/social-share/SocialIcons.jsx
+index 2ea7f22..a3dba14 100644
+--- a/src/courseware/social-share/SocialIcons.jsx
++++ b/src/courseware/social-share/SocialIcons.jsx
+@@ -33,7 +33,7 @@ function SocialIcons({
+     marketingUrl,
+     org,
+     title,
+-  } = useModel('courses', courseId);
++  } = useModel('coursewareMeta', courseId);
+ 
+   if (!marketingUrl) {
+     return null;
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index be55a23..b7cb928 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -15,6 +15,7 @@ function LoadedTabPage({
+   activeTabSlug,
+   children,
+   courseId,
++  metadataModel,
+   unitId,
+ }) {
+   const {
+@@ -23,8 +24,10 @@ function LoadedTabPage({
+     org,
+     tabs,
+     title,
+-  } = useModel('courses', courseId);
++  } = useModel(metadataModel, courseId);
+ 
++  // Logistration and enrollment alerts are only really used for the outline tab, but loaded here to put them above
++  // breadcrumbs when they are visible.
+   const logistrationAlert = useLogistrationAlert(courseId);
+   const enrollmentAlert = useEnrollmentAlert(courseId);
+ 
+@@ -68,11 +71,13 @@ LoadedTabPage.propTypes = {
+   activeTabSlug: PropTypes.string.isRequired,
+   children: PropTypes.node,
+   courseId: PropTypes.string.isRequired,
++  metadataModel: PropTypes.string,
+   unitId: PropTypes.string,
+ };
+ 
+ LoadedTabPage.defaultProps = {
+   children: null,
++  metadataModel: 'courseHomeMeta',
+   unitId: null,
+ };
+ 
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+index 10a55ca..c704914 100644
+--- a/src/tab-page/LoadedTabPage.test.jsx
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -7,7 +7,7 @@ jest.mock('../course-header/CourseTabsNavigation', () => () => <div data-testid=
+ jest.mock('../instructor-toolbar/InstructorToolbar', () => () => <div data-testid="InstructorToolbar" />);
+ 
+ describe('Loaded Tab Page', () => {
+-  const mockData = { activeTabSlug: 'courseware' };
++  const mockData = { activeTabSlug: 'courseware', metadataModel: 'coursewareMeta' };
+ 
+   beforeAll(async () => {
+     const store = await initializeTestStore({ excludeFetchSequence: true });
+-- 
+2.34.1
+

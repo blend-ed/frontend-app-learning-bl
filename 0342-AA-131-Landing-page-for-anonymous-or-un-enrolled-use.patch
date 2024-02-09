@@ -1,0 +1,1275 @@
+From 4341a828db0db5ed6461e5c117e0c90b71cc5c76 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 16 Dec 2020 15:50:17 -0500
+Subject: [PATCH 0342/1021] AA-131: Landing page for anonymous or un-enrolled
+ users (#281)
+
+---
+ .../enrollment-alert/EnrollmentAlert.jsx      |   4 +-
+ src/alerts/enrollment-alert/hooks.js          |  16 ++-
+ src/alerts/enrollment-alert/messages.js       |  12 +-
+ .../logistration-alert/LogistrationAlert.jsx  |  23 ++--
+ src/alerts/logistration-alert/hooks.js        |  12 +-
+ src/alerts/logistration-alert/messages.js     |  16 ---
+ .../PrivateCourseAlert.jsx                    | 115 +++++++++++++++++
+ src/alerts/private-course-alert/hooks.js      |  36 ++++++
+ src/alerts/private-course-alert/index.js      |   1 +
+ src/alerts/private-course-alert/messages.js   |  11 ++
+ src/course-header/AnonymousUserMenu.jsx       |  34 +++++
+ .../AuthenticatedUserDropdown.jsx             |  74 +++++++++++
+ src/course-header/Header.jsx                  |  67 ++--------
+ .../data/__snapshots__/redux.test.js.snap     |   4 +-
+ src/course-home/data/api.js                   |   8 +-
+ src/course-home/outline-tab/OutlineTab.jsx    | 116 ++++++++----------
+ .../outline-tab/OutlineTab.test.jsx           |  49 +++-----
+ .../certificate-available-alert/hooks.js      |   3 +-
+ src/course-home/outline-tab/messages.js       |  10 +-
+ .../outline-tab/widgets/CourseDates.jsx       |   4 +
+ .../outline-tab/widgets/CourseGoalCard.jsx    |   2 +-
+ .../course/course-exit/CourseExit.test.jsx    |   6 +
+ src/courseware/course/course-exit/utils.js    |   6 +-
+ src/courseware/course/sequence/Unit.jsx       |   6 +-
+ src/courseware/course/sequence/Unit.test.jsx  |   2 +-
+ .../SequenceNavigation.test.jsx               |   3 +-
+ .../UnitNavigation.test.jsx                   |   3 +-
+ src/courseware/data/api.js                    |   4 +-
+ src/generic/messages.js                       |  20 +++
+ src/index.jsx                                 |   3 -
+ src/tab-page/LoadedTabPage.jsx                |  14 +++
+ 31 files changed, 481 insertions(+), 203 deletions(-)
+ delete mode 100644 src/alerts/logistration-alert/messages.js
+ create mode 100644 src/alerts/private-course-alert/PrivateCourseAlert.jsx
+ create mode 100644 src/alerts/private-course-alert/hooks.js
+ create mode 100644 src/alerts/private-course-alert/index.js
+ create mode 100644 src/alerts/private-course-alert/messages.js
+ create mode 100644 src/course-header/AnonymousUserMenu.jsx
+ create mode 100644 src/course-header/AuthenticatedUserDropdown.jsx
+
+diff --git a/src/alerts/enrollment-alert/EnrollmentAlert.jsx b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+index 9574e86..63eee39 100644
+--- a/src/alerts/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+@@ -33,8 +33,8 @@ function EnrollmentAlert({ intl, payload }) {
+   }
+ 
+   const button = canEnroll && (
+-    <Button disabled={loading} variant="link" className="p-0 border-0 align-top" onClick={enrollClickHandler}>
+-      {intl.formatMessage(messages.enroll)}
++    <Button disabled={loading} variant="link" className="p-0 border-0 align-top" style={{ textDecoration: 'underline' }} onClick={enrollClickHandler}>
++      {intl.formatMessage(messages.enrollNowSentence)}
+     </Button>
+   );
+ 
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index f981dac..b5ddbb1 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -2,6 +2,7 @@
+ import React, {
+   useContext, useState, useCallback, useMemo,
+ } from 'react';
++import { AppContext } from '@edx/frontend-platform/react';
+ 
+ import { UserMessagesContext, ALERT_TYPES, useAlert } from '../../generic/user-messages';
+ import { useModel } from '../../generic/model-store';
+@@ -11,13 +12,22 @@ import { postCourseEnrollment } from './data/api';
+ const EnrollmentAlert = React.lazy(() => import('./EnrollmentAlert'));
+ 
+ export function useEnrollmentAlert(courseId) {
++  const { authenticatedUser } = useContext(AppContext);
+   const course = useModel('courses', courseId);
+   const outline = useModel('outline', courseId);
+-  const isVisible = course && course.isEnrolled !== undefined && !course.isEnrolled;
++  const enrolledUser = course && course.isEnrolled !== undefined && course.isEnrolled;
++  const privateOutline = outline && outline.courseBlocks && !outline.courseBlocks.courses;
++  /**
++   * This alert should render if
++   *    1. the user is not enrolled,
++   *    2. the user is authenticated, AND
++   *    3. the course is private.
++   */
++  const isVisible = !enrolledUser && authenticatedUser !== null && privateOutline;
+   const payload = {
+-    canEnroll: outline.enrollAlert.canEnroll,
++    canEnroll: outline ? outline.enrollAlert.canEnroll : false,
+     courseId,
+-    extraText: outline.enrollAlert.extraText,
++    extraText: outline ? outline.enrollAlert.extraText : '',
+     isStaff: course.isStaff,
+   };
+ 
+diff --git a/src/alerts/enrollment-alert/messages.js b/src/alerts/enrollment-alert/messages.js
+index 1d74456..cf583a8 100644
+--- a/src/alerts/enrollment-alert/messages.js
++++ b/src/alerts/enrollment-alert/messages.js
+@@ -11,9 +11,15 @@ const messages = defineMessages({
+     defaultMessage: 'You are viewing this course as staff, and are not enrolled.',
+     description: 'Message shown to indicate that a user is not enrolled, but is able to view a course anyway because they are staff. Shown as part of an alert, along with a link to enroll.',
+   },
+-  enroll: {
+-    id: 'learning.enrollment.enroll.now',
+-    defaultMessage: 'Enroll Now',
++  enrollNowInline: {
++    id: 'learning.enrollment.enrollNow.Inline',
++    defaultMessage: 'Enroll now',
++    description: 'A link prompting the user to click on it to enroll in the currently viewed course.'
++      + 'This text is meant to be used at the beginning of a sentence (example: Enroll now to view course content.)',
++  },
++  enrollNowSentence: {
++    id: 'learning.enrollment.enrollNow.Sentence',
++    defaultMessage: 'Enroll now.',
+     description: 'A link prompting the user to click on it to enroll in the currently viewed course.',
+   },
+   success: {
+diff --git a/src/alerts/logistration-alert/LogistrationAlert.jsx b/src/alerts/logistration-alert/LogistrationAlert.jsx
+index 304a8c5..3271329 100644
+--- a/src/alerts/logistration-alert/LogistrationAlert.jsx
++++ b/src/alerts/logistration-alert/LogistrationAlert.jsx
+@@ -2,23 +2,30 @@ import React from 'react';
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
++import { Hyperlink } from '@edx/paragon';
+ 
+ import { Alert } from '../../generic/user-messages';
+-import messages from './messages';
++import genericMessages from '../../generic/messages';
+ 
+ function LogistrationAlert({ intl }) {
+   const signIn = (
+-    <a href={`${getLoginRedirectUrl(global.location.href)}`}>
+-      {intl.formatMessage(messages.login)}
+-    </a>
++    <Hyperlink
++      style={{ textDecoration: 'underline' }}
++      destination={`${getLoginRedirectUrl(global.location.href)}`}
++    >
++      {intl.formatMessage(genericMessages.signInLowercase)}
++    </Hyperlink>
+   );
+ 
+   // TODO: Pull this registration URL building out into a function, like the login one above.
+   // This is complicated by the fact that we don't have a REGISTER_URL env variable available.
+   const register = (
+-    <a href={`${getConfig().LMS_BASE_URL}/register?next=${encodeURIComponent(global.location.href)}`}>
+-      {intl.formatMessage(messages.register)}
+-    </a>
++    <Hyperlink
++      style={{ textDecoration: 'underline' }}
++      destination={`${getConfig().LMS_BASE_URL}/register?next=${encodeURIComponent(global.location.href)}`}
++    >
++      {intl.formatMessage(genericMessages.registerLowercase)}
++    </Hyperlink>
+   );
+ 
+   return (
+@@ -26,7 +33,7 @@ function LogistrationAlert({ intl }) {
+       <FormattedMessage
+         id="learning.logistration.alert"
+         description="Prompts the user to sign in or register to see course content."
+-        defaultMessage="Please {signIn} or {register} to see course content."
++        defaultMessage="To see course content, {signIn} or {register}."
+         values={{
+           signIn,
+           register,
+diff --git a/src/alerts/logistration-alert/hooks.js b/src/alerts/logistration-alert/hooks.js
+index be804b1..aba3f3e 100644
+--- a/src/alerts/logistration-alert/hooks.js
++++ b/src/alerts/logistration-alert/hooks.js
+@@ -2,12 +2,20 @@
+ import React, { useContext } from 'react';
+ import { AppContext } from '@edx/frontend-platform/react';
+ import { ALERT_TYPES, useAlert } from '../../generic/user-messages';
++import { useModel } from '../../generic/model-store';
+ 
+ const LogistrationAlert = React.lazy(() => import('./LogistrationAlert'));
+ 
+-export function useLogistrationAlert() {
++export function useLogistrationAlert(courseId) {
+   const { authenticatedUser } = useContext(AppContext);
+-  const isVisible = authenticatedUser === null;
++  const outline = useModel('outline', courseId);
++  const privateOutline = outline && outline.courseBlocks && !outline.courseBlocks.courses;
++  /**
++   * This alert should render if
++   *    1. the user is not authenticated, AND
++   *    2. the course is private.
++   */
++  const isVisible = authenticatedUser === null && privateOutline;
+ 
+   useAlert(isVisible, {
+     code: 'clientLogistrationAlert',
+diff --git a/src/alerts/logistration-alert/messages.js b/src/alerts/logistration-alert/messages.js
+deleted file mode 100644
+index 35ae74d..0000000
+--- a/src/alerts/logistration-alert/messages.js
++++ /dev/null
+@@ -1,16 +0,0 @@
+-import { defineMessages } from '@edx/frontend-platform/i18n';
+-
+-const messages = defineMessages({
+-  login: {
+-    id: 'learning.logistration.login',
+-    defaultMessage: 'sign in',
+-    description: 'Text in a link, prompting the user to log in.  Used in "learning.logistration.alert"',
+-  },
+-  register: {
+-    id: 'learning.logistration.register',
+-    defaultMessage: 'register',
+-    description: 'Text in a link, prompting the user to create an account.  Used in "learning.logistration.alert"',
+-  },
+-});
+-
+-export default messages;
+diff --git a/src/alerts/private-course-alert/PrivateCourseAlert.jsx b/src/alerts/private-course-alert/PrivateCourseAlert.jsx
+new file mode 100644
+index 0000000..b200fd5
+--- /dev/null
++++ b/src/alerts/private-course-alert/PrivateCourseAlert.jsx
+@@ -0,0 +1,115 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
++import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
++import { Button, Hyperlink } from '@edx/paragon';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faSpinner } from '@fortawesome/free-solid-svg-icons';
++
++import { Alert } from '../../generic/user-messages';
++import enrollmentMessages from '../enrollment-alert/messages';
++import genericMessages from '../../generic/messages';
++import outlineMessages from '../../course-home/outline-tab/messages';
++import { useEnrollClickHandler } from '../enrollment-alert/hooks';
++import { useModel } from '../../generic/model-store';
++
++function PrivateCourseAlert({ intl, payload }) {
++  const {
++    anonymousUser,
++    canEnroll,
++    courseId,
++  } = payload;
++
++  const {
++    title,
++  } = useModel('courses', courseId);
++
++  const { enrollClickHandler, loading } = useEnrollClickHandler(
++    courseId,
++    intl.formatMessage(enrollmentMessages.success),
++  );
++
++  const enrollNow = (
++    <Button
++      disabled={loading}
++      variant="link"
++      className="p-0 border-0 align-top"
++      style={{ textDecoration: 'underline' }}
++      onClick={enrollClickHandler}
++    >
++      {intl.formatMessage(enrollmentMessages.enrollNowInline)}
++    </Button>
++  );
++
++  const register = (
++    <Hyperlink
++      style={{ textDecoration: 'underline' }}
++      destination={`${getConfig().LMS_BASE_URL}/register?next=${encodeURIComponent(global.location.href)}`}
++    >
++      {intl.formatMessage(genericMessages.registerLowercase)}
++    </Hyperlink>
++  );
++
++  const signIn = (
++    <Hyperlink
++      style={{ textDecoration: 'underline' }}
++      destination={`${getLoginRedirectUrl(global.location.href)}`}
++    >
++      {intl.formatMessage(genericMessages.signInSentenceCase)}
++    </Hyperlink>
++  );
++
++  return (
++    <Alert type="welcome">
++      {anonymousUser && (
++        <>
++          <p className="font-weight-bold">
++            {intl.formatMessage(enrollmentMessages.alert)}
++          </p>
++          <FormattedMessage
++            id="learning.privateCourse.signInOrRegister"
++            description="Prompts the user to sign in or register to see course content."
++            defaultMessage="{signIn} or {register} and then enroll in this course."
++            values={{
++              signIn,
++              register,
++            }}
++          />
++        </>
++      )}
++      {!anonymousUser && (
++        <>
++          <p className="font-weight-bold">{intl.formatMessage(outlineMessages.welcomeTo)} {title}</p>
++          {canEnroll && (
++            <>
++              <FormattedMessage
++                id="learning.privateCourse.canEnroll"
++                description="Prompts the user to enroll in the course to see course content."
++                defaultMessage="{enrollNow} to access the full course."
++                values={{ enrollNow }}
++              />
++              {loading && <FontAwesomeIcon icon={faSpinner} spin />}
++            </>
++          )}
++          {!canEnroll && (
++            <>
++              {intl.formatMessage(enrollmentMessages.alert)}
++            </>
++          )}
++        </>
++      )}
++    </Alert>
++  );
++}
++
++PrivateCourseAlert.propTypes = {
++  intl: intlShape.isRequired,
++  payload: PropTypes.shape({
++    anonymousUser: PropTypes.bool,
++    canEnroll: PropTypes.bool,
++    courseId: PropTypes.string,
++  }).isRequired,
++};
++
++export default injectIntl(PrivateCourseAlert);
+diff --git a/src/alerts/private-course-alert/hooks.js b/src/alerts/private-course-alert/hooks.js
+new file mode 100644
+index 0000000..07d32a5
+--- /dev/null
++++ b/src/alerts/private-course-alert/hooks.js
+@@ -0,0 +1,36 @@
++/* eslint-disable import/prefer-default-export */
++import React, { useContext, useMemo } from 'react';
++import { AppContext } from '@edx/frontend-platform/react';
++import { ALERT_TYPES, useAlert } from '../../generic/user-messages';
++import { useModel } from '../../generic/model-store';
++
++const PrivateCourseAlert = React.lazy(() => import('./PrivateCourseAlert'));
++
++export function usePrivateCourseAlert(courseId) {
++  const { authenticatedUser } = useContext(AppContext);
++  const course = useModel('courses', courseId);
++  const outline = useModel('outline', courseId);
++  const enrolledUser = course && course.isEnrolled !== undefined && course.isEnrolled;
++  const privateOutline = outline && outline.courseBlocks && !outline.courseBlocks.courses;
++  /**
++   * This alert should render if the user is not enrolled AND
++   *    1. the user is anonymous AND the outline is private, OR
++   *    2. the user is authenticated.
++   * */
++  const isVisible = !enrolledUser && (privateOutline || authenticatedUser !== null);
++  const payload = {
++    anonymousUser: authenticatedUser === null,
++    canEnroll: outline ? outline.enrollAlert.canEnroll : false,
++    courseId,
++  };
++
++  useAlert(isVisible, {
++    code: 'clientPrivateCourseAlert',
++    dismissible: false,
++    payload: useMemo(() => payload, Object.values(payload).sort()),
++    topic: 'outline-private-alerts',
++    type: ALERT_TYPES.WELCOME,
++  });
++
++  return { clientPrivateCourseAlert: PrivateCourseAlert };
++}
+diff --git a/src/alerts/private-course-alert/index.js b/src/alerts/private-course-alert/index.js
+new file mode 100644
+index 0000000..03f577d
+--- /dev/null
++++ b/src/alerts/private-course-alert/index.js
+@@ -0,0 +1 @@
++export { usePrivateCourseAlert as default } from './hooks';
+diff --git a/src/alerts/private-course-alert/messages.js b/src/alerts/private-course-alert/messages.js
+new file mode 100644
+index 0000000..903f92a
+--- /dev/null
++++ b/src/alerts/private-course-alert/messages.js
+@@ -0,0 +1,11 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  enroll: {
++    id: 'alert.enroll',
++    defaultMessage: 'You must be enrolled in the course to see course content.',
++    description: 'Text instructing the learner to enroll in the course in order to see course content.',
++  },
++});
++
++export default messages;
+diff --git a/src/course-header/AnonymousUserMenu.jsx b/src/course-header/AnonymousUserMenu.jsx
+new file mode 100644
+index 0000000..7539608
+--- /dev/null
++++ b/src/course-header/AnonymousUserMenu.jsx
+@@ -0,0 +1,34 @@
++import React from 'react';
++
++import { getConfig } from '@edx/frontend-platform';
++import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button } from '@edx/paragon';
++
++import genericMessages from '../generic/messages';
++
++function AnonymousUserMenu({ intl }) {
++  return (
++    <div>
++      <Button
++        className="mr-3"
++        variant="outline-primary"
++        href={`${getConfig().LMS_BASE_URL}/register?next=${encodeURIComponent(global.location.href)}`}
++      >
++        {intl.formatMessage(genericMessages.registerSentenceCase)}
++      </Button>
++      <Button
++        variant="primary"
++        href={`${getLoginRedirectUrl(global.location.href)}`}
++      >
++        {intl.formatMessage(genericMessages.signInSentenceCase)}
++      </Button>
++    </div>
++  );
++}
++
++AnonymousUserMenu.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(AnonymousUserMenu);
+diff --git a/src/course-header/AuthenticatedUserDropdown.jsx b/src/course-header/AuthenticatedUserDropdown.jsx
+new file mode 100644
+index 0000000..f886104
+--- /dev/null
++++ b/src/course-header/AuthenticatedUserDropdown.jsx
+@@ -0,0 +1,74 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faUserCircle } from '@fortawesome/free-solid-svg-icons';
++
++import { getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Dropdown } from '@edx/paragon';
++
++import messages from './messages';
++
++function AuthenticatedUserDropdown({ enterpriseLearnerPortalLink, intl, username }) {
++  let dashboardMenuItem = (
++    <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/dashboard`}>
++      {intl.formatMessage(messages.dashboard)}
++    </Dropdown.Item>
++  );
++  if (enterpriseLearnerPortalLink && Object.keys(enterpriseLearnerPortalLink).length > 0) {
++    dashboardMenuItem = (
++      <Dropdown.Item
++        href={enterpriseLearnerPortalLink.href}
++      >
++        {enterpriseLearnerPortalLink.content}
++      </Dropdown.Item>
++    );
++  }
++  return (
++    <>
++      <a className="text-gray-700 mr-3" href={`${getConfig().SUPPORT_URL}`}>{intl.formatMessage(messages.help)}</a>
++      <Dropdown className="user-dropdown">
++        <Dropdown.Toggle variant="outline-primary">
++          <FontAwesomeIcon icon={faUserCircle} className="d-md-none" size="lg" />
++          <span data-hj-suppress className="d-none d-md-inline">
++            {username}
++          </span>
++        </Dropdown.Toggle>
++        <Dropdown.Menu className="dropdown-menu-right">
++          {dashboardMenuItem}
++          <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/u/${username}`}>
++            {intl.formatMessage(messages.profile)}
++          </Dropdown.Item>
++          <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/account/settings`}>
++            {intl.formatMessage(messages.account)}
++          </Dropdown.Item>
++          {!enterpriseLearnerPortalLink && (
++            // Users should only see Order History if they do not have an available
++            // learner portal, because an available learner portal currently means
++            // that they access content via Subscriptions, in which context an "order"
++            // is not relevant.
++            <Dropdown.Item href={getConfig().ORDER_HISTORY_URL}>
++              {intl.formatMessage(messages.orderHistory)}
++            </Dropdown.Item>
++          )}
++          <Dropdown.Item href={getConfig().LOGOUT_URL}>
++            {intl.formatMessage(messages.signOut)}
++          </Dropdown.Item>
++        </Dropdown.Menu>
++      </Dropdown>
++    </>
++  );
++}
++
++AuthenticatedUserDropdown.propTypes = {
++  enterpriseLearnerPortalLink: PropTypes.string,
++  intl: intlShape.isRequired,
++  username: PropTypes.string.isRequired,
++};
++
++AuthenticatedUserDropdown.defaultProps = {
++  enterpriseLearnerPortalLink: '',
++};
++
++export default injectIntl(AuthenticatedUserDropdown);
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index 7d5b980..bd77469 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -1,15 +1,11 @@
+ import React, { useContext } from 'react';
+ import PropTypes from 'prop-types';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Dropdown } from '@edx/paragon';
+ import { useEnterpriseConfig } from '@edx/frontend-enterprise';
+ import { getConfig } from '@edx/frontend-platform';
+ import { AppContext } from '@edx/frontend-platform/react';
+ 
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faUserCircle } from '@fortawesome/free-solid-svg-icons';
+-
+-import messages from './messages';
++import AnonymousUserMenu from './AnonymousUserMenu';
++import AuthenticatedUserDropdown from './AuthenticatedUserDropdown';
+ 
+ function LinkedLogo({
+   href,
+@@ -31,7 +27,7 @@ LinkedLogo.propTypes = {
+ };
+ 
+ function Header({
+-  courseOrg, courseNumber, courseTitle, intl,
++  courseOrg, courseNumber, courseTitle,
+ }) {
+   const { authenticatedUser } = useContext(AppContext);
+ 
+@@ -41,21 +37,6 @@ function Header({
+     getConfig().LMS_BASE_URL,
+   );
+ 
+-  let dashboardMenuItem = (
+-    <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/dashboard`}>
+-      {intl.formatMessage(messages.dashboard)}
+-    </Dropdown.Item>
+-  );
+-  if (enterpriseLearnerPortalLink && Object.keys(enterpriseLearnerPortalLink).length > 0) {
+-    dashboardMenuItem = (
+-      <Dropdown.Item
+-        href={enterpriseLearnerPortalLink.href}
+-      >
+-        {enterpriseLearnerPortalLink.content}
+-      </Dropdown.Item>
+-    );
+-  }
+-
+   let headerLogo = (
+     <LinkedLogo
+       className="logo"
+@@ -83,36 +64,15 @@ function Header({
+           <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
+           <span className="d-block m-0 font-weight-bold course-title">{courseTitle}</span>
+         </div>
+-        <a className="text-gray-700 mr-3" href={`${getConfig().SUPPORT_URL}`}>{intl.formatMessage(messages.help)}</a>
+-        <Dropdown className="user-dropdown">
+-          <Dropdown.Toggle variant="outline-primary">
+-            <FontAwesomeIcon icon={faUserCircle} className="d-md-none" size="lg" />
+-            <span data-hj-suppress className="d-none d-md-inline">
+-              {authenticatedUser.username}
+-            </span>
+-          </Dropdown.Toggle>
+-          <Dropdown.Menu className="dropdown-menu-right">
+-            {dashboardMenuItem}
+-            <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/u/${authenticatedUser.username}`}>
+-              {intl.formatMessage(messages.profile)}
+-            </Dropdown.Item>
+-            <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/account/settings`}>
+-              {intl.formatMessage(messages.account)}
+-            </Dropdown.Item>
+-            {!enterpriseLearnerPortalLink && (
+-              // Users should only see Order History if they do not have an available
+-              // learner portal, because an available learner portal currently means
+-              // that they access content via Subscriptions, in which context an "order"
+-              // is not relevant.
+-              <Dropdown.Item href={getConfig().ORDER_HISTORY_URL}>
+-                {intl.formatMessage(messages.orderHistory)}
+-              </Dropdown.Item>
+-            )}
+-            <Dropdown.Item href={getConfig().LOGOUT_URL}>
+-              {intl.formatMessage(messages.signOut)}
+-            </Dropdown.Item>
+-          </Dropdown.Menu>
+-        </Dropdown>
++        {authenticatedUser && (
++          <AuthenticatedUserDropdown
++            enterpriseLearnerPortalLink={enterpriseLearnerPortalLink}
++            username={authenticatedUser.username}
++          />
++        )}
++        {!authenticatedUser && (
++          <AnonymousUserMenu />
++        )}
+       </div>
+     </header>
+   );
+@@ -122,7 +82,6 @@ Header.propTypes = {
+   courseOrg: PropTypes.string,
+   courseNumber: PropTypes.string,
+   courseTitle: PropTypes.string,
+-  intl: intlShape.isRequired,
+ };
+ 
+ Header.defaultProps = {
+@@ -131,4 +90,4 @@ Header.defaultProps = {
+   courseTitle: null,
+ };
+ 
+-export default injectIntl(Header);
++export default Header;
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index d34fecb..d2463b0 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -28,7 +28,7 @@ Object {
+         "originalUserIsStaff": false,
+         "tabs": Array [
+           Object {
+-            "slug": "courseware",
++            "slug": "outline",
+             "title": "Course",
+             "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
+           },
+@@ -309,7 +309,7 @@ Object {
+         "originalUserIsStaff": false,
+         "tabs": Array [
+           Object {
+-            "slug": "courseware",
++            "slug": "outline",
+             "title": "Course",
+             "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
+           },
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 184b849..79184b5 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -7,7 +7,9 @@ function normalizeCourseHomeCourseMetadata(metadata) {
+   return {
+     ...data,
+     tabs: data.tabs.map(tab => ({
+-      slug: tab.tabId,
++      // The API uses "courseware" as a slug for both courseware and the outline tab. We switch it to "outline" here for
++      // use within the MFE to differentiate between course home and courseware.
++      slug: tab.tabId === 'courseware' ? 'outline' : tab.tabId,
+       title: tab.title,
+       url: tab.url,
+     })),
+@@ -105,6 +107,10 @@ export async function getDatesTabData(courseId) {
+       global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/dates`);
+       return {};
+     }
++    if (httpErrorStatus === 401) {
++      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`);
++      return {};
++    }
+     throw error;
+   }
+ }
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 90aefe0..f79e62c 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -21,9 +21,8 @@ import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
+ import useCertificateAvailableAlert from './alerts/certificate-available-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+ import useCourseStartAlert from './alerts/course-start-alert';
+-import useEnrollmentAlert from '../../alerts/enrollment-alert';
+-import useLogistrationAlert from '../../alerts/logistration-alert';
+ import useOfferAlert from '../../alerts/offer-alert';
++import usePrivateCourseAlert from '../../alerts/private-course-alert';
+ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+ 
+@@ -34,12 +33,6 @@ function OutlineTab({ intl }) {
+ 
+   const {
+     title,
+-    start,
+-    end,
+-    enrollmentStart,
+-    enrollmentEnd,
+-    enrollmentMode,
+-    isEnrolled,
+   } = useModel('courses', courseId);
+ 
+   const {
+@@ -71,16 +64,13 @@ function OutlineTab({ intl }) {
+   const [goalToastHeader, setGoalToastHeader] = useState('');
+   const [expandAll, setExpandAll] = useState(false);
+ 
+-  // Above the tab alerts (appearing in the order listed here)
+-  const logistrationAlert = useLogistrationAlert();
+-  const enrollmentAlert = useEnrollmentAlert(courseId);
+-
+   // Below the course title alerts (appearing in the order listed here)
+   const offerAlert = useOfferAlert(offer, userTimezone, 'outline-course-alerts');
+   const accessExpirationAlert = useAccessExpirationAlert(accessExpiration, userTimezone, 'outline-course-alerts');
+   const courseStartAlert = useCourseStartAlert(courseId);
+   const courseEndAlert = useCourseEndAlert(courseId);
+   const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
++  const privateCourseAlert = usePrivateCourseAlert(courseId);
+ 
+   const rootCourseId = courses && Object.keys(courses)[0];
+ 
+@@ -88,14 +78,6 @@ function OutlineTab({ intl }) {
+ 
+   return (
+     <>
+-      <AlertList
+-        topic="outline"
+-        className="mb-3"
+-        customAlerts={{
+-          ...enrollmentAlert,
+-          ...logistrationAlert,
+-        }}
+-      />
+       <Toast
+         closeLabel={intl.formatMessage(genericMessages.close)}
+         onClose={() => setGoalToastHeader('')}
+@@ -116,16 +98,15 @@ function OutlineTab({ intl }) {
+         )}
+       </div>
+       <div className="row">
++        <div className="col-12">
++          <AlertList
++            topic="outline-private-alerts"
++            customAlerts={{
++              ...privateCourseAlert,
++            }}
++          />
++        </div>
+         <div className="col col-12 col-md-8">
+-          {!courseGoalToDisplay && goalOptions.length > 0 && (
+-            <CourseGoalCard
+-              courseId={courseId}
+-              goalOptions={goalOptions}
+-              title={title}
+-              setGoalToDisplay={(newGoal) => { setCourseGoalToDisplay(newGoal); }}
+-              setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
+-            />
+-          )}
+           <AlertList
+             topic="outline-course-alerts"
+             className="mb-3"
+@@ -137,13 +118,24 @@ function OutlineTab({ intl }) {
+               ...offerAlert,
+             }}
+           />
+-          <DatesBannerContainer
+-            courseDateBlocks={courseDateBlocks}
+-            datesBannerInfo={datesBannerInfo}
+-            hasEnded={hasEnded}
+-            model="outline"
+-            tabFetch={fetchOutlineTab}
+-          />
++          {courseDateBlocks && (
++            <DatesBannerContainer
++              courseDateBlocks={courseDateBlocks}
++              datesBannerInfo={datesBannerInfo}
++              hasEnded={hasEnded}
++              model="outline"
++              tabFetch={fetchOutlineTab}
++            />
++          )}
++          {!courseGoalToDisplay && goalOptions.length > 0 && (
++            <CourseGoalCard
++              courseId={courseId}
++              goalOptions={goalOptions}
++              title={title}
++              setGoalToDisplay={(newGoal) => { setCourseGoalToDisplay(newGoal); }}
++              setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
++            />
++          )}
+           <WelcomeMessage courseId={courseId} />
+           {rootCourseId && (
+             <>
+@@ -166,36 +158,32 @@ function OutlineTab({ intl }) {
+             </>
+           )}
+         </div>
+-        <div className="col col-12 col-md-4">
+-          {courseGoalToDisplay && goalOptions.length > 0 && (
+-            <UpdateGoalSelector
++        {rootCourseId && (
++          <div className="col col-12 col-md-4">
++            {courseGoalToDisplay && goalOptions.length > 0 && (
++              <UpdateGoalSelector
++                courseId={courseId}
++                goalOptions={goalOptions}
++                selectedGoal={courseGoalToDisplay}
++                setGoalToDisplay={(newGoal) => { setCourseGoalToDisplay(newGoal); }}
++                setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
++              />
++            )}
++            <CourseTools
+               courseId={courseId}
+-              goalOptions={goalOptions}
+-              selectedGoal={courseGoalToDisplay}
+-              setGoalToDisplay={(newGoal) => { setCourseGoalToDisplay(newGoal); }}
+-              setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
+             />
+-          )}
+-          <CourseTools
+-            courseId={courseId}
+-          />
+-          <UpgradeCard
+-            courseId={courseId}
+-            onLearnMore={canShowUpgradeSock ? () => { courseSock.current.showToUser(); } : null}
+-          />
+-          <CourseDates
+-            start={start}
+-            end={end}
+-            enrollmentStart={enrollmentStart}
+-            enrollmentEnd={enrollmentEnd}
+-            enrollmentMode={enrollmentMode}
+-            isEnrolled={isEnrolled}
+-            courseId={courseId}
+-          />
+-          <CourseHandouts
+-            courseId={courseId}
+-          />
+-        </div>
++            <UpgradeCard
++              courseId={courseId}
++              onLearnMore={canShowUpgradeSock ? () => { courseSock.current.showToUser(); } : null}
++            />
++            <CourseDates
++              courseId={courseId}
++            />
++            <CourseHandouts
++              courseId={courseId}
++            />
++          </div>
++        )}
+       </div>
+       {canShowUpgradeSock && <CourseSock ref={courseSock} verifiedMode={verifiedMode} />}
+     </>
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 437e125..f50727b 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -5,7 +5,6 @@ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import MockAdapter from 'axios-mock-adapter';
+ import userEvent from '@testing-library/user-event';
+ 
+-import { ALERT_TYPES } from '../../generic/user-messages';
+ import buildSimpleCourseBlocks from '../data/__factories__/courseBlocks.factory';
+ import {
+   fireEvent, initializeMockApp, logUnhandledRequests, render, screen, waitFor,
+@@ -124,6 +123,10 @@ describe('Outline Tab', () => {
+   });
+ 
+   describe('Welcome Message', () => {
++    beforeEach(() => {
++      setMetadata({ is_enrolled: true });
++    });
++
+     it('does not render show more/less button under 100 words', async () => {
+       await fetchAndRender();
+       expect(screen.getByTestId('alert-container-welcome')).toBeInTheDocument();
+@@ -274,20 +277,12 @@ describe('Outline Tab', () => {
+   });
+ 
+   describe('Alert List', () => {
+-    describe('Enrollment Alert', () => {
+-      let alertMessage;
+-      let staffMessage;
+-
+-      beforeEach(() => {
+-        const extraText = defaultTabData.enroll_alert.extra_text;
+-        alertMessage = `You must be enrolled in the course to see course content. ${extraText}`;
+-        staffMessage = 'You are viewing this course as staff, and are not enrolled.';
+-      });
+-
+-      it('does not display enrollment alert for enrolled user', async () => {
++    describe('Private Course Alert', () => {
++      it('does not display alert for enrolled user', async () => {
+         setMetadata({ is_enrolled: true });
+         await fetchAndRender();
+-        expect(screen.queryByText(alertMessage)).not.toBeInTheDocument();
++        expect(screen.queryByRole('button', { name: 'Enroll now' })).not.toBeInTheDocument();
++        expect(screen.queryByText('to access the full course')).not.toBeInTheDocument();
+       });
+ 
+       it('does not display enrollment button if enrollment is not available', async () => {
+@@ -297,29 +292,21 @@ describe('Outline Tab', () => {
+           },
+         });
+         await fetchAndRender();
+-        expect(screen.queryByRole('button', { name: 'Enroll Now' })).not.toBeInTheDocument();
+-      });
+-
+-      it('displays enrollment alert for unenrolled user', async () => {
+-        await fetchAndRender();
+ 
+-        const alert = await screen.findByText(alertMessage);
+-        expect(alert).toHaveAttribute('role', 'alert');
+-        const alertContainer = await screen.findByTestId(`alert-container-${ALERT_TYPES.ERROR}`);
+-        expect(screen.queryByText(staffMessage)).not.toBeInTheDocument();
++        const alert = await screen.findByText('Welcome to Demonstration Course');
++        expect(alert.parentElement).toHaveAttribute('role', 'alert');
+ 
+-        expect(alertContainer.querySelector('svg')).toHaveClass('fa-exclamation-triangle');
++        expect(screen.queryByRole('button', { name: 'Enroll now' })).not.toBeInTheDocument();
++        expect(screen.getByText('You must be enrolled in the course to see course content.')).toBeInTheDocument();
+       });
+ 
+-      it('displays different message for unenrolled staff user', async () => {
+-        setMetadata({ is_staff: true });
++      it('displays alert for unenrolled user', async () => {
+         await fetchAndRender();
+ 
+-        const alert = await screen.findByText(staffMessage);
+-        expect(alert).toHaveAttribute('role', 'alert');
+-        expect(screen.queryByText(alertMessage)).not.toBeInTheDocument();
+-        const alertContainer = await screen.findByTestId(`alert-container-${ALERT_TYPES.INFO}`);
+-        expect(alertContainer.querySelector('svg')).toHaveClass('fa-info-circle');
++        const alert = await screen.findByText('Welcome to Demonstration Course');
++        expect(alert.parentElement).toHaveAttribute('role', 'alert');
++
++        expect(screen.getByRole('button', { name: 'Enroll now' })).toBeInTheDocument();
+       });
+ 
+       it('handles button click', async () => {
+@@ -330,7 +317,7 @@ describe('Outline Tab', () => {
+         };
+         await fetchAndRender();
+ 
+-        const button = await screen.findByRole('button', { name: 'Enroll Now' });
++        const button = await screen.findByRole('button', { name: 'Enroll now' });
+         fireEvent.click(button);
+         await waitFor(() => expect(axiosMock.history.post).toHaveLength(1));
+         expect(axiosMock.history.post[0].data)
+diff --git a/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+index fce997c..20589bd 100644
+--- a/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+@@ -16,7 +16,8 @@ function useCertificateAvailableAlert(courseId) {
+       userTimezone,
+     },
+   } = useModel('outline', courseId);
+-  const { username } = getAuthenticatedUser();
++  const authenticatedUser = getAuthenticatedUser();
++  const username = authenticatedUser ? authenticatedUser.username : '';
+ 
+   const certBlock = courseDateBlocks.find(b => b.dateType === 'certificate-available-date');
+   const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index f9036f4..581f6af 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -43,11 +43,6 @@ const messages = defineMessages({
+     id: 'learning.outline.goalUnsure',
+     defaultMessage: 'Not sure yet',
+   },
+-  goalWelcome: {
+-    id: 'learning.outline.goalWelcome',
+-    defaultMessage: 'Welcome to',
+-    description: 'This precedes the title of the course',
+-  },
+   handouts: {
+     id: 'learning.outline.handouts',
+     defaultMessage: 'Course Handouts',
+@@ -112,6 +107,11 @@ const messages = defineMessages({
+     id: 'learning.outline.welcomeMessageShowLessButton',
+     defaultMessage: 'Show Less',
+   },
++  welcomeTo: {
++    id: 'learning.outline.goalWelcome',
++    defaultMessage: 'Welcome to',
++    description: 'This precedes the title of the course',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index 4db2ecb..0bf1d8d 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -16,6 +16,10 @@ function CourseDates({ courseId, intl }) {
+     },
+   } = useModel('outline', courseId);
+ 
++  if (courseDateBlocks.length === 0) {
++    return null;
++  }
++
+   return (
+     <section className="mb-4">
+       <h2 className="h6">{intl.formatMessage(messages.dates)}</h2>
+diff --git a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx b/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+index 1247b9b..64ae8cb 100644
+--- a/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/CourseGoalCard.jsx
+@@ -38,7 +38,7 @@ function CourseGoalCard({
+       <Card.Body>
+         <div className="row w-100 m-0 justify-content-between align-items-center">
+           <div className="col col-8 p-0">
+-            <Card.Title className="h6 m-0">{intl.formatMessage(messages.goalWelcome)} {title}</Card.Title>
++            <Card.Title className="h6 m-0">{intl.formatMessage(messages.welcomeTo)} {title}</Card.Title>
+           </div>
+           <div className="col col-auto p-0">
+             <Button
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index e6fc38d..105962a 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -55,6 +55,9 @@ describe('Course Exit Pages', () => {
+           cert_status: 'downloadable',
+           cert_web_view_url: '/certificates/cooluuidgoeshere',
+         },
++        enrollment: {
++          is_active: true,
++        },
+       });
+       await fetchAndRender(<CourseExit />);
+       expect(screen.getByText('Congratulations!')).toBeInTheDocument();
+@@ -65,6 +68,9 @@ describe('Course Exit Pages', () => {
+         certificate_data: {
+           cert_status: 'unverified',
+         },
++        enrollment: {
++          is_active: true,
++        },
+         user_has_passing_grade: false,
+       });
+       await fetchAndRender(<CourseExit />);
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index a89e2dc..3dac4e1 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -1,4 +1,5 @@
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+ import { useModel } from '../../../generic/model-store';
+ 
+@@ -28,10 +29,13 @@ function getCourseExitMode(courseId) {
+   const {
+     certificateData,
+     courseExitPageIsActive,
++    isEnrolled,
+     userHasPassingGrade,
+   } = useModel('courses', courseId);
+ 
+-  if (!courseExitPageIsActive) {
++  const authenticatedUser = getAuthenticatedUser();
++
++  if (!courseExitPageIsActive || !authenticatedUser || !isEnrolled) {
+     return COURSE_EXIT_MODES.disabled;
+   }
+ 
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 7a2e785..4913bb9 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -1,5 +1,6 @@
+ import React, {
+   Suspense,
++  useContext,
+   useEffect,
+   useRef,
+   useState,
+@@ -9,6 +10,7 @@ import { useDispatch } from 'react-redux';
+ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { AppContext } from '@edx/frontend-platform/react';
+ import { Modal } from '@edx/paragon';
+ import messages from './messages';
+ import BookmarkButton from '../bookmark/BookmarkButton';
+@@ -59,7 +61,9 @@ function Unit({
+   id,
+   intl,
+ }) {
+-  let iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0`;
++  const { authenticatedUser } = useContext(AppContext);
++  const view = authenticatedUser ? 'student_view' : 'public_view';
++  let iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0&view=${view}`;
+   if (format) {
+     iframeUrl += `&format=${format}`;
+   }
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 111feb7..9142f7b 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -38,7 +38,7 @@ describe('Unit', () => {
+     const renderedUnit = screen.getByTitle(unit.display_name);
+     expect(renderedUnit).toHaveAttribute('height', String(0));
+     expect(renderedUnit).toHaveAttribute(
+-      'src', `http://localhost:18000/xblock/${mockData.id}?show_title=0&show_bookmark_button=0&format=${mockData.format}`,
++      'src', `http://localhost:18000/xblock/${mockData.id}?show_title=0&show_bookmark_button=0&view=student_view&format=${mockData.format}`,
+     );
+   });
+ 
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index a1b023b..229f0bc 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -115,7 +115,7 @@ describe('Sequence Navigation', () => {
+   });
+ 
+   it('displays end of course message instead of the "Next" button as needed', async () => {
+-    const testMetadata = { ...courseMetadata, certificate_data: { cert_status: 'notpassing' } };
++    const testMetadata = { ...courseMetadata, certificate_data: { cert_status: 'notpassing' }, enrollment: { is_active: true } };
+     const testStore = await initializeTestStore({ courseMetadata: testMetadata, unitBlocks }, false);
+     // Have to refetch the sequenceId since the new store generates new sequences
+     const { courseware } = testStore.getState();
+@@ -134,6 +134,7 @@ describe('Sequence Navigation', () => {
+     const testMetadata = {
+       ...courseMetadata,
+       certificate_data: { cert_status: 'downloadable' },
++      enrollment: { is_active: true },
+       user_has_passing_grade: true,
+     };
+     const testStore = await initializeTestStore({ courseMetadata: testMetadata, unitBlocks }, false);
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+index b483e7f..cd80b75 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+@@ -90,7 +90,7 @@ describe('Unit Navigation', () => {
+   });
+ 
+   it('displays end of course message instead of the "Next" button as needed', async () => {
+-    const testCourseMetadata = { ...courseMetadata, certificate_data: { cert_status: 'notpassing' } };
++    const testCourseMetadata = { ...courseMetadata, certificate_data: { cert_status: 'notpassing' }, enrollment: { is_active: true } };
+     const testStore = await initializeTestStore({ courseMetadata: testCourseMetadata, unitBlocks }, false);
+     // Have to refetch the sequenceId since the new store generates new sequences
+     const { courseware } = testStore.getState();
+@@ -109,6 +109,7 @@ describe('Unit Navigation', () => {
+     const testCourseMetadata = {
+       ...courseMetadata,
+       certificate_data: { cert_status: 'downloadable' },
++      enrollment: { is_active: true },
+       user_has_passing_grade: true,
+     };
+     const testStore = await initializeTestStore({ courseMetadata: testCourseMetadata, unitBlocks }, false);
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 70345a0..ec41481 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -86,10 +86,10 @@ export function normalizeBlocks(courseId, blocks) {
+ }
+ 
+ export async function getCourseBlocks(courseId) {
+-  const { username } = getAuthenticatedUser();
++  const authenticatedUser = getAuthenticatedUser();
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+   url.searchParams.append('course_id', courseId);
+-  url.searchParams.append('username', username);
++  url.searchParams.append('username', authenticatedUser ? authenticatedUser.username : '');
+   url.searchParams.append('depth', 3);
+   url.searchParams.append('requested_fields', 'children,show_gated_sections,graded,special_exam_info');
+ 
+diff --git a/src/generic/messages.js b/src/generic/messages.js
+index 6d96161..ad435a0 100644
+--- a/src/generic/messages.js
++++ b/src/generic/messages.js
+@@ -6,6 +6,26 @@ const messages = defineMessages({
+     defaultMessage: 'Close',
+     description: 'Text used as an aria-label to describe closing or dismissing a component',
+   },
++  registerLowercase: {
++    id: 'learning.logistration.register', // ID left for historical purposes
++    defaultMessage: 'register',
++    description: 'Text in a link, prompting the user to create an account.  Used in "learning.logistration.alert"',
++  },
++  registerSentenceCase: {
++    id: 'general.register.sentenceCase',
++    defaultMessage: 'Register',
++    description: 'Text in a button, prompting the user to register.',
++  },
++  signInLowercase: {
++    id: 'learning.logistration.login', // ID left for historical purposes
++    defaultMessage: 'sign in',
++    description: 'Text in a link, prompting the user to log in.  Used in "learning.logistration.alert"',
++  },
++  signInSentenceCase: {
++    id: 'general.signIn.sentenceCase',
++    defaultMessage: 'Sign in',
++    description: 'Text in a button, prompting the user to log in.',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/index.jsx b/src/index.jsx
+index b9cd193..dc2809c 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -93,9 +93,6 @@ initialize({
+       }, 'LearnerAppConfig');
+     },
+   },
+-  // TODO: Remove this once the course blocks api supports unauthenticated
+-  // access and we are prepared to support public courses in this app.
+-  requireAuthenticatedUser: true,
+   messages: [
+     appMessages,
+     footerMessages,
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 0f29828..698fac8 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -3,7 +3,10 @@ import PropTypes from 'prop-types';
+ 
+ import { Header, CourseTabsNavigation } from '../course-header';
+ import { useModel } from '../generic/model-store';
++import { AlertList } from '../generic/user-messages';
+ import InstructorToolbar from '../instructor-toolbar';
++import useEnrollmentAlert from '../alerts/enrollment-alert';
++import useLogistrationAlert from '../alerts/logistration-alert';
+ 
+ function LoadedTabPage({
+   activeTabSlug,
+@@ -19,6 +22,9 @@ function LoadedTabPage({
+     title,
+   } = useModel('courses', courseId);
+ 
++  const logistrationAlert = useLogistrationAlert(courseId);
++  const enrollmentAlert = useEnrollmentAlert(courseId);
++
+   return (
+     <>
+       <Header
+@@ -33,6 +39,14 @@ function LoadedTabPage({
+         />
+       )}
+       <main className="d-flex flex-column flex-grow-1">
++        <AlertList
++          topic="outline"
++          className="mx-5 mt-3"
++          customAlerts={{
++            ...enrollmentAlert,
++            ...logistrationAlert,
++          }}
++        />
+         <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug={activeTabSlug} />
+         <div className="container-fluid">
+           {children}
+-- 
+2.34.1
+

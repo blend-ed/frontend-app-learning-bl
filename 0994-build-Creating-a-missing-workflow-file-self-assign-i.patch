@@ -1,0 +1,35 @@
+From a4ea334692a1eab1447b755f56cf56bbea89b650 Mon Sep 17 00:00:00 2001
+From: Feanil Patel <feanil@tcril.org>
+Date: Thu, 23 Feb 2023 13:59:15 -0500
+Subject: [PATCH 0994/1021] build: Creating a missing workflow file
+ `self-assign-issue.yml`.
+
+The .github/workflows/self-assign-issue.yml workflow is missing or needs an update to stay in
+sync with the current standard for this workflow as defined in the
+`.github` repo of the `openedx` GitHub org.
+---
+ .github/workflows/self-assign-issue.yml | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 .github/workflows/self-assign-issue.yml
+
+diff --git a/.github/workflows/self-assign-issue.yml b/.github/workflows/self-assign-issue.yml
+new file mode 100644
+index 0000000..37522fd
+--- /dev/null
++++ b/.github/workflows/self-assign-issue.yml
+@@ -0,0 +1,12 @@
++# This workflow runs when a comment is made on the ticket
++# If the comment starts with "assign me" it assigns the author to the
++# ticket (case insensitive)
++
++name: Assign comment author to ticket if they say "assign me"
++on:
++  issue_comment:
++    types: [created]
++
++jobs:
++  self_assign_by_comment:
++    uses: openedx/.github/.github/workflows/self-assign-issue.yml@master
+-- 
+2.34.1
+

@@ -1,0 +1,68 @@
+From 41207e953e7d18a2d6661eea7d26b5367a36963e Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 10 Jan 2022 13:33:30 -0500
+Subject: [PATCH 0775/1021] feat: show error page when xblock fails to render
+ (#795)
+
+AA-1175
+---
+ src/courseware/course/sequence/Unit.jsx | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 35b300f..7ceb4ae 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -10,7 +10,7 @@ import { useDispatch } from 'react-redux';
+ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { AppContext } from '@edx/frontend-platform/react';
++import { AppContext, ErrorPage } from '@edx/frontend-platform/react';
+ import { Modal } from '@edx/paragon';
+ import messages from './messages';
+ import BookmarkButton from '../bookmark/BookmarkButton';
+@@ -98,6 +98,7 @@ function Unit({
+ 
+   const [iframeHeight, setIframeHeight] = useState(0);
+   const [hasLoaded, setHasLoaded] = useState(false);
++  const [showError, setShowError] = useState(false);
+   const [modalOptions, setModalOptions] = useState({ open: false });
+   const [shouldDisplayHonorCode, setShouldDisplayHonorCode] = useState(false);
+ 
+@@ -192,11 +193,14 @@ function Unit({
+         </Suspense>
+       )}
+       { /** [MM-P2P] Experiment (conditional) */ }
+-      {!mmp2p.meta.blockContent && !shouldDisplayHonorCode && !hasLoaded && (
++      {!mmp2p.meta.blockContent && !shouldDisplayHonorCode && !hasLoaded && !showError && (
+         <PageLoading
+           srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+         />
+       )}
++      {!mmp2p.meta.blockContent && !shouldDisplayHonorCode && !hasLoaded && showError && (
++        <ErrorPage />
++      )}
+       {modalOptions.open && (
+         <Modal
+           body={(
+@@ -235,7 +239,15 @@ function Unit({
+             scrolling="no"
+             referrerPolicy="origin"
+             onLoad={() => {
+-              window.onmessage = function handleResetDates(e) {
++              // onLoad *should* only fire after everything in the iframe has finished its own load events.
++              // Which means that the plugin.resize message (which calls setHasLoaded above) will have fired already
++              // for a successful load. If it *has not fired*, we are in an error state. For example, the backend
++              // could have given us a 4xx or 5xx response.
++              if (!hasLoaded) {
++                setShowError(true);
++              }
++
++              window.onmessage = (e) => {
+                 if (e.data.event_name) {
+                   dispatch(processEvent(e.data, fetchCourse));
+                 }
+-- 
+2.34.1
+

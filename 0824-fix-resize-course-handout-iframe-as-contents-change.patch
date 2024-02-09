@@ -1,0 +1,63 @@
+From 48aad3951a55cf0797c4aff9a839e201eab0491a Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 1 Mar 2022 12:44:51 -0500
+Subject: [PATCH 0824/1021] fix: resize course handout iframe as contents
+ change
+
+This can happen if a handout has e.g. expanding list elements.
+
+AA-1215
+---
+ .../outline-tab/LmsHtmlFragment.jsx           | 22 ++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.jsx b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+index aa5c87c..7ac2d78 100644
+--- a/src/course-home/outline-tab/LmsHtmlFragment.jsx
++++ b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+@@ -1,4 +1,4 @@
+-import React, { useRef } from 'react';
++import React, { useEffect, useRef } from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import { getConfig } from '@edx/frontend-platform';
+@@ -17,18 +17,34 @@ export default function LmsHtmlFragment({
+         <link rel="stylesheet" type="text/css" href="${getConfig().BASE_URL}/src/course-home/outline-tab/LmsHtmlFragment.css">
+       </head>
+       <body class="${className}">${html}</body>
++      <script>
++        const resizer = new ResizeObserver(() => {
++          window.parent.postMessage({type: 'lmshtmlfragment.resize'}, '*');
++        });
++        resizer.observe(document.body);
++      </script>
+     </html>
+   `;
+ 
+   const iframe = useRef(null);
+-  function handleLoad() {
++  function resetIframeHeight() {
+     iframe.current.height = iframe.current.contentWindow.document.body.scrollHeight;
+   }
+ 
++  useEffect(() => {
++    function receiveMessage(event) {
++      const { type } = event.data;
++      if (type === 'lmshtmlfragment.resize') {
++        resetIframeHeight();
++      }
++    }
++    global.addEventListener('message', receiveMessage);
++  }, []);
++
+   return (
+     <iframe
+       className="w-100 border-0"
+-      onLoad={handleLoad}
++      onLoad={resetIframeHeight}
+       ref={iframe}
+       referrerPolicy="origin"
+       scrolling="no"
+-- 
+2.34.1
+

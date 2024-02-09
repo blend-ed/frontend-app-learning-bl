@@ -1,0 +1,498 @@
+From 3e76f7ac78ca7242e2cd90959408d8889453b486 Mon Sep 17 00:00:00 2001
+From: Hammad Ahmad Waqas <hammadahmadwaqas1@gmail.com>
+Date: Mon, 25 Jul 2022 13:14:41 +0500
+Subject: [PATCH 0923/1021] feat: Added support to redirect to DSC if required.
+ (#958)
+
+---
+ package-lock.json                             | 213 +++++++++++++++---
+ package.json                                  |   2 +
+ src/courseware/CoursewareContainer.test.jsx   |   8 +
+ .../CoursewareRedirectLandingPage.jsx         |   8 +
+ .../CoursewareRedirectLandingPage.test.jsx    |  37 +++
+ src/shared/access.js                          |   3 +
+ 6 files changed, 235 insertions(+), 36 deletions(-)
+ create mode 100644 src/courseware/CoursewareRedirectLandingPage.test.jsx
+
+diff --git a/package-lock.json b/package-lock.json
+index 7824789..1240f89 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -24,9 +24,11 @@
+         "@reduxjs/toolkit": "1.8.1",
+         "classnames": "2.3.1",
+         "core-js": "3.22.2",
++        "history": "^5.3.0",
+         "js-cookie": "3.0.1",
+         "lodash.camelcase": "4.3.0",
+         "prop-types": "15.8.1",
++        "query-string": "^7.1.1",
+         "react": "16.14.0",
+         "react-dom": "16.14.0",
+         "react-helmet": "6.1.0",
+@@ -3245,6 +3247,19 @@
+         "follow-redirects": "^1.14.8"
+       }
+     },
++    "node_modules/@edx/frontend-platform/node_modules/history": {
++      "version": "4.10.1",
++      "resolved": "https://registry.npmjs.org/history/-/history-4.10.1.tgz",
++      "integrity": "sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==",
++      "dependencies": {
++        "@babel/runtime": "^7.1.2",
++        "loose-envify": "^1.2.0",
++        "resolve-pathname": "^3.0.0",
++        "tiny-invariant": "^1.0.2",
++        "tiny-warning": "^1.0.0",
++        "value-equal": "^1.0.1"
++      }
++    },
+     "node_modules/@edx/frontend-platform/node_modules/react-intl": {
+       "version": "2.9.0",
+       "resolved": "https://registry.npmjs.org/react-intl/-/react-intl-2.9.0.tgz",
+@@ -8068,6 +8083,21 @@
+         "node": ">=4"
+       }
+     },
++    "node_modules/cacheable-request/node_modules/query-string": {
++      "version": "5.1.1",
++      "resolved": "https://registry.npmjs.org/query-string/-/query-string-5.1.1.tgz",
++      "integrity": "sha512-gjWOsm2SoGlgLEdAGt7a6slVOk9mGiXmPFMqrEhLQ68rhQuBnpfs3+EmlvqKyxnCo9/PPlF+9MtY02S1aFg+Jw==",
++      "dev": true,
++      "optional": true,
++      "dependencies": {
++        "decode-uri-component": "^0.2.0",
++        "object-assign": "^4.1.0",
++        "strict-uri-encode": "^1.0.0"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
+     "node_modules/cacheable-request/node_modules/sort-keys": {
+       "version": "2.0.0",
+       "resolved": "https://registry.npmjs.org/sort-keys/-/sort-keys-2.0.0.tgz",
+@@ -9295,7 +9325,6 @@
+       "version": "0.2.0",
+       "resolved": "https://registry.npmjs.org/decode-uri-component/-/decode-uri-component-0.2.0.tgz",
+       "integrity": "sha1-6zkTMzRYd1y4TNGh+uBiEGu4dUU=",
+-      "dev": true,
+       "engines": {
+         "node": ">=0.10"
+       }
+@@ -11803,6 +11832,14 @@
+         "node": ">=8"
+       }
+     },
++    "node_modules/filter-obj": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/filter-obj/-/filter-obj-1.1.0.tgz",
++      "integrity": "sha512-8rXg1ZnX7xzy2NGDVkBVaAy+lSlPNwad13BtgSlLuxfIslyt5Vg64U7tFcCt4WS1R0hvtnQybT/IyCkGZ3DpXQ==",
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
+     "node_modules/finalhandler": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/finalhandler/-/finalhandler-1.1.2.tgz",
+@@ -12969,16 +13006,11 @@
+       }
+     },
+     "node_modules/history": {
+-      "version": "4.10.1",
+-      "resolved": "https://registry.npmjs.org/history/-/history-4.10.1.tgz",
+-      "integrity": "sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==",
++      "version": "5.3.0",
++      "resolved": "https://registry.npmjs.org/history/-/history-5.3.0.tgz",
++      "integrity": "sha512-ZqaKwjjrAYUYfLG+htGaIIZ4nioX2L70ZUMIFysS3xvBsSG4x/n1V6TXV3N8ZYNuFGlDirFg32T7B6WOUPDYcQ==",
+       "dependencies": {
+-        "@babel/runtime": "^7.1.2",
+-        "loose-envify": "^1.2.0",
+-        "resolve-pathname": "^3.0.0",
+-        "tiny-invariant": "^1.0.2",
+-        "tiny-warning": "^1.0.0",
+-        "value-equal": "^1.0.1"
++        "@babel/runtime": "^7.7.6"
+       }
+     },
+     "node_modules/hoist-non-react-statics": {
+@@ -21867,18 +21899,28 @@
+       }
+     },
+     "node_modules/query-string": {
+-      "version": "5.1.1",
+-      "resolved": "https://registry.npmjs.org/query-string/-/query-string-5.1.1.tgz",
+-      "integrity": "sha512-gjWOsm2SoGlgLEdAGt7a6slVOk9mGiXmPFMqrEhLQ68rhQuBnpfs3+EmlvqKyxnCo9/PPlF+9MtY02S1aFg+Jw==",
+-      "dev": true,
+-      "optional": true,
++      "version": "7.1.1",
++      "resolved": "https://registry.npmjs.org/query-string/-/query-string-7.1.1.tgz",
++      "integrity": "sha512-MplouLRDHBZSG9z7fpuAAcI7aAYjDLhtsiVZsevsfaHWDS2IDdORKbSd1kWUA+V4zyva/HZoSfpwnYMMQDhb0w==",
+       "dependencies": {
+         "decode-uri-component": "^0.2.0",
+-        "object-assign": "^4.1.0",
+-        "strict-uri-encode": "^1.0.0"
++        "filter-obj": "^1.1.0",
++        "split-on-first": "^1.0.0",
++        "strict-uri-encode": "^2.0.0"
+       },
+       "engines": {
+-        "node": ">=0.10.0"
++        "node": ">=6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
++    "node_modules/query-string/node_modules/strict-uri-encode": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/strict-uri-encode/-/strict-uri-encode-2.0.0.tgz",
++      "integrity": "sha512-QwiXZgpRcKkhTj2Scnn++4PKtWsH0kpzZ62L2R6c/LUVYv7hVnZqcg2+sMuT6R7Jusu1vviK/MFsu6kNJfWlEQ==",
++      "engines": {
++        "node": ">=4"
+       }
+     },
+     "node_modules/queue-microtask": {
+@@ -22579,6 +22621,32 @@
+         "react": ">=15"
+       }
+     },
++    "node_modules/react-router-dom/node_modules/history": {
++      "version": "4.10.1",
++      "resolved": "https://registry.npmjs.org/history/-/history-4.10.1.tgz",
++      "integrity": "sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==",
++      "dependencies": {
++        "@babel/runtime": "^7.1.2",
++        "loose-envify": "^1.2.0",
++        "resolve-pathname": "^3.0.0",
++        "tiny-invariant": "^1.0.2",
++        "tiny-warning": "^1.0.0",
++        "value-equal": "^1.0.1"
++      }
++    },
++    "node_modules/react-router/node_modules/history": {
++      "version": "4.10.1",
++      "resolved": "https://registry.npmjs.org/history/-/history-4.10.1.tgz",
++      "integrity": "sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==",
++      "dependencies": {
++        "@babel/runtime": "^7.1.2",
++        "loose-envify": "^1.2.0",
++        "resolve-pathname": "^3.0.0",
++        "tiny-invariant": "^1.0.2",
++        "tiny-warning": "^1.0.0",
++        "value-equal": "^1.0.1"
++      }
++    },
+     "node_modules/react-share": {
+       "version": "4.4.0",
+       "resolved": "https://registry.npmjs.org/react-share/-/react-share-4.4.0.tgz",
+@@ -24494,6 +24562,14 @@
+       "integrity": "sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==",
+       "dev": true
+     },
++    "node_modules/split-on-first": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/split-on-first/-/split-on-first-1.1.0.tgz",
++      "integrity": "sha512-43ZssAJaMusuKWL8sKUBQXHWOpq8d6CfN/u1p4gUzfJkM05C8rxTmYrkIPTXapZpORA6LkkzcUulJ8FqA7Uudw==",
++      "engines": {
++        "node": ">=6"
++      }
++    },
+     "node_modules/split-string": {
+       "version": "3.1.0",
+       "resolved": "https://registry.npmjs.org/split-string/-/split-string-3.1.0.tgz",
+@@ -30002,6 +30078,19 @@
+             "follow-redirects": "^1.14.8"
+           }
+         },
++        "history": {
++          "version": "4.10.1",
++          "resolved": "https://registry.npmjs.org/history/-/history-4.10.1.tgz",
++          "integrity": "sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==",
++          "requires": {
++            "@babel/runtime": "^7.1.2",
++            "loose-envify": "^1.2.0",
++            "resolve-pathname": "^3.0.0",
++            "tiny-invariant": "^1.0.2",
++            "tiny-warning": "^1.0.0",
++            "value-equal": "^1.0.1"
++          }
++        },
+         "react-intl": {
+           "version": "2.9.0",
+           "resolved": "https://registry.npmjs.org/react-intl/-/react-intl-2.9.0.tgz",
+@@ -33808,6 +33897,18 @@
+           "dev": true,
+           "optional": true
+         },
++        "query-string": {
++          "version": "5.1.1",
++          "resolved": "https://registry.npmjs.org/query-string/-/query-string-5.1.1.tgz",
++          "integrity": "sha512-gjWOsm2SoGlgLEdAGt7a6slVOk9mGiXmPFMqrEhLQ68rhQuBnpfs3+EmlvqKyxnCo9/PPlF+9MtY02S1aFg+Jw==",
++          "dev": true,
++          "optional": true,
++          "requires": {
++            "decode-uri-component": "^0.2.0",
++            "object-assign": "^4.1.0",
++            "strict-uri-encode": "^1.0.0"
++          }
++        },
+         "sort-keys": {
+           "version": "2.0.0",
+           "resolved": "https://registry.npmjs.org/sort-keys/-/sort-keys-2.0.0.tgz",
+@@ -34825,8 +34926,7 @@
+     "decode-uri-component": {
+       "version": "0.2.0",
+       "resolved": "https://registry.npmjs.org/decode-uri-component/-/decode-uri-component-0.2.0.tgz",
+-      "integrity": "sha1-6zkTMzRYd1y4TNGh+uBiEGu4dUU=",
+-      "dev": true
++      "integrity": "sha1-6zkTMzRYd1y4TNGh+uBiEGu4dUU="
+     },
+     "decompress": {
+       "version": "4.2.1",
+@@ -36843,6 +36943,11 @@
+         "to-regex-range": "^5.0.1"
+       }
+     },
++    "filter-obj": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/filter-obj/-/filter-obj-1.1.0.tgz",
++      "integrity": "sha512-8rXg1ZnX7xzy2NGDVkBVaAy+lSlPNwad13BtgSlLuxfIslyt5Vg64U7tFcCt4WS1R0hvtnQybT/IyCkGZ3DpXQ=="
++    },
+     "finalhandler": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/finalhandler/-/finalhandler-1.1.2.tgz",
+@@ -37709,16 +37814,11 @@
+       "dev": true
+     },
+     "history": {
+-      "version": "4.10.1",
+-      "resolved": "https://registry.npmjs.org/history/-/history-4.10.1.tgz",
+-      "integrity": "sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==",
++      "version": "5.3.0",
++      "resolved": "https://registry.npmjs.org/history/-/history-5.3.0.tgz",
++      "integrity": "sha512-ZqaKwjjrAYUYfLG+htGaIIZ4nioX2L70ZUMIFysS3xvBsSG4x/n1V6TXV3N8ZYNuFGlDirFg32T7B6WOUPDYcQ==",
+       "requires": {
+-        "@babel/runtime": "^7.1.2",
+-        "loose-envify": "^1.2.0",
+-        "resolve-pathname": "^3.0.0",
+-        "tiny-invariant": "^1.0.2",
+-        "tiny-warning": "^1.0.0",
+-        "value-equal": "^1.0.1"
++        "@babel/runtime": "^7.7.6"
+       }
+     },
+     "hoist-non-react-statics": {
+@@ -44492,15 +44592,21 @@
+       }
+     },
+     "query-string": {
+-      "version": "5.1.1",
+-      "resolved": "https://registry.npmjs.org/query-string/-/query-string-5.1.1.tgz",
+-      "integrity": "sha512-gjWOsm2SoGlgLEdAGt7a6slVOk9mGiXmPFMqrEhLQ68rhQuBnpfs3+EmlvqKyxnCo9/PPlF+9MtY02S1aFg+Jw==",
+-      "dev": true,
+-      "optional": true,
++      "version": "7.1.1",
++      "resolved": "https://registry.npmjs.org/query-string/-/query-string-7.1.1.tgz",
++      "integrity": "sha512-MplouLRDHBZSG9z7fpuAAcI7aAYjDLhtsiVZsevsfaHWDS2IDdORKbSd1kWUA+V4zyva/HZoSfpwnYMMQDhb0w==",
+       "requires": {
+         "decode-uri-component": "^0.2.0",
+-        "object-assign": "^4.1.0",
+-        "strict-uri-encode": "^1.0.0"
++        "filter-obj": "^1.1.0",
++        "split-on-first": "^1.0.0",
++        "strict-uri-encode": "^2.0.0"
++      },
++      "dependencies": {
++        "strict-uri-encode": {
++          "version": "2.0.0",
++          "resolved": "https://registry.npmjs.org/strict-uri-encode/-/strict-uri-encode-2.0.0.tgz",
++          "integrity": "sha512-QwiXZgpRcKkhTj2Scnn++4PKtWsH0kpzZ62L2R6c/LUVYv7hVnZqcg2+sMuT6R7Jusu1vviK/MFsu6kNJfWlEQ=="
++        }
+       }
+     },
+     "queue-microtask": {
+@@ -44988,6 +45094,21 @@
+         "react-is": "^16.6.0",
+         "tiny-invariant": "^1.0.2",
+         "tiny-warning": "^1.0.0"
++      },
++      "dependencies": {
++        "history": {
++          "version": "4.10.1",
++          "resolved": "https://registry.npmjs.org/history/-/history-4.10.1.tgz",
++          "integrity": "sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==",
++          "requires": {
++            "@babel/runtime": "^7.1.2",
++            "loose-envify": "^1.2.0",
++            "resolve-pathname": "^3.0.0",
++            "tiny-invariant": "^1.0.2",
++            "tiny-warning": "^1.0.0",
++            "value-equal": "^1.0.1"
++          }
++        }
+       }
+     },
+     "react-router-dom": {
+@@ -45002,6 +45123,21 @@
+         "react-router": "5.2.1",
+         "tiny-invariant": "^1.0.2",
+         "tiny-warning": "^1.0.0"
++      },
++      "dependencies": {
++        "history": {
++          "version": "4.10.1",
++          "resolved": "https://registry.npmjs.org/history/-/history-4.10.1.tgz",
++          "integrity": "sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==",
++          "requires": {
++            "@babel/runtime": "^7.1.2",
++            "loose-envify": "^1.2.0",
++            "resolve-pathname": "^3.0.0",
++            "tiny-invariant": "^1.0.2",
++            "tiny-warning": "^1.0.0",
++            "value-equal": "^1.0.1"
++          }
++        }
+       }
+     },
+     "react-share": {
+@@ -46498,6 +46634,11 @@
+         }
+       }
+     },
++    "split-on-first": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/split-on-first/-/split-on-first-1.1.0.tgz",
++      "integrity": "sha512-43ZssAJaMusuKWL8sKUBQXHWOpq8d6CfN/u1p4gUzfJkM05C8rxTmYrkIPTXapZpORA6LkkzcUulJ8FqA7Uudw=="
++    },
+     "split-string": {
+       "version": "3.1.0",
+       "resolved": "https://registry.npmjs.org/split-string/-/split-string-3.1.0.tgz",
+diff --git a/package.json b/package.json
+index c780b0b..178b18d 100644
+--- a/package.json
++++ b/package.json
+@@ -44,9 +44,11 @@
+     "@reduxjs/toolkit": "1.8.1",
+     "classnames": "2.3.1",
+     "core-js": "3.22.2",
++    "history": "^5.3.0",
+     "js-cookie": "3.0.1",
+     "lodash.camelcase": "4.3.0",
+     "prop-types": "15.8.1",
++    "query-string": "^7.1.1",
+     "react": "16.14.0",
+     "react-dom": "16.14.0",
+     "react-helmet": "6.1.0",
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 4ee2988..73fa6c0 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -450,6 +450,7 @@ describe('CoursewareContainer', () => {
+           has_access: false,
+           error_code: errorCode,
+           additional_context_user_message: 'uhoh oh no', // only used by audit_expired
++          developer_message: 'data_sharing_consent_url', // only used by data_sharing_access_required
+         },
+       });
+ 
+@@ -475,6 +476,13 @@ describe('CoursewareContainer', () => {
+       expect(global.location.href).toEqual(`http://localhost/redirect/survey/${courseMetadata.id}`);
+     });
+ 
++    it('should go to consent page for a data_sharing_access_required error code', async () => {
++      setUpWithDeniedStatus('data_sharing_access_required');
++      await loadContainer();
++
++      expect(global.location.href).toEqual('http://localhost/redirect/consent?consentPath=data_sharing_consent_url');
++    });
++
+     it('should go to course home for an authentication_required error code', async () => {
+       const { courseMetadata } = setUpWithDeniedStatus('authentication_required');
+       await loadContainer();
+diff --git a/src/courseware/CoursewareRedirectLandingPage.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+index 7cc2b9d..1e62d74 100644
+--- a/src/courseware/CoursewareRedirectLandingPage.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -4,6 +4,7 @@ import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { PageRoute } from '@edx/frontend-platform/react';
+ 
++import queryString from 'query-string';
+ import PageLoading from '../generic/PageLoading';
+ 
+ export default () => {
+@@ -32,6 +33,13 @@ export default () => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}/dashboard${location.search}`);
+           }}
+         />
++        <PageRoute
++          path={`${path}/consent/`}
++          render={({ location }) => {
++            const { consentPath } = queryString.parse(location.search);
++            global.location.assign(`${getConfig().LMS_BASE_URL}${consentPath}`);
++          }}
++        />
+       </Switch>
+     </div>
+   );
+diff --git a/src/courseware/CoursewareRedirectLandingPage.test.jsx b/src/courseware/CoursewareRedirectLandingPage.test.jsx
+new file mode 100644
+index 0000000..ecede53
+--- /dev/null
++++ b/src/courseware/CoursewareRedirectLandingPage.test.jsx
+@@ -0,0 +1,37 @@
++import React from 'react';
++import { render } from '@testing-library/react';
++import { Router } from 'react-router';
++import { createMemoryHistory } from 'history';
++import CoursewareRedirectLandingPage from './CoursewareRedirectLandingPage';
++
++const redirectUrl = jest.fn();
++
++jest.mock('@edx/frontend-platform/analytics');
++
++jest.mock('react-router', () => ({
++  ...jest.requireActual('react-router'),
++  useRouteMatch: () => ({
++    path: '/redirect',
++  }),
++}));
++
++describe('CoursewareRedirectLandingPage', () => {
++  beforeEach(async () => {
++    delete global.location;
++    global.location = { assign: redirectUrl };
++  });
++
++  it('Redirects to correct consent URL', () => {
++    const history = createMemoryHistory({
++      initialEntries: ['/redirect/consent/?consentPath=%2Fgrant_data_sharing_consent'],
++    });
++
++    render(
++      <Router history={history}>
++        <CoursewareRedirectLandingPage />
++      </Router>,
++    );
++
++    expect(redirectUrl).toHaveBeenCalledWith('http://localhost:18000/grant_data_sharing_consent');
++  });
++});
+diff --git a/src/shared/access.js b/src/shared/access.js
+index 4ac2840..a60a21a 100644
+--- a/src/shared/access.js
++++ b/src/shared/access.js
+@@ -18,6 +18,9 @@ export function getAccessDeniedRedirectUrl(courseId, activeTabSlug, courseAccess
+     case 'survey_required':
+       url = `/redirect/survey/${courseId}`;
+       break;
++    case 'data_sharing_access_required':
++      url = `/redirect/consent?consentPath=${encodeURIComponent(courseAccess.developerMessage)}`;
++      break;
+     case 'unfulfilled_milestones':
+       url = '/redirect/dashboard';
+       break;
+-- 
+2.34.1
+

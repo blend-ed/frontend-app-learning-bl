@@ -1,0 +1,343 @@
+From 2932d989766a984e86cac2bc07b26d1a28cf2623 Mon Sep 17 00:00:00 2001
+From: connorhaugh <49422820+connorhaugh@users.noreply.github.com>
+Date: Tue, 21 Sep 2021 15:39:52 -0400
+Subject: [PATCH 0655/1021] feat:  breadcrumb rolloutout flag + analytics
+ (#647)
+
+As an addendum to https://openedx.atlassian.net/browse/TNL-7107, we want to hide rollout behind a frontend feature flag added in https://github.com/edx/edx-internal/pull/5489. We also want to report these events to the events api with name `edx.ui.lms.jump_nav.selected`. Doummentation to add this event is listed at the following PR: https://github.com/edx/edx-documentation/pull/1982
+---
+ .env                                          |   1 +
+ .env.development                              |   1 +
+ .env.test                                     |   1 +
+ README.rst                                    |   6 +
+ src/courseware/course/Course.test.jsx         |  25 ++++
+ src/courseware/course/CourseBreadcrumbs.jsx   |  39 ++++--
+ .../course/CourseBreadcrumbs.test.jsx         | 117 ++++++++++++++++++
+ src/index.jsx                                 |   1 +
+ 8 files changed, 181 insertions(+), 10 deletions(-)
+ create mode 100644 src/courseware/course/CourseBreadcrumbs.test.jsx
+
+diff --git a/.env b/.env
+index a8f64ec..8864ad8 100644
+--- a/.env
++++ b/.env
+@@ -37,3 +37,4 @@ TWITTER_HASHTAG=''
+ TWITTER_URL=''
+ USER_INFO_COOKIE_NAME=''
+ SESSION_COOKIE_DOMAIN=''
++ENABLE_JUMPNAV='true'
+diff --git a/.env.development b/.env.development
+index 3404a92..61164b0 100644
+--- a/.env.development
++++ b/.env.development
+@@ -37,3 +37,4 @@ TWITTER_HASHTAG='myedxjourney'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+ SESSION_COOKIE_DOMAIN='localhost'
++ENABLE_JUMPNAV='true'
+diff --git a/.env.test b/.env.test
+index 4a1445b..3b844f3 100644
+--- a/.env.test
++++ b/.env.test
+@@ -36,3 +36,4 @@ TERMS_OF_SERVICE_URL='https://www.edx.org/edx-terms-service'
+ TWITTER_HASHTAG='myedxjourney'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
++ENABLE_JUMPNAV='true'
+diff --git a/README.rst b/README.rst
+index b19b4d0..4af4a22 100644
+--- a/README.rst
++++ b/README.rst
+@@ -109,3 +109,9 @@ TWITTER_URL
+   unless this is set. Optional.
+ 
+   Example: https://twitter.com/edXOnline
++
++ENABLE_JUMPNAV
++  Enables the new Jump Navigation feature in the course breadcrumbs, defaulted to  the string 'true'.
++  Disable to have simple hyperlinks for breadcrumbs. Setting it to any other value but 'true' ('false','I love flags', 'etc' would disable the Jumpnav).
++  This feature flag is slated to be removed as jumpnav becomes default. Follow the progress of this ticket here:
++  https://openedx.atlassian.net/browse/TNL-8678
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index ea454d2..26512c8 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -91,6 +91,31 @@ describe('Course', () => {
+     expect(notificationTrigger).not.toHaveClass('trigger-active');
+   });
+ 
++  it('renders course breadcrumbs as expected', async () => {
++    const courseMetadata = Factory.build('courseMetadata');
++    const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
++      'block',
++      { type: 'vertical' },
++      { courseId: courseMetadata.id },
++    ));
++    const testStore = await initializeTestStore({ courseMetadata, unitBlocks }, false);
++    const { courseware, models } = testStore.getState();
++    const { courseId, sequenceId } = courseware;
++    const testData = {
++      ...mockData,
++      courseId,
++      sequenceId,
++      unitId: Object.values(models.units)[1].id, // Corner cases are already covered in `Sequence` tests.
++    };
++    render(<Course {...testData} />, { store: testStore });
++
++    loadUnit();
++    await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
++    // expect the section and sequence "titles" to be loaded in as breadcrumb labels.
++    expect(screen.getByText('cdabcdabcdabcdabcdabcdabcdabcd13')).toBeInTheDocument();
++    expect(screen.getByText('cdabcdabcdabcdabcdabcdabcdabcd12')).toBeInTheDocument();
++  });
++
+   it('passes handlers to the sequence', async () => {
+     const nextSequenceHandler = jest.fn();
+     const previousSequenceHandler = jest.fn();
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index e6b4e85..7b918bb 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -7,6 +7,10 @@ import { faHome } from '@fortawesome/free-solid-svg-icons';
+ import { useSelector } from 'react-redux';
+ import { Hyperlink, MenuItem, SelectMenu } from '@edx/paragon';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import {
++  sendTrackingLogEvent,
++  sendTrackEvent,
++} from '@edx/frontend-platform/analytics';
+ import { useModel, useModels } from '../../generic/model-store';
+ /** [MM-P2P] Experiment */
+ import { MMP2PFlyoverTrigger } from '../../experiments/mm-p2p';
+@@ -16,14 +20,31 @@ function CourseBreadcrumb({
+ }) {
+   const defaultContent = content.filter(destination => destination.default)[0];
+   const { administrator } = getAuthenticatedUser();
++  function logEvent(target) {
++    const eventName = 'edx.ui.lms.jump_nav.selected';
++    const payload = {
++      target_name: target.label,
++      id: target.id,
++      current_id: defaultContent.id,
++      widget_placement: 'breadcrumb',
++    };
++    sendTrackEvent(eventName, payload);
++    sendTrackingLogEvent(eventName, payload);
++  }
+ 
+   return (
+     <>
+       {withSeparator && (
+-        <li className="mx-2 text-primary-500" role="presentation" aria-hidden>/</li>
++        <li className="mx-2 text-primary-500 text-truncate text-nowrap" role="presentation" aria-hidden>/</li>
+       )}
+-      <li>
+-        {process.env.NODE_ENV !== 'test' || content.length < 2 || !administrator
++
++      <li style={{
++        overflow: 'hidden',
++        textOverflow: 'ellipsis',
++        whiteSpace: 'nowrap',
++      }}
++      >
++        { getConfig().ENABLE_JUMPNAV !== 'true' || content.length < 2 || !administrator
+           ? (
+             <a className="text-primary-500" href={defaultContent.url}>{defaultContent.label}
+             </a>
+@@ -34,7 +55,8 @@ function CourseBreadcrumb({
+                 <MenuItem
+                   as={Hyperlink}
+                   defaultSelected={item.default}
+-                  href={item.url}
++                  destination={item.url}
++                  onClick={logEvent(item)}
+                 >
+                   {item.label}
+                 </MenuItem>
+@@ -46,7 +68,6 @@ function CourseBreadcrumb({
+     </>
+   );
+ }
+-
+ CourseBreadcrumb.propTypes = {
+   content: PropTypes.arrayOf(
+     PropTypes.shape({
+@@ -72,7 +93,7 @@ export default function CourseBreadcrumbs({
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+   const courseStatus = useSelector(state => state.courseware.courseStatus);
+-  const sections = Object.fromEntries(useModels('sections', course.sectionIds).map(section => [section.id, section]));
++  const sections = course ? Object.fromEntries(useModels('sections', course.sectionIds).map(section => [section.id, section])) : null;
+   const possibleSequences = sections && sectionId ? sections[sectionId].sequenceIds : [];
+   const sequences = Object.fromEntries(useModels('sequences', possibleSequences).map(sequence => [sequence.id, sequence]));
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+@@ -97,13 +118,12 @@ export default function CourseBreadcrumbs({
+     }
+     return temp;
+   }, [courseStatus, sections, sequences]);
+-
+   return (
+     <nav aria-label="breadcrumb" className="my-1 d-inline-block col-sm-10">
+       <ol className="list-unstyled d-flex align-items-center m-0">
+         <li>
+           <a
+-            href={`${getConfig().LMS_BASE_URL}/courses/${course.id}/course/`}
++            href={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course/`}
+             className="flex-shrink-0 text-primary"
+           >
+             <FontAwesomeIcon icon={faHome} className="mr-2" />
+@@ -121,7 +141,7 @@ export default function CourseBreadcrumbs({
+           />
+         ))}
+         {/** [MM-P2P] Experiment */}
+-        {mmp2p.state.isEnabled && (
++        {mmp2p.state && mmp2p.state.isEnabled && (
+           <MMP2PFlyoverTrigger options={mmp2p} />
+         )}
+       </ol>
+@@ -144,7 +164,6 @@ CourseBreadcrumbs.propTypes = {
+ CourseBreadcrumbs.defaultProps = {
+   sectionId: null,
+   sequenceId: null,
+-
+   /** [MM-P2P] Experiment */
+   mmp2p: {},
+ };
+diff --git a/src/courseware/course/CourseBreadcrumbs.test.jsx b/src/courseware/course/CourseBreadcrumbs.test.jsx
+new file mode 100644
+index 0000000..c2fff42
+--- /dev/null
++++ b/src/courseware/course/CourseBreadcrumbs.test.jsx
+@@ -0,0 +1,117 @@
++import React from 'react';
++import { screen, render, fireEvent } from '@testing-library/react';
++import { useSelector } from 'react-redux';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { getConfig } from '@edx/frontend-platform';
++import { useModel, useModels } from '../../generic/model-store';
++import CourseBreadcrumbs from './CourseBreadcrumbs';
++
++jest.mock('@edx/frontend-platform');
++jest.mock('react-redux');
++jest.mock('@edx/frontend-platform/analytics');
++
++// Remove When Fully rolled out>>>
++jest.mock('../../generic/model-store');
++jest.mock('@edx/frontend-platform/auth');
++getConfig.mockImplementation(() => ({ ENABLE_JUMPNAV: 'true' }));
++getAuthenticatedUser.mockImplementation(() => ({ administrator: true }));
++// ^^^^Remove When Fully rolled out
++
++useSelector.mockImplementation(() => 'loaded');
++useModels.mockImplementation((name) => {
++  if (name === 'sections') {
++    return [
++      {
++        courseId: 'course-v1:edX+DemoX+Demo_Course',
++        id: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@d8a6192ade314473a78242dfeedfbf5b',
++        sequenceIds: ['block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction'],
++        title: 'Introduction',
++      },
++      {
++        courseId: 'course-v1:edX+DemoX+Demo_Course',
++        id: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
++        sequenceIds: ['block-v1:edX+DemoX+Demo_Course+type@sequential+block@19a30717eff543078a5d94ae9d6c18a5',
++          'block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions'],
++        title: 'Example Week 1: Getting Started',
++      },
++    ];
++  }
++  return [
++    {
++      id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@19a30717eff543078a5d94ae9d6c18a5',
++      sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
++      title: 'Lesson 1 - Getting Started',
++      unitIds: [
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@867dddb6f55d410caaa9c1eb9c6743ec',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@4f6c1b4e316a419ab5b6bf30e6c708e9',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@3dc16db8d14842e38324e95d4030b8a0',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@4a1bba2a403f40bca5ec245e945b0d76',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@256f17a44983429fb1a60802203ee4e0',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@e3601c0abee6427d8c17e6d6f8fdddd1',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@134df56c516a4a0dbb24dd5facef746e',
++      ],
++    },
++    {
++      id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions',
++      sectionId: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
++      title: 'Homework - Question Styles',
++      unitIds: [
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@2152d4a4aadc4cb0af5256394a3d1fc7',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@47dbd5f836544e61877a483c0b75606c',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@54bb9b142c6c4c22afc62bcb628f0e68',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0c92347a5c00',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_1fef54c2b23b',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@2889db1677a549abb15eb4d886f95d1c',
++        'block-v1:edX+DemoX+Demo_Course+type@vertical+block@e8a5cc2aed424838853defab7be45e42',
++      ],
++    },
++  ];
++});
++useModel.mockImplementation(() => ({
++  sectionIds: ['block-v1:edX+DemoX+Demo_Course+type@chapter+block@d8a6192ade314473a78242dfeedfbf5b',
++    'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations'],
++}));
++
++describe('CourseBreadcrumbs', () => {
++  jest.spyOn(React, 'useMemo').mockImplementation(() => [
++    [
++      {
++        default: false,
++        id: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@d8a6192ade314473a78242dfeedfbf5b',
++        label: 'Introduction',
++        url: 'http://localhost:2000/course/course-v1:edX+DemoX+Demo_Course/block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction',
++      },
++      {
++        default: true,
++        id: 'block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations',
++        label: 'Example Week 1: Getting Started',
++        url: 'http://localhost:2000/course/course-v1:edX+DemoX+Demo_Course/block-v1:edX+DemoX+Demo_Course+type@sequential+block@19a30717eff543078a5d94ae9d6c18a5',
++      },
++    ],
++    [
++      {
++        id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@simulations', label: "Lesson 2 - Let's Get Interactive!", default: true, url: 'http://localhost:2000/course/course-v1:edX+DemoX+D…e@vertical+block@d0d804e8863c4a95a659c04d8a2b2bc0',
++      },
++      {
++        id: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@175e76c4951144a29d46211361266e0e', label: 'Homework - Essays', default: false, url: 'http://localhost:2000/course/course-v1:edX+DemoX+D…e@vertical+block@fb79dcbad35b466a8c6364f8ffee9050',
++      },
++    ],
++  ]);
++  render(
++    <CourseBreadcrumbs
++      courseId="course-v1:edX+DemoX+Demo_Course"
++      sectionId="block-v1:edX+DemoX+Demo_Course+type@chapter+block@interactive_demonstrations"
++      sequenceId="block-v1:edX+DemoX+Demo_Course+type@sequential+block@basic_questions"
++    />,
++  );
++  it('renders course breadcrumbs as expected, handles clicks', async () => {
++    expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toBeInTheDocument();
++    expect(screen.queryAllByRole('button')).toHaveLength(2);
++    const sectionButton = screen.getByText('Example Week 1: Getting Started');
++    expect(screen.queryAllByRole('link')).toHaveLength(1);
++    fireEvent.click(sectionButton);
++    expect(screen.queryAllByRole('link')).toHaveLength(2);
++    const menuItem = screen.queryAllByRole('link')[0];
++    fireEvent.click(menuItem);
++  });
++});
+diff --git a/src/index.jsx b/src/index.jsx
+index f25efc0..a6c4c85 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -92,6 +92,7 @@ initialize({
+         CONTACT_URL: process.env.CONTACT_URL || null,
+         CREDENTIALS_BASE_URL: process.env.CREDENTIALS_BASE_URL || null,
+         ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
++        ENABLE_JUMPNAV: process.env.ENABLE_JUMPNAV || null,
+         INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
+         SEARCH_CATALOG_URL: process.env.SEARCH_CATALOG_URL || null,
+         SOCIAL_UTM_MILESTONE_CAMPAIGN: process.env.SOCIAL_UTM_MILESTONE_CAMPAIGN || null,
+-- 
+2.34.1
+

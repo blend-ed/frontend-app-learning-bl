@@ -1,0 +1,167 @@
+From 56ea6d46d46f708bb386792573a7311b8fe00e06 Mon Sep 17 00:00:00 2001
+From: Emma <egreen@edx.org>
+Date: Wed, 21 Jul 2021 15:51:50 -0400
+Subject: [PATCH 0570/1021] fix: dfferentiate upsell link eventing between
+ in_course and course_home
+
+---
+ .../upgradeNotificationData.factory.js        |  1 +
+ src/course-home/outline-tab/OutlineTab.jsx    |  3 ++-
+ src/courseware/course/NotificationTray.jsx    |  3 ++-
+ .../UpgradeNotification.jsx                   | 12 +++++----
+ .../UpgradeNotification.test.jsx              | 27 ++++++++++++++++++-
+ 5 files changed, 38 insertions(+), 8 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/upgradeNotificationData.factory.js b/src/course-home/data/__factories__/upgradeNotificationData.factory.js
+index fcb7524..6411f7e 100644
+--- a/src/course-home/data/__factories__/upgradeNotificationData.factory.js
++++ b/src/course-home/data/__factories__/upgradeNotificationData.factory.js
+@@ -8,6 +8,7 @@ Factory.define('upgradeNotificationData')
+   .option('accessExpiration', null)
+   .option('contentTypeGatingEnabled', false)
+   .attr('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .attr('upsellPageName', 'test')
+   .attr('verifiedMode', ['host'], (host) => ({
+     access_expiration_date: '2050-01-01T12:00:00',
+     currency: 'USD',
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index a6183bf..3b14199 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -224,11 +224,12 @@ function OutlineTab({ intl }) {
+                   verifiedMode={verifiedMode}
+                   accessExpiration={accessExpiration}
+                   contentTypeGatingEnabled={datesBannerInfo.contentTypeGatingEnabled}
++                  upsellPageName="course_home"
+                   userTimezone={userTimezone}
++                  shouldDisplayBorder
+                   timeOffsetMillis={timeOffsetMillis}
+                   courseId={courseId}
+                   org={org}
+-                  shouldDisplayBorder
+                 />
+               )}
+             <CourseDates
+diff --git a/src/courseware/course/NotificationTray.jsx b/src/courseware/course/NotificationTray.jsx
+index 779853b..bb5fef1 100644
+--- a/src/courseware/course/NotificationTray.jsx
++++ b/src/courseware/course/NotificationTray.jsx
+@@ -58,11 +58,12 @@ function NotificationTray({
+             verifiedMode={verifiedMode}
+             accessExpiration={accessExpiration}
+             contentTypeGatingEnabled={contentTypeGatingEnabled}
++            upsellPageName="in_course"
+             userTimezone={userTimezone}
++            shouldDisplayBorder={false}
+             timeOffsetMillis={timeOffsetMillis}
+             courseId={courseId}
+             org={org}
+-            shouldDisplayBorder={false}
+           />
+         ) : <p className="notification-tray-content">{intl.formatMessage(messages.noNotificationsMessage)}</p>}
+       </div>
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+index c929c90..935a51f 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -265,10 +265,11 @@ function UpgradeNotification({
+   courseId,
+   offer,
+   org,
++  shouldDisplayBorder,
+   timeOffsetMillis,
++  upsellPageName,
+   userTimezone,
+   verifiedMode,
+-  shouldDisplayBorder,
+ }) {
+   const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+   const correctedTime = new Date(Date.now() + timeOffsetMillis);
+@@ -305,9 +306,9 @@ function UpgradeNotification({
+     sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
+       ...eventProperties,
+       linkCategory: 'green_upgrade',
+-      linkName: 'course_home_green',
++      linkName: `${upsellPageName}_green`,
+       linkType: 'button',
+-      pageName: 'course_home',
++      pageName: upsellPageName,
+     });
+   };
+ 
+@@ -427,24 +428,25 @@ UpgradeNotification.propTypes = {
+     percentage: PropTypes.number,
+     code: PropTypes.string,
+   }),
++  shouldDisplayBorder: PropTypes.bool,
+   timeOffsetMillis: PropTypes.number,
++  upsellPageName: PropTypes.string.isRequired,
+   userTimezone: PropTypes.string,
+   verifiedMode: PropTypes.shape({
+     currencySymbol: PropTypes.string.isRequired,
+     price: PropTypes.number.isRequired,
+     upgradeUrl: PropTypes.string.isRequired,
+   }),
+-  shouldDisplayBorder: PropTypes.bool,
+ };
+ 
+ UpgradeNotification.defaultProps = {
+   accessExpiration: null,
+   contentTypeGatingEnabled: false,
+   offer: null,
++  shouldDisplayBorder: null,
+   timeOffsetMillis: 0,
+   userTimezone: null,
+   verifiedMode: null,
+-  shouldDisplayBorder: null,
+ };
+ 
+ export default injectIntl(UpgradeNotification);
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.test.jsx b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+index e2b1f68..d00dea6 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.test.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+@@ -1,7 +1,14 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ 
+-import { initializeMockApp, render, screen } from '../../setupTest';
++import {
++  fireEvent,
++  initializeMockApp,
++  render,
++  screen,
++  waitFor,
++} from '../../setupTest';
+ import UpgradeNotification from './UpgradeNotification';
+ 
+ initializeMockApp();
+@@ -17,6 +24,24 @@ describe('Upgrade Notification', () => {
+     render(<UpgradeNotification {...upgradeNotificationData} />);
+   }
+ 
++  it('sends upgrade click info to segment', async () => {
++    sendTrackEvent.mockClear();
++    buildAndRender({ pageName: 'test' });
++
++    const upgradeButton = await waitFor(() => screen.queryByRole('link', { name: 'Upgrade for $149' }));
++    fireEvent.click(upgradeButton);
++
++    expect(sendTrackEvent).toHaveBeenCalledTimes(3);
++    expect(sendTrackEvent).toHaveBeenNthCalledWith(3, 'edx.bi.ecommerce.upsell_links_clicked', {
++      org_key: 'edX',
++      courserun_key: 'course-v1:edX+DemoX+Demo_Course',
++      linkCategory: 'green_upgrade',
++      linkName: 'test_green',
++      linkType: 'button',
++      pageName: 'test',
++    });
++  });
++
+   it('does not render when there is no verified mode', async () => {
+     buildAndRender({ verifiedMode: null });
+     expect(screen.queryByRole('link', { name: 'Upgrade for $149' })).not.toBeInTheDocument();
+-- 
+2.34.1
+

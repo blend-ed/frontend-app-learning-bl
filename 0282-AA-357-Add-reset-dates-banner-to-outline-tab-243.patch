@@ -1,0 +1,277 @@
+From 2d5af74b1b92b128dca36bd7ab81728e7541cc2e Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Thu, 15 Oct 2020 13:44:04 -0400
+Subject: [PATCH 0282/1021] AA-357: Add reset dates banner to outline tab
+ (#243)
+
+---
+ .../__factories__/outlineTabData.factory.js   |  5 ++++
+ .../data/__snapshots__/redux.test.js.snap     |  6 ++++
+ src/course-home/data/api.js                   |  4 +++
+ src/course-home/dates-banner/DatesBanner.jsx  |  9 +++---
+ .../dates-banner/DatesBannerContainer.jsx     | 29 ++++++++++++-------
+ src/course-home/dates-tab/DatesTab.jsx        | 20 ++++++++++++-
+ src/course-home/outline-tab/OutlineTab.jsx    | 12 ++++++++
+ .../course/course-exit/CourseCelebration.jsx  |  4 +--
+ 8 files changed, 71 insertions(+), 18 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 6147682..f5da722 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -25,6 +25,11 @@ Factory.define('outlineTabData')
+     can_enroll: true,
+     extra_text: 'Contact the administrator.',
+   })
++  .attr('dates_banner_info', {
++    content_type_gating_enabled: false,
++    missed_gated_content: false,
++    missed_deadlines: false,
++  })
+   .attr('dates_widget', {
+     courseDateBlocks: [],
+     userTimezone: 'UTC',
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 08c8efe..f88dc48 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -386,6 +386,11 @@ Object {
+             "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/bookmarks/",
+           },
+         ],
++        "datesBannerInfo": Object {
++          "contentTypeGatingEnabled": false,
++          "missedDeadlines": false,
++          "missedGatedContent": false,
++        },
+         "datesWidget": Object {
+           "courseDateBlocks": Array [],
+           "userTimezone": "UTC",
+@@ -395,6 +400,7 @@ Object {
+           "extraText": "Contact the administrator.",
+         },
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
++        "hasEnded": undefined,
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "offerHtml": "<div>Great offer here</div>",
+         "resumeCourse": Object {
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 8dd05b4..9e47a6f 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -145,9 +145,11 @@ export async function getOutlineTabData(courseId) {
+   const courseGoals = camelCaseObject(data.course_goals);
+   const courseExpiredHtml = data.course_expired_html;
+   const courseTools = camelCaseObject(data.course_tools);
++  const datesBannerInfo = camelCaseObject(data.dates_banner_info);
+   const datesWidget = camelCaseObject(data.dates_widget);
+   const enrollAlert = camelCaseObject(data.enroll_alert);
+   const handoutsHtml = data.handouts_html;
++  const hasEnded = data.has_ended;
+   const offerHtml = data.offer_html;
+   const resumeCourse = camelCaseObject(data.resume_course);
+   const welcomeMessageHtml = data.welcome_message_html;
+@@ -157,9 +159,11 @@ export async function getOutlineTabData(courseId) {
+     courseGoals,
+     courseExpiredHtml,
+     courseTools,
++    datesBannerInfo,
+     datesWidget,
+     enrollAlert,
+     handoutsHtml,
++    hasEnded,
+     offerHtml,
+     resumeCourse,
+     welcomeMessageHtml,
+diff --git a/src/course-home/dates-banner/DatesBanner.jsx b/src/course-home/dates-banner/DatesBanner.jsx
+index 1417903..c418ac3 100644
+--- a/src/course-home/dates-banner/DatesBanner.jsx
++++ b/src/course-home/dates-banner/DatesBanner.jsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button } from '@edx/paragon';
+ 
+ import messages from './messages';
+ 
+@@ -14,17 +15,17 @@ function DatesBanner(props) {
+   return (
+     <div className="banner rounded my-4 p-4 container-fluid border border-primary-200 bg-info-100">
+       <div className="row w-100 m-0 justify-content-start justify-content-sm-between">
+-        <div className={name === 'datesTabInfoBanner' ? 'col-12' : 'col-12 col-md-9'}>
++        <div className={name === 'datesTabInfoBanner' ? 'col-12' : 'col-12 col-lg-9'}>
+           <strong>
+             {intl.formatMessage(messages[`datesBanner.${name}.header`])}
+           </strong>
+           {intl.formatMessage(messages[`datesBanner.${name}.body`])}
+         </div>
+         {bannerClickHandler && (
+-          <div className="col-auto col-md-3 p-md-0 d-inline-flex align-items-center justify-content-start justify-content-md-center">
+-            <button type="button" className="btn rounded align-self-center border border-primary bg-white mt-3 mt-md-0 font-weight-bold" onClick={bannerClickHandler}>
++          <div className="col-auto col-lg-3 p-lg-0 d-inline-flex align-items-center justify-content-start justify-content-lg-center">
++            <Button variant="outline-primary" className="align-self-center bg-white mt-3 mt-lg-0" onClick={bannerClickHandler}>
+               {intl.formatMessage(messages[`datesBanner.${name}.button`])}
+-            </button>
++            </Button>
+           </div>
+         )}
+       </div>
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index 3df02df..4a370b1 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -7,21 +7,16 @@ import { useModel } from '../../generic/model-store';
+ import DatesBanner from './DatesBanner';
+ import { fetchDatesTab, resetDeadlines } from '../data/thunks';
+ 
+-function DatesBannerContainer(props) {
+-  const {
+-    model,
+-  } = props;
+-
++function DatesBannerContainer({
++  courseDateBlocks,
++  datesBannerInfo,
++  hasEnded,
++  model,
++}) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+ 
+-  const {
+-    courseDateBlocks,
+-    datesBannerInfo,
+-    hasEnded,
+-  } = useModel(model, courseId);
+-
+   const {
+     contentTypeGatingEnabled,
+     missedDeadlines,
+@@ -76,7 +71,19 @@ function DatesBannerContainer(props) {
+ }
+ 
+ DatesBannerContainer.propTypes = {
++  courseDateBlocks: PropTypes.arrayOf(PropTypes.object).isRequired,
++  datesBannerInfo: PropTypes.shape({
++    contentTypeGatingEnabled: PropTypes.bool.isRequired,
++    missedDeadlines: PropTypes.bool.isRequired,
++    missedGatedContent: PropTypes.bool.isRequired,
++    verifiedUpgradeLink: PropTypes.string,
++  }).isRequired,
++  hasEnded: PropTypes.bool,
+   model: PropTypes.string.isRequired,
+ };
+ 
++DatesBannerContainer.defaultProps = {
++  hasEnded: false,
++};
++
+ export default DatesBannerContainer;
+diff --git a/src/course-home/dates-tab/DatesTab.jsx b/src/course-home/dates-tab/DatesTab.jsx
+index 32d72f1..f12a5e2 100644
+--- a/src/course-home/dates-tab/DatesTab.jsx
++++ b/src/course-home/dates-tab/DatesTab.jsx
+@@ -1,17 +1,35 @@
+ import React from 'react';
++import { useSelector } from 'react-redux';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from './messages';
+ import Timeline from './Timeline';
+ import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ 
++import { useModel } from '../../generic/model-store';
++
+ function DatesTab({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    courseDateBlocks,
++    datesBannerInfo,
++    hasEnded,
++  } = useModel('dates', courseId);
++
+   return (
+     <>
+       <div role="heading" aria-level="1" className="h4 my-3">
+         {intl.formatMessage(messages.title)}
+       </div>
+-      <DatesBannerContainer model="dates" />
++      <DatesBannerContainer
++        courseDateBlocks={courseDateBlocks}
++        datesBannerInfo={datesBannerInfo}
++        hasEnded={hasEnded}
++        model="dates"
++      />
+       <Timeline />
+     </>
+   );
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index affa503..5d8d437 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -9,6 +9,7 @@ import CourseDates from './widgets/CourseDates';
+ import CourseGoalCard from './widgets/CourseGoalCard';
+ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
++import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ import Section from './Section';
+@@ -48,6 +49,11 @@ function OutlineTab({ intl }) {
+       selectedGoal,
+     },
+     courseExpiredHtml,
++    datesBannerInfo,
++    datesWidget: {
++      courseDateBlocks,
++    },
++    hasEnded,
+     resumeCourse: {
+       hasVisitedCourse,
+       url: resumeCourseUrl,
+@@ -124,6 +130,12 @@ function OutlineTab({ intl }) {
+               ...offerAlert,
+             }}
+           />
++          <DatesBannerContainer
++            courseDateBlocks={courseDateBlocks}
++            datesBannerInfo={datesBannerInfo}
++            hasEnded={hasEnded}
++            model="outline"
++          />
+           {rootCourseId && (
+             <>
+               <div className="row w-100 m-0 mb-3 justify-content-end">
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index e09141f..11434d1 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -186,18 +186,18 @@ function CourseCelebration({ intl }) {
+               {/* The requesting status needs a different button because it does a POST instead of a GET */}
+               {certStatus === 'requesting' && (
+                 <Button
++                  className="bg-white"
+                   variant="outline-primary"
+                   onClick={() => dispatch(requestCert(courseId))}
+-                  style={{ backgroundColor: 'white' }}
+                 >
+                   {buttonText}
+                 </Button>
+               )}
+               {buttonLocation && (
+                 <Button
++                  className="bg-white"
+                   variant="outline-primary"
+                   href={buttonLocation}
+-                  style={{ backgroundColor: 'white' }}
+                 >
+                   {buttonText}
+                 </Button>
+-- 
+2.34.1
+

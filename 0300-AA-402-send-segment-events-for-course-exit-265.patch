@@ -1,0 +1,288 @@
+From cd1d3dd379151b268956926447dbe32e3788aebe Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 29 Oct 2020 09:55:14 -0400
+Subject: [PATCH 0300/1021] AA-402: send segment events for course-exit (#265)
+
+Specifically, a "I visited this page" event, with information on
+which variant was seen. And "I clicked this button" events, for
+our various calls to action.
+---
+ .../course/course-exit/CourseCelebration.jsx  | 33 ++++++++++------
+ .../course/course-exit/CourseNonPassing.jsx   | 14 ++++++-
+ .../course/course-exit/UpgradeFootnote.jsx    |  7 ++++
+ src/courseware/course/course-exit/utils.js    | 38 ++++++++++++++++++-
+ 4 files changed, 77 insertions(+), 15 deletions(-)
+
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index fe6c81d..67933ff 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -1,4 +1,4 @@
+-import React from 'react';
++import React, { useEffect } from 'react';
+ 
+ import {
+   FormattedDate, FormattedMessage, injectIntl, intlShape,
+@@ -9,7 +9,6 @@ import { useDispatch, useSelector } from 'react-redux';
+ import { LinkedinIcon } from 'react-share';
+ import { Alert, Button, Hyperlink } from '@edx/paragon';
+ import { getConfig } from '@edx/frontend-platform';
+-import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+ import CelebrationMobile from './assets/celebration_456x328.gif';
+@@ -22,6 +21,7 @@ import { requestCert } from '../../../course-home/data/thunks';
+ import DashboardFootnote from './DashboardFootnote';
+ import UpgradeFootnote from './UpgradeFootnote';
+ import SocialIcons from '../../social-share/SocialIcons';
++import { logClick, logVisit } from './utils';
+ 
+ const LINKEDIN_BLUE = '#007fb1';
+ 
+@@ -81,22 +81,16 @@ function CourseCelebration({ intl }) {
+     </Hyperlink>
+   );
+ 
+-  const logClick = (service) => {
+-    sendTrackEvent('edx.ui.lms.course_celebration.linkedin_add_to_profile.clicked', {
+-      course_id: courseId,
+-      is_staff: administrator,
+-      service,
+-    });
+-  };
+-
+   let buttonLocation;
+   let buttonText;
+   let buttonBackground = 'bg-white';
+   let buttonVariant = 'outline-primary';
++  let buttonEvent = null;
+   let certificateImage = certificate;
+   let footnote;
+   let message;
+   let certHeader;
++  let visitEvent = 'celebration_generic';
+   // These cases are taken from the edx-platform `get_cert_data` function found in lms/courseware/views/views.py
+   switch (certStatus) {
+     case 'downloadable':
+@@ -120,6 +114,8 @@ function CourseCelebration({ intl }) {
+         buttonLocation = downloadUrl;
+         buttonText = intl.formatMessage(messages.downloadButton);
+       }
++      buttonEvent = 'view_cert';
++      visitEvent = 'celebration_with_cert';
+       footnote = <DashboardFootnote />;
+       break;
+     case 'earned_but_not_available': {
+@@ -146,17 +142,21 @@ function CourseCelebration({ intl }) {
+           </p>
+         </>
+       );
++      visitEvent = 'celebration_with_unavailable_cert';
+       footnote = <DashboardFootnote />;
+       break;
+     }
+     case 'requesting':
+       buttonText = intl.formatMessage(messages.requestCertificateButton);
++      buttonEvent = 'request_cert';
+       certHeader = intl.formatMessage(messages.certificateHeaderRequestable);
+       message = (<p>{intl.formatMessage(messages.requestCertificateBodyText)}</p>);
++      visitEvent = 'celebration_with_requestable_cert';
+       footnote = <DashboardFootnote />;
+       break;
+     case 'unverified':
+       buttonText = intl.formatMessage(messages.verifyIdentityButton);
++      buttonEvent = 'verify_id';
+       buttonLocation = verifyIdentityUrl;
+       certHeader = intl.formatMessage(messages.certificateHeaderUnverified);
+       // todo: check for idVerificationSupportLink null
+@@ -170,6 +170,7 @@ function CourseCelebration({ intl }) {
+           />
+         </p>
+       );
++      visitEvent = 'celebration_unverified';
+       footnote = <DashboardFootnote />;
+       break;
+     case 'audit_passing':
+@@ -200,10 +201,12 @@ function CourseCelebration({ intl }) {
+           </p>
+         );
+         buttonText = intl.formatMessage(messages.upgradeButton);
++        buttonEvent = 'upgrade';
+         buttonLocation = verifiedMode.upgradeUrl;
+         buttonBackground = '';
+         buttonVariant = 'primary';
+         certificateImage = certificateLocked;
++        visitEvent = 'celebration_upgrade';
+         if (verifiedMode.accessExpirationDate) {
+           footnote = <UpgradeFootnote deadline={verifiedMode.accessExpirationDate} href={verifiedMode.upgradeUrl} />;
+         } else {
+@@ -215,6 +218,8 @@ function CourseCelebration({ intl }) {
+       break;
+   }
+ 
++  useEffect(() => logVisit(courseId, administrator, visitEvent), [courseId, administrator, visitEvent]);
++
+   return (
+     <>
+       <Helmet>
+@@ -262,7 +267,10 @@ function CourseCelebration({ intl }) {
+                 <Button
+                   className={buttonBackground}
+                   variant={buttonVariant}
+-                  onClick={() => dispatch(requestCert(courseId))}
++                  onClick={() => {
++                    logClick(courseId, administrator, buttonEvent);
++                    dispatch(requestCert(courseId));
++                  }}
+                 >
+                   {buttonText}
+                 </Button>
+@@ -271,7 +279,7 @@ function CourseCelebration({ intl }) {
+                 <Button
+                   className="mr-3 mb-2 mb-sm-0"
+                   href={linkedinAddToProfileUrl}
+-                  onClick={() => logClick('linkedin')}
++                  onClick={() => logClick(courseId, administrator, 'linkedin_add_to_profile')}
+                   style={{ backgroundColor: LINKEDIN_BLUE, padding: '0.25rem 1.25rem 0.25rem 0.5rem' }}
+                 >
+                   <LinkedinIcon bgStyle={{ fill: 'white' }} className="mr-2" iconFillColor={LINKEDIN_BLUE} round size={28} />
+@@ -283,6 +291,7 @@ function CourseCelebration({ intl }) {
+                   className={`${buttonBackground} mb-2 mb-sm-0`}
+                   variant={buttonVariant}
+                   href={buttonLocation}
++                  onClick={() => logClick(courseId, administrator, buttonEvent)}
+                 >
+                   {buttonText}
+                 </Button>
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index d8721d8..bff7f6f 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -1,5 +1,6 @@
+-import React from 'react';
++import React, { useEffect } from 'react';
+ 
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Helmet } from 'react-helmet';
+ import { useSelector } from 'react-redux';
+@@ -10,15 +11,19 @@ import { useModel } from '../../../generic/model-store';
+ 
+ import DashboardFootnote from './DashboardFootnote';
+ import messages from './messages';
++import { logClick, logVisit } from './utils';
+ 
+ function CourseNonPassing({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+   const { tabs } = useModel('courses', courseId);
++  const { administrator } = getAuthenticatedUser();
+ 
+   // Get progress tab link for 'view grades' button
+   const progressTab = tabs.find(tab => tab.slug === 'progress');
+   const progressLink = progressTab && progressTab.url;
+ 
++  useEffect(() => logVisit(courseId, administrator, 'nonpassing'), [courseId, administrator]);
++
+   return (
+     <>
+       <Helmet>
+@@ -31,7 +36,12 @@ function CourseNonPassing({ intl }) {
+         <Alert variant="primary" className="col col-lg-10 mt-4 d-flex align-items-start">
+           <div className="flex-grow-1 mr-5">{ intl.formatMessage(messages.endOfCourseDescription) }</div>
+           {progressLink && (
+-            <Button variant="primary" className="flex-shrink-0" href={progressLink}>
++            <Button
++              variant="primary"
++              className="flex-shrink-0"
++              href={progressLink}
++              onClick={() => logClick(courseId, administrator, 'view_grades')}
++            >
+               {intl.formatMessage(messages.viewGradesButton)}
+             </Button>
+           )}
+diff --git a/src/courseware/course/course-exit/UpgradeFootnote.jsx b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+index 31a96af..29ff2f0 100644
+--- a/src/courseware/course/course-exit/UpgradeFootnote.jsx
++++ b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+@@ -1,6 +1,8 @@
+ import React from 'react';
++import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ 
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import {
+   FormattedDate, FormattedMessage, injectIntl, intlShape,
+ } from '@edx/frontend-platform/i18n';
+@@ -8,14 +10,19 @@ import { Hyperlink } from '@edx/paragon';
+ import { faCalendarAlt } from '@fortawesome/free-regular-svg-icons';
+ 
+ import Footnote from './Footnote';
++import { logClick } from './utils';
+ import messages from './messages';
+ 
+ function UpgradeFootnote({ deadline, href, intl }) {
++  const { courseId } = useSelector(state => state.courseware);
++  const { administrator } = getAuthenticatedUser();
++
+   const upgradeLink = (
+     <Hyperlink
+       style={{ textDecoration: 'underline' }}
+       destination={href}
+       className="text-reset"
++      onClick={() => logClick(courseId, administrator, 'upgrade_footnote')}
+     >
+       {intl.formatMessage(messages.upgradeLink)}
+     </Hyperlink>
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index df225fb..ba8f7cb 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -1,3 +1,5 @@
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++
+ import { useModel } from '../../../generic/model-store';
+ 
+ import messages from './messages';
+@@ -68,4 +70,38 @@ function getCourseExitText(courseId, intl) {
+   }
+ }
+ 
+-export { COURSE_EXIT_MODES, getCourseExitMode, getCourseExitText };
++// Meant to be used as part of a button's onClick handler.
++// For convenience, you can pass a falsy event and it will be ignored.
++const logClick = (courseId, administrator, event) => {
++  if (!event) {
++    return;
++  }
++
++  sendTrackEvent(`edx.ui.lms.course_exit.${event}.clicked`, {
++    course_id: courseId,
++    is_staff: administrator,
++  });
++};
++
++// Use like the following to call this only once on initial page load:
++// useEffect(() => logVisit(courseId, administrator, variant), [courseId, administrator, variant]);
++// For convenience, you can pass a falsy variant and it will be ignored.
++const logVisit = (courseId, administrator, variant) => {
++  if (!variant) {
++    return;
++  }
++
++  sendTrackEvent('edx.ui.lms.course_exit.visited', {
++    course_id: courseId,
++    is_staff: administrator,
++    variant,
++  });
++};
++
++export {
++  COURSE_EXIT_MODES,
++  getCourseExitMode,
++  getCourseExitText,
++  logClick,
++  logVisit,
++};
+-- 
+2.34.1
+

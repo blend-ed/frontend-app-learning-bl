@@ -1,0 +1,100 @@
+From f08a23ecf914f769f75b9f392bef869ced7bb422 Mon Sep 17 00:00:00 2001
+From: Diane Kaplan <dianekaplan@gmail.com>
+Date: Tue, 1 Jun 2021 09:12:28 -0400
+Subject: [PATCH 0481/1021] feat: remove first purchase discount banner from
+ course home (REV-2253)
+
+---
+ src/course-home/outline-tab/OutlineTab.jsx    |  3 --
+ .../outline-tab/OutlineTab.test.jsx           | 47 -------------------
+ 2 files changed, 50 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index b84ea5f..ac6eaa7 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -22,7 +22,6 @@ import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
+ import useCertificateAvailableAlert from './alerts/certificate-available-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+ import useCourseStartAlert from './alerts/course-start-alert';
+-import useOfferAlert from '../../alerts/offer-alert';
+ import usePrivateCourseAlert from './alerts/private-course-alert';
+ import { useModel } from '../../generic/model-store';
+ import WelcomeMessage from './widgets/WelcomeMessage';
+@@ -86,7 +85,6 @@ function OutlineTab({ intl }) {
+   };
+ 
+   // Below the course title alerts (appearing in the order listed here)
+-  const offerAlert = useOfferAlert(courseId, offer, org, userTimezone, 'outline-course-alerts', 'course_home');
+   const accessExpirationAlert = useAccessExpirationAlert(accessExpiration, courseId, org, userTimezone, 'outline-course-alerts', 'course_home');
+   const courseStartAlert = useCourseStartAlert(courseId);
+   const courseEndAlert = useCourseEndAlert(courseId);
+@@ -153,7 +151,6 @@ function OutlineTab({ intl }) {
+                 ...certificateAvailableAlert,
+                 ...courseEndAlert,
+                 ...courseStartAlert,
+-                ...offerAlert,
+               }}
+             />
+             )}
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index db234c2..b967e4d 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -689,53 +689,6 @@ describe('Outline Tab', () => {
+         await screen.findByText('Your grade and certificate will be ready soon!');
+       });
+     });
+-
+-    describe('Offer Alert', () => {
+-      it('sends analytics event onClick of upgrade link', async () => {
+-        setTabData({
+-          offer: {
+-            code: 'EDXWELCOME',
+-            expiration_date: '2070-01-01T12:00:00Z',
+-            original_price: '$100',
+-            discounted_price: '$85',
+-            percentage: 15,
+-            upgrade_url: 'https://example.com/upgrade',
+-          },
+-        });
+-        await fetchAndRender();
+-
+-        expect(screen.getByRole('link', { name: 'Upgrade now' })).toBeInTheDocument();
+-      });
+-
+-      it('sends analytics event onClick of upgrade link', async () => {
+-        setTabData({
+-          offer: {
+-            code: 'EDXWELCOME',
+-            expiration_date: '2070-01-01T12:00:00Z',
+-            original_price: '$100',
+-            discounted_price: '$85',
+-            percentage: 15,
+-            upgrade_url: 'https://example.com/upgrade',
+-          },
+-        });
+-        await fetchAndRender();
+-
+-        // Clearing after render to remove any events sent on view (ex. 'Promotion Viewed')
+-        sendTrackEvent.mockClear();
+-        const upgradeLink = screen.getByRole('link', { name: 'Upgrade now' });
+-        fireEvent.click(upgradeLink);
+-
+-        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+-        expect(sendTrackEvent).toHaveBeenCalledWith('edx.bi.ecommerce.upsell_links_clicked', {
+-          org_key: 'edX',
+-          courserun_key: courseId,
+-          linkCategory: 'welcome',
+-          linkName: 'course_home_welcome',
+-          linkType: 'link',
+-          pageName: 'course_home',
+-        });
+-      });
+-    });
+   });
+ 
+   describe('Proctoring Info Panel', () => {
+-- 
+2.34.1
+

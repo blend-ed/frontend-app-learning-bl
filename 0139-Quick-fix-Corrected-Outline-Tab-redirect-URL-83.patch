@@ -1,0 +1,26 @@
+From b51809fa508be33d80d6df56707e21acd7341ec8 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <ciduarte@wpi.edu>
+Date: Mon, 15 Jun 2020 17:54:16 -0400
+Subject: [PATCH 0139/1021] Quick fix: Corrected Outline Tab redirect URL (#83)
+
+Co-authored-by: Carla Duarte <cduarte@edx.org>
+---
+ src/data/api.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/data/api.js b/src/data/api.js
+index 8fb6cf5..1fda3d9 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -158,7 +158,7 @@ export async function getOutlineTabData(courseId, version) {
+   } catch (error) {
+     const { httpErrorStatus } = error && error.customAttributes;
+     if (httpErrorStatus === 404) {
+-      return window.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/home`);
++      return window.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`);
+     }
+   }
+ 
+-- 
+2.34.1
+

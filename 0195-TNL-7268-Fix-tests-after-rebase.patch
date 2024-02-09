@@ -1,0 +1,188 @@
+From 0c5fd44d132ed55753a2d336efa2713ab04f8ebe Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Wed, 15 Jul 2020 22:50:48 +0200
+Subject: [PATCH 0195/1021] [TNL-7268] Fix tests after rebase
+
+---
+ package-lock.json                             |  9 ++++++
+ package.json                                  |  1 +
+ .../course/sequence/Sequence.test.jsx         |  7 +++--
+ .../course/sequence/SequenceContent.test.jsx  |  4 +--
+ .../sequence-navigation/UnitButton.test.jsx   | 30 ++++++++++++-------
+ src/setupTest.js                              | 16 ----------
+ .../@fortawesome/react-fontawesome.js         |  2 +-
+ 7 files changed, 37 insertions(+), 32 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index 28ce802..1a3dc24 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2833,6 +2833,15 @@
+         "@testing-library/dom": "^7.14.2"
+       }
+     },
++    "@testing-library/user-event": {
++      "version": "12.0.11",
++      "resolved": "https://registry.npmjs.org/@testing-library/user-event/-/user-event-12.0.11.tgz",
++      "integrity": "sha512-r7QNfktLE2n8IODEl32orup/HNOMueJpoXRDeTMlvWR4nZIHJwx59+8SkLf6nqV4Ot5Xo6qNeaWrvC1KO4eOng==",
++      "dev": true,
++      "requires": {
++        "@babel/runtime": "^7.10.2"
++      }
++    },
+     "@tootallnate/once": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/@tootallnate/once/-/once-1.1.2.tgz",
+diff --git a/package.json b/package.json
+index 4cb6c3b..af2c9bb 100644
+--- a/package.json
++++ b/package.json
+@@ -64,6 +64,7 @@
+     "@testing-library/dom": "^7.16.2",
+     "@testing-library/jest-dom": "^5.10.1",
+     "@testing-library/react": "^10.3.0",
++    "@testing-library/user-event": "^12.0.2",
+     "axios-mock-adapter": "^1.18.2",
+     "codecov": "^3.6.1",
+     "es-check": "^5.1.0",
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index 28559d6..a452f91 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -21,18 +21,19 @@ describe('Sequence', () => {
+ 
+   it('renders correctly without data', () => {
+     render(<Sequence {...mockData} {...{ unitId: undefined, sequenceId: undefined }} />, { initialState: {} });
+-    expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
++    expect(screen.getByText('There is no content here.')).toBeInTheDocument();
+     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+   });
+ 
+   it('renders correctly for gated content', async () => {
+-    render(<Sequence {...mockData} {...{ sequenceId: '3' }} />);
++    const { container } = render(<Sequence {...mockData} {...{ sequenceId: '3' }} />);
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+     // Only `Previous`, `Next` and `Bookmark` buttons.
+     expect(screen.getAllByRole('button').length).toEqual(3);
+ 
+     expect(await screen.findByText('Content Locked')).toBeInTheDocument();
+-    expect(screen.getByAltText('fa-lock')).toBeInTheDocument();
++    const unitContainer = container.querySelector('.unit-container');
++    expect(unitContainer.querySelector('svg')).toHaveClass('fa-lock');
+     expect(screen.getByText(/You must complete the prerequisite/)).toBeInTheDocument();
+     expect(screen.getByRole('button', { name: 'Go To Prerequisite Section' })).toBeInTheDocument();
+     expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
+diff --git a/src/courseware/course/sequence/SequenceContent.test.jsx b/src/courseware/course/sequence/SequenceContent.test.jsx
+index bbed341..a26521b 100644
+--- a/src/courseware/course/sequence/SequenceContent.test.jsx
++++ b/src/courseware/course/sequence/SequenceContent.test.jsx
+@@ -18,13 +18,13 @@ describe('Sequence Content', () => {
+   });
+ 
+   it('displays messages for the locked content', async () => {
+-    render(<SequenceContent {...mockData} gated />, { initialState });
++    const { container } = render(<SequenceContent {...mockData} gated />, { initialState });
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+ 
+     expect(await screen.findByText('Content Locked')).toBeInTheDocument();
+     expect(screen.getByText('test-sequence')).toBeInTheDocument();
+     expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
+-    expect(screen.getByAltText('fa-lock')).toBeInTheDocument();
++    expect(container.querySelector('svg')).toHaveClass('fa-lock');
+     expect(screen.getByText(/You must complete the prerequisite/)).toBeInTheDocument();
+     expect(screen.getByRole('button', { name: 'Go To Prerequisite Section' })).toBeInTheDocument();
+   });
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+index 7f3f77d..08fb90f 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+@@ -36,28 +36,38 @@ describe('Unit Button', () => {
+   });
+ 
+   it('does not show completion for non-completed unit', () => {
+-    render(<UnitButton {...mockData} />, { initialState });
+-    expect(screen.queryByAltText('fa-check')).toBeNull();
++    const { container } = render(<UnitButton {...mockData} />, { initialState });
++    container.querySelectorAll('svg').forEach(icon => {
++      expect(icon).not.toHaveClass('fa-check');
++    });
+   });
+ 
+   it('shows completion for completed unit', () => {
+-    render(<UnitButton {...mockData} unitId="problem" />, { initialState });
+-    expect(screen.getByAltText('fa-check')).toBeInTheDocument();
++    const { container } = render(<UnitButton {...mockData} unitId="problem" />, { initialState });
++    const buttonIcons = container.querySelectorAll('svg');
++    expect(buttonIcons).toHaveLength(3);
++    expect(buttonIcons[1]).toHaveClass('fa-check');
+   });
+ 
+   it('hides completion', () => {
+-    render(<UnitButton {...mockData} unitId="problem" showCompletion={false} />, { initialState });
+-    expect(screen.queryByAltText('fa-check')).toBeNull();
++    const { container } = render(<UnitButton {...mockData} unitId="problem" showCompletion={false} />, { initialState });
++    container.querySelectorAll('svg').forEach(icon => {
++      expect(icon).not.toHaveClass('fa-check');
++    });
+   });
+ 
+   it('does not show bookmark', () => {
+-    render(<UnitButton {...mockData} />, { initialState });
+-    expect(screen.queryByAltText('fa-bookmark')).toBeNull();
++    const { container } = render(<UnitButton {...mockData} />, { initialState });
++    container.querySelectorAll('svg').forEach(icon => {
++      expect(icon).not.toHaveClass('fa-bookmark');
++    });
+   });
+ 
+   it('shows bookmark', () => {
+-    render(<UnitButton {...mockData} unitId="problem" />, { initialState });
+-    expect(screen.getByAltText('fa-bookmark')).toBeInTheDocument();
++    const { container } = render(<UnitButton {...mockData} unitId="problem" />, { initialState });
++    const buttonIcons = container.querySelectorAll('svg');
++    expect(buttonIcons).toHaveLength(3);
++    expect(buttonIcons[2]).toHaveClass('fa-bookmark');
+   });
+ 
+   it('handles the click', () => {
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 327617b..82932e5 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -54,22 +54,6 @@ export default function initializeMockApp() {
+   return { loggingService, authService };
+ }
+ 
+-/**
+- * HACK: Mock the MutationObserver as it's breaking async testing.
+- *  According to StackOverflow it should be fixed in `jest-environment-jsdom` v16,
+- *  but upgrading `jest` to v26 didn't fix this problem.
+- *  ref: https://stackoverflow.com/questions/61036156/react-typescript-testing-typeerror-mutationobserver-is-not-a-constructor
+- */
+-global.MutationObserver = class {
+-  // eslint-disable-next-line no-unused-vars,no-useless-constructor,no-empty-function
+-  constructor(callback) {}
+-
+-  disconnect() {}
+-
+-  // eslint-disable-next-line no-unused-vars
+-  observe(element, initObject) {}
+-};
+-
+ window.scrollTo = jest.fn();
+ 
+ // Generated units for convenience.
+diff --git a/src/test/__mocks__/@fortawesome/react-fontawesome.js b/src/test/__mocks__/@fortawesome/react-fontawesome.js
+index f574d7b..2d1ef1c 100644
+--- a/src/test/__mocks__/@fortawesome/react-fontawesome.js
++++ b/src/test/__mocks__/@fortawesome/react-fontawesome.js
+@@ -28,5 +28,5 @@ export function FontAwesomeIcon(props) {
+   }
+ 
+   // eslint-disable-next-line react/jsx-filename-extension
+-  return <img data-testid="icon" className={iconName} alt={iconName} />;
++  return <svg data-testid="icon" className={iconName} />;
+ }
+-- 
+2.34.1
+

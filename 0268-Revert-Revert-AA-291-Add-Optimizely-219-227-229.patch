@@ -1,0 +1,36 @@
+From d52aa3246e0e15e6cb362b7b08fcd3d15d2b8e90 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 1 Oct 2020 10:38:09 -0400
+Subject: [PATCH 0268/1021] Revert "Revert "AA-291: Add Optimizely (#219)"
+ (#227)" (#229)
+
+This reverts commit 42715d3de24572be9712a7c076b216747ed116df.
+---
+ public/index.html | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/public/index.html b/public/index.html
+index c022b7f..ed8b3be 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -1,10 +1,13 @@
+ <!doctype html>
+ <html lang="en-us">
+   <head>
+-      <title>Course | <%= process.env.SITE_NAME %></title>
+-      <meta charset="utf-8">
+-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-      <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
++    <title>Course | <%= process.env.SITE_NAME %></title>
++    <meta charset="utf-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
++    <% if (htmlWebpackPlugin.options.OPTIMIZELY_PROJECT_ID) { %>
++      <script src="https://www.edx.org/optimizelyjs/<%= htmlWebpackPlugin.options.OPTIMIZELY_PROJECT_ID %>.js"></script>
++    <% } %>
+   </head>
+   <body>
+     <div id="root"></div>
+-- 
+2.34.1
+

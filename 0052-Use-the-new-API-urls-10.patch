@@ -1,0 +1,39 @@
+From dc2971870ff611570bfd1adc3ca41355ba3795a8 Mon Sep 17 00:00:00 2001
+From: "Dave St.Germain" <dstgermain@edx.org>
+Date: Wed, 29 Jan 2020 12:50:28 -0500
+Subject: [PATCH 0052/1021] Use the new API urls (#10)
+
+---
+ src/courseware/CourseContainer.jsx          | 2 +-
+ src/courseware/course/SequenceContainer.jsx | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index 6ecb08f..595d782 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -23,7 +23,7 @@ export async function getCourseBlocks(courseUsageKey, username) {
+ }
+ 
+ export async function getCourse(courseUsageKey) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/courses/v2/courses/${courseUsageKey}`;
++  const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseUsageKey}`;
+   const { data } = await getAuthenticatedHttpClient().get(url);
+ 
+   return data;
+diff --git a/src/courseware/course/SequenceContainer.jsx b/src/courseware/course/SequenceContainer.jsx
+index 2f1ee10..cd102fd 100644
+--- a/src/courseware/course/SequenceContainer.jsx
++++ b/src/courseware/course/SequenceContainer.jsx
+@@ -12,7 +12,7 @@ import UserMessagesContext from '../../user-messages/UserMessagesContext';
+ 
+ export async function getSequenceMetadata(courseUsageKey, sequenceId) {
+   const { data } = await getAuthenticatedHttpClient()
+-    .get(`${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/xblock/${sequenceId}/handler/xmodule_handler/metadata`, {});
++    .get(`${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceId}`, {});
+ 
+   return data;
+ }
+-- 
+2.34.1
+

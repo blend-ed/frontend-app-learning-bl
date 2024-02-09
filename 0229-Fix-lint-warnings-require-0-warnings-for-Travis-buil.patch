@@ -1,0 +1,70 @@
+From 0ad80a63cfde23f45f409dc9895e954d53098e6a Mon Sep 17 00:00:00 2001
+From: Kyle McCormick <kmccormick@edx.org>
+Date: Wed, 12 Aug 2020 17:16:28 -0400
+Subject: [PATCH 0229/1021] Fix lint warnings; require 0 warnings for Travis
+ build (#181)
+
+---
+ .travis.yml                                 | 2 +-
+ src/course-home/progress-tab/Subsection.jsx | 1 +
+ src/courseware/course/sequence/Unit.jsx     | 2 +-
+ src/toast/LearningToast.jsx                 | 2 ++
+ 4 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/.travis.yml b/.travis.yml
+index 92b984a..136ca94 100755
+--- a/.travis.yml
++++ b/.travis.yml
+@@ -7,7 +7,7 @@ install:
+ script:
+ - make validate-no-uncommitted-package-lock-changes
+ - npm run i18n_extract
+-- npm run lint
++- npm run lint -- --max-warnings 0
+ - npm run test
+ - npm run build
+ - npm run is-es5
+diff --git a/src/course-home/progress-tab/Subsection.jsx b/src/course-home/progress-tab/Subsection.jsx
+index 46c5f4b..d65f507 100644
+--- a/src/course-home/progress-tab/Subsection.jsx
++++ b/src/course-home/progress-tab/Subsection.jsx
+@@ -24,6 +24,7 @@ function Subsection({
+     <section className="my-3 ml-3">
+       <div className="row">
+         <a className="h6" href={subsection.url}>
++          {/* eslint-disable-next-line react/no-danger */}
+           <div dangerouslySetInnerHTML={{ __html: subsection.displayName }} />
+           {showTotalScore && <span className="sr-only">{totalScoreSr}</span>}
+         </a>
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index ff43094..e17a0b5 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -140,7 +140,7 @@ function Unit({
+           scrolling="no"
+           referrerPolicy="origin"
+           onLoad={() => {
+-            window.onmessage = function (e) {
++            window.onmessage = function handleResetDates(e) {
+               if (e.data.event_name) {
+                 dispatch(processEvent(e.data, fetchCourse));
+               }
+diff --git a/src/toast/LearningToast.jsx b/src/toast/LearningToast.jsx
+index 24a8879..66274fd 100644
+--- a/src/toast/LearningToast.jsx
++++ b/src/toast/LearningToast.jsx
+@@ -25,9 +25,11 @@ export default function LearningToast({
+       }}
+     >
+       <Toast.Header className="bg-gray-700 border-bottom-0 text-light">
++        {/* eslint-disable-next-line react/no-danger */}
+         <div dangerouslySetInnerHTML={{ __html: header }} />
+       </Toast.Header>
+       <Toast.Body className="bg-gray-700 text-light">
++        {/* eslint-disable-next-line react/no-danger */}
+         <div dangerouslySetInnerHTML={{ __html: body }} />
+       </Toast.Body>
+     </Toast>
+-- 
+2.34.1
+

@@ -1,0 +1,477 @@
+From 446367e56c6aea8df86027a24d1e65050f2474fe Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 6 Jan 2020 15:43:13 -0500
+Subject: [PATCH 0014/1021] feat: sub section navigation working, allows
+ navigating between all units
+
+---
+ .../LearningSequencePage.jsx                  | 178 ++++++++++--------
+ .../SubSectionNavigation.jsx                  |  65 ++++++-
+ src/learning-sequence/api.js                  | 128 +++++++++++++
+ 3 files changed, 281 insertions(+), 90 deletions(-)
+ create mode 100644 src/learning-sequence/api.js
+
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+index 0aa612e..8bf9ac0 100644
+--- a/src/learning-sequence/LearningSequencePage.jsx
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -1,101 +1,108 @@
++/* eslint-disable no-plusplus */
+ import React, { Component } from 'react';
+ import PropTypes from 'prop-types';
+-import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { getConfig, camelCaseObject } from '@edx/frontend-platform';
++import { getConfig, history } from '@edx/frontend-platform';
+ import { AppContext } from '@edx/frontend-platform/react';
+ import { Breadcrumb } from '@edx/paragon';
+ 
+ import PageLoading from './PageLoading';
+ import messages from './messages';
+ import SubSectionNavigation from './SubSectionNavigation';
+-
+-async function getCourseBlocks(courseId, username) {
+-  const queryParams = Object.entries({
+-    course_id: courseId,
+-    username,
+-    depth: 3,
+-    requested_fields: 'children',
+-  }).reduce((acc, [key, value]) => (acc === '' ? `?${key}=${value}` : `${acc}&${key}=${value}`), '');
+-
+-  const { data } = await getAuthenticatedHttpClient()
+-    .get(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/${queryParams}`, {});
+-
+-  return { models: organizeCourseModels(data.blocks), courseBlockId: data.root };
+-}
+-
+-function organizeCourseModels(blocksMap) {
+-  const models = {};
+-
+-  const blocks = Object.values(blocksMap);
+-  for (let i = 0; i < blocks.length; i++) {
+-    const block = blocks[i];
+-    models[block.id] = camelCaseObject(block);
+-  }
+-
+-  // NOTE: If a child is listed as a child of multiple models, the last one in wins.  This does NOT
+-  // support multiple parents.
+-  const modelValues = Object.values(models);
+-  for (let i = 0; i < modelValues.length; i++) {
+-    const model = modelValues[i];
+-
+-    if (Array.isArray(model.children)) {
+-      for (let j = 0; j < model.children.length; j++) {
+-        const child = models[model.children[j]];
+-        child.parentId = model.id;
+-      }
+-    }
+-  }
+-
+-  return models;
+-}
+-
+-function findFirstLeafChild(models, blockId) {
+-  const block = models[blockId];
+-  if (Array.isArray(block.children) && block.children.length > 0) {
+-    return findFirstLeafChild(models, block.children[0]);
+-  }
+-  return block;
+-}
+-
+-function findBlockAncestry(models, block, descendents = []) {
+-  descendents.unshift(block);
+-  if (block.parentId === undefined) {
+-    return descendents;
+-  }
+-  return findBlockAncestry(models, models[block.parentId], descendents);
+-}
++import { loadCourseSequence, findBlockAncestry, loadSubSectionMetadata } from './api';
+ 
+ class LearningSequencePage extends Component {
+   constructor(props, context) {
+     super(props, context);
+ 
+     this.state = {
+-      models: {},
+-      courseBlockId: null,
+       loading: true,
+-      currentUnitId: null,
++      blocks: {},
++      units: {},
++      subSectionMetadata: null,
++      subSectionId: null,
++      subSectionIds: [],
++      unitId: null,
++      courseBlockId: null,
+     };
+ 
+     this.iframeRef = React.createRef();
+   }
+ 
+   componentDidMount() {
+-    getCourseBlocks(this.props.match.params.courseId, this.context.authenticatedUser.username)
+-      .then(({ models, courseBlockId }) => {
+-        const currentUnit = findFirstLeafChild(models, courseBlockId); // Temporary until we know where the user is in the course.
++    loadCourseSequence(this.props.match.params.courseId, null, this.context.authenticatedUser.username)
++      .then(({
++        blocks, courseBlockId, subSectionIds, subSectionMetadata, units, unitId,
++      }) => {
+         this.setState({
+-          models,
+-          courseBlockId,
+           loading: false,
+-          currentUnitId: currentUnit.id,
++          blocks,
++          units,
++          subSectionMetadata,
++          subSectionId: subSectionMetadata.itemId,
++          subSectionIds,
++          unitId,
++          courseBlockId, // TODO: Currently unused, but may be necessary.
+         });
+       });
+   }
+ 
++  handlePreviousClick = () => {
++    const index = this.state.subSectionMetadata.unitIds.indexOf(this.state.unitId);
++    if (index > 0) {
++      this.setState({
++        unitId: this.state.subSectionMetadata.unitIds[index - 1],
++      });
++    } else {
++      const subSectionIndex = this.state.subSectionIds.indexOf(this.state.subSectionId);
++      if (subSectionIndex > 0) {
++        const previousSubSectionId = this.state.subSectionIds[subSectionIndex - 1];
++
++        loadSubSectionMetadata(this.props.match.params.courseId, previousSubSectionId).then(({ subSectionMetadata, units, unitId }) => {
++          this.setState({
++            subSectionId: subSectionMetadata.itemId,
++            subSectionMetadata,
++            units,
++            unitId,
++          });
++        });
++      } else {
++        console.log('we are at the beginning!');
++        // TODO: We need to calculate whether we're on the first/last subSection in render so we can
++        // disable the Next/Previous buttons.  That'll involve extracting a bit of logic from this
++        // function and handleNextClick below and reusing it - memoized, probably - in render().
++      }
++    }
++  }
++
++  handleNextClick = () => {
++    const index = this.state.subSectionMetadata.unitIds.indexOf(this.state.unitId);
++    if (index < this.state.subSectionMetadata.unitIds.length - 1) {
++      this.setState({
++        unitId: this.state.subSectionMetadata.unitIds[index + 1],
++      });
++    } else {
++      const subSectionIndex = this.state.subSectionIds.indexOf(this.state.subSectionId);
++      if (subSectionIndex < this.state.subSectionIds.length - 1) {
++        const nextSubSectionId = this.state.subSectionIds[subSectionIndex + 1];
++
++        loadSubSectionMetadata(this.props.match.params.courseId, nextSubSectionId).then(({ subSectionMetadata, units, unitId }) => {
++          this.setState({
++            subSectionId: subSectionMetadata.itemId,
++            subSectionMetadata,
++            units,
++            unitId,
++          });
++        });
++      } else {
++        console.log('we are at the end!');
++      }
++    }
++  }
++
+   handleUnitChange = (unitId) => {
+     this.setState({
+-      currentUnitId: unitId,
++      unitId,
+     });
+   }
+ 
+@@ -106,33 +113,40 @@ class LearningSequencePage extends Component {
+       );
+     }
+ 
+-    const currentUnit = this.state.models[this.state.currentUnitId];
+-
+-    // TODO: All of this should be put in state or memoized.
+-    const course = this.state.models[this.state.courseBlockId];
+-    const chapter = this.state.models[course.children[0].id];
+-    const subSection = this.state.models[currentUnit.parentId];
+-    const ancestry = findBlockAncestry(this.state.models, currentUnit);
+-    const breadcrumbLinks = ancestry.slice(0, ancestry.length - 1).map(ancestor => ({ label: ancestor.displayName, url: global.location.href }));
+-
++    const [course, chapter, subSection] = findBlockAncestry(
++      this.state.blocks,
++      this.state.blocks[this.state.subSectionId],
++    );
+ 
+-    console.log(course, chapter, currentUnit, ancestry);
++    const currentUnit = this.state.units[this.state.unitId];
++    const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${this.state.unitId}`;
+ 
+     return (
+       <main >
+         <div className="container-fluid">
+           <h1>{course.displayName}</h1>
+           <Breadcrumb
+-            links={breadcrumbLinks}
+-            activeLabel={currentUnit.displayName}
++            links={[
++              { label: course.displayName, url: global.location.href },
++              { label: chapter.displayName, url: global.location.href },
++              { label: subSection.displayName, url: global.location.href },
++            ]}
++            activeLabel={currentUnit.pageTitle}
+             spacer={<span>&gt;</span>}
+           />
+-          <SubSectionNavigation models={this.state.models} subSection={subSection} unitClickHandler={this.handleUnitChange} />
++          <SubSectionNavigation
++            units={this.state.units}
++            unitIds={this.state.subSectionMetadata.unitIds}
++            activeUnitId={this.state.unitId}
++            unitClickHandler={this.handleUnitChange}
++            nextClickHandler={this.handleNextClick}
++            previousClickHandler={this.handlePreviousClick}
++          />
+         </div>
+         <iframe
+           title="yus"
+           ref={this.iframeRef}
+-          src={currentUnit.studentViewUrl}
++          src={iframeUrl}
+         />
+       </main>
+     );
+diff --git a/src/learning-sequence/SubSectionNavigation.jsx b/src/learning-sequence/SubSectionNavigation.jsx
+index 9ab5605..99076f9 100644
+--- a/src/learning-sequence/SubSectionNavigation.jsx
++++ b/src/learning-sequence/SubSectionNavigation.jsx
+@@ -1,17 +1,43 @@
+ import React, { Component } from 'react';
++import PropTypes from 'prop-types';
+ import { Button } from '@edx/paragon';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faFilm, faBook, faPencilAlt, faTasks } from '@fortawesome/free-solid-svg-icons';
+ 
+ export default class SubSectionNavigation extends Component {
++  renderUnitIcon(type) {
++    let icon = null;
++    switch (type) {
++      case 'video':
++        icon = faFilm;
++        break;
++      case 'other':
++        icon = faBook;
++        break;
++      case 'vertical':
++        icon = faTasks;
++        break;
++      case 'problem':
++        icon = faPencilAlt;
++        break;
++      default:
++        icon = faBook;
++    }
++    return <FontAwesomeIcon icon={icon} />;
++  }
++
+   renderUnits() {
+-    return this.props.subSection.children.map((unitId) => {
+-      const unit = this.props.models[unitId];
++    return this.props.unitIds.map((id) => {
++      const { type } = this.props.units[id];
++      const disabled = this.props.activeUnitId === id;
+       return (
+         <Button
+-          key={unitId}
++          key={id}
+           className="btn-outline-secondary unit-button"
+-          onClick={() => this.props.unitClickHandler(unitId)}
++          onClick={() => this.props.unitClickHandler(id)}
++          disabled={disabled}
+         >
+-          {unit.displayName}
++          {this.renderUnitIcon(type)}
+         </Button>
+       );
+     });
+@@ -20,11 +46,34 @@ export default class SubSectionNavigation extends Component {
+   render() {
+     return (
+       <nav>
+-        <Button key="previous" className="btn-outline-primary">Previous</Button>
++        <Button
++          key="previous"
++          className="btn-outline-primary"
++          onClick={this.props.previousClickHandler}
++        >
++          Previous
++        </Button>
+         {this.renderUnits()}
+-        <Button key="next" className="btn-outline-primary">Next</Button>
+-
++        <Button
++          key="next"
++          className="btn-outline-primary"
++          onClick={this.props.nextClickHandler}
++        >
++          Next
++        </Button>
+       </nav>
+     );
+   }
+ }
++
++SubSectionNavigation.propTypes = {
++  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++  units: PropTypes.objectOf(PropTypes.shape({
++    pageTitle: PropTypes.string.isRequired,
++    type: PropTypes.oneOf('video', 'other', 'vertical', 'problem').isRequired,
++  })).isRequired,
++  activeUnitId: PropTypes.string.isRequired,
++  unitClickHandler: PropTypes.func.isRequired,
++  nextClickHandler: PropTypes.func.isRequired,
++  previousClickHandler: PropTypes.func.isRequired,
++};
+diff --git a/src/learning-sequence/api.js b/src/learning-sequence/api.js
+new file mode 100644
+index 0000000..ab48694
+--- /dev/null
++++ b/src/learning-sequence/api.js
+@@ -0,0 +1,128 @@
++/* eslint-disable no-use-before-define */
++/* eslint-disable no-plusplus */
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { getConfig, camelCaseObject } from '@edx/frontend-platform';
++
++export async function loadCourseSequence(courseId, subSectionId, username) {
++  const blocksData = await getCourseBlocks(courseId, username);
++  const courseBlockId = blocksData.root;
++  const blocks = createBlocksMap(blocksData.blocks);
++  const defaultedSubSectionId = subSectionId || findFirstLeafChild(blocks, courseBlockId).id;
++  const subSectionIds = createSubSectionIdList(blocks, courseBlockId);
++  const { subSectionMetadata, units, unitId } = await loadSubSectionMetadata(
++    courseId,
++    defaultedSubSectionId,
++  );
++
++  return {
++    blocks,
++    subSectionIds,
++    courseBlockId,
++    subSectionMetadata,
++    units,
++    unitId,
++  };
++}
++
++async function getCourseBlocks(courseId, username) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
++  url.searchParams.append('course_id', decodeURIComponent(courseId));
++  url.searchParams.append('username', username);
++  url.searchParams.append('depth', 2);
++  url.searchParams.append('requested_fields', 'children');
++
++  const { data } = await getAuthenticatedHttpClient()
++    .get(url.href, {});
++
++  return data;
++}
++
++export async function loadSubSectionMetadata(courseId, subSectionId) {
++  let subSectionMetadata = await getSubSectionMetadata(courseId, subSectionId);
++  subSectionMetadata = camelCaseObject(subSectionMetadata);
++  subSectionMetadata.unitIds = subSectionMetadata.items.map(item => item.id);
++  const unitId = subSectionMetadata.position ?
++    subSectionMetadata.items[subSectionMetadata.position - 1].id :
++    subSectionMetadata.items[0].id;
++  const units = createUnitsMap(subSectionMetadata.items);
++
++  return {
++    subSectionMetadata,
++    units,
++    unitId,
++  };
++}
++
++async function getSubSectionMetadata(courseId, subSectionId) {
++  const { data } = await getAuthenticatedHttpClient()
++    .get(`${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${subSectionId}/handler/xmodule_handler/metadata`, {});
++
++  return data;
++}
++
++function createBlocksMap(blocksData) {
++  const blocks = {};
++  const blocksList = Object.values(blocksData);
++
++  // First go through the list and flesh out our blocks map, camelCasing the objects as we go.
++  for (let i = 0; i < blocksList.length; i++) {
++    const block = blocksList[i];
++    blocks[block.id] = camelCaseObject(block);
++  }
++
++  // Next go through the blocksList again - now that we've added them all to the blocks map - and
++  // append a parent ID to every child found in every `children` list, using the blocks map to find
++  // them.
++  for (let i = 0; i < blocksList.length; i++) {
++    const block = blocksList[i];
++
++    if (Array.isArray(block.children)) {
++      for (let j = 0; j < block.children.length; j++) {
++        const childId = block.children[j];
++        const child = blocks[childId];
++        child.parentId = block.id;
++      }
++    }
++  }
++
++  return blocks;
++}
++
++function createUnitsMap(unitsList) {
++  const units = {};
++  for (let i = 0; i < unitsList.length; i++) {
++    const unit = unitsList[i];
++    units[unit.id] = camelCaseObject(unit);
++  }
++  return units;
++}
++
++function findFirstLeafChild(blocks, entryPointId) {
++  const block = blocks[entryPointId];
++  if (Array.isArray(block.children) && block.children.length > 0) {
++    return findFirstLeafChild(blocks, block.children[0]);
++  }
++  return block;
++}
++
++function createSubSectionIdList(blocks, entryPointId, subSections = []) {
++  const block = blocks[entryPointId];
++  if (block.type === 'sequential') {
++    subSections.push(block.id);
++  }
++  if (Array.isArray(block.children)) {
++    for (let i = 0; i < block.children.length; i++) {
++      const childId = block.children[i];
++      createSubSectionIdList(blocks, childId, subSections);
++    }
++  }
++  return subSections;
++}
++
++export function findBlockAncestry(blocks, block, descendents = []) {
++  descendents.unshift(block);
++  if (block.parentId === undefined) {
++    return descendents;
++  }
++  return findBlockAncestry(blocks, blocks[block.parentId], descendents);
++}
+-- 
+2.34.1
+

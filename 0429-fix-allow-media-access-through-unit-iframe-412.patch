@@ -1,0 +1,66 @@
+From ca8122686b77472a7d4fba1e42f1049122ed3c5f Mon Sep 17 00:00:00 2001
+From: Kyle McCormick <kmccormick@edx.org>
+Date: Wed, 21 Apr 2021 14:30:02 -0400
+Subject: [PATCH 0429/1021] fix: allow media access through unit iframe (#412)
+
+Set the `allow` attribute of the unit iframe to allow
+access to camera, MIDI, location, and encrpyted media.
+
+Access to these features was implicitly allowed in older
+browser versions. However, in the current versions of
+at least Chromium and Firefox, iframed content must be
+explicitly granted the ability to request media access.
+
+This fixes a bug where content requiring microphone
+access did not work in the Learning MFE.
+
+TNL-7675
+---
+ src/courseware/course/sequence/Unit.jsx | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 19b8fcc..dc47eb1 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -23,6 +23,20 @@ import { MMP2PLockPaywall } from '../../../experiments/mm-p2p';
+ 
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
+ 
++/**
++ * Feature policy for iframe, allowing access to certain courseware-related media.
++ *
++ * We must use the wildcard (*) origin for each feature, as courseware content
++ * may be embedded in external iframes. Notably, xblock-lti-consumer is a popular
++ * block that iframes external course content.
++
++ * This policy was selected in conference with the edX Security Working Group.
++ * Changes to it should be vetted by them (security@edx.org).
++ */
++const IFRAME_FEATURE_POLICY = (
++  'microphone *; camera *; midi *; geolocation *; encrypted-media *'
++);
++
+ /**
+  * We discovered an error in Firefox where - upon iframe load - React would cease to call any
+  * useEffect hooks until the user interacts with the page again.  This is particularly confusing
+@@ -155,7 +169,7 @@ function Unit({
+                 : (
+                   <iframe
+                     title={modalOptions.title}
+-                    allow="microphone *; camera *; midi *; geolocation *; encrypted-media *"
++                    allow={IFRAME_FEATURE_POLICY}
+                     frameBorder="0"
+                     src={modalOptions.url}
+                     style={{
+@@ -178,6 +192,7 @@ function Unit({
+             id="unit-iframe"
+             title={unit.title}
+             src={iframeUrl}
++            allow={IFRAME_FEATURE_POLICY}
+             allowFullScreen
+             height={iframeHeight}
+             scrolling="no"
+-- 
+2.34.1
+

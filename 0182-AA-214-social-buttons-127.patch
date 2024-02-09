@@ -1,0 +1,98 @@
+From 7a108728c05841b511a32c37040b575be5d48046 Mon Sep 17 00:00:00 2001
+From: Nick <ndalfonso@edx.org>
+Date: Tue, 28 Jul 2020 12:00:26 -0400
+Subject: [PATCH 0182/1021] AA-214 social buttons (#127)
+
+- social sharing buttons for linkedin and email
+---
+ .../course/celebration/SocialIcons.jsx        | 22 +++++++++++++++++++
+ src/courseware/course/celebration/messages.js | 14 ++++++++++++
+ 2 files changed, 36 insertions(+)
+
+diff --git a/src/courseware/course/celebration/SocialIcons.jsx b/src/courseware/course/celebration/SocialIcons.jsx
+index 0c5aff2..2ece285 100644
+--- a/src/courseware/course/celebration/SocialIcons.jsx
++++ b/src/courseware/course/celebration/SocialIcons.jsx
+@@ -1,8 +1,12 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import {
++  EmailIcon,
++  EmailShareButton,
+   FacebookIcon,
+   FacebookShareButton,
++  LinkedinIcon,
++  LinkedinShareButton,
+   TwitterIcon,
+   TwitterShareButton,
+ } from 'react-share';
+@@ -39,9 +43,17 @@ function SocialIcons({ courseId, intl }) {
+ 
+   return (
+     <div className="social-icons">
++      <LinkedinShareButton
++        beforeOnClick={() => logClick('linkedin')}
++        url={marketingUrl}
++      >
++        <LinkedinIcon round size={32} />
++        <span className="sr-only">{intl.formatMessage(messages.shareService, { service: 'LinkedIn' })}</span>
++      </LinkedinShareButton>
+       { twitterAccount && (
+         <TwitterShareButton
+           beforeOnClick={() => logClick('twitter')}
++          className="ml-2"
+           hashtags={['mooc']}
+           title={intl.formatMessage(messages.social, { platform: `@${twitterAccount}`, title })}
+           url={marketingUrl}
+@@ -59,6 +71,16 @@ function SocialIcons({ courseId, intl }) {
+         <FacebookIcon round size={32} />
+         <span className="sr-only">{intl.formatMessage(messages.shareService, { service: 'Facebook' })}</span>
+       </FacebookShareButton>
++      <EmailShareButton
++        beforeOnClick={() => logClick('email')}
++        body={intl.formatMessage(messages.emailBody)}
++        className="ml-2"
++        subject={intl.formatMessage(messages.emailSubject, { platform: getConfig().SITE_NAME, title })}
++        url={marketingUrl}
++      >
++        <EmailIcon round size={32} />
++        <span className="sr-only">{intl.formatMessage(messages.shareEmail)}</span>
++      </EmailShareButton>
+     </div>
+   );
+ }
+diff --git a/src/courseware/course/celebration/messages.js b/src/courseware/course/celebration/messages.js
+index 05b25c9..6bf0b48 100644
+--- a/src/courseware/course/celebration/messages.js
++++ b/src/courseware/course/celebration/messages.js
+@@ -13,6 +13,16 @@ const messages = defineMessages({
+     id: 'learning.celebration.earned',
+     defaultMessage: 'You earned it!',
+   },
++  emailBody: {
++    id: 'learning.celebration.emailBody',
++    defaultMessage: 'What are you spending your time learning?',
++    description: 'Body when sharing course progress via email',
++  },
++  emailSubject: {
++    id: 'learning.celebration.emailSubject',
++    defaultMessage: "I'm on my way to completing {title} online with @edxonline!",
++    description: 'Subject when sharing course progress via email',
++  },
+   forward: {
+     id: 'learning.celebration.forward',
+     defaultMessage: 'Keep going',
+@@ -22,6 +32,10 @@ const messages = defineMessages({
+     id: 'learning.celebration.share',
+     defaultMessage: 'Take a moment to celebrate and share your progress.',
+   },
++  shareEmail: {
++    id: 'learning.celebration.share.email',
++    defaultMessage: 'Share your progress via email.',
++  },
+   shareService: {
+     id: 'learning.celebration.share.service',
+     defaultMessage: 'Share your progress on {service}.',
+-- 
+2.34.1
+

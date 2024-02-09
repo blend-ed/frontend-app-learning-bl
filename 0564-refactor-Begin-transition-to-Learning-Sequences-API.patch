@@ -1,0 +1,434 @@
+From fae23969772ed60878ec4842b8bc49505baee40b Mon Sep 17 00:00:00 2001
+From: David Ormsbee <dave@edx.org>
+Date: Tue, 20 Jul 2021 11:54:54 -0400
+Subject: [PATCH 0564/1021] refactor: Begin transition to Learning Sequences
+ API
+
+For performance and long term simplification reasons, we want to take
+the work currently done by the Course Blocks API and split it up between
+the Learning Sequences API (course outline) and Sequence Metadata API
+(details about the Units in a Sequence). This will also make it easier
+to later support different kinds of Sequences, where we might not know
+all the details about it at the time we load the course-wide outline
+data.
+
+This starts moving over the responsibility for the high level outline
+and metadata to Learning Sequences. It requires that the waffle flag
+"learning_sequences.use_for_outlines" be active in the LMS. If that flag
+is not active, the Learning Sequences API call will return a 403 error,
+and this code will fall back to the older behavior.
+
+Some data could not be shifted over yet. Namely:
+
+* Sequence legacy URL is not currently output by the Learning Sequences
+  API. This is simple to add, but I don't know if there's any point in
+  adding it now that the Courseware MFE is functional for timed exams.
+* Unit metadata was not completely shifted over to the Sequence Metadata
+  API because doing so would cause blocking requests and would cause a
+  noticeable performance regression. This should not be moved over until
+  the Sequence Metadata API can be made more performant.
+* Effort Estimation currently relies on content introspection of the
+  underlying content in a way that the Learning Sequences API does not
+  support.
+
+This is the last of a handful of PRs in support of TNL-8330.
+---
+ .../learningSequencesOutline.factory.js       |  60 +++++--
+ src/courseware/data/api.js                    |  45 +++++-
+ src/courseware/data/redux.test.js             |  13 +-
+ src/courseware/data/thunks.js                 | 150 +++++++++++++-----
+ 4 files changed, 214 insertions(+), 54 deletions(-)
+
+diff --git a/src/courseware/data/__factories__/learningSequencesOutline.factory.js b/src/courseware/data/__factories__/learningSequencesOutline.factory.js
+index 7dc566a..d69e64b 100644
+--- a/src/courseware/data/__factories__/learningSequencesOutline.factory.js
++++ b/src/courseware/data/__factories__/learningSequencesOutline.factory.js
+@@ -1,14 +1,11 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+ 
+ Factory.define('learningSequencesOutline')
+-  .option('courseId', (courseId) => {
+-    if (courseId) {
+-      return courseId;
+-    }
+-    throw new Error('courseId must be specified for learningSequencesOutline factory.');
+-  })
+   .attrs({
++    title: 'Demo Course',
++    course_id: 'course-v1:edX+DemoX+Demo_Course',
+     outline: {
++      sections: [],
+       sequences: {
+       },
+     },
+@@ -17,21 +14,58 @@ Factory.define('learningSequencesOutline')
+ export function buildEmptyOutline(courseId) {
+   return Factory.build(
+     'learningSequencesOutline',
+-    {},
++    {
++      title: 'Demo Course',
++      course_id: courseId,
++      outline: {
++        sections: [],
++        sequences: {
++        },
++      },
++    },
+     { courseId },
+   );
+ }
+ 
+-export function buildSimpleOutline(courseId, sequenceBlocks) {
+-  return Factory.build(
++// Given courseBlocks (output from buildSimpleCourseBlocks), create a matching
++// Learning Sequences API outline (what the REST API would return to us).
++export function buildOutlineFromBlocks(courseBlocks) {
++  const sections = {};
++  const sequences = {};
++  let courseBlock = null;
++
++  Object.values(courseBlocks.blocks).forEach(block => {
++    if (block.type === 'course') {
++      courseBlock = block;
++    } else if (block.type === 'chapter') {
++      sections[block.id] = {
++        id: block.id,
++        title: block.title,
++        start: null,
++        sequence_ids: [...block.children],
++      };
++    } else if (block.type === 'sequential') {
++      sequences[block.id] = {
++        id: block.id,
++        title: block.title,
++        accessible: true,
++        start: null,
++      };
++    }
++  });
++
++  const outline = Factory.build(
+     'learningSequencesOutline',
+     {
++      course_key: courseBlocks.courseId,
++      title: courseBlocks.title,
+       outline: {
+-        sequences: Object.fromEntries(
+-          sequenceBlocks.map(({ id }) => [id, {}]),
+-        ),
++        sections: courseBlock.children.map(sectionId => sections[sectionId]),
++        sequences,
+       },
+     },
+-    { courseId },
++    {},
+   );
++
++  return outline;
+ }
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 69998c2..4e1b10d 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -91,6 +91,48 @@ export function normalizeBlocks(courseId, blocks) {
+   return models;
+ }
+ 
++export function normalizeLearningSequencesData(learningSequencesData) {
++  const models = {
++    courses: {},
++    sections: {},
++    sequences: {},
++  };
++
++  // Course
++  const now = new Date();
++  models.courses[learningSequencesData.course_key] = {
++    id: learningSequencesData.course_key,
++    title: learningSequencesData.title,
++    sectionIds: learningSequencesData.outline.sections.map(section => section.id),
++
++    // Scan through all the sequences and look for ones that aren't accessible
++    // to us yet because the start date has not yet passed. (Some may be
++    // inaccessible because the end_date has passed.)
++    hasScheduledContent: Object.values(learningSequencesData.outline.sequences).some(
++      seq => !seq.accessible && now < Date.parse(seq.effective_start),
++    ),
++  };
++
++  // Sections
++  learningSequencesData.outline.sections.forEach(section => {
++    models.sections[section.id] = {
++      id: section.id,
++      title: section.title,
++      sequenceIds: section.sequence_ids,
++    };
++  });
++
++  // Sequences
++  Object.entries(learningSequencesData.outline.sequences).forEach(([seqId, sequence]) => {
++    models.sequences[seqId] = {
++      id: seqId,
++      title: sequence.title,
++    };
++  });
++
++  return models;
++}
++
+ export async function getCourseBlocks(courseId) {
+   const authenticatedUser = getAuthenticatedUser();
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+@@ -110,7 +152,7 @@ export async function getLearningSequencesOutline(courseId) {
+ 
+   try {
+     const { data } = await getAuthenticatedHttpClient().get(outlineUrl.href, {});
+-    return data;
++    return normalizeLearningSequencesData(data);
+   } catch (error) {
+     // This is not a critical API to use at the moment. If it errors for any
+     // reason, just send back a null so the higher layers know to ignore it.
+@@ -179,6 +221,7 @@ function normalizeMetadata(metadata) {
+     userNeedsIntegritySignature: data.user_needs_integrity_signature,
+     specialExamsEnabledWaffleFlag: data.is_mfe_special_exams_enabled,
+     proctoredExamsEnabledWaffleFlag: data.is_mfe_proctored_exams_enabled,
++    isMasquerading: data.original_user_is_staff && !data.is_staff,
+   };
+ }
+ 
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index d3bea90..a288db3 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -9,7 +9,7 @@ import * as thunks from './thunks';
+ import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
+ 
+ import { buildSimpleCourseBlocks } from '../../shared/data/__factories__/courseBlocks.factory';
+-import { buildEmptyOutline, buildSimpleOutline } from './__factories__/learningSequencesOutline.factory';
++import { buildOutlineFromBlocks } from './__factories__/learningSequencesOutline.factory';
+ import { initializeMockApp } from '../../setupTest';
+ import initializeStore from '../../store';
+ 
+@@ -32,8 +32,7 @@ describe('Data layer integration tests', () => {
+     {},
+     { courseId, unitBlocks, sequenceBlock: sequenceBlocks[0] },
+   );
+-  const emptyOutline = buildEmptyOutline(courseId);
+-  const simpleOutline = buildSimpleOutline(courseId, sequenceBlocks);
++  const simpleOutline = buildOutlineFromBlocks(courseBlocks);
+ 
+   let courseUrl = `${courseBaseUrl}/${courseId}`;
+   courseUrl = appendBrowserTimezoneToUrl(courseUrl);
+@@ -129,6 +128,7 @@ describe('Data layer integration tests', () => {
+       // check that at least one key camel cased, thus course data normalized
+       expect(state.models.coursewareMeta[courseId].courseAccess).not.toBeUndefined();
+       expect(state.models.sequences.length === 1);
++
+       Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 1));
+     });
+ 
+@@ -137,8 +137,12 @@ describe('Data layer integration tests', () => {
+       // (even though it won't actually filter down in this case).
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+-      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, emptyOutline);
+ 
++      // Create an outline with basic matching metadata, but then empty it out...
++      const emptyOutline = buildOutlineFromBlocks(courseBlocks);
++      emptyOutline.sequences = {};
++      emptyOutline.sections = [];
++      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, emptyOutline);
+       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
+ 
+       const state = store.getState();
+@@ -151,6 +155,7 @@ describe('Data layer integration tests', () => {
+       // check that at least one key camel cased, thus course data normalized
+       expect(state.models.coursewareMeta[courseId].courseAccess).not.toBeUndefined();
+       expect(state.models.sequences === null);
++
+       Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 0));
+     });
+   });
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 55767d3..9322b1b 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -23,17 +23,113 @@ import {
+   fetchSequenceFailure,
+ } from './slice';
+ 
+-// Make a copy of the sectionData and return it, but with the sequences filtered
+-// down to only those sequences in allowedSequences
+-function filterSequencesFromSection(sectionData, allowedSequences) {
+-  return Object.fromEntries(
+-    Object.entries(sectionData).map(
+-      ([key, value]) => [
+-        key,
+-        (key === 'sequenceIds') ? value.filter(seqId => seqId in allowedSequences) : value,
+-      ],
+-    ),
+-  );
++/**
++ * Combines the models from the Course Blocks and Learning Sequences API into a
++ * new models obj that is returned. Does not mutate the models passed in.
++ *
++ * For performance and long term maintainability, we want to switch as much of
++ * the Courseware MFE to use the Learning Sequences API as possible, and
++ * eventually remove calls to the Course Blocks API. However, right now, certain
++ * data still has to come form the Course Blocks API. This function is a
++ * transitional step to help build out some of the data from the new API, while
++ * falling back to the Course Blocks API for other things.
++ *
++ * Overall performance gains will not be realized until we completely remove
++ * this call to the Course Blocks API (and the need for this function).
++ *
++ * @param {*} learningSequencesModels  Normalized model from normalizeLearningSequencesData
++ * @param {*} courseBlocksModels       Normalized model from normalizeBlocks
++ * @param {bool} isMasquerading        Is Masquerading being used?
++ */
++function mergeLearningSequencesWithCourseBlocks(learningSequencesModels, courseBlocksModels, isMasquerading) {
++  // If there's no Learning Sequences API data yet (not active for this course),
++  // send back the course blocks model as-is. Likewise, Learning Sequences
++  // doesn't currently handle masquerading properly for content groups.
++  if (isMasquerading || learningSequencesModels === null) {
++    return courseBlocksModels;
++  }
++  const mergedModels = {
++    courses: {},
++    sections: {},
++    sequences: {},
++
++    // Units are now copied over verbatim from Course Blocks API, but they
++    // should eventually come just-in-time, once the Sequence Metadata API is
++    // made to be acceptably fast.
++    units: courseBlocksModels.units,
++  };
++
++  // Top level course information
++  //
++  // It is not at all clear to me why courses is a dict when there's only ever
++  // one course, but I'm not going to make that model change right now.
++  const lsCourse = Object.values(learningSequencesModels.courses)[0];
++  const [courseBlockId, courseBlock] = Object.entries(courseBlocksModels.courses)[0];
++
++  // The Learning Sequences API never exposes the usage key of the root course
++  // block, which is used as the key here (instead of the CourseKey). It doesn't
++  // look like anything actually queries for this value though, and even the
++  // courseBlocksModels.courses uses the CourseKey as the "id" in the value. So
++  // I'm imitating the form here to minimize the chance of things breaking, but
++  // I think we should just forget the keys and replace courses with a singular
++  // course. I might end up doing that before my refactoring is done here. >_<
++  mergedModels.courses[courseBlockId] = {
++    // Learning Sequences API Data
++    id: lsCourse.id,
++    title: lsCourse.title,
++    sectionIds: lsCourse.sectionIds,
++    hasScheduledContent: lsCourse.hasScheduledContent,
++
++    // Still pulling from Course Blocks API
++    effortActivities: courseBlock.effortActivities,
++    effortTime: courseBlock.effortTime,
++  };
++
++  // List of Sequences comes from Learning Sequences. Course Blocks will have
++  // extra sequences that we don't want to display to the user, like ones that
++  // are empty because all the enclosed units are in user partition groups that
++  // the user is not a part of (e.g. Verified Track).
++  Object.entries(learningSequencesModels.sequences).forEach(([sequenceId, sequence]) => {
++    const blocksSequence = courseBlocksModels.sequences[sequenceId];
++    mergedModels.sequences[sequenceId] = {
++      // Learning Sequences API Data
++      id: sequenceId,
++      title: sequence.title,
++
++      // Still pulling from Course Blocks API Data:
++      effortActivities: blocksSequence.effortActivities,
++      effortTime: blocksSequence.effortTime,
++      legacyWebUrl: blocksSequence.legacyWebUrl,
++      unitIds: blocksSequence.unitIds,
++    };
++
++    // Add back-references to this sequence for all child units.
++    blocksSequence.unitIds.forEach(childUnitId => {
++      mergedModels.units[childUnitId].sequenceId = sequenceId;
++    });
++  });
++
++  // List of Sections comes from Learning Sequences.
++  Object.entries(learningSequencesModels.sections).forEach(([sectionId, section]) => {
++    const blocksSection = courseBlocksModels.sections[sectionId];
++    mergedModels.sections[sectionId] = {
++      // Learning Sequences API Data
++      id: sectionId,
++      title: section.title,
++      sequenceIds: section.sequenceIds,
++      courseId: lsCourse.id,
++
++      // Still pulling from Course Blocks API Data:
++      effortActivities: blocksSection.effortActivities,
++      effortTime: blocksSection.effortTime,
++    };
++    // Add back-references to this section for all child sequences.
++    section.sequenceIds.forEach(childSeqId => {
++      mergedModels.sequences[childSeqId].sectionId = sectionId;
++    });
++  });
++
++  return mergedModels;
+ }
+ 
+ export function fetchCourse(courseId) {
+@@ -60,29 +156,11 @@ export function fetchCourse(courseId) {
+       if (courseBlocksResult.status === 'fulfilled') {
+         const {
+           courses, sections, sequences, units,
+-        } = courseBlocksResult.value;
+-
+-        // Filter the data we get from the Course Blocks API using the data we
+-        // get back from the Learning Sequences API (which knows to hide certain
+-        // sequences that users shouldn't see).
+-        //
+-        // This is temporary – all this data should come from Learning Sequences
+-        // soon.
+-        let filteredSections = sections;
+-        let filteredSequences = sequences;
+-        if (learningSequencesOutlineResult.value) {
+-          const allowedSequences = learningSequencesOutlineResult.value.outline.sequences;
+-          filteredSequences = Object.fromEntries(
+-            Object.entries(sequences).filter(
+-              ([blockId]) => blockId in allowedSequences,
+-            ),
+-          );
+-          filteredSections = Object.fromEntries(
+-            Object.entries(sections).map(
+-              ([blockId, sectionData]) => [blockId, filterSequencesFromSection(sectionData, allowedSequences)],
+-            ),
+-          );
+-        }
++        } = mergeLearningSequencesWithCourseBlocks(
++          learningSequencesOutlineResult.value,
++          courseBlocksResult.value,
++          courseMetadataResult.value.isMasquerading,
++        );
+ 
+         // This updates the course with a sectionIds array from the blocks data.
+         dispatch(updateModelsMap({
+@@ -91,12 +169,12 @@ export function fetchCourse(courseId) {
+         }));
+         dispatch(addModelsMap({
+           modelType: 'sections',
+-          modelsMap: filteredSections,
++          modelsMap: sections,
+         }));
+         // We update for sequences and units because the sequence metadata may have come back first.
+         dispatch(updateModelsMap({
+           modelType: 'sequences',
+-          modelsMap: filteredSequences,
++          modelsMap: sequences,
+         }));
+         dispatch(updateModelsMap({
+           modelType: 'units',
+-- 
+2.34.1
+

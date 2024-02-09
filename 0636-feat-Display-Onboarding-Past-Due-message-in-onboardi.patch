@@ -1,0 +1,172 @@
+From bdfbbc0b75eb9c2f3b9ea4a6e506a3c3e4ff8a3f Mon Sep 17 00:00:00 2001
+From: Michael Roytman <mroytman@edx.org>
+Date: Wed, 1 Sep 2021 16:32:00 -0400
+Subject: [PATCH 0636/1021] feat: Display "Onboarding Past Due" message in
+ onboarding button if onboarding is past due (#472)
+
+[MST-746](https://openedx.atlassian.net/browse/MST-746)
+
+The ProctoringInfoPanel displays information in a learner's course outline about the state of the learner's onboarding. It displays a link to navigate the learner to the onboarding exam if it is available. If the onboarding exam is not yet released, it displays information about the release date. This code changes adds an "Onboarding Past Due" message to the link if the onboarding is past due, as determined by a call to the LMS onboarding endpoint.
+---
+ src/course-home/outline-tab/messages.js       |  4 +
+ .../widgets/ProctoringInfoPanel.jsx           | 91 +++++++++++--------
+ 2 files changed, 56 insertions(+), 39 deletions(-)
+
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index 1e6a107..0a2de61 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -216,6 +216,10 @@ const messages = defineMessages({
+     id: 'learning.proctoringPanel.reviewRequirementsButton',
+     defaultMessage: 'Review instructions and system requirements',
+   },
++  proctoringOnboardingButtonPastDue: {
++    id: 'learning.proctoringPanel.onboardingButtonPastDue',
++    defaultMessage: 'Onboarding Past Due',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index acde48d..146618f 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -9,10 +9,12 @@ import messages from '../messages';
+ import { getProctoringInfoData } from '../../data/api';
+ 
+ function ProctoringInfoPanel({ courseId, username, intl }) {
+-  const [status, setStatus] = useState('');
+   const [link, setLink] = useState('');
+-  const [releaseDate, setReleaseDate] = useState(null);
++  const [onboardingPastDue, setOnboardingPastDue] = useState(false);
++  const [showInfoPanel, setShowInfoPanel] = useState(false);
++  const [status, setStatus] = useState('');
+   const [readableStatus, setReadableStatus] = useState('');
++  const [releaseDate, setReleaseDate] = useState(null);
+ 
+   const readableStatuses = {
+     notStarted: 'notStarted',
+@@ -77,6 +79,10 @@ function ProctoringInfoPanel({ courseId, username, intl }) {
+       .then(
+         response => {
+           if (response) {
++            if (Object.keys(response).length > 0) {
++              setShowInfoPanel(true);
++            }
++
+             setStatus(response.onboarding_status);
+             setLink(response.onboarding_link);
+             const expirationDate = response.expiration_date;
+@@ -86,14 +92,54 @@ function ProctoringInfoPanel({ courseId, username, intl }) {
+               setReadableStatus(getReadableStatusClass(response.onboarding_status));
+             }
+             setReleaseDate(new Date(response.onboarding_release_date));
++            setOnboardingPastDue(response.onboarding_past_due);
+           }
+         },
+       );
+   }, []);
+ 
++  let onboardingExamButton = null;
++
++  if (isNotYetReleased(releaseDate)) {
++    onboardingExamButton = (
++      <Button variant="secondary" block disabled aria-disabled="true">
++        {intl.formatMessage(
++          messages.proctoringOnboardingButtonNotOpen,
++          {
++            releaseDate: intl.formatDate(releaseDate, {
++              day: 'numeric',
++              month: 'short',
++              year: 'numeric',
++            }),
++          },
++        )}
++      </Button>
++    );
++  } else if (onboardingPastDue) {
++    onboardingExamButton = (
++      <Button variant="secondary" block disabled aria-disabled="true">
++        {intl.formatMessage(messages.proctoringOnboardingButtonPastDue)}
++      </Button>
++    );
++  } else if (!isNotYetReleased(releaseDate)) {
++    if (readableStatus === readableStatuses.otherCourseApproved) {
++      onboardingExamButton = (
++        <Button variant="primary" block href={link}>
++          {intl.formatMessage(messages.proctoringOnboardingPracticeButton)}
++        </Button>
++      );
++    } else if (readableStatus !== readableStatuses.otherCourseApproved) {
++      onboardingExamButton = (
++        <Button variant="primary" block href={link}>
++          {intl.formatMessage(messages.proctoringOnboardingButton)}
++        </Button>
++      );
++    }
++  }
++
+   return (
+     <>
+-      { link && (
++      { showInfoPanel && (
+         <section className={`mb-4 p-3 outline-sidebar-proctoring-panel ${getBorderClass()}`}>
+           <h2 className="h4" id="outline-sidebar-upgrade-header">{intl.formatMessage(messages.proctoringInfoPanel)}</h2>
+           <div>
+@@ -114,50 +160,17 @@ function ProctoringInfoPanel({ courseId, username, intl }) {
+               <>
+                 <p>
+                   {isNotYetSubmitted(status) && (
+-                    <>
+-                      {intl.formatMessage(messages.proctoringPanelGeneralInfo)}
+-                    </>
++                    intl.formatMessage(messages.proctoringPanelGeneralInfo)
+                   )}
+                   {!isNotYetSubmitted(status) && (
+-                    <>
+-                      {intl.formatMessage(messages.proctoringPanelGeneralInfoSubmitted)}
+-                    </>
++                    intl.formatMessage(messages.proctoringPanelGeneralInfoSubmitted)
+                   )}
+                 </p>
+                 <p>{intl.formatMessage(messages.proctoringPanelGeneralTime)}</p>
+               </>
+             )}
+             {isNotYetSubmitted(status) && (
+-              <>
+-                {!isNotYetReleased(releaseDate) && (
+-                  <Button variant="primary" block href={link}>
+-                    {readableStatus === readableStatuses.otherCourseApproved && (
+-                      <>
+-                        {intl.formatMessage(messages.proctoringOnboardingPracticeButton)}
+-                      </>
+-                    )}
+-                    {readableStatus !== readableStatuses.otherCourseApproved && (
+-                      <>
+-                        {intl.formatMessage(messages.proctoringOnboardingButton)}
+-                      </>
+-                    )}
+-                  </Button>
+-                )}
+-                {isNotYetReleased(releaseDate) && (
+-                  <Button variant="secondary" block disabled aria-disabled="true">
+-                    {intl.formatMessage(
+-                      messages.proctoringOnboardingButtonNotOpen,
+-                      {
+-                        releaseDate: intl.formatDate(releaseDate, {
+-                          day: 'numeric',
+-                          month: 'short',
+-                          year: 'numeric',
+-                        }),
+-                      },
+-                    )}
+-                  </Button>
+-                )}
+-              </>
++              onboardingExamButton
+             )}
+             <Button variant="outline-primary" block href="https://support.edx.org/hc/en-us/sections/115004169247-Taking-Timed-and-Proctored-Exams">
+               {intl.formatMessage(messages.proctoringReviewRequirementsButton)}
+-- 
+2.34.1
+

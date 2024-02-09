@@ -1,0 +1,331 @@
+From 50e649daa3fa4c5a4ddd12471bb95a231ad1b059 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Tue, 2 Feb 2021 05:39:27 -0800
+Subject: [PATCH 0379/1021] AA-491: Update MFE with analytics event (#351)
+
+These already exist in the legacy view. This is just porting them
+over into the MFEs
+---
+ .../enrollment-alert/EnrollmentAlert.jsx      |  6 +++
+ src/alerts/enrollment-alert/hooks.js          |  7 +++-
+ src/course-home/outline-tab/OutlineTab.jsx    | 26 +++++++++++--
+ .../PrivateCourseAlert.jsx                    |  2 +
+ .../outline-tab/widgets/UpgradeCard.jsx       | 13 ++++++-
+ src/courseware/course/Course.jsx              | 11 +++++-
+ src/generic/course-sock/CourseSock.jsx        | 37 +++++++++++++++++++
+ src/generic/course-sock/CourseSock.test.jsx   |  3 ++
+ 8 files changed, 99 insertions(+), 6 deletions(-)
+
+diff --git a/src/alerts/enrollment-alert/EnrollmentAlert.jsx b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+index 63eee39..6707883 100644
+--- a/src/alerts/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+@@ -5,6 +5,7 @@ import { Button } from '@edx/paragon';
+ 
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
++import { useModel } from '../../generic/model-store';
+ import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+ 
+ import messages from './messages';
+@@ -18,8 +19,13 @@ function EnrollmentAlert({ intl, payload }) {
+     isStaff,
+   } = payload;
+ 
++  const {
++    org,
++  } = useModel('courseHomeMeta', courseId);
++
+   const { enrollClickHandler, loading } = useEnrollClickHandler(
+     courseId,
++    org,
+     intl.formatMessage(messages.success),
+   );
+ 
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index f880db8..57c30d4 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -2,6 +2,7 @@
+ import React, {
+   useContext, useState, useCallback, useMemo,
+ } from 'react';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { AppContext } from '@edx/frontend-platform/react';
+ 
+ import { UserMessagesContext, ALERT_TYPES, useAlert } from '../../generic/user-messages';
+@@ -40,7 +41,7 @@ export function useEnrollmentAlert(courseId) {
+   return { clientEnrollmentAlert: EnrollmentAlert };
+ }
+ 
+-export function useEnrollClickHandler(courseId, successText) {
++export function useEnrollClickHandler(courseId, orgId, successText) {
+   const [loading, setLoading] = useState(false);
+   const { addFlash } = useContext(UserMessagesContext);
+   const enrollClickHandler = useCallback(() => {
+@@ -54,6 +55,10 @@ export function useEnrollClickHandler(courseId, successText) {
+         topic: 'course',
+       });
+       setLoading(false);
++      sendTrackEvent('edx.bi.user.course-home.enrollment', {
++        org_key: orgId,
++        courserun_key: courseId,
++      });
+       global.location.reload();
+     });
+   }, [courseId]);
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 0b10ed5..39179f7 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -1,5 +1,6 @@
+ import React, { useRef, useState } from 'react';
+ import { useSelector } from 'react-redux';
++import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { Button, Toast } from '@edx/paragon';
+@@ -33,6 +34,7 @@ function OutlineTab({ intl }) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    org,
+     title,
+   } = useModel('courseHomeMeta', courseId);
+ 
+@@ -65,6 +67,15 @@ function OutlineTab({ intl }) {
+   const [goalToastHeader, setGoalToastHeader] = useState('');
+   const [expandAll, setExpandAll] = useState(false);
+ 
++  const logResumeCourseClick = () => {
++    sendTrackingLogEvent('edx.course.home.resume_course.clicked', {
++      courserun_key: courseId,
++      event_type: hasVisitedCourse ? 'resume' : 'start',
++      org_key: org,
++      url: resumeCourseUrl,
++    });
++  };
++
+   // Below the course title alerts (appearing in the order listed here)
+   const offerAlert = useOfferAlert(offer, userTimezone, 'outline-course-alerts');
+   const accessExpirationAlert = useAccessExpirationAlert(accessExpiration, userTimezone, 'outline-course-alerts');
+@@ -92,9 +103,9 @@ function OutlineTab({ intl }) {
+         </div>
+         {resumeCourseUrl && (
+           <div className="col-12 col-sm-auto p-0">
+-            <a className="btn btn-primary btn-block" href={resumeCourseUrl}>
++            <Button block href={resumeCourseUrl} onClick={() => logResumeCourseClick()}>
+               {hasVisitedCourse ? intl.formatMessage(messages.resume) : intl.formatMessage(messages.start)}
+-            </a>
++            </Button>
+           </div>
+         )}
+       </div>
+@@ -191,7 +202,16 @@ function OutlineTab({ intl }) {
+           </div>
+         )}
+       </div>
+-      {canShowUpgradeSock && <CourseSock ref={courseSock} offer={offer} verifiedMode={verifiedMode} />}
++      {canShowUpgradeSock && (
++        <CourseSock
++          courseId={courseId}
++          offer={offer}
++          orgKey={org}
++          pageLocation="Home Page"
++          ref={courseSock}
++          verifiedMode={verifiedMode}
++        />
++      )}
+     </>
+   );
+ }
+diff --git a/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx b/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+index b555652..4255eaa 100644
+--- a/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
++++ b/src/course-home/outline-tab/alerts/private-course-alert/PrivateCourseAlert.jsx
+@@ -22,11 +22,13 @@ function PrivateCourseAlert({ intl, payload }) {
+   } = payload;
+ 
+   const {
++    org,
+     title,
+   } = useModel('courseHomeMeta', courseId);
+ 
+   const { enrollClickHandler, loading } = useEnrollClickHandler(
+     courseId,
++    org,
+     intl.formatMessage(enrollmentMessages.success),
+   );
+ 
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.jsx b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+index a9c9a60..d6826f5 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.jsx
++++ b/src/course-home/outline-tab/widgets/UpgradeCard.jsx
+@@ -1,7 +1,7 @@
+ import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
++import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Button } from '@edx/paragon';
+ 
+@@ -26,15 +26,26 @@ function UpgradeCard({ courseId, intl, onLearnMore }) {
+     courserun_key: courseId,
+   };
+ 
++  const promotionEventProperties = {
++    creative: 'sidebarupsell',
++    name: 'In-Course Verification Prompt',
++    position: 'sidebar-message',
++    promotion_id: 'courseware_verified_certificate_upsell',
++    ...eventProperties,
++  };
++
+   useEffect(() => {
+     sendTrackingLogEvent('edx.bi.course.upgrade.sidebarupsell.displayed', eventProperties);
++    sendTrackEvent('Promotion Viewed', promotionEventProperties);
+   });
+ 
+   const logClick = () => {
+     sendTrackingLogEvent('edx.bi.course.upgrade.sidebarupsell.clicked', eventProperties);
+     sendTrackingLogEvent('edx.course.enrollment.upgrade.clicked', {
++      ...eventProperties,
+       location: 'sidebar-message',
+     });
++    sendTrackEvent('Promotion Clicked', promotionEventProperties);
+   };
+ 
+   return (
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index df092f3..3cb9828 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -39,6 +39,7 @@ function Course({
+     canShowUpgradeSock,
+     celebrations,
+     offer,
++    org,
+     userTimezone,
+     verifiedMode,
+   } = course;
+@@ -119,7 +120,15 @@ function Course({
+           open
+         />
+       )}
+-      {canShowUpgradeSock && <CourseSock offer={offer} verifiedMode={verifiedMode} />}
++      {canShowUpgradeSock && (
++        <CourseSock
++          courseId={courseId}
++          offer={offer}
++          orgKey={org}
++          pageLocation="Course Content Page"
++          verifiedMode={verifiedMode}
++        />
++      )}
+       <ContentTools course={course} />
+     </>
+   );
+diff --git a/src/generic/course-sock/CourseSock.jsx b/src/generic/course-sock/CourseSock.jsx
+index 55f8ccb..4e84ece 100644
+--- a/src/generic/course-sock/CourseSock.jsx
++++ b/src/generic/course-sock/CourseSock.jsx
+@@ -1,6 +1,7 @@
+ import React, { Component } from 'react';
+ import PropTypes from 'prop-types';
+ import { getConfig } from '@edx/frontend-platform';
++import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import LearnerQuote1 from './assets/learner-quote.png';
+ import LearnerQuote2 from './assets/learner-quote2.png';
+@@ -12,12 +13,42 @@ export default class CourseSock extends Component {
+     super(props);
+     this.state = { showUpsell: false };
+     this.sockElement = React.createRef();
++    this.commonEventProperties = {
++      courserun_key: this.props.courseId,
++      org_key: this.props.orgKey,
++    };
++    this.promotionEventProperties = {
++      creative: 'original_sock',
++      name: 'In-Course Verification Prompt',
++      position: 'sock',
++      promotion_id: 'courseware_verified_certificate_upsell',
++      ...this.commonEventProperties,
++    };
++  }
++
++  componentDidMount() {
++    sendTrackEvent('Promotion Viewed', this.promotionEventProperties);
+   }
+ 
+   handleClick = () => {
+     this.setState(state => ({
+       showUpsell: !state.showUpsell,
+     }));
++
++    const toggleLogEvent = this.state.showUpsell ? 'edx.bi.course.sock.toggle_opened'
++      : 'edx.bi.course.sock.toggle_closed';
++    sendTrackEvent(toggleLogEvent, {
++      from_page: this.props.pageLocation,
++      ...this.commonEventProperties,
++    });
++    sendTrackEvent('Promotion Clicked', this.promotionEventProperties);
++  }
++
++  logClick = () => {
++    sendTrackingLogEvent('edx.course.enrollment.upgrade.clicked', {
++      location: 'sock',
++      ...this.commonEventProperties,
++    });
+   }
+ 
+   showToUser = () => {
+@@ -68,6 +99,7 @@ export default class CourseSock extends Component {
+                     <UpgradeButton
+                       size="lg"
+                       offer={this.props.offer}
++                      onClick={this.logClick}
+                       verifiedMode={this.props.verifiedMode}
+                       className="mb-3"
+                       data-creative="original_sock"
+@@ -208,10 +240,15 @@ export default class CourseSock extends Component {
+ }
+ 
+ CourseSock.defaultProps = {
++  courseId: null,
+   offer: null,
++  orgKey: null,
+ };
+ 
+ CourseSock.propTypes = {
++  courseId: PropTypes.string,
+   offer: PropTypes.shape({}),
++  orgKey: PropTypes.string,
++  pageLocation: PropTypes.string.isRequired,
+   verifiedMode: PropTypes.shape({}).isRequired,
+ };
+diff --git a/src/generic/course-sock/CourseSock.test.jsx b/src/generic/course-sock/CourseSock.test.jsx
+index 65e6808..585e262 100644
+--- a/src/generic/course-sock/CourseSock.test.jsx
++++ b/src/generic/course-sock/CourseSock.test.jsx
+@@ -4,6 +4,8 @@ import {
+ } from '../../setupTest';
+ import CourseSock from './CourseSock';
+ 
++jest.mock('@edx/frontend-platform/analytics');
++
+ describe('Course Sock', () => {
+   const mockData = {
+     verifiedMode: {
+@@ -12,6 +14,7 @@ describe('Course Sock', () => {
+       currency: 'dollars',
+       currencySymbol: '$',
+     },
++    pageLocation: 'Course Content Page',
+   };
+ 
+   beforeAll(async () => {
+-- 
+2.34.1
+

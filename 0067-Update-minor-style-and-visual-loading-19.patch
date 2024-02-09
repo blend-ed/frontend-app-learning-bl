@@ -1,0 +1,214 @@
+From 8347a6637542e88c6d9a3c530cbf538dfd14cf8a Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Fri, 6 Mar 2020 09:20:34 -0500
+Subject: [PATCH 0067/1021] Update minor style and visual loading (#19)
+
+---
+ src/courseware/sequence/Sequence.jsx | 62 +++++++++++++++++-----------
+ src/courseware/sequence/Unit.jsx     | 10 +++++
+ src/index.scss                       | 29 +++++++------
+ 3 files changed, 64 insertions(+), 37 deletions(-)
+
+diff --git a/src/courseware/sequence/Sequence.jsx b/src/courseware/sequence/Sequence.jsx
+index 06c1bb8..71bfcf5 100644
+--- a/src/courseware/sequence/Sequence.jsx
++++ b/src/courseware/sequence/Sequence.jsx
+@@ -1,5 +1,7 @@
+ /* eslint-disable no-use-before-define */
+-import React, { useEffect, useContext, Suspense } from 'react';
++import React, {
++  useEffect, useContext, Suspense, useState,
++} from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+@@ -71,6 +73,13 @@ function Sequence({
+     };
+   }, [bannerText]);
+ 
++  const [unitHasLoaded, setUnitHasLoaded] = useState(false);
++  const handleUnitLoaded = () => {
++    setUnitHasLoaded(true);
++  };
++  useEffect(() => {
++    setUnitHasLoaded(false);
++  }, [activeUnitId]);
+ 
+   return (
+     <>
+@@ -105,33 +114,36 @@ function Sequence({
+           <Unit
+             key={activeUnitId}
+             id={activeUnitId}
++            onLoaded={handleUnitLoaded}
+           />
+         )}
+       </div>
+-      <div className="unit-content-container below-unit-navigation">
+-        <Button
+-          className="btn-outline-secondary previous-button w-25 mr-2"
+-          onClick={handlePrevious}
+-        >
+-          <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
+-          <FormattedMessage
+-            id="learn.sequence.navigation.after.unit.previous"
+-            description="The button to go to the previous unit"
+-            defaultMessage="Previous"
+-          />
+-        </Button>
+-        <Button
+-          className="btn-outline-primary next-button w-75"
+-          onClick={handleNext}
+-        >
+-          <FormattedMessage
+-            id="learn.sequence.navigation.after.unit.next"
+-            description="The button to go to the next unit"
+-            defaultMessage="Next"
+-          />
+-          <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
+-        </Button>
+-      </div>
++      {unitHasLoaded ? (
++        <div className="unit-content-container below-unit-navigation">
++          <Button
++            className="btn-outline-secondary previous-button w-25 mr-2"
++            onClick={handlePrevious}
++          >
++            <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
++            <FormattedMessage
++              id="learn.sequence.navigation.after.unit.previous"
++              description="The button to go to the previous unit"
++              defaultMessage="Previous"
++            />
++          </Button>
++          <Button
++            className="btn-outline-primary next-button w-75"
++            onClick={handleNext}
++          >
++            <FormattedMessage
++              id="learn.sequence.navigation.after.unit.next"
++              description="The button to go to the next unit"
++              defaultMessage="Next"
++            />
++            <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
++          </Button>
++        </div>
++      ) : null}
+     </>
+   );
+ }
+diff --git a/src/courseware/sequence/Unit.jsx b/src/courseware/sequence/Unit.jsx
+index c7affd0..2cf484b 100644
+--- a/src/courseware/sequence/Unit.jsx
++++ b/src/courseware/sequence/Unit.jsx
+@@ -9,6 +9,7 @@ function Unit({
+   bookmarked,
+   bookmarkedUpdateState,
+   displayName,
++  onLoaded,
+   id,
+   ...props
+ }) {
+@@ -16,12 +17,19 @@ function Unit({
+   const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}?show_title=0&show_bookmark_button=0`;
+ 
+   const [iframeHeight, setIframeHeight] = useState(0);
++  const [hasLoaded, setHasLoaded] = useState(false);
+   useEffect(() => {
+     global.onmessage = (event) => {
+       const { type, payload } = event.data;
+ 
+       if (type === 'plugin.resize') {
+         setIframeHeight(payload.height);
++        if (!hasLoaded && iframeHeight === 0 && payload.height > 0) {
++          setHasLoaded(true);
++          if (onLoaded) {
++            onLoaded();
++          }
++        }
+       }
+     };
+   }, []);
+@@ -65,11 +73,13 @@ Unit.propTypes = {
+   displayName: PropTypes.string.isRequired,
+   id: PropTypes.string.isRequired,
+   removeBookmark: PropTypes.func.isRequired,
++  onLoaded: PropTypes.func,
+ };
+ 
+ Unit.defaultProps = {
+   bookmarked: false,
+   bookmarkedUpdateState: undefined,
++  onLoaded: undefined,
+ };
+ 
+ const mapStateToProps = (state, props) => state.courseBlocks.blocks[props.id] || {};
+diff --git a/src/index.scss b/src/index.scss
+index 799df49..f4524f9 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -100,6 +100,7 @@ $primary: #1176B2;
+     }
+     &.complete {
+       background-color: #EEF7E5;
++      color: $success;
+     }
+     &:first-child {
+       margin-left: 0;
+@@ -108,6 +109,7 @@ $primary: #1176B2;
+   .previous-btn, .next-btn {
+     flex-basis: 10em;
+     min-width: 9em;
++    color: theme-color('gray', 700);
+     display: inline-flex;
+     justify-content: center;
+     align-items: center;
+@@ -120,11 +122,26 @@ $primary: #1176B2;
+   }
+ }
+ 
++.unit-content-container {
++  padding-left: 20px;
++  padding-right: 20px;
++  max-width: 1024px;
++  margin-left: auto;
++  margin-right: auto;
++  width: 100%;
++  @media (min-width: 830px) {
++    padding-left: 40px;
++    padding-right: 40px;
++  }
++}
++
+ .below-unit-navigation {
+   display: flex;
+   justify-content: center;
+   margin-top: 2rem;
+   margin-bottom: 2rem;
++  padding-left: 6rem;
++  padding-right: 6rem;
+   .previous-button,
+   .next-button {
+     border-radius: 4px;
+@@ -134,18 +151,6 @@ $primary: #1176B2;
+   }
+ }
+ 
+-.unit-content-container {
+-  padding-left: 20px;
+-  padding-right: 20px;
+-  max-width: 1024px;
+-  margin-left: auto;
+-  margin-right: auto;
+-  width: 100%;
+-  @media (min-width: 830px) {
+-    padding-left: 40px;
+-    padding-right: 40px;
+-  }
+-}
+ #unit-iframe {
+   max-width: 1024px;
+   width: 100%;
+-- 
+2.34.1
+

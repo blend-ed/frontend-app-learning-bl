@@ -1,0 +1,40 @@
+From 5bfca284507a266519589ae99ee41ff87f95a636 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Wed, 2 Jun 2021 17:12:56 -0400
+Subject: [PATCH 0483/1021] feat: update streak discount coupon expiration date
+ (#471)
+
+---
+ src/shared/streak-celebration/StreakCelebrationModal.jsx      | 2 +-
+ src/shared/streak-celebration/StreakCelebrationModal.test.jsx | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index 7681a36..f201cfa 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -143,7 +143,7 @@ function StreakModal({
+                 id="learning.streakCelebration.streakAA759EndDateMessage"
+                 defaultMessage="Ends {date}."
+                 values={{
+-                  date: new Date('2021-6-25 00:00').toLocaleDateString({ timeZone: 'UTC' }),
++                  date: new Date('2021-7-20 00:00').toLocaleDateString({ timeZone: 'UTC' }),
+                 }}
+               />
+             </div>
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index 04d3d03..99674fb 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -55,7 +55,7 @@ describe('Loaded Tab Page', () => {
+     const testStore = await initializeTestStore({ courseMetadata }, false);
+     render(<StreakModal {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+     expect(screen.getByText('You’ve unlocked a 15% off discount when you upgrade this course for a limited time only.')).toBeInTheDocument();
+-    expect(screen.getByText('Ends 6/25/2021.')).toBeInTheDocument();
++    expect(screen.getByText('Ends 7/20/2021.')).toBeInTheDocument();
+     expect(screen.getByText('Continue with course')).toBeInTheDocument();
+   });
+ });
+-- 
+2.34.1
+

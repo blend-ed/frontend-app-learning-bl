@@ -1,0 +1,129 @@
+From c298bc1dbf89080b42478774ace0191bde26f73e Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 10 Aug 2020 17:23:21 -0400
+Subject: [PATCH 0230/1021] Implement kill-switch for non-staff users
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+to redirect to the current unit’s lmsWebUrl if the MFE is disabled
+
+If we receive an error_code of 'microfrontend_disabled',
+go to the equivalent unit in the LMS experience.
+
+Fixes: TNL-7362
+Co-authored-by: stvn <stvn@mit.edu>
+---
+ src/courseware/CoursewareContainer.jsx             | 13 ++++++++++++-
+ src/courseware/CoursewareRedirect.jsx              | 14 ++++++++++++++
+ .../CoursewareRedirectLandingPage.jsx}             |  8 +++++++-
+ src/index.jsx                                      |  4 ++--
+ 4 files changed, 35 insertions(+), 4 deletions(-)
+ create mode 100644 src/courseware/CoursewareRedirect.jsx
+ rename src/{CoursewareRedirect.jsx => courseware/CoursewareRedirectLandingPage.jsx} (81%)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 7485fc4..e4a8764 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -171,7 +171,15 @@ class CoursewareContainer extends Component {
+   }
+ 
+   renderDenied() {
+-    const { courseId, course } = this.props;
++    const {
++      course,
++      courseId,
++      match: {
++        params: {
++          unitId: routeUnitId,
++        },
++      },
++    } = this.props;
+     let url = `/redirect/course-home/${courseId}`;
+     switch (course.canLoadCourseware.errorCode) {
+       case 'audit_expired':
+@@ -186,6 +194,9 @@ class CoursewareContainer extends Component {
+       case 'unfulfilled_milestones':
+         url = '/redirect/dashboard';
+         break;
++      case 'microfrontend_disabled':
++        url = `/redirect/courseware/${courseId}/unit/${routeUnitId}`;
++        break;
+       case 'authentication_required':
+       case 'enrollment_required':
+       default:
+diff --git a/src/courseware/CoursewareRedirect.jsx b/src/courseware/CoursewareRedirect.jsx
+new file mode 100644
+index 0000000..136651d
+--- /dev/null
++++ b/src/courseware/CoursewareRedirect.jsx
+@@ -0,0 +1,14 @@
++import { getConfig } from '@edx/frontend-platform';
++
++import { useModel } from '../generic/model-store';
++
++export default function CourseRedirect({ match }) {
++  const {
++    courseId,
++    unitId,
++  } = match.params;
++  const unit = useModel('units', unitId) || {};
++  const coursewareUrl = unit.lmsWebUrl || `${getConfig().LMS_BASE_URL}/courses/${courseId}/courseware/`;
++  global.location.assign(coursewareUrl);
++  return null;
++}
+diff --git a/src/CoursewareRedirect.jsx b/src/courseware/CoursewareRedirectLandingPage.jsx
+similarity index 81%
+rename from src/CoursewareRedirect.jsx
+rename to src/courseware/CoursewareRedirectLandingPage.jsx
+index b40c986..f27ad73 100644
+--- a/src/CoursewareRedirect.jsx
++++ b/src/courseware/CoursewareRedirectLandingPage.jsx
+@@ -2,7 +2,9 @@ import React from 'react';
+ import { Switch, Route, useRouteMatch } from 'react-router';
+ import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+-import PageLoading from './generic/PageLoading';
++
++import PageLoading from '../generic/PageLoading';
++import CoursewareRedirect from './CoursewareRedirect';
+ 
+ export default () => {
+   const { path } = useRouteMatch();
+@@ -18,6 +20,10 @@ export default () => {
+       />
+ 
+       <Switch>
++        <Route
++          path={`${path}/courseware/:courseId/unit/:unitId`}
++          component={CoursewareRedirect}
++        />
+         <Route
+           path={`${path}/course-home/:courseId`}
+           render={({ match }) => {
+diff --git a/src/index.jsx b/src/index.jsx
+index c2fbc7f..df1dff5 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -20,7 +20,7 @@ import './index.scss';
+ import './assets/favicon.ico';
+ import OutlineTab from './course-home/outline-tab';
+ import CoursewareContainer from './courseware';
+-import CoursewareRedirect from './CoursewareRedirect';
++import CoursewareRedirectLandingPage from './courseware/CoursewareRedirectLandingPage';
+ import DatesTab from './course-home/dates-tab';
+ import ProgressTab from './course-home/progress-tab/ProgressTab';
+ import { TabContainer } from './tab-page';
+@@ -33,7 +33,7 @@ subscribe(APP_READY, () => {
+     <AppProvider store={initializeStore()}>
+       <UserMessagesProvider>
+         <Switch>
+-          <Route path="/redirect" component={CoursewareRedirect} />
++          <Route path="/redirect" component={CoursewareRedirectLandingPage} />
+           <Route path="/course/:courseId/home">
+             <TabContainer tab="outline" fetch={fetchOutlineTab}>
+               <OutlineTab />
+-- 
+2.34.1
+

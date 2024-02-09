@@ -1,0 +1,130 @@
+From 2f0933be6e458d22c599bbf71f92a236a7cfa7f1 Mon Sep 17 00:00:00 2001
+From: Saad Yousaf <saad.yousaf@arbisoft.com>
+Date: Wed, 28 Jul 2021 02:01:26 +0500
+Subject: [PATCH 0558/1021] fix: update container-fluid to container-xl class
+ to match legacy experience. (#530)
+
+Co-authored-by: SaadYousaf <saadyousaf@A006-00314.local>
+---
+ src/course-header/CourseTabsNavigation.jsx                | 2 +-
+ src/course-header/Header.jsx                              | 2 +-
+ .../course/content-tools/calculator/Calculator.jsx        | 6 +++---
+ src/index.scss                                            | 8 --------
+ src/instructor-toolbar/InstructorToolbar.jsx              | 4 ++--
+ src/tab-page/LoadedTabPage.jsx                            | 2 +-
+ 6 files changed, 8 insertions(+), 16 deletions(-)
+
+diff --git a/src/course-header/CourseTabsNavigation.jsx b/src/course-header/CourseTabsNavigation.jsx
+index efa4aa8..62366ad 100644
+--- a/src/course-header/CourseTabsNavigation.jsx
++++ b/src/course-header/CourseTabsNavigation.jsx
+@@ -11,7 +11,7 @@ function CourseTabsNavigation({
+ }) {
+   return (
+     <div className={classNames('course-tabs-navigation', className)}>
+-      <div className="container-fluid">
++      <div className="container-xl">
+         <Tabs
+           className="nav-underline-tabs"
+           aria-label={intl.formatMessage(messages.courseMaterial)}
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index b77702c..50c6145 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -61,7 +61,7 @@ function Header({
+   return (
+     <header className="course-header">
+       <a className="sr-only sr-only-focusable" href="#main-content">{intl.formatMessage(messages.skipNavLink)}</a>
+-      <div className="container-fluid py-2 d-flex align-items-center">
++      <div className="container-xl py-2 d-flex align-items-center">
+         {headerLogo}
+         <div className="flex-grow-1 course-title-lockup" style={{ lineHeight: 1 }}>
+           <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
+diff --git a/src/courseware/course/content-tools/calculator/Calculator.jsx b/src/courseware/course/content-tools/calculator/Calculator.jsx
+index 7784287..f325983 100644
+--- a/src/courseware/course/content-tools/calculator/Calculator.jsx
++++ b/src/courseware/course/content-tools/calculator/Calculator.jsx
+@@ -52,7 +52,7 @@ class Calculator extends Component {
+           </Collapsible.Trigger>
+         </div>
+         <Collapsible.Body className="calculator-content pt-4">
+-          <form onSubmit={this.handleSubmit} className="container-fluid form-inline flex-nowrap">
++          <form onSubmit={this.handleSubmit} className="container-xl form-inline flex-nowrap">
+             <input
+               type="text"
+               placeholder={this.props.intl.formatMessage(messages['calculator.input.field.label'])}
+@@ -80,7 +80,7 @@ class Calculator extends Component {
+           </form>
+ 
+           <Collapsible.Advanced>
+-            <div className="container-fluid">
++            <div className="container-xl">
+               <Collapsible.Trigger className="btn btn-link btn-sm px-0 d-inline-flex align-items-center">
+                 <Collapsible.Visible whenOpen>
+                   <FontAwesomeIcon icon={faTimesCircle} aria-hidden="true" className="mr-2" />
+@@ -94,7 +94,7 @@ class Calculator extends Component {
+                 />
+               </Collapsible.Trigger>
+             </div>
+-            <Collapsible.Body className="container-fluid pt-3" style={{ maxHeight: '50vh', overflow: 'auto' }}>
++            <Collapsible.Body className="container-xl pt-3" style={{ maxHeight: '50vh', overflow: 'auto' }}>
+               <FormattedMessage
+                 tagName="h6"
+                 id="calculator.instructions"
+diff --git a/src/index.scss b/src/index.scss
+index 77043b9..595e34a 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -5,14 +5,6 @@
+ 
+ @import "~@edx/frontend-component-footer/dist/footer";
+ 
+-// TODO: Fix .container-fluid for mobile in paragon
+-.container-fluid {
+-  max-width: 1140px + 2 * $grid-gutter-width;
+-  @media (max-width: -1 + map-get($grid-breakpoints, 'sm')) {
+-    padding-left: $grid-gutter-width/2;
+-    padding-right: $grid-gutter-width/2;
+-  }
+-}
+ 
+ #root {
+   display: flex;
+diff --git a/src/instructor-toolbar/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+index 60a9ea5..797c622 100644
+--- a/src/instructor-toolbar/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -74,7 +74,7 @@ export default function InstructorToolbar(props) {
+   return (!didMount ? null : (
+     <div>
+       <div className="bg-primary text-white">
+-        <div className="container-fluid py-3 d-md-flex justify-content-end align-items-start">
++        <div className="container-xl py-3 d-md-flex justify-content-end align-items-start">
+           <div className="align-items-center flex-grow-1 d-md-flex mx-1 my-1">
+             <MasqueradeWidget courseId={courseId} onError={showMasqueradeError} />
+           </div>
+@@ -102,7 +102,7 @@ export default function InstructorToolbar(props) {
+         </div>
+       </div>
+       {masqueradeErrorMessage && (
+-        <div className="container-fluid mt-3">
++        <div className="container-xl mt-3">
+           <Alert
+             type={ALERT_TYPES.ERROR}
+             dismissible={false}
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 5360b12..3459827 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -78,7 +78,7 @@ function LoadedTabPage({
+           }}
+         />
+         <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug={activeTabSlug} />
+-        <div className="container-fluid">
++        <div className="container-xl">
+           {children}
+         </div>
+       </main>
+-- 
+2.34.1
+

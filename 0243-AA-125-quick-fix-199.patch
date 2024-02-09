@@ -1,0 +1,34 @@
+From c83389e7c560cdc7f8fbcff608653573840eac5b Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 31 Aug 2020 13:50:20 -0400
+Subject: [PATCH 0243/1021] AA-125: quick fix (#199)
+
+---
+ src/course-home/outline-tab/OutlineTab.jsx | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index f0ba8a2..9238750 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -96,7 +96,7 @@ function OutlineTab({ intl }) {
+       </div>
+       <div className="row">
+         <div className="col col-12 col-md-8">
+-          {!courseGoalToDisplay && goalOptions && (
++          {!courseGoalToDisplay && goalOptions.length > 0 && (
+             <CourseGoalCard
+               courseId={courseId}
+               goalOptions={goalOptions}
+@@ -127,7 +127,7 @@ function OutlineTab({ intl }) {
+           ))}
+         </div>
+         <div className="col col-12 col-md-4">
+-          {courseGoalToDisplay && goalOptions && (
++          {courseGoalToDisplay && goalOptions.length > 0 && (
+             <UpdateGoalSelector
+               courseId={courseId}
+               goalOptions={goalOptions}
+-- 
+2.34.1
+

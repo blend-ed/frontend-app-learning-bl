@@ -1,0 +1,321 @@
+From d2573a16b16ee9b5414d56e8b6473d569790bdf6 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Thu, 8 Jul 2021 12:17:43 -0400
+Subject: [PATCH 0528/1021] feat: add user id parameter to progress page (#505)
+
+---
+ .../data/__snapshots__/redux.test.js.snap     |  3 ++
+ src/course-home/data/api.js                   | 11 ++++-
+ src/course-home/data/redux.test.js            | 14 +++++++
+ src/course-home/data/slice.js                 |  1 +
+ src/course-home/data/thunks.js                | 10 ++---
+ .../progress-tab/ProgressHeader.jsx           | 13 ++++--
+ .../progress-tab/ProgressTab.test.jsx         | 14 ++++++-
+ src/course-home/progress-tab/messages.js      |  5 +++
+ src/index.jsx                                 | 20 ++++++---
+ src/tab-page/TabContainer.test.jsx            | 41 +++++++++++++++----
+ 10 files changed, 108 insertions(+), 24 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 7a8a20b..b6e4623 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -6,6 +6,7 @@ Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+     "gradesFeatureIsLocked": false,
++    "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+     "toastHeader": "",
+@@ -302,6 +303,7 @@ Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+     "gradesFeatureIsLocked": false,
++    "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+     "toastHeader": "",
+@@ -479,6 +481,7 @@ Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+     "gradesFeatureIsLocked": false,
++    "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+     "toastHeader": "",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 73fa35a..c06b680 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -211,8 +211,15 @@ export async function getDatesTabData(courseId) {
+   }
+ }
+ 
+-export async function getProgressTabData(courseId) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
++export async function getProgressTabData(courseId, targetUserId) {
++  let url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
++
++  // If targetUserId is passed in, we will get the progress page data
++  // for the user with the provided id, rather than the requesting user.
++  if (targetUserId) {
++    url += `/${targetUserId}/`;
++  }
++
+   try {
+     const { data } = await getAuthenticatedHttpClient().get(url);
+     const camelCasedData = camelCaseObject(data);
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index 62bd0d6..c4ae61d 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -115,6 +115,20 @@ describe('Data layer integration tests', () => {
+       expect(state.courseHome.courseStatus).toEqual('loaded');
+       expect(state).toMatchSnapshot();
+     });
++
++    it('Should handle the url including a targetUserId', async () => {
++      const progressTabData = Factory.build('progressTabData', { courseId });
++      const targetUserId = 2;
++      const progressUrl = `${progressBaseUrl}/${courseId}/${targetUserId}/`;
++
++      axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadata);
++      axiosMock.onGet(progressUrl).reply(200, progressTabData);
++
++      await executeThunk(thunks.fetchProgressTab(courseId, 2), store.dispatch);
++
++      const state = store.getState();
++      expect(state.courseHome.targetUserId).toEqual(2);
++    });
+   });
+ 
+   describe('Test saveCourseGoal', () => {
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index 0cefaae..4534887 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -22,6 +22,7 @@ const slice = createSlice({
+     },
+     fetchTabSuccess: (state, { payload }) => {
+       state.courseId = payload.courseId;
++      state.targetUserId = payload.targetUserId;
+       state.courseStatus = LOADED;
+     },
+     fetchTabFailure: (state, { payload }) => {
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index 44cabea..f95a705 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -27,12 +27,12 @@ const eventTypes = {
+   POST_EVENT: 'post_event',
+ };
+ 
+-export function fetchTab(courseId, tab, getTabData) {
++export function fetchTab(courseId, tab, getTabData, targetUserId) {
+   return async (dispatch) => {
+     dispatch(fetchTabRequest({ courseId }));
+     Promise.allSettled([
+       getCourseHomeCourseMetadata(courseId),
+-      getTabData(courseId),
++      getTabData(courseId, targetUserId),
+     ]).then(([courseHomeCourseMetadataResult, tabDataResult]) => {
+       const fetchedCourseHomeCourseMetadata = courseHomeCourseMetadataResult.status === 'fulfilled';
+       const fetchedTabData = tabDataResult.status === 'fulfilled';
+@@ -62,7 +62,7 @@ export function fetchTab(courseId, tab, getTabData) {
+       }
+ 
+       if (fetchedCourseHomeCourseMetadata && fetchedTabData) {
+-        dispatch(fetchTabSuccess({ courseId }));
++        dispatch(fetchTabSuccess({ courseId, targetUserId }));
+       } else {
+         dispatch(fetchTabFailure({ courseId }));
+       }
+@@ -74,8 +74,8 @@ export function fetchDatesTab(courseId) {
+   return fetchTab(courseId, 'dates', getDatesTabData);
+ }
+ 
+-export function fetchProgressTab(courseId) {
+-  return fetchTab(courseId, 'progress', getProgressTabData);
++export function fetchProgressTab(courseId, targetUserId) {
++  return fetchTab(courseId, 'progress', getProgressTabData, parseInt(targetUserId, 10) || targetUserId);
+ }
+ 
+ export function fetchOutlineTab(courseId) {
+diff --git a/src/course-home/progress-tab/ProgressHeader.jsx b/src/course-home/progress-tab/ProgressHeader.jsx
+index 2ff8bc3..38f9cfa 100644
+--- a/src/course-home/progress-tab/ProgressHeader.jsx
++++ b/src/course-home/progress-tab/ProgressHeader.jsx
+@@ -12,16 +12,23 @@ import messages from './messages';
+ function ProgressHeader({ intl }) {
+   const {
+     courseId,
++    targetUserId,
+   } = useSelector(state => state.courseHome);
+ 
+-  const { administrator } = getAuthenticatedUser();
++  const { administrator, userId } = getAuthenticatedUser();
+ 
+-  const { studioUrl } = useModel('progress', courseId);
++  const { studioUrl, username } = useModel('progress', courseId);
++
++  const viewingOtherStudentsProgressPage = (targetUserId && targetUserId !== userId);
++
++  const pageTitle = viewingOtherStudentsProgressPage
++    ? intl.formatMessage(messages.progressHeaderForTargetUser, { username })
++    : intl.formatMessage(messages.progressHeader);
+ 
+   return (
+     <>
+       <div className="row w-100 m-0 mt-3 mb-4 justify-content-between">
+-        <h1>{intl.formatMessage(messages.progressHeader)}</h1>
++        <h1>{pageTitle}</h1>
+         {administrator && studioUrl && (
+           <Button variant="outline-primary" size="sm" className="align-self-center" href={studioUrl}>
+             {intl.formatMessage(messages.studioLink)}
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 4aae4bc..1b7349a 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -22,7 +22,7 @@ describe('Progress Tab', () => {
+   const courseId = 'course-v1:edX+Test+run';
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+-  const progressUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
++  const progressUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/*`);
+ 
+   const store = initializeStore();
+   const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+@@ -1034,4 +1034,16 @@ describe('Progress Tab', () => {
+       expect(screen.queryByTestId('certificate-status-component')).not.toBeInTheDocument();
+     });
+   });
++
++  describe('Viewing progress page of other students by changing url', () => {
++    it('Changing the url changes the header', async () => {
++      setMetadata({ is_enrolled: true });
++      setTabData({ username: 'otherstudent' });
++
++      await executeThunk(thunks.fetchProgressTab(courseId, 10), store.dispatch);
++      await act(async () => render(<ProgressTab />, { store }));
++
++      expect(screen.getByText('Course progress for otherstudent')).toBeInTheDocument();
++    });
++  });
+ });
+diff --git a/src/course-home/progress-tab/messages.js b/src/course-home/progress-tab/messages.js
+index 3cd3e38..1359c31 100644
+--- a/src/course-home/progress-tab/messages.js
++++ b/src/course-home/progress-tab/messages.js
+@@ -5,6 +5,11 @@ const messages = defineMessages({
+     id: 'progress.header',
+     defaultMessage: 'Your progress',
+   },
++  progressHeaderForTargetUser: {
++    id: 'progress.header.targetUser',
++    defaultMessage: 'Course progress for {username}',
++    description: 'Header when displaying the progress for a different user',
++  },
+   studioLink: {
+     id: 'progress.link.studio',
+     defaultMessage: 'View grading in Studio',
+diff --git a/src/index.jsx b/src/index.jsx
+index dc2809c..ff42d84 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -44,11 +44,21 @@ subscribe(APP_READY, () => {
+               <DatesTab />
+             </TabContainer>
+           </PageRoute>
+-          <PageRoute path="/course/:courseId/progress">
+-            <TabContainer tab="progress" fetch={fetchProgressTab} slice="courseHome">
+-              <ProgressTab />
+-            </TabContainer>
+-          </PageRoute>
++          <PageRoute
++            path={[
++              '/course/:courseId/progress/:targetUserId/',
++              '/course/:courseId/progress',
++            ]}
++            render={({ match }) => (
++              <TabContainer
++                tab="progress"
++                fetch={(courseId) => fetchProgressTab(courseId, match.params.targetUserId)}
++                slice="courseHome"
++              >
++                <ProgressTab />
++              </TabContainer>
++            )}
++          />
+           <PageRoute path="/course/:courseId/course-end">
+             <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
+               <CourseExit />
+diff --git a/src/tab-page/TabContainer.test.jsx b/src/tab-page/TabContainer.test.jsx
+index 1a6ede0..55c81fa 100644
+--- a/src/tab-page/TabContainer.test.jsx
++++ b/src/tab-page/TabContainer.test.jsx
+@@ -5,7 +5,7 @@ import { initializeTestStore, render, screen } from '../setupTest';
+ import { TabContainer } from './index';
+ 
+ const mockDispatch = jest.fn();
+-const mockFetch = jest.fn().mockImplementation((x) => x);
++
+ jest.mock('react-redux', () => ({
+   ...jest.requireActual('react-redux'),
+   useDispatch: () => mockDispatch,
+@@ -13,15 +13,18 @@ jest.mock('react-redux', () => ({
+ jest.mock('./TabPage', () => () => <div data-testid="TabPage" />);
+ 
+ describe('Tab Container', () => {
+-  const mockData = {
+-    children: [],
+-    fetch: mockFetch,
+-    tab: 'dummy',
+-    slice: 'courseware',
+-  };
+   let courseId;
++  let mockFetch;
++  let mockData;
+ 
+-  beforeAll(async () => {
++  beforeEach(async () => {
++    mockFetch = jest.fn().mockImplementation((x) => x);
++    mockData = {
++      children: [],
++      fetch: mockFetch,
++      tab: 'dummy',
++      slice: 'courseware',
++    };
+     const store = await initializeTestStore({ excludeFetchSequence: true });
+     courseId = store.getState().courseware.courseId;
+   });
+@@ -42,4 +45,26 @@ describe('Tab Container', () => {
+       .toHaveBeenCalledWith(courseId);
+     expect(screen.getByTestId('TabPage')).toBeInTheDocument();
+   });
++
++  it('Should handle passing in a targetUserId', () => {
++    const targetUserId = '1';
++    history.push(`/course/${courseId}/progress/${targetUserId}/`);
++
++    render(
++      <Route
++        path="/course/:courseId/progress/:targetUserId/"
++        render={({ match }) => (
++          <TabContainer
++            fetch={() => mockFetch(match.params.courseId, match.params.targetUserId)}
++            slice="courseHome"
++          />
++        )}
++      />,
++    );
++
++    expect(mockFetch)
++      .toHaveBeenCalledTimes(1)
++      .toHaveBeenCalledWith(courseId, targetUserId);
++    expect(screen.getByTestId('TabPage')).toBeInTheDocument();
++  });
+ });
+-- 
+2.34.1
+

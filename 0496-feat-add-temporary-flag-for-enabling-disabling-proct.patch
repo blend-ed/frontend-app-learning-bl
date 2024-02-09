@@ -1,0 +1,219 @@
+From 432cb669f5c546d24c3e349bfc079fdb4ba8205d Mon Sep 17 00:00:00 2001
+From: Ihor Romaniuk <notsuchasall25@gmail.com>
+Date: Mon, 14 Jun 2021 17:42:53 +0300
+Subject: [PATCH 0496/1021] feat: add temporary flag for enabling/disabling
+ proctored exams (#464)
+
+---
+ .../data/__snapshots__/redux.test.js.snap     |  3 +++
+ src/courseware/CoursewareContainer.jsx        |  9 ++++++++-
+ src/courseware/course/sequence/Sequence.jsx   | 19 +++++++++++++------
+ .../__factories__/courseMetadata.factory.js   |  1 +
+ src/courseware/data/api.js                    |  2 ++
+ src/courseware/data/slice.js                  |  5 +++++
+ src/courseware/data/thunks.js                 |  4 ++++
+ 7 files changed, 36 insertions(+), 7 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 74e1699..6545921 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -12,6 +12,7 @@ Object {
+   "courseware": Object {
+     "courseId": null,
+     "courseStatus": "loading",
++    "proctoredExamsEnabledWaffleFlag": false,
+     "sequenceId": null,
+     "sequenceStatus": "loading",
+     "specialExamsEnabledWaffleFlag": false,
+@@ -306,6 +307,7 @@ Object {
+   "courseware": Object {
+     "courseId": null,
+     "courseStatus": "loading",
++    "proctoredExamsEnabledWaffleFlag": false,
+     "sequenceId": null,
+     "sequenceStatus": "loading",
+     "specialExamsEnabledWaffleFlag": false,
+@@ -481,6 +483,7 @@ Object {
+   "courseware": Object {
+     "courseId": null,
+     "courseStatus": "loading",
++    "proctoredExamsEnabledWaffleFlag": false,
+     "sequenceId": null,
+     "sequenceStatus": "loading",
+     "specialExamsEnabledWaffleFlag": false,
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 902c580..05982cc 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -122,6 +122,7 @@ class CoursewareContainer extends Component {
+       courseStatus,
+       sequenceStatus,
+       specialExamsEnabledWaffleFlag,
++      proctoredExamsEnabledWaffleFlag,
+       sequence,
+       firstSequenceId,
+       unitViaSequenceId,
+@@ -177,7 +178,9 @@ class CoursewareContainer extends Component {
+     // Check special exam redirect:
+     //    /course/:courseId/:sequenceId(/:unitId) -> :legacyWebUrl
+     // because special exams are currently still served in the legacy LMS frontend.
+-    if (!specialExamsEnabledWaffleFlag) {
++    const shouldRedirectProctoredExams = specialExamsEnabledWaffleFlag && sequence.isProctored
++      && !proctoredExamsEnabledWaffleFlag;
++    if (!specialExamsEnabledWaffleFlag || shouldRedirectProctoredExams) {
+       checkSpecialExamRedirect(sequenceStatus, sequence);
+     }
+ 
+@@ -327,6 +330,7 @@ const sequenceShape = PropTypes.shape({
+   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+   sectionId: PropTypes.string.isRequired,
+   isTimeLimited: PropTypes.bool,
++  isProctored: PropTypes.bool,
+   legacyWebUrl: PropTypes.string,
+ });
+ 
+@@ -366,6 +370,7 @@ CoursewareContainer.propTypes = {
+   fetchCourse: PropTypes.func.isRequired,
+   fetchSequence: PropTypes.func.isRequired,
+   specialExamsEnabledWaffleFlag: PropTypes.bool.isRequired,
++  proctoredExamsEnabledWaffleFlag: PropTypes.bool.isRequired,
+ };
+ 
+ CoursewareContainer.defaultProps = {
+@@ -470,6 +475,7 @@ const mapStateToProps = (state) => {
+     courseStatus,
+     sequenceStatus,
+     specialExamsEnabledWaffleFlag,
++    proctoredExamsEnabledWaffleFlag,
+   } = state.courseware;
+ 
+   return {
+@@ -478,6 +484,7 @@ const mapStateToProps = (state) => {
+     courseStatus,
+     sequenceStatus,
+     specialExamsEnabledWaffleFlag,
++    proctoredExamsEnabledWaffleFlag,
+     course: currentCourseSelector(state),
+     sequence: currentSequenceSelector(state),
+     previousSequence: previousSequenceSelector(state),
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 196982e..0078cfb 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -48,6 +48,7 @@ function Sequence({
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+   const specialExamsEnabledWaffleFlag = useSelector(state => state.courseware.specialExamsEnabledWaffleFlag);
++  const proctoredExamsEnabledWaffleFlag = useSelector(state => state.courseware.proctoredExamsEnabledWaffleFlag);
+   const shouldDisplaySidebarButton = useWindowSize().width < responsiveBreakpoints.small.minWidth;
+ 
+   const handleNext = () => {
+@@ -145,12 +146,18 @@ function Sequence({
+   because we expect CoursewareContainer to be performing a redirect to the legacy experience while
+   we're waiting. That redirect may take a few seconds, so we show the spinner in the meantime.
+   */
+-  if (sequenceStatus === 'loaded' && sequence.isTimeLimited && !specialExamsEnabledWaffleFlag) {
+-    return (
+-      <PageLoading
+-        srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-      />
+-    );
++  if (sequenceStatus === 'loaded') {
++    const shouldRedirectSpecialExams = sequence.isTimeLimited && !specialExamsEnabledWaffleFlag;
++    const shouldRedirectProctoredExams = sequence.isProctored && specialExamsEnabledWaffleFlag
++      && !proctoredExamsEnabledWaffleFlag;
++
++    if (shouldRedirectSpecialExams || shouldRedirectProctoredExams) {
++      return (
++        <PageLoading
++          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++        />
++      );
++    }
+   }
+ 
+   const gated = sequence && sequence.gatedContent !== undefined && sequence.gatedContent.gated;
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 72bc62e..2c97f45 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -58,4 +58,5 @@ Factory.define('courseMetadata')
+     related_programs: null,
+     user_needs_integrity_signature: false,
+     is_mfe_special_exams_enabled: false,
++    is_mfe_proctored_exams_enabled: false,
+   });
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index c66b0ec..d47d8c3 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -153,6 +153,7 @@ function normalizeMetadata(metadata) {
+     relatedPrograms: camelCaseObject(metadata.related_programs),
+     userNeedsIntegritySignature: metadata.user_needs_integrity_signature,
+     specialExamsEnabledWaffleFlag: metadata.is_mfe_special_exams_enabled,
++    proctoredExamsEnabledWaffleFlag: metadata.is_mfe_proctored_exams_enabled,
+   };
+ }
+ 
+@@ -183,6 +184,7 @@ function normalizeSequenceMetadata(sequence) {
+       */
+       gatedContent: camelCaseObject(sequence.gated_content),
+       isTimeLimited: sequence.is_time_limited,
++      isProctored: sequence.is_proctored,
+       // Position comes back from the server 1-indexed. Adjust here.
+       activeUnitIndex: sequence.position ? sequence.position - 1 : 0,
+       saveUnitPosition: sequence.save_position,
+diff --git a/src/courseware/data/slice.js b/src/courseware/data/slice.js
+index 2f3a6b6..8a51574 100644
+--- a/src/courseware/data/slice.js
++++ b/src/courseware/data/slice.js
+@@ -14,11 +14,15 @@ const slice = createSlice({
+     sequenceStatus: 'loading',
+     sequenceId: null,
+     specialExamsEnabledWaffleFlag: false,
++    proctoredExamsEnabledWaffleFlag: false,
+   },
+   reducers: {
+     setsSpecialExamsEnabled: (state, { payload }) => {
+       state.specialExamsEnabledWaffleFlag = payload.specialExamsEnabledWaffleFlag;
+     },
++    setsProctoredExamsEnabled: (state, { payload }) => {
++      state.proctoredExamsEnabledWaffleFlag = payload.proctoredExamsEnabledWaffleFlag;
++    },
+     fetchCourseRequest: (state, { payload }) => {
+       state.courseId = payload.courseId;
+       state.courseStatus = LOADING;
+@@ -52,6 +56,7 @@ const slice = createSlice({
+ 
+ export const {
+   setsSpecialExamsEnabled,
++  setsProctoredExamsEnabled,
+   fetchCourseRequest,
+   fetchCourseSuccess,
+   fetchCourseFailure,
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index bea60c8..4c860a8 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -12,6 +12,7 @@ import {
+ } from '../../generic/model-store';
+ import {
+   setsSpecialExamsEnabled,
++  setsProctoredExamsEnabled,
+   fetchCourseRequest,
+   fetchCourseSuccess,
+   fetchCourseFailure,
+@@ -36,6 +37,9 @@ export function fetchCourse(courseId) {
+         dispatch(setsSpecialExamsEnabled({
+           specialExamsEnabledWaffleFlag: courseMetadataResult.value.specialExamsEnabledWaffleFlag,
+         }));
++        dispatch(setsProctoredExamsEnabled({
++          proctoredExamsEnabledWaffleFlag: courseMetadataResult.value.proctoredExamsEnabledWaffleFlag,
++        }));
+       }
+ 
+       if (courseBlocksResult.status === 'fulfilled') {
+-- 
+2.34.1
+

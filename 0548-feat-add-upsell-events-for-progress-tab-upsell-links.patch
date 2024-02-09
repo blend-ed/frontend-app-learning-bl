@@ -1,0 +1,136 @@
+From 3703e8d81d2d3c29bc7079ce0844fbc554922237 Mon Sep 17 00:00:00 2001
+From: Diane Kaplan <dianekaplan@gmail.com>
+Date: Thu, 22 Jul 2021 09:05:16 -0400
+Subject: [PATCH 0548/1021] feat: add upsell events for progress tab upsell
+ links (#532)
+
+---
+ .../progress-tab/ProgressTab.test.jsx         | 22 ++++++++++++++++---
+ .../certificate-status/CertificateStatus.jsx  | 15 +++++++++++++
+ .../grades/course-grade/CourseGradeHeader.jsx | 12 ++++++++++
+ 3 files changed, 46 insertions(+), 3 deletions(-)
+
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 128e382..2558b00 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -281,7 +281,7 @@ describe('Progress Tab', () => {
+       expect(screen.getAllByRole('link', 'Unlock now')).toHaveLength(3);
+     });
+ 
+-    it('sends event on click of upgrade button in locked content header (CourseGradeHeader)', async () => {
++    it('sends events on click of upgrade button in locked content header (CourseGradeHeader)', async () => {
+       sendTrackEvent.mockClear();
+       setTabData({
+         completion_summary: {
+@@ -325,12 +325,20 @@ describe('Progress Tab', () => {
+       const upgradeButton = screen.getAllByRole('link', 'Unlock now')[0];
+       fireEvent.click(upgradeButton);
+ 
+-      expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++      expect(sendTrackEvent).toHaveBeenCalledTimes(2);
+       expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.grades_upgrade.clicked', {
+         org_key: 'edX',
+         courserun_key: courseId,
+         is_staff: false,
+       });
++      expect(sendTrackEvent).toHaveBeenCalledWith('edx.bi.ecommerce.upsell_links_clicked', {
++        org_key: 'edX',
++        courserun_key: courseId,
++        linkCategory: '(none)',
++        linkName: 'progress_locked',
++        linkType: 'button',
++        pageName: 'progress',
++      });
+     });
+ 
+     it('renders locked feature preview with no upgrade button when user has locked content but cannot upgrade', async () => {
+@@ -1093,13 +1101,21 @@ describe('Progress Tab', () => {
+         const upgradeLink = screen.getByRole('link', { name: 'Upgrade now' });
+         fireEvent.click(upgradeLink);
+ 
+-        expect(sendTrackEvent).toHaveBeenCalledTimes(2);
++        expect(sendTrackEvent).toHaveBeenCalledTimes(3);
+         expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.course_progress.certificate_status.clicked', {
+           org_key: 'edX',
+           courserun_key: courseId,
+           is_staff: false,
+           certificate_status_variant: 'audit_passing',
+         });
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.bi.ecommerce.upsell_links_clicked', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          linkCategory: '(none)',
++          linkName: 'progress_certificate',
++          linkType: 'button',
++          pageName: 'progress',
++        });
+       });
+ 
+       it('Displays nothing if audit only', async () => {
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index b47c8de..ea79584 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -46,6 +46,12 @@ function CertificateStatus({ intl }) {
+     isEnrolled,
+     userHasPassingGrade,
+   );
++
++  const eventProperties = {
++    org_key: org,
++    courserun_key: courseId,
++  };
++
+   const dispatch = useDispatch();
+   const { administrator } = getAuthenticatedUser();
+ 
+@@ -198,6 +204,15 @@ function CertificateStatus({ intl }) {
+       is_staff: administrator,
+       certificate_status_variant: certEventName,
+     });
++    if (certCase === 'upgrade') {
++      sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
++        ...eventProperties,
++        linkCategory: '(none)',
++        linkName: 'progress_certificate',
++        linkType: 'button',
++        pageName: 'progress',
++      });
++    }
+   };
+ 
+   return (
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+index 79b5b71..4a485b1 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+@@ -22,6 +22,11 @@ function CourseGradeHeader({ intl }) {
+     gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+ 
++  const eventProperties = {
++    org_key: org,
++    courserun_key: courseId,
++  };
++
+   const { administrator } = getAuthenticatedUser();
+   const logUpgradeButtonClick = () => {
+     sendTrackEvent('edx.ui.lms.course_progress.grades_upgrade.clicked', {
+@@ -29,6 +34,13 @@ function CourseGradeHeader({ intl }) {
+       courserun_key: courseId,
+       is_staff: administrator,
+     });
++    sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
++      ...eventProperties,
++      linkCategory: '(none)',
++      linkName: 'progress_locked',
++      linkType: 'button',
++      pageName: 'progress',
++    });
+   };
+   let previewText;
+   if (verifiedMode) {
+-- 
+2.34.1
+

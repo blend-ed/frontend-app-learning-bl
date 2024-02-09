@@ -1,0 +1,123 @@
+From 5ac49610da7a2cdf2b892d3ac90976c660e4e4bd Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 24 Jul 2020 13:02:50 -0400
+Subject: [PATCH 0179/1021] Re-enable the celebration modal (#123)
+
+It got accidentally disabled during a refactor.
+
+Also, try a little harder to make sure it doesn't re-appear during
+the same browsing session.
+---
+ src/courseware/CoursewareContainer.jsx      | 18 ++++++++++++++++--
+ src/courseware/course/Course.jsx            |  4 +++-
+ src/courseware/course/celebration/utils.jsx | 14 +++++++++++++-
+ 3 files changed, 32 insertions(+), 4 deletions(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index bb7d5a9..94d03be 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -17,6 +17,7 @@ import {
+ import { TabPage } from '../tab-page';
+ 
+ import Course from './course';
++import { handleNextSectionCelebration } from './course/celebration';
+ 
+ const checkExamRedirect = memoize((sequenceStatus, sequence) => {
+   if (sequenceStatus === 'loaded') {
+@@ -125,15 +126,28 @@ class CoursewareContainer extends Component {
+   }
+ 
+   handleNextSequenceClick = () => {
+-    const { nextSequence, courseId } = this.props;
++    const {
++      course,
++      courseId,
++      nextSequence,
++      sequence,
++      sequenceId,
++    } = this.props;
++
+     if (nextSequence !== null) {
++      let nextUnitId = null;
+       if (nextSequence.unitIds.length > 0) {
+-        const nextUnitId = nextSequence.unitIds[0];
++        [nextUnitId] = nextSequence.unitIds;
+         history.push(`/course/${courseId}/${nextSequence.id}/${nextUnitId}`);
+       } else {
+         // Some sequences have no units.  This will show a blank page with prev/next buttons.
+         history.push(`/course/${courseId}/${nextSequence.id}`);
+       }
++
++      const celebrateFirstSection = course && course.celebrations && course.celebrations.firstSection;
++      if (celebrateFirstSection && sequence.sectionId !== nextSequence.sectionId) {
++        handleNextSectionCelebration(sequenceId, nextSequence.id, nextUnitId);
++      }
+     }
+   }
+ 
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index c6dc221..217cdc7 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { Helmet } from 'react-helmet';
++import { useDispatch } from 'react-redux';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+ import { AlertList } from '../../generic/user-messages';
+@@ -52,8 +53,9 @@ function Course({
+     verifiedMode,
+   } = course;
+ 
++  const dispatch = useDispatch();
+   const celebrateFirstSection = celebrations && celebrations.firstSection;
+-  const celebrationOpen = shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFirstSection);
++  const celebrationOpen = shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFirstSection, dispatch);
+ 
+   return (
+     <>
+diff --git a/src/courseware/course/celebration/utils.jsx b/src/courseware/course/celebration/utils.jsx
+index e8bf911..9fdebf3 100644
+--- a/src/courseware/course/celebration/utils.jsx
++++ b/src/courseware/course/celebration/utils.jsx
+@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+ import { postFirstSectionCelebrationComplete } from './data/api';
+ import { clearLocalStorage, getLocalStorage, setLocalStorage } from '../../../data/localStorage';
++import { updateModel } from '../../../generic/model-store';
+ 
+ const CELEBRATION_LOCAL_STORAGE_KEY = 'CelebrationModal.showOnSectionLoad';
+ 
+@@ -29,7 +30,7 @@ function recordFirstSectionCelebration(courseId) {
+ 
+ // Looks at local storage to see whether we just came from the end of a section.
+ // Note! This does have side effects (will clear some local storage and may start an api call).
+-function shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFirstSection) {
++function shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFirstSection, dispatch) {
+   const celebrationIds = getLocalStorage(CELEBRATION_LOCAL_STORAGE_KEY);
+   if (!celebrationIds) {
+     return false;
+@@ -46,6 +47,17 @@ function shouldCelebrateOnSectionLoad(courseId, sequenceId, unitId, celebrateFir
+   if (sequenceId !== prevSequenceId && !onTargetUnit) {
+     // Don't clear until we move off of current/prev sequence
+     clearLocalStorage(CELEBRATION_LOCAL_STORAGE_KEY);
++
++    // Update our local copy of course data from LMS
++    dispatch(updateModel({
++      modelType: 'courses',
++      model: {
++        id: courseId,
++        celebrations: {
++          firstSection: false,
++        },
++      },
++    }));
+   }
+ 
+   return shouldCelebrate;
+-- 
+2.34.1
+

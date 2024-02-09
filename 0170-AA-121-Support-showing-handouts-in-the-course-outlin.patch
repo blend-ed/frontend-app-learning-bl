@@ -1,0 +1,339 @@
+From 16bd20e0e87e55d8ff67c10e03833a658bd627f4 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 20 Jul 2020 09:24:26 -0400
+Subject: [PATCH 0170/1021] AA-121: Support showing handouts in the course
+ outline (#112)
+
+And add translation support for the outline.
+---
+ .../__factories__/outlineTabData.factory.js   |  3 +-
+ .../data/__snapshots__/redux.test.js.snap     |  1 +
+ src/course-home/data/api.js                   |  8 +++-
+ .../outline-tab/LmsHtmlFragment.jsx           | 39 +++++++++++++++++++
+ src/course-home/outline-tab/OutlineTab.jsx    | 18 ++++++++-
+ src/course-home/outline-tab/messages.js       | 26 +++++++++++++
+ .../outline-tab/widgets/CourseDates.jsx       | 18 +++++++--
+ .../outline-tab/widgets/CourseHandouts.jsx    | 35 +++++++++++++++++
+ .../outline-tab/widgets/CourseTools.jsx       | 13 +++++--
+ 9 files changed, 149 insertions(+), 12 deletions(-)
+ create mode 100644 src/course-home/outline-tab/LmsHtmlFragment.jsx
+ create mode 100644 src/course-home/outline-tab/messages.js
+ create mode 100644 src/course-home/outline-tab/widgets/CourseHandouts.jsx
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 10c7321..c9f5d39 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -12,4 +12,5 @@ Factory.define('outlineTabData')
+   }))
+   .attr('course_blocks', ['courseId'], courseId => ({
+     blocks: Factory.build('courseBlocks', { courseId }).blocks,
+-  }));
++  }))
++  .attr('handouts_html', [], () => '<ul><li>Handout 1</li></ul>');
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 8473c1c..39a0878 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -196,6 +196,7 @@ Object {
+           "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/bookmarks/",
+         },
+         "datesWidget": undefined,
++        "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+       },
+     },
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 463a4a8..c131053 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -71,8 +71,14 @@ export async function getOutlineTabData(courseId) {
+   const courseBlocks = normalizeBlocks(courseId, data.course_blocks.blocks);
+   const courseTools = camelCaseObject(data.course_tools);
+   const datesWidget = camelCaseObject(data.dates_widget);
++  const handoutsHtml = data.handouts_html;
+ 
+-  return { courseTools, courseBlocks, datesWidget };
++  return {
++    courseTools,
++    courseBlocks,
++    datesWidget,
++    handoutsHtml,
++  };
+ }
+ 
+ export async function postCourseDeadlines(courseId) {
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.jsx b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+new file mode 100644
+index 0000000..5496ce3
+--- /dev/null
++++ b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+@@ -0,0 +1,39 @@
++import React, { useRef } from 'react';
++import PropTypes from 'prop-types';
++
++import { getConfig } from '@edx/frontend-platform';
++
++export default function LmsHtmlFragment({ html, title, ...rest }) {
++  const wholePage = `
++<html>
++  <head>
++    <base href="${getConfig().LMS_BASE_URL}" target="_parent">
++    <link rel="stylesheet" href="/static/css/bootstrap/lms-main.css">
++  </head>
++  <body>${html}</body>
++</html>
++`;
++
++  const iframe = useRef(null);
++  function handleLoad() {
++    iframe.current.height = iframe.current.contentWindow.document.body.scrollHeight;
++  }
++
++  return (
++    <iframe
++      className="w-100 border-0"
++      onLoad={handleLoad}
++      ref={iframe}
++      referrerPolicy="origin"
++      scrolling="no"
++      srcDoc={wholePage}
++      title={title}
++      {...rest}
++    />
++  );
++}
++
++LmsHtmlFragment.propTypes = {
++  html: PropTypes.string.isRequired,
++  title: PropTypes.string.isRequired,
++};
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 9b8c8b1..20d03e5 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -1,11 +1,14 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import { Button } from '@edx/paragon';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { AlertList } from '../../generic/user-messages';
+ 
+ import CourseDates from './widgets/CourseDates';
++// import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
++import messages from './messages';
+ import Section from './Section';
+ import { useModel } from '../../generic/model-store';
+ 
+@@ -16,7 +19,7 @@ import { useModel } from '../../generic/model-store';
+ const { EnrollmentAlert, StaffEnrollmentAlert } = React.lazy(() => import('../../alerts/enrollment-alert'));
+ const LogistrationAlert = React.lazy(() => import('../../alerts/logistration-alert'));
+ 
+-export default function OutlineTab() {
++function OutlineTab({ intl }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+@@ -54,7 +57,7 @@ export default function OutlineTab() {
+       />
+       <div className="d-flex justify-content-between mb-3">
+         <h2>{title}</h2>
+-        <Button className="btn-primary" type="button">Resume Course</Button>
++        <Button className="btn-primary" type="button">{intl.formatMessage(messages.resume)}</Button>
+       </div>
+       <div className="row">
+         <div className="col col-8">
+@@ -80,8 +83,19 @@ export default function OutlineTab() {
+             isEnrolled={isEnrolled}
+             courseId={courseId}
+           />
++          {/* Disabled until we decide whether iframes are the best solution for handouts
++          <CourseHandouts
++            courseId={courseId}
++          />
++          */}
+         </div>
+       </div>
+     </>
+   );
+ }
++
++OutlineTab.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(OutlineTab);
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+new file mode 100644
+index 0000000..a7011ad
+--- /dev/null
++++ b/src/course-home/outline-tab/messages.js
+@@ -0,0 +1,26 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  allDates: {
++    id: 'learning.outline.dates.all',
++    defaultMessage: 'View all course dates',
++  },
++  dates: {
++    id: 'learning.outline.dates',
++    defaultMessage: 'Upcoming Dates',
++  },
++  handouts: {
++    id: 'learning.outline.handouts',
++    defaultMessage: 'Course Handouts',
++  },
++  resume: {
++    id: 'learning.outline.resume',
++    defaultMessage: 'Resume Course',
++  },
++  tools: {
++    id: 'learning.outline.tools',
++    defaultMessage: 'Course Tools',
++  },
++});
++
++export default messages;
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index 8014221..f2615ed 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -1,15 +1,20 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import { useModel } from '../../../generic/model-store';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
+ import DateSummary from '../DateSummary';
++import messages from '../messages';
++import { useModel } from '../../../generic/model-store';
+ 
+-export default function CourseDates({ courseId }) {
++function CourseDates({ courseId, intl }) {
+   const {
+     datesWidget,
+   } = useModel('outline', courseId);
++
+   return (
+     <section className="mb-3">
+-      <h4>Upcoming Dates</h4>
++      <h4>{intl.formatMessage(messages.tools)}</h4>
+       {datesWidget.courseDateBlocks.map((courseDateBlock) => (
+         <DateSummary
+           key={courseDateBlock.title + courseDateBlock.date}
+@@ -17,15 +22,20 @@ export default function CourseDates({ courseId }) {
+           userTimezone={datesWidget.userTimezone}
+         />
+       ))}
+-      <a className="font-weight-bold" href={datesWidget.datesTabLink}>View all course dates</a>
++      <a className="font-weight-bold" href={datesWidget.datesTabLink}>
++        {intl.formatMessage(messages.allDates)}
++      </a>
+     </section>
+   );
+ }
+ 
+ CourseDates.propTypes = {
+   courseId: PropTypes.string,
++  intl: intlShape.isRequired,
+ };
+ 
+ CourseDates.defaultProps = {
+   courseId: null,
+ };
++
++export default injectIntl(CourseDates);
+diff --git a/src/course-home/outline-tab/widgets/CourseHandouts.jsx b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+new file mode 100644
+index 0000000..5ed67b0
+--- /dev/null
++++ b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+@@ -0,0 +1,35 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import LmsHtmlFragment from '../LmsHtmlFragment';
++import messages from '../messages';
++import { useModel } from '../../../generic/model-store';
++
++function CourseHandouts({ courseId, intl }) {
++  const {
++    handoutsHtml,
++  } = useModel('outline', courseId);
++
++  if (!handoutsHtml) {
++    return null;
++  }
++
++  return (
++    <section className="mb-3">
++      <h4>{intl.formatMessage(messages.handouts)}</h4>
++      <LmsHtmlFragment
++        html={handoutsHtml}
++        title={intl.formatMessage(messages.handouts)}
++      />
++    </section>
++  );
++}
++
++CourseHandouts.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CourseHandouts);
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 45da59b..38ce966 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -1,15 +1,17 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import {
+   faBookmark, faCertificate, faInfo, faCalendar, faStar,
+ } from '@fortawesome/free-solid-svg-icons';
+ import { faNewspaper } from '@fortawesome/free-regular-svg-icons';
++
++import messages from '../messages';
+ import { useModel } from '../../../generic/model-store';
+ 
+-export default function CourseTools(
+-  { courseId },
+-) {
++function CourseTools({ courseId, intl }) {
+   const {
+     courseTools,
+   } = useModel('outline', courseId);
+@@ -35,7 +37,7 @@ export default function CourseTools(
+ 
+   return (
+     <section className="mb-3">
+-      <h4>Course Tools</h4>
++      <h4>{intl.formatMessage(messages.tools)}</h4>
+       {courseTools.map((courseTool) => (
+         <div key={courseTool.analyticsId}>
+           <a data-analytics-id={courseTool.analyticsId} href={courseTool.url}>
+@@ -50,8 +52,11 @@ export default function CourseTools(
+ 
+ CourseTools.propTypes = {
+   courseId: PropTypes.string,
++  intl: intlShape.isRequired,
+ };
+ 
+ CourseTools.defaultProps = {
+   courseId: null,
+ };
++
++export default injectIntl(CourseTools);
+-- 
+2.34.1
+

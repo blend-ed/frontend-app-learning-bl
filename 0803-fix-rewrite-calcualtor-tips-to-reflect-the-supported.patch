@@ -1,0 +1,54 @@
+From 616027df8662cecd69446cbb2713a21b83cf287f Mon Sep 17 00:00:00 2001
+From: Ghassan Maslamani <ghassan.maslamani@gmail.com>
+Date: Thu, 17 Feb 2022 18:24:00 +0200
+Subject: [PATCH 0803/1021] fix: rewrite calcualtor tips to reflect the
+ supported features (#825)
+
+Fixes #820
+  - Removing constants that are no longer supported
+  - Removing suffixes that are no longer supported
+---
+ .../course/content-tools/calculator/Calculator.jsx  | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
+
+diff --git a/src/courseware/course/content-tools/calculator/Calculator.jsx b/src/courseware/course/content-tools/calculator/Calculator.jsx
+index f325983..7fb3a86 100644
+--- a/src/courseware/course/content-tools/calculator/Calculator.jsx
++++ b/src/courseware/course/content-tools/calculator/Calculator.jsx
+@@ -259,11 +259,11 @@ class Calculator extends Component {
+                         defaultMessage="Constants"
+                       />
+                     </th>
+-                    <td dir="auto">c, e, g, i, j, k, pi, q, T</td>
++                    <td dir="auto">e, pi</td>
+                     <td dir="auto">
+                       <ul className="list-unstyled m-0">
+-                        <li>20*c</li>
+-                        <li>418*T</li>
++                        <li>20*e</li>
++                        <li>418*pi</li>
+                       </ul>
+                     </td>
+                   </tr>
+@@ -277,17 +277,12 @@ class Calculator extends Component {
+                     <td dir="auto">
+                       <FormattedMessage
+                         id="calculator.instruction.table.to.use.affixes.type"
+-                        defaultMessage="Percent sign (%) and metric affixes ({affixes})"
+-                        values={{
+-                          affixes: 'd, c, m, u, n, p, k, M, G, T',
+-                        }}
++                        defaultMessage="Percent sign (%)"
+                       />
+                     </td>
+                     <td dir="auto">
+                       <ul className="list-unstyled m-0">
+                         <li>20%</li>
+-                        <li>20c</li>
+-                        <li>418T</li>
+                       </ul>
+                     </td>
+                   </tr>
+-- 
+2.34.1
+

@@ -1,0 +1,313 @@
+From 71482f1ec7fabe25039d6ba360eee3fb6365f01d Mon Sep 17 00:00:00 2001
+From: daphneli-chen <47010279+daphneli-chen@users.noreply.github.com>
+Date: Tue, 28 Jul 2020 12:53:49 -0400
+Subject: [PATCH 0183/1021] AA-205: created chapters and subsections containing
+ progress (#109)
+
+Co-authored-by: Daphne Li-Chen <dli-chen@edx.org>
+---
+ src/course-home/progress-tab/Chapter.jsx      | 36 +++++++++
+ src/course-home/progress-tab/DueDateTime.jsx  | 36 +++++++++
+ .../progress-tab/ProblemScores.jsx            | 37 +++++++++
+ src/course-home/progress-tab/ProgressTab.jsx  | 14 ++--
+ src/course-home/progress-tab/Subsection.jsx   | 76 +++++++++++++++++++
+ src/course-home/progress-tab/messages.js      | 38 ++++++++++
+ 6 files changed, 232 insertions(+), 5 deletions(-)
+ create mode 100644 src/course-home/progress-tab/Chapter.jsx
+ create mode 100644 src/course-home/progress-tab/DueDateTime.jsx
+ create mode 100644 src/course-home/progress-tab/ProblemScores.jsx
+ create mode 100644 src/course-home/progress-tab/Subsection.jsx
+ create mode 100644 src/course-home/progress-tab/messages.js
+
+diff --git a/src/course-home/progress-tab/Chapter.jsx b/src/course-home/progress-tab/Chapter.jsx
+new file mode 100644
+index 0000000..74c0034
+--- /dev/null
++++ b/src/course-home/progress-tab/Chapter.jsx
+@@ -0,0 +1,36 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import Subsection from './Subsection';
++
++export default function Chapter({
++  chapter,
++}) {
++  if (chapter.displayName === 'hidden') { return null; }
++  const { subsections } = chapter;
++  return (
++    <section className="border-top border-light-500">
++      <div className="row">
++        <div className="lead font-weight-normal col-12 col-sm-3 my-3 border-right border-light-500">
++          {chapter.displayName}
++        </div>
++        <div className="col-12 col-sm-9">
++          {subsections.map((subsection) => (
++            <Subsection
++              key={subsection.url}
++              subsection={subsection}
++            />
++          ))}
++        </div>
++      </div>
++    </section>
++  );
++}
++
++Chapter.propTypes = {
++  chapter: PropTypes.shape({
++    displayName: PropTypes.string,
++    subsections: PropTypes.arrayOf(PropTypes.shape({
++      url: PropTypes.string,
++    })),
++  }).isRequired,
++};
+diff --git a/src/course-home/progress-tab/DueDateTime.jsx b/src/course-home/progress-tab/DueDateTime.jsx
+new file mode 100644
+index 0000000..81d80e7
+--- /dev/null
++++ b/src/course-home/progress-tab/DueDateTime.jsx
+@@ -0,0 +1,36 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { useSelector } from 'react-redux';
++import { FormattedDate, FormattedTime } from '@edx/frontend-platform/i18n';
++import { useModel } from '../../generic/model-store';
++
++export default function DueDateTime({
++  due,
++}) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++  const {
++    userTimezone,
++  } = useModel('progress', courseId);
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  return (
++    <em className="ml-0">
++      due <FormattedDate
++        value={due}
++        day="numeric"
++        month="short"
++        weekday="short"
++        year="numeric"
++        {...timezoneFormatArgs}
++      /> <FormattedTime
++        value={due}
++      />
++    </em>
++  );
++}
++
++DueDateTime.propTypes = {
++  due: PropTypes.string.isRequired,
++};
+diff --git a/src/course-home/progress-tab/ProblemScores.jsx b/src/course-home/progress-tab/ProblemScores.jsx
+new file mode 100644
+index 0000000..22cf908
+--- /dev/null
++++ b/src/course-home/progress-tab/ProblemScores.jsx
+@@ -0,0 +1,37 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import messages from './messages';
++
++function ProblemScores({
++  intl,
++  scoreName,
++  problemScores,
++}) {
++  return (
++    <div className="row mt-1">
++      <dl className="d-flex flex-wrap small text-gray-500">
++        <dt className="mr-3">{intl.formatMessage(messages[`${scoreName}`])}</dt>
++        {problemScores.map((problem, index) => {
++          const key = scoreName + index;
++          return (
++            <dd className="mr-3" key={key}>{problem.earned}/{problem.possible}</dd>
++          );
++        })}
++      </dl>
++    </div>
++  );
++}
++
++ProblemScores.propTypes = {
++  intl: intlShape.isRequired,
++  scoreName: PropTypes.string.isRequired,
++  problemScores: PropTypes.arrayOf(PropTypes.shape({
++    possible: PropTypes.number,
++    earned: PropTypes.number,
++    id: PropTypes.string,
++  })).isRequired,
++};
++
++export default injectIntl(ProblemScores);
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index 247a96d..e948975 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -2,6 +2,7 @@ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { useModel } from '../../generic/model-store';
++import Chapter from './Chapter';
+ 
+ export default function ProgressTab() {
+   const {
+@@ -12,15 +13,18 @@ export default function ProgressTab() {
+ 
+   const {
+     enrollmentMode,
++    coursewareSummary,
+   } = useModel('progress', courseId);
+ 
+   return (
+     <section>
+-      <h2 className="mb-4">
+-        the user is {username} and they are enrolled as an {enrollmentMode} learner
+-        {administrator
+-        && <div>the user is admin</div>}
+-      </h2>
++      {enrollmentMode} {administrator} {username}
++      {coursewareSummary.map((chapter) => (
++        <Chapter
++          key={chapter.displayName}
++          chapter={chapter}
++        />
++      ))}
+     </section>
+   );
+ }
+diff --git a/src/course-home/progress-tab/Subsection.jsx b/src/course-home/progress-tab/Subsection.jsx
+new file mode 100644
+index 0000000..46c5f4b
+--- /dev/null
++++ b/src/course-home/progress-tab/Subsection.jsx
+@@ -0,0 +1,76 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import messages from './messages';
++
++import DueDateTime from './DueDateTime';
++import ProblemScores from './ProblemScores';
++
++function Subsection({
++  intl,
++  subsection,
++}) {
++  const scoreName = subsection.graded ? 'problem' : 'practice';
++
++  const { earned, possible } = subsection.gradedTotal;
++
++  const showTotalScore = ((possible > 0) || (earned > 0)) && subsection.showGrades;
++
++  // screen reader information
++  const totalScoreSr = intl.formatMessage(messages.pointsEarned, { earned, total: possible });
++
++  return (
++    <section className="my-3 ml-3">
++      <div className="row">
++        <a className="h6" href={subsection.url}>
++          <div dangerouslySetInnerHTML={{ __html: subsection.displayName }} />
++          {showTotalScore && <span className="sr-only">{totalScoreSr}</span>}
++        </a>
++        {showTotalScore && <span className="small ml-1 mb-2">({earned}/{possible}) {subsection.percentGraded}%</span>}
++      </div>
++      <div className="row small">
++        {subsection.format && <div className="mr-1">{subsection.format}</div>}
++        {subsection.due !== null && <DueDateTime due={subsection.due} />}
++      </div>
++      {subsection.problemScores.length > 0 && subsection.showGrades && (
++        <ProblemScores scoreName={scoreName} problemScores={subsection.problemScores} />
++      )}
++      {subsection.problemScores.length > 0 && !subsection.showGrades && subsection.showCorrectness === 'past_due' && (
++        <div className="row small">{intl.formatMessage(messages[`${scoreName}HiddenUntil`])}</div>
++      )}
++      {subsection.problemScores.length > 0 && !subsection.showGrades && !(subsection.showCorrectness === 'past_due')
++      && <div className="row small">{intl.formatMessage(messages[`${scoreName}Hidden`])}</div>}
++      {(subsection.problemScores.length === 0) && (
++        <div className="row small">{intl.formatMessage(messages.noScores)}</div>
++      )}
++    </section>
++  );
++}
++
++Subsection.propTypes = {
++  intl: intlShape.isRequired,
++  subsection: PropTypes.shape({
++    graded: PropTypes.bool.isRequired,
++    url: PropTypes.string.isRequired,
++    showGrades: PropTypes.bool.isRequired,
++    gradedTotal: PropTypes.shape({
++      possible: PropTypes.number,
++      earned: PropTypes.number,
++      graded: PropTypes.bool,
++    }).isRequired,
++    showCorrectness: PropTypes.string.isRequired,
++    due: PropTypes.string,
++    problemScores: PropTypes.arrayOf(PropTypes.shape({
++      possible: PropTypes.number,
++      earned: PropTypes.number,
++      id: PropTypes.string,
++    })).isRequired,
++    format: PropTypes.string,
++    // override: PropTypes.object,
++    displayName: PropTypes.string.isRequired,
++    percentGraded: PropTypes.number.isRequired,
++  }).isRequired,
++};
++
++export default injectIntl(Subsection);
+diff --git a/src/course-home/progress-tab/messages.js b/src/course-home/progress-tab/messages.js
+new file mode 100644
+index 0000000..9a81a51
+--- /dev/null
++++ b/src/course-home/progress-tab/messages.js
+@@ -0,0 +1,38 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  problem: {
++    id: 'learning.progress.badge.problem',
++    defaultMessage: 'Problem Scores: ',
++  },
++  practice: {
++    id: 'learning.progress.badge.practice',
++    defaultMessage: 'Practice Scores: ',
++  },
++  problemHiddenUntil: {
++    id: 'learning.progress.badge.problemHiddenUntil',
++    defaultMessage: 'Problem scores are hidden until the due date.',
++  },
++  practiceHiddenUntil: {
++    id: 'learning.progress.badge.practiceHiddenUntil',
++    defaultMessage: 'Practice scores are hidden until the due date.',
++  },
++  problemHidden: {
++    id: 'learning.progress.badge.probHidden',
++    defaultMessage: 'problemlem scores are hidden.',
++  },
++  practiceHidden: {
++    id: 'learning.progress.badge.practiceHidden',
++    defaultMessage: 'Practice scores are hidden.',
++  },
++  noScores: {
++    id: 'learning.progress.badge.noScores',
++    defaultMessage: 'No problem scores in this section.',
++  },
++  pointsEarned: {
++    id: 'learning.progress.badge.scoreEarned',
++    defaultMessage: '{earned} of {total} possible points',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

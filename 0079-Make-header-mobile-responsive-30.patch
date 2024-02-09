@@ -1,0 +1,102 @@
+From fb83d881f6fdef9914b8c76d6027c93d67f08c1b Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Fri, 13 Mar 2020 16:46:35 -0400
+Subject: [PATCH 0079/1021] Make header mobile responsive (#30)
+
+TNL-7072
+---
+ src/courseware/course/CourseHeader.jsx | 16 +++++++++++-----
+ src/index.scss                         | 25 +++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 5 deletions(-)
+
+diff --git a/src/courseware/course/CourseHeader.jsx b/src/courseware/course/CourseHeader.jsx
+index 393d184..20980ba 100644
+--- a/src/courseware/course/CourseHeader.jsx
++++ b/src/courseware/course/CourseHeader.jsx
+@@ -4,6 +4,9 @@ import { Dropdown } from '@edx/paragon';
+ import { getConfig } from '@edx/frontend-platform';
+ import { AppContext } from '@edx/frontend-platform/react';
+ 
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faUserCircle } from '@fortawesome/free-solid-svg-icons';
++
+ import logo from './logo.svg';
+ 
+ function LinkedLogo({
+@@ -31,7 +34,7 @@ export default function CourseHeader({
+   const { authenticatedUser } = useContext(AppContext);
+ 
+   return (
+-    <header>
++    <header className="course-header">
+       <div className="container-fluid py-2 d-flex align-items-center ">
+         <LinkedLogo
+           className="logo"
+@@ -39,14 +42,17 @@ export default function CourseHeader({
+           src={logo}
+           alt={getConfig().SITE_NAME}
+         />
+-        <div className="flex-grow-1" style={{ lineHeight: 1 }}>
++        <div className="flex-grow-1 course-title-lockup" style={{ lineHeight: 1 }}>
+           <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
+-          <span className="d-block m-0 font-weight-bold">{courseName}</span>
++          <span className="d-block m-0 font-weight-bold course-name">{courseName}</span>
+         </div>
+ 
+-        <Dropdown>
++        <Dropdown className="user-dropdown">
+           <Dropdown.Button>
+-            {authenticatedUser.username}
++            <FontAwesomeIcon icon={faUserCircle} className="d-md-none" size="lg" />
++            <span className="d-none d-mb-block">
++              {authenticatedUser.username}
++            </span>
+           </Dropdown.Button>
+           <Dropdown.Menu className="dropdown-menu-right">
+             <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/dashboard`}>Dashboard</Dropdown.Item>
+diff --git a/src/index.scss b/src/index.scss
+index dedb021..ad339dd 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -16,6 +16,14 @@ $primary: #1176B2;
+   }
+ }
+ 
++// TODO: Fix .container-fluid for mobile in paragon
++.container-fluid {
++  @media (max-width: -1 + map-get($grid-breakpoints, 'sm')) {
++    padding-left: $grid-gutter-width/2;
++    padding-right: $grid-gutter-width/2;
++  }
++}
++
+ #root {
+   display: flex;
+   flex-direction: column;
+@@ -45,6 +53,23 @@ $primary: #1176B2;
+   }
+ }
+ 
++.course-header {
++  min-width: 0;
++  .course-title-lockup {
++    min-width: 0;
++    span {
++      white-space: nowrap;
++      overflow: hidden;
++      text-overflow: ellipsis;
++    }
++  }
++  .user-dropdown {
++    .btn {
++      height: 3rem;
++      padding: 0 .5rem;
++    }
++  }
++}
+ .course-tabs-navigation {
+   border-bottom: solid 1px #EAEAEA;
+ }
+-- 
+2.34.1
+

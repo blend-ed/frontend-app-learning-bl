@@ -1,0 +1,25 @@
+From 5ffc1bc59916200b4d3cf514debcb1c2d1c9dab6 Mon Sep 17 00:00:00 2001
+From: Nick <ndalfonso@edx.org>
+Date: Tue, 16 Jun 2020 14:42:18 -0400
+Subject: [PATCH 0143/1021] Add logging back to the coursemetadata call (#86)
+
+---
+ src/data/thunks.js | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index fe551b3..e10c3e2 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -115,6 +115,8 @@ export function fetchTab(courseId, tab, version, getTabData) {
+           modelType: 'courses',
+           model: courseMetadataResult.value,
+         }));
++      } else {
++        logError(courseMetadataResult.reason);
+       }
+ 
+       if (fetchedCourseHomeCourseMetadata) {
+-- 
+2.34.1
+

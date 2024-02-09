@@ -1,0 +1,774 @@
+From 3fe5bb1733aee0351e102fb5a506da03914d413f Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Fri, 14 Jan 2022 08:54:07 -0500
+Subject: [PATCH 0786/1021] fix: [AA-1018] api refactor
+
+This is the first step toward clearing out the redundant metadata from the
+coursewareMetadata and getting it from a common source - the courseHomeMetadata.
+
+remove username from coursewareMetadata
+Remove courseAccess from coursewareMetadata.
+
+Fix all unit tests
+Modify classes that use metadataModel to use courseHomeMetadata for common data.
+metadataModel still exists as a mechanism to distinguish if a component is under
+courseware or courseHome, and it will be renamed or removed in a later refactor.
+---
+ .../courseHomeMetadata.factory.js             |  1 +
+ .../data/__snapshots__/redux.test.js.snap     |  3 ++
+ src/courseware/CoursewareContainer.test.jsx   | 12 +++++--
+ src/courseware/course/Course.test.jsx         |  2 +-
+ .../course/NotificationTrigger.test.jsx       |  2 +-
+ .../course/sequence/honor-code/HonorCode.jsx  |  2 +-
+ .../sequence/honor-code/HonorCode.test.jsx    | 18 +++++-----
+ .../lock-paywall/LockPaywall.test.jsx         |  2 +-
+ .../sequence/sequence-navigation/hooks.js     |  5 +--
+ .../__factories__/courseMetadata.factory.js   |  1 -
+ .../__factories__/sequenceMetadata.factory.js |  4 +++
+ src/courseware/data/api.js                    |  2 --
+ .../data/pact-tests/lmsPact.test.jsx          |  8 -----
+ src/courseware/data/redux.test.js             | 23 ++++++++++---
+ src/courseware/data/thunks.js                 | 34 +++++++++++++++----
+ src/index.jsx                                 |  2 +-
+ src/product-tours/ProductTours.jsx            |  2 +-
+ src/product-tours/ProductTours.test.jsx       | 25 +++++++++-----
+ src/setupTest.js                              | 13 ++++---
+ .../courseMetadataBase.factory.js             |  2 +-
+ .../StreakCelebrationModal.jsx                |  4 +--
+ .../StreakCelebrationModal.test.jsx           |  3 +-
+ src/tab-page/LoadedTabPage.jsx                |  2 +-
+ src/tab-page/LoadedTabPage.test.jsx           | 15 +++++++-
+ src/tab-page/TabPage.jsx                      |  2 +-
+ 25 files changed, 127 insertions(+), 62 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+index 53b5045..ffc0699 100644
+--- a/src/course-home/data/__factories__/courseHomeMetadata.factory.js
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -10,6 +10,7 @@ Factory.define('courseHomeMetadata')
+     is_self_paced: false,
+     is_enrolled: false,
+     can_load_courseware: false,
++    celebrations: null,
+     course_access: {
+       additional_context_user_message: null,
+       developer_message: null,
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index a5a7932..bc74623 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -21,6 +21,7 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "canLoadCourseware": false,
++        "celebrations": null,
+         "courseAccess": Object {
+           "additionalContextUserMessage": null,
+           "developerMessage": null,
+@@ -334,6 +335,7 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "canLoadCourseware": false,
++        "celebrations": null,
+         "courseAccess": Object {
+           "additionalContextUserMessage": null,
+           "developerMessage": null,
+@@ -527,6 +529,7 @@ Object {
+     "courseHomeMeta": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "canLoadCourseware": false,
++        "celebrations": null,
+         "courseAccess": Object {
+           "additionalContextUserMessage": null,
+           "developerMessage": null,
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 737e181..465266d 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -47,6 +47,7 @@ describe('CoursewareContainer', () => {
+   // By default, `setUpMockRequests()` will configure the mock LMS API to return use this data.
+   // Certain test cases override these in order to test with special blocks/metadata.
+   const defaultCourseMetadata = Factory.build('courseMetadata');
++  const defaultCourseHomeMetadata = Factory.build('courseHomeMetadata');
+   const defaultCourseId = defaultCourseMetadata.id;
+   const defaultUnitBlocks = [
+     Factory.build(
+@@ -101,6 +102,7 @@ describe('CoursewareContainer', () => {
+     // If we weren't given course blocks or metadata, use the defaults.
+     const courseBlocks = options.courseBlocks || defaultCourseBlocks;
+     const courseMetadata = options.courseMetadata || defaultCourseMetadata;
++    const courseHomeMetadata = options.courseHomeMetadata || defaultCourseHomeMetadata;
+     const courseId = courseMetadata.id;
+     // If we weren't given a list of sequence metadatas for URL mocking,
+     // then construct it ourselves by looking at courseBlocks.
+@@ -127,6 +129,9 @@ describe('CoursewareContainer', () => {
+     const courseMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`);
+     axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+ 
++    const courseHomeMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`);
++    axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
++
+     sequenceMetadatas.forEach(sequenceMetadata => {
+       const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceMetadata.item_id}`;
+       axiosMock.onGet(sequenceMetadataUrl).reply(200, sequenceMetadata);
+@@ -413,17 +418,20 @@ describe('CoursewareContainer', () => {
+ 
+   describe('when receiving a course_access error_code', () => {
+     function setUpWithDeniedStatus(errorCode) {
+-      const courseMetadata = Factory.build('courseMetadata', {
++      const courseMetadata = Factory.build('courseMetadata');
++      const courseHomeMetadata = Factory.build('courseHomeMetadata', {
+         course_access: {
+           has_access: false,
+           error_code: errorCode,
+           additional_context_user_message: 'uhoh oh no', // only used by audit_expired
+         },
++        id: courseMetadata.id,
+       });
++
+       const courseId = courseMetadata.id;
+ 
+       const { courseBlocks, sequenceBlocks, unitBlocks } = buildSimpleCourseBlocks(courseId, courseMetadata.name);
+-      setUpMockRequests({ courseBlocks, courseMetadata });
++      setUpMockRequests({ courseBlocks, courseMetadata, courseHomeMetadata });
+       history.push(`/course/${courseId}/${sequenceBlocks[0].id}/${unitBlocks[0].id}`);
+       return { courseMetadata, unitBlocks };
+     }
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index be9171e..24d37e5 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -147,7 +147,7 @@ describe('Course', () => {
+ 
+   it('handles sessionStorage from a different course for the notification tray', async () => {
+     sessionStorage.clear();
+-    const courseMetadataSecondCourse = Factory.build('courseMetadata');
++    const courseMetadataSecondCourse = Factory.build('courseMetadata', { id: 'second_course' });
+ 
+     // set sessionStorage for a different course before rendering Course
+     sessionStorage.setItem(`notificationTrayStatus.${courseMetadataSecondCourse.id}`, '"open"');
+diff --git a/src/courseware/course/NotificationTrigger.test.jsx b/src/courseware/course/NotificationTrigger.test.jsx
+index 2bc28f2..f700b6e 100644
+--- a/src/courseware/course/NotificationTrigger.test.jsx
++++ b/src/courseware/course/NotificationTrigger.test.jsx
+@@ -105,7 +105,7 @@ describe('Notification Trigger', () => {
+   });
+ 
+   it('handles localStorage from a different course', async () => {
+-    const courseMetadataSecondCourse = Factory.build('courseMetadata');
++    const courseMetadataSecondCourse = Factory.build('courseMetadata', { id: 'second_id' });
+     // set localStorage for a different course before rendering NotificationTrigger
+     localStorage.setItem(`upgradeNotificationLastSeen.${courseMetadataSecondCourse.id}`, '"accessDateView"');
+     localStorage.setItem(`notificationStatus.${courseMetadataSecondCourse.id}`, '"inactive"');
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.jsx b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+index 5c3d916..c819f3d 100644
+--- a/src/courseware/course/sequence/honor-code/HonorCode.jsx
++++ b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+@@ -12,7 +12,7 @@ import messages from './messages';
+ 
+ function HonorCode({ intl, courseId }) {
+   const dispatch = useDispatch();
+-  const coursewareMetaData = useModel('coursewareMeta', courseId);
++  const coursewareMetaData = useModel('courseHomeMeta', courseId);
+   const authUser = getAuthenticatedUser();
+   const siteName = getConfig().SITE_NAME;
+   const honorCodeUrl = `${getConfig().TERMS_OF_SERVICE_URL}#honor-code`;
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.test.jsx b/src/courseware/course/sequence/honor-code/HonorCode.test.jsx
+index 6b972e2..c0cf779 100644
+--- a/src/courseware/course/sequence/honor-code/HonorCode.test.jsx
++++ b/src/courseware/course/sequence/honor-code/HonorCode.test.jsx
+@@ -1,14 +1,15 @@
+ import React from 'react';
+-import MockAdapter from 'axios-mock-adapter';
+-import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import { getConfig, history } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import MockAdapter from 'axios-mock-adapter';
+ import { Factory } from 'rosie';
+ 
+ import {
+-  authenticatedUser, fireEvent, initializeTestStore, render, screen, waitFor,
++  authenticatedUser, fireEvent, initializeMockApp, initializeTestStore, render, screen, waitFor,
+ } from '../../../../setupTest';
+ import HonorCode from './HonorCode';
+ 
++initializeMockApp();
+ jest.mock('@edx/frontend-platform', () => ({
+   ...jest.requireActual('@edx/frontend-platform'),
+   history: {
+@@ -22,13 +23,10 @@ describe('Honor Code', () => {
+   let honorCodePostUrl;
+   const mockData = {};
+ 
+-  async function setupStoreState(coursewareMetaOptions) {
+-    if (coursewareMetaOptions) {
+-      const courseMetadata = Factory.build(
+-        'courseMetadata',
+-        coursewareMetaOptions,
+-      );
+-      store = await initializeTestStore({ courseMetadata });
++  async function setupStoreState(courseHomeMetaOptions) {
++    if (courseHomeMetaOptions) {
++      const courseHomeMetadata = Factory.build('courseHomeMetadata', courseHomeMetaOptions);
++      store = await initializeTestStore({ courseHomeMetadata });
+     } else {
+       store = await initializeTestStore();
+     }
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+index 9620c37..5a83fa9 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+@@ -11,7 +11,7 @@ jest.mock('@edx/frontend-platform/analytics');
+ 
+ describe('Lock Paywall', () => {
+   let store;
+-  const mockData = { metadataModel: 'coursewareMeta' };
++  const mockData = { notificationTrayVisible: false };
+ 
+   beforeAll(async () => {
+     store = await initializeTestStore();
+diff --git a/src/courseware/course/sequence/sequence-navigation/hooks.js b/src/courseware/course/sequence/sequence-navigation/hooks.js
+index 404f414..02794f0 100644
+--- a/src/courseware/course/sequence/sequence-navigation/hooks.js
++++ b/src/courseware/course/sequence/sequence-navigation/hooks.js
+@@ -2,15 +2,16 @@
+ 
+ import { useSelector } from 'react-redux';
+ import { useModel } from '../../../../generic/model-store';
+-import { sequenceIdsSelector } from '../../../data/selectors';
++import { sequenceIdsSelector } from '../../../data';
+ 
+ export function useSequenceNavigationMetadata(currentSequenceId, currentUnitId) {
+   const sequenceIds = useSelector(sequenceIdsSelector);
+   const sequence = useModel('sequences', currentSequenceId);
+   const courseStatus = useSelector(state => state.courseware.courseStatus);
++  const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+ 
+   // If we don't know the sequence and unit yet, then assume no.
+-  if (courseStatus !== 'loaded' || !currentSequenceId || !currentUnitId) {
++  if (courseStatus !== 'loaded' || sequenceStatus !== 'loaded' || !currentSequenceId || !currentUnitId) {
+     return { isFirstUnit: false, isLastUnit: false };
+   }
+   const isFirstSequence = sequenceIds.indexOf(currentSequenceId) === 0;
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 11053fa..a8ca74a 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -63,5 +63,4 @@ Factory.define('courseMetadata')
+     related_programs: null,
+     user_needs_integrity_signature: false,
+     recommendations: null,
+-    username: 'MockUser',
+   });
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index 17bca14..f9ba895 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -83,9 +83,13 @@ export default function buildSimpleCourseAndSequenceMetadata(options = {}) {
+       courseId, unitBlocks, sequenceBlock: block,
+     },
+   ));
++  // need to synchronize the id with the courseMetadata
++  const courseHomeMetadataOptions = (options.courseHomeMetadata ? options.courseHomeMetadata : {});
++  const courseHomeMetadata = Factory.build('courseHomeMetadata', courseHomeMetadataOptions);
+   return {
+     ...simpleCourseBlocks,
+     courseMetadata,
+     sequenceMetadata,
++    courseHomeMetadata,
+   };
+ }
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 1214ec2..3919cdc 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -210,7 +210,6 @@ function normalizeMetadata(metadata) {
+     start: data.start,
+     enrollmentMode: data.enrollment.mode,
+     isEnrolled: data.enrollment.is_active,
+-    courseAccess: camelCaseObject(data.course_access),
+     canViewLegacyCourseware: data.can_view_legacy_courseware,
+     originalUserIsStaff: data.original_user_is_staff,
+     isStaff: data.is_staff,
+@@ -233,7 +232,6 @@ function normalizeMetadata(metadata) {
+     isIntegritySignatureEnabled: data.is_integrity_signature_enabled,
+     userNeedsIntegritySignature: data.user_needs_integrity_signature,
+     isMasquerading: data.original_user_is_staff && !data.is_staff,
+-    username: data.username,
+   };
+ }
+ 
+diff --git a/src/courseware/data/pact-tests/lmsPact.test.jsx b/src/courseware/data/pact-tests/lmsPact.test.jsx
+index 09f437c..63e8234 100644
+--- a/src/courseware/data/pact-tests/lmsPact.test.jsx
++++ b/src/courseware/data/pact-tests/lmsPact.test.jsx
+@@ -368,14 +368,6 @@ describe('Courseware Service', () => {
+         start: '2013-02-05T05:00:00Z',
+         enrollmentMode: 'audit',
+         isEnrolled: true,
+-        courseAccess: {
+-          hasAccess: true,
+-          errorCode: null,
+-          developerMessage: null,
+-          userMessage: null,
+-          additionalContextUserMessage: null,
+-          userFragment: null,
+-        },
+         canViewLegacyCourseware: true,
+         originalUserIsStaff: true,
+         isStaff: true,
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index a288db3..2343ce2 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -26,6 +26,7 @@ describe('Data layer integration tests', () => {
+   // building minimum set of api responses to test all thunks
+   const courseMetadata = Factory.build('courseMetadata');
+   const courseId = courseMetadata.id;
++  const courseHomeMetadata = Factory.build('courseHomeMetadata');
+   const { courseBlocks, unitBlocks, sequenceBlocks } = buildSimpleCourseBlocks(courseId);
+   const sequenceMetadata = Factory.build(
+     'sequenceMetadata',
+@@ -37,6 +38,9 @@ describe('Data layer integration tests', () => {
+   let courseUrl = `${courseBaseUrl}/${courseId}`;
+   courseUrl = appendBrowserTimezoneToUrl(courseUrl);
+ 
++  const courseHomeMetadataUrl = appendBrowserTimezoneToUrl(
++    `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`,
++  );
+   const sequenceUrl = `${sequenceBaseUrl}/${sequenceMetadata.item_id}`;
+   const sequenceId = sequenceBlocks[0].id;
+   const unitId = unitBlocks[0].id;
+@@ -66,17 +70,22 @@ describe('Data layer integration tests', () => {
+     });
+ 
+     it('Should fetch, normalize, and save metadata, but with denied status', async () => {
+-      const forbiddenCourseMetadata = Factory.build('courseMetadata', {
++      const forbiddenCourseMetadata = Factory.build('courseMetadata');
++      const forbiddenCourseHomeMetadata = Factory.build('courseHomeMetadata', {
+         course_access: {
+           has_access: false,
+         },
+       });
++      const forbiddenCourseHomeUrl = appendBrowserTimezoneToUrl(
++        `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`,
++      );
+       const forbiddenCourseBlocks = Factory.build('courseBlocks', {
+         courseId: forbiddenCourseMetadata.id,
+       });
+       let forbiddenCourseUrl = `${courseBaseUrl}/${forbiddenCourseMetadata.id}`;
+       forbiddenCourseUrl = appendBrowserTimezoneToUrl(forbiddenCourseUrl);
+ 
++      axiosMock.onGet(forbiddenCourseHomeUrl).reply(200, forbiddenCourseHomeMetadata);
+       axiosMock.onGet(forbiddenCourseUrl).reply(200, forbiddenCourseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, forbiddenCourseBlocks);
+       axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+@@ -88,10 +97,11 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.courseStatus).toEqual('denied');
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[forbiddenCourseMetadata.id].courseAccess).not.toBeUndefined();
++      expect(state.models.courseHomeMeta[forbiddenCourseMetadata.id].courseAccess).not.toBeUndefined();
+     });
+ 
+     it('Should fetch, normalize, and save metadata', async () => {
++      axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+       axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+@@ -106,12 +116,13 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].courseAccess).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].verifiedMode).not.toBeUndefined();
+     });
+ 
+     it('Should fetch, normalize, and save metadata; filtering has no effect', async () => {
+       // Very similar to previous test, but pass back an outline for filtering
+       // (even though it won't actually filter down in this case).
++      axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+       axiosMock.onGet(learningSequencesUrlRegExp).reply(200, simpleOutline);
+@@ -126,7 +137,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].courseAccess).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].verifiedMode).not.toBeUndefined();
+       expect(state.models.sequences.length === 1);
+ 
+       Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 1));
+@@ -135,6 +146,7 @@ describe('Data layer integration tests', () => {
+     it('Should fetch, normalize, and save metadata; filtering removes sequence', async () => {
+       // Very similar to previous test, but pass back an outline for filtering
+       // (even though it won't actually filter down in this case).
++      axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+ 
+@@ -153,7 +165,7 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+       // check that at least one key camel cased, thus course data normalized
+-      expect(state.models.coursewareMeta[courseId].courseAccess).not.toBeUndefined();
++      expect(state.models.coursewareMeta[courseId].verifiedMode).not.toBeUndefined();
+       expect(state.models.sequences === null);
+ 
+       Object.values(state.models.sections).forEach(section => expect(section.sequenceIds.length === 0));
+@@ -187,6 +199,7 @@ describe('Data layer integration tests', () => {
+     });
+ 
+     it('Should fetch and normalize metadata, and then update existing models with sequence metadata', async () => {
++      axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
+       axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+       axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 846b37d..23d1a13 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -1,13 +1,14 @@
+ import { logError, logInfo } from '@edx/frontend-platform/logging';
+ import {
+   getBlockCompletion,
+-  postSequencePosition,
+-  getCourseMetadata,
+   getCourseBlocks,
++  getCourseMetadata,
+   getLearningSequencesOutline,
+   getSequenceMetadata,
+   postIntegritySignature,
++  postSequencePosition,
+ } from './api';
++import { getCourseHomeCourseMetadata } from '../../course-home/data/api';
+ import {
+   updateModel, addModel, updateModelsMap, addModelsMap, updateModels,
+ } from '../../generic/model-store';
+@@ -130,14 +131,34 @@ export function fetchCourse(courseId) {
+       getCourseMetadata(courseId),
+       getCourseBlocks(courseId),
+       getLearningSequencesOutline(courseId),
+-    ]).then(([courseMetadataResult, courseBlocksResult, learningSequencesOutlineResult]) => {
++      getCourseHomeCourseMetadata(courseId),
++    ]).then(([
++      courseMetadataResult,
++      courseBlocksResult,
++      learningSequencesOutlineResult,
++      courseHomeMetadataResult]) => {
+       if (courseMetadataResult.status === 'fulfilled') {
+         dispatch(addModel({
+           modelType: 'coursewareMeta',
+-          model: courseMetadataResult.value,
++          model: {
++            id: courseId,
++            ...courseMetadataResult.value,
++          },
+         }));
+       }
+ 
++      if (courseHomeMetadataResult.status === 'fulfilled') {
++        dispatch(addModel({
++          modelType: 'courseHomeMeta',
++          model: {
++            id: courseId,
++            ...courseHomeMetadataResult.value,
++          },
++        }));
++      } else {
++        logError(courseHomeMetadataResult.reason);
++      }
++
+       if (courseBlocksResult.status === 'fulfilled') {
+         const {
+           courses, sections, sequences, units,
+@@ -167,6 +188,7 @@ export function fetchCourse(courseId) {
+       }
+ 
+       const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
++      const fetchedCourseHomeMetadata = courseHomeMetadataResult.status === 'fulfilled';
+       const fetchedBlocks = courseBlocksResult.status === 'fulfilled';
+ 
+       // Log errors for each request if needed. Course block failures may occur
+@@ -185,8 +207,8 @@ export function fetchCourse(courseId) {
+         logError(courseMetadataResult.reason);
+       }
+ 
+-      if (fetchedMetadata) {
+-        if (courseMetadataResult.value.courseAccess.hasAccess && fetchedBlocks) {
++      if (fetchedMetadata && fetchedCourseHomeMetadata) {
++        if (courseHomeMetadataResult.value.courseAccess.hasAccess && fetchedBlocks) {
+           // User has access
+           dispatch(fetchCourseSuccess({ courseId }));
+           return;
+diff --git a/src/index.jsx b/src/index.jsx
+index f625e20..280855d 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -66,7 +66,7 @@ subscribe(APP_READY, () => {
+                 )}
+               />
+               <PageRoute path="/course/:courseId/course-end">
+-                <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
++                <TabContainer tab="courseware" fetch={fetchCourse} slice="courseHome">
+                   <CourseExit />
+                 </TabContainer>
+               </PageRoute>
+diff --git a/src/product-tours/ProductTours.jsx b/src/product-tours/ProductTours.jsx
+index 5b102e2..acaa241 100644
+--- a/src/product-tours/ProductTours.jsx
++++ b/src/product-tours/ProductTours.jsx
+@@ -16,7 +16,7 @@ import {
+   endCourseHomeTour,
+   endCoursewareTour,
+   fetchTourData,
+-} from './data/thunks';
++} from './data';
+ 
+ function ProductTours({
+   activeTab,
+diff --git a/src/product-tours/ProductTours.test.jsx b/src/product-tours/ProductTours.test.jsx
+index be79be8..70099a5 100644
+--- a/src/product-tours/ProductTours.test.jsx
++++ b/src/product-tours/ProductTours.test.jsx
+@@ -8,7 +8,7 @@ import { getConfig, history } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import { AppProvider } from '@edx/frontend-platform/react';
+ import MockAdapter from 'axios-mock-adapter';
+-import { waitForElementToBeRemoved } from '@testing-library/dom';
++import { prettyDOM, waitForElementToBeRemoved } from '@testing-library/dom';
+ import * as popper from '@popperjs/core';
+ 
+ import {
+@@ -35,12 +35,13 @@ describe('Course Home Tours', () => {
+   const courseId = 'course-v1:edX+Test+run';
+   let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
++  const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
++
+   const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+   const tourDataUrl = `${getConfig().LMS_BASE_URL}/api/user_tours/v1/MockUser`;
+   const proctoringUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=course-v1%3AedX%2BTest%2Brun&username=MockUser`;
+ 
+   const store = initializeStore();
+-  const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+   const defaultTabData = Factory.build('outlineTabData');
+ 
+   function setMetadata(attributes, options) {
+@@ -177,8 +178,9 @@ describe('Courseware Tour', () => {
+   // This is a standard set of data that can be used in CoursewareContainer tests.
+   // By default, `setUpMockRequests()` will configure the mock LMS API to return use this data.
+   // Certain test cases override these in order to test with special blocks/metadata.
+-  const courseMetadata = Factory.build('courseMetadata');
+-  const courseId = courseMetadata.id;
++  const defaultCourseMetadata = Factory.build('courseMetadata');
++
++  const courseId = defaultCourseMetadata.id;
+   const unitBlocks = [
+     Factory.build(
+       'block',
+@@ -201,7 +203,7 @@ describe('Courseware Tour', () => {
+     sequenceBlocks: [defaultSequenceBlock],
+   } = buildSimpleCourseBlocks(
+     courseId,
+-    courseMetadata.name,
++    defaultCourseMetadata.name,
+     { unitBlocks },
+   );
+ 
+@@ -268,7 +270,11 @@ describe('Courseware Tour', () => {
+       axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+ 
+       const courseMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`);
+-      axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++      axiosMock.onGet(courseMetadataUrl).reply(200, defaultCourseMetadata);
++
++      const defaultCourseHomeMetadata = Factory.build('courseHomeMetadata', { id: courseId, courseId });
++      const courseHomeMetadataUrl = appendBrowserTimezoneToUrl(`${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`);
++      axiosMock.onGet(courseHomeMetadataUrl).reply(200, defaultCourseHomeMetadata);
+ 
+       sequenceMetadatas.forEach(sequenceMetadata => {
+         const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceMetadata.item_id}`;
+@@ -277,9 +283,8 @@ describe('Courseware Tour', () => {
+         axiosMock.onGet(proctoredExamApiUrl).reply(404);
+       });
+ 
+-      axiosMock.onPost(`${courseId}/xblock/${defaultSequenceBlock.id}/handler/get_completion`).reply(200, {
+-        complete: true,
+-      });
++      const blockUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/*`);
++      axiosMock.onPost(blockUrlRegExp).reply(200, { complete: true });
+ 
+       history.push(`/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[0].id}`);
+     });
+@@ -303,6 +308,8 @@ describe('Courseware Tour', () => {
+ 
+   expect(global.location.href).toEqual(`http://localhost/course/${courseId}/${defaultSequenceBlock.id}/${unitBlocks[1].id}`);
+ 
++  console.log(prettyDOM(container, 999999));
++
+   const checkpoint = container.querySelectorAll('#checkpoint');
+   expect(checkpoint).toHaveLength(showCoursewareTour ? 1 : 0);
+ });
+diff --git a/src/setupTest.js b/src/setupTest.js
+index e086cb1..c38ddbd 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -27,9 +27,11 @@ import { appendBrowserTimezoneToUrl, executeThunk } from './utils';
+ import buildSimpleCourseAndSequenceMetadata from './courseware/data/__factories__/sequenceMetadata.factory';
+ 
+ class MockLoggingService {
+-  logInfo = jest.fn();
++  // eslint-disable-next-line no-console
++  logInfo = jest.fn(infoString => console.log(infoString));
+ 
+-  logError = jest.fn();
++  // eslint-disable-next-line no-console
++  logError = jest.fn(infoString => console.log(infoString));
+ }
+ 
+ window.getComputedStyle = jest.fn(() => ({
+@@ -50,7 +52,7 @@ Object.defineProperty(window, 'matchMedia', {
+     // Returns true given a mediaQuery for a screen size greater than 768px (this exact query is what react-break sends)
+     // Without this, if we hardcode `matches` to either true or false, either all or none of the breakpoints match,
+     // respectively.
+-    const matches = !!(query === 'screen and (min-width: 768px)');
++    const matches = (query === 'screen and (min-width: 768px)');
+     return {
+       matches,
+       media: query,
+@@ -146,7 +148,7 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
+   axiosMock.reset();
+ 
+   const {
+-    courseBlocks, sequenceBlocks, courseMetadata, sequenceMetadata,
++    courseBlocks, sequenceBlocks, courseMetadata, sequenceMetadata, courseHomeMetadata,
+   } = buildSimpleCourseAndSequenceMetadata(options);
+ 
+   let forbiddenCourseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseMetadata.id}`;
+@@ -154,8 +156,11 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
+ 
+   const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
+   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
++  let courseHomeMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseMetadata.id}`;
++  courseHomeMetadataUrl = appendBrowserTimezoneToUrl(courseHomeMetadataUrl);
+ 
+   axiosMock.onGet(forbiddenCourseUrl).reply(200, courseMetadata);
++  axiosMock.onGet(courseHomeMetadataUrl).reply(200, courseHomeMetadata);
+   axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
+   axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+   sequenceMetadata.forEach(metadata => {
+diff --git a/src/shared/data/__factories__/courseMetadataBase.factory.js b/src/shared/data/__factories__/courseMetadataBase.factory.js
+index 9afe868..440a470 100644
+--- a/src/shared/data/__factories__/courseMetadataBase.factory.js
++++ b/src/shared/data/__factories__/courseMetadataBase.factory.js
+@@ -5,9 +5,9 @@ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dep
+ import './tab.factory';
+ 
+ export default new Factory()
+-  .sequence('id', (i) => `course-v1:edX+DemoX+Demo_Course_${i}`)
+   .option('host')
+   .attrs({
++    id: 'course-v1:edX+DemoX+Demo_Course_1',
+     is_staff: false,
+     original_user_is_staff: false,
+     number: 'DemoX',
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index ec203bc..edc01ff 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -58,7 +58,7 @@ function StreakModal({
+   if (!isStreakCelebrationOpen) {
+     return null;
+   }
+-  const { org, celebrations, username } = useModel(metadataModel, courseId);
++  const { org, celebrations, username } = useModel('courseHomeMeta', courseId);
+   const factoid = getRandomFactoid(intl, streakLengthToCelebrate);
+   // eslint-disable-next-line no-unused-vars
+   const [randomFactoid, setRandomFactoid] = useState(factoid); // Don't change factoid on re-render
+@@ -155,7 +155,7 @@ function StreakModal({
+       title={title}
+       onClose={() => {
+         closeStreakCelebration();
+-        recordModalClosing(metadataModel, celebrations, org, courseId, dispatch);
++        recordModalClosing('courseHomeMeta', celebrations, org, courseId, dispatch);
+       }}
+       isOpen={isStreakCelebrationOpen}
+       isFullscreenScroll
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index 0bc9d4d..0ac9782 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -23,6 +23,7 @@ describe('Loaded Tab Page', () => {
+   let axiosMock;
+   const calculateUrl = `${getConfig().ECOMMERCE_BASE_URL}/api/v2/baskets/calculate/?code=ZGY11119949&sku=8CF08E5&username=MockUser`;
+   const courseMetadata = Factory.build('courseMetadata', { celebrations: { streak_length_to_celebrate: 3 } });
++  const courseHomeMetadata = Factory.build('courseHomeMetadata', { id: courseMetadata.id, courseId: courseMetadata.courseId });
+ 
+   function setDiscount(percent) {
+     mockData.streakDiscountCouponEnabled = true;
+@@ -51,7 +52,7 @@ describe('Loaded Tab Page', () => {
+       verifiedMode: camelCaseObject(courseMetadata.verified_mode),
+     };
+ 
+-    testStore = await initializeTestStore({ courseMetadata }, false);
++    testStore = await initializeTestStore({ courseMetadata, courseHomeMetadata }, false);
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+   });
+ 
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index b71ed87..44e85db 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -30,7 +30,7 @@ function LoadedTabPage({
+     tabs,
+     title,
+     verifiedMode,
+-  } = useModel(metadataModel, courseId);
++  } = useModel('courseHomeMeta', courseId);
+ 
+   // Logistration and enrollment alerts are only really used for the outline tab, but loaded here to put them above
+   // breadcrumbs when they are visible.
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+index 0c15e9f..ac3bdaa 100644
+--- a/src/tab-page/LoadedTabPage.test.jsx
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -25,7 +25,20 @@ describe('Loaded Tab Page', () => {
+ 
+   it('shows Instructor Toolbar if original user is staff', async () => {
+     const courseMetadata = Factory.build('courseMetadata', { original_user_is_staff: true });
+-    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
++    const courseHomeMetadata = Factory.build('courseHomeMetadata', {
++      courseId: courseMetadata.id,
++      // need to synchronize the id with the courseMetadata because it is autoincremented by courseMetadataBase
++      id: courseMetadata.id,
++      original_user_is_staff: true,
++    });
++    const testStore = await initializeTestStore(
++      {
++        courseMetadata,
++        courseHomeMetadata,
++        excludeFetchSequence: true,
++      },
++      false,
++    );
+     render(<LoadedTabPage {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+ 
+     expect(screen.getByTestId('InstructorToolbar')).toBeInTheDocument();
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index 0b89ee4..39e6c4c 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -37,7 +37,7 @@ function TabPage({ intl, ...props }) {
+     org,
+     start,
+     title,
+-  } = useModel(metadataModel, courseId);
++  } = useModel('courseHomeMeta', courseId);
+ 
+   if (courseStatus === 'loading') {
+     return (
+-- 
+2.34.1
+

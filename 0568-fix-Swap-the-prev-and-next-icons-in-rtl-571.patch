@@ -1,0 +1,66 @@
+From 63c86701de77cbba4456764df425043debb5a206 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Mon, 2 Aug 2021 10:01:54 -0400
+Subject: [PATCH 0568/1021] fix: Swap the prev and next icons in rtl (#571)
+
+Right To Left (RTL) languages need to reverse the
+direction of the icons in navigation.
+This fix corrects the arrows in UnitNavigation.jsx,
+which were missed in the previous checkin.
+
+Fixes: AA-891
+
+Co-authored-by: cdeery <cdeery@edx.edu>
+---
+ .../sequence/sequence-navigation/UnitNavigation.jsx    | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+index 26610f9..b6aa1ef 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+@@ -3,7 +3,9 @@ import PropTypes from 'prop-types';
+ import { Button } from '@edx/paragon';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import {
++  injectIntl, intlShape, isRtl, getLocale,
++} from '@edx/frontend-platform/i18n';
+ import { useSelector } from 'react-redux';
+ 
+ import { getCourseExitNavigation } from '../../course-exit';
+@@ -28,6 +30,7 @@ function UnitNavigation({
+     const buttonOnClick = isLastUnit ? goToCourseExitPage : onClickNext;
+     const buttonText = (isLastUnit && exitText) ? exitText : intl.formatMessage(messages.nextButton);
+     const disabled = isLastUnit && !exitActive;
++    const nextArrow = isRtl(getLocale()) ? faChevronLeft : faChevronRight;
+     return (
+       <Button
+         variant="outline-primary"
+@@ -38,11 +41,12 @@ function UnitNavigation({
+         <UnitNavigationEffortEstimate sequenceId={sequenceId} unitId={unitId}>
+           {buttonText}
+         </UnitNavigationEffortEstimate>
+-        <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
++        <FontAwesomeIcon icon={nextArrow} className="ml-2" size="sm" />
+       </Button>
+     );
+   };
+ 
++  const prevArrow = isRtl(getLocale()) ? faChevronRight : faChevronLeft;
+   return (
+     <div className="unit-navigation d-flex">
+       <Button
+@@ -51,7 +55,7 @@ function UnitNavigation({
+         disabled={isFirstUnit}
+         onClick={onClickPrevious}
+       >
+-        <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
++        <FontAwesomeIcon icon={prevArrow} className="mr-2" size="sm" />
+         {intl.formatMessage(messages.previousButton)}
+       </Button>
+       {renderNextButton()}
+-- 
+2.34.1
+

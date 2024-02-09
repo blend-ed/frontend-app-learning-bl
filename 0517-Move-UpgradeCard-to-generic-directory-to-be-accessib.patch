@@ -1,0 +1,157 @@
+From 5e925c93dac88220264988239432b3406d2acb51 Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Fri, 2 Jul 2021 09:29:48 -0400
+Subject: [PATCH 0517/1021] Move UpgradeCard to generic directory to be
+ accessible in courseware (#514)
+
+Part 1 of REV-2130, Value Prop work
+---
+ src/course-home/outline-tab/OutlineTab.jsx    |  2 +-
+ .../upgrade-card}/UpgradeCard.jsx             |  2 +-
+ .../upgrade-card}/UpgradeCard.scss            | 29 ++++++++-----------
+ .../upgrade-card}/UpgradeCard.test.jsx        |  2 +-
+ src/index.scss                                |  2 +-
+ 5 files changed, 16 insertions(+), 21 deletions(-)
+ rename src/{course-home/outline-tab/widgets => generic/upgrade-card}/UpgradeCard.jsx (99%)
+ rename src/{course-home/outline-tab/widgets => generic/upgrade-card}/UpgradeCard.scss (52%)
+ rename src/{course-home/outline-tab/widgets => generic/upgrade-card}/UpgradeCard.test.jsx (99%)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 500f208..d2a9431 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -16,7 +16,7 @@ import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ import Section from './Section';
+ import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+-import UpgradeCard from './widgets/UpgradeCard';
++import UpgradeCard from '../../generic/upgrade-card/UpgradeCard';
+ import { useAccessExpirationAlertMasquerade } from '../../alerts/access-expiration-alert';
+ import useCertificateAvailableAlert from './alerts/certificate-status-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.jsx b/src/generic/upgrade-card/UpgradeCard.jsx
+similarity index 99%
+rename from src/course-home/outline-tab/widgets/UpgradeCard.jsx
+rename to src/generic/upgrade-card/UpgradeCard.jsx
+index 4ab383a..3c23974 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.jsx
++++ b/src/generic/upgrade-card/UpgradeCard.jsx
+@@ -7,7 +7,7 @@ import { sendTrackEvent, sendTrackingLogEvent } from '@edx/frontend-platform/ana
+ import { FormattedDate, FormattedMessage, injectIntl } from '@edx/frontend-platform/i18n';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+-import { UpgradeButton } from '../../../generic/upgrade-button';
++import { UpgradeButton } from '../upgrade-button';
+ 
+ function UpsellNoFBECardContent() {
+   const verifiedCertLink = (
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.scss b/src/generic/upgrade-card/UpgradeCard.scss
+similarity index 52%
+rename from src/course-home/outline-tab/widgets/UpgradeCard.scss
+rename to src/generic/upgrade-card/UpgradeCard.scss
+index 62cec69..a4b7b34 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.scss
++++ b/src/generic/upgrade-card/UpgradeCard.scss
+@@ -2,50 +2,45 @@
+   border-radius: 0 !important;
+ }
+ 
+-.upgrade-card-header{
++.upgrade-card-header {
+   margin: 1.25rem;
+ }
+ 
+-.upsell-warning{
++.upsell-warning {
+   background-color: $danger-100;
+ }
+ 
+-.upsell-warning-light{
++.upsell-warning-light {
+   background-color: $warning-100;
+ }
+ 
+-.upsell-warning, .upsell-warning-light{
+-  padding-left: 1.25rem;
+-  padding-right: 1.25rem;
+-  padding-top: 0.5rem;
+-  padding-bottom: 0.5rem;
++.upsell-warning, .upsell-warning-light {
++  padding: 0.5rem 1.25rem;
+ }
+ 
+-.upgrade-card-ul{
++.upgrade-card-ul {
+   margin-left: 3rem;
+   padding-top: 0.875rem;
+   padding-right: 1.25rem;
+ }
+ 
+-.upgrade-card-li{
++.upgrade-card-li {
+   left: -2.125rem;
+   top: 0 !important;
+ }
+ 
+-.upgrade-card-text{
+-  padding-top: 0.875rem;
+-  padding-right: 1.25rem;
+-  padding-left: 1.25rem;
++.upgrade-card-text {
++  padding: 0.875rem 1.25rem 0 1.25rem;
+ }
+ 
+-.upgrade-card-button{
++.upgrade-card-button {
+   margin-left: 1.25rem;
+   margin-right: 1.25rem;
+   margin-bottom: 1.25rem;
+ }
+ 
+ .discount-info {
+-  border-top: 1px solid rgba(0, 0, 0, 0.125);
++  border-top: 1px solid $light-400;
+   padding-top: .75rem;
+   padding-bottom: .75rem;
+ }
+@@ -54,6 +49,6 @@
+   text-decoration: underline;
+ }
+ 
+-.upgrade-card .upgrade-card-message a{
++.upgrade-card .upgrade-card-message a {
+   color: $primary-500;
+ }
+\ No newline at end of file
+diff --git a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx b/src/generic/upgrade-card/UpgradeCard.test.jsx
+similarity index 99%
+rename from src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
+rename to src/generic/upgrade-card/UpgradeCard.test.jsx
+index 847f699..370bf78 100644
+--- a/src/course-home/outline-tab/widgets/UpgradeCard.test.jsx
++++ b/src/generic/upgrade-card/UpgradeCard.test.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
+ 
+-import { initializeMockApp, render, screen } from '../../../setupTest';
++import { initializeMockApp, render, screen } from '../../setupTest';
+ import UpgradeCard from './UpgradeCard';
+ 
+ initializeMockApp();
+diff --git a/src/index.scss b/src/index.scss
+index c2cfb04..f4344e9 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -380,7 +380,7 @@
+ @import 'courseware/course/content-tools/contentTools.scss';
+ @import 'course-home/dates-tab/Badge.scss';
+ @import 'course-home/dates-tab/Day.scss';
+-@import 'course-home/outline-tab/widgets/UpgradeCard.scss';
++@import 'generic/upgrade-card/UpgradeCard.scss';
+ @import 'course-home/outline-tab/widgets/ProctoringInfoPanel.scss';
+ @import 'course-home/progress-tab/course-completion/CompletionDonutChart.scss';
+ @import 'course-home/progress-tab/grades/course-grade/GradeBar.scss';
+-- 
+2.34.1
+

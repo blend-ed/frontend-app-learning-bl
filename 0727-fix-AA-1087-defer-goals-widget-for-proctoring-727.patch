@@ -1,0 +1,275 @@
+From 9c2c1427e15a3e1996c220787a5dfb5e476beeb0 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 9 Nov 2021 10:22:20 -0500
+Subject: [PATCH 0727/1021] fix: [AA-1087] defer goals widget for proctoring
+ (#727)
+
+fix: [AA-1087] defer goals widget for proctoring
+
+- pause showing goals widget while proctor info panel awaits callback.
+
+- Implement tests to check that goals show up when
+  proctoring does not
+
+- small refactoring of LearningGoalButton to eliminate test warnings
+---
+ .../data/__snapshots__/redux.test.js.snap     |  1 +
+ src/course-home/data/api.js                   |  2 +
+ src/course-home/outline-tab/OutlineTab.jsx    |  9 ++-
+ .../outline-tab/OutlineTab.test.jsx           | 59 +++++++++++++++----
+ .../widgets/LearningGoalButton.jsx            |  6 +-
+ .../widgets/ProctoringInfoPanel.jsx           | 13 +++-
+ .../widgets/WeeklyLearningGoalCard.jsx        |  6 +-
+ 7 files changed, 75 insertions(+), 21 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 17c85ee..f31764d 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -453,6 +453,7 @@ Object {
+         "datesWidget": Object {
+           "courseDateBlocks": Array [],
+         },
++        "enableProctoredExams": undefined,
+         "enrollAlert": Object {
+           "canEnroll": true,
+           "extraText": "Contact the administrator.",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index d30746b..6988bc3 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -343,6 +343,7 @@ export async function getOutlineTabData(courseId) {
+   const courseTools = camelCaseObject(data.course_tools);
+   const datesBannerInfo = camelCaseObject(data.dates_banner_info);
+   const datesWidget = camelCaseObject(data.dates_widget);
++  const enableProctoredExams = data.enable_proctored_exams;
+   const enrollAlert = camelCaseObject(data.enroll_alert);
+   const enrollmentMode = data.enrollment_mode;
+   const handoutsHtml = data.handouts_html;
+@@ -366,6 +367,7 @@ export async function getOutlineTabData(courseId) {
+     datesWidget,
+     enrollAlert,
+     enrollmentMode,
++    enableProctoredExams,
+     handoutsHtml,
+     hasScheduledContent,
+     hasEnded,
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index a889030..86f434e 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -62,10 +62,11 @@ function OutlineTab({ intl }) {
+     datesWidget: {
+       courseDateBlocks,
+     },
++    enableProctoredExams,
++    offer,
+     resumeCourse: {
+       url: resumeCourseUrl,
+     },
+-    offer,
+     timeOffsetMillis,
+     verifiedMode,
+   } = useModel('outline', courseId);
+@@ -73,6 +74,9 @@ function OutlineTab({ intl }) {
+   const [deprecatedCourseGoalToDisplay, setDeprecatedCourseGoalToDisplay] = useState(selectedGoal);
+   const [goalToastHeader, setGoalToastHeader] = useState('');
+   const [expandAll, setExpandAll] = useState(false);
++  // Defer showing the goal widget until the ProctoringInfoPanel is either shown or determined as not showing
++  // to avoid components bouncing around too much as screen is displayed
++  const [proctorPanelResolved, setProctorPanelResolved] = useState(!enableProctoredExams);
+ 
+   const eventProperties = {
+     org_key: org,
+@@ -200,6 +204,7 @@ function OutlineTab({ intl }) {
+             <ProctoringInfoPanel
+               courseId={courseId}
+               username={username}
++              isResolved={() => setProctorPanelResolved(true)}
+             />
+             {deprecatedCourseGoalToDisplay && goalOptions && goalOptions.length > 0 && (
+               <UpdateGoalSelector
+@@ -210,7 +215,7 @@ function OutlineTab({ intl }) {
+                 setGoalToastHeader={(newHeader) => { setGoalToastHeader(newHeader); }}
+               />
+             )}
+-            {weeklyLearningGoalEnabled && (
++            {proctorPanelResolved && weeklyLearningGoalEnabled && (
+               <WeeklyLearningGoalCard
+                 daysPerWeek={selectedGoal && 'daysPerWeek' in selectedGoal ? selectedGoal.daysPerWeek : null}
+                 subscribedToReminders={selectedGoal && 'subscribedToReminders' in selectedGoal ? selectedGoal.subscribedToReminders : false}
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 93c1540..56a1c1b 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -513,19 +513,55 @@ describe('Outline Tab', () => {
+         expect(screen.queryByText(messages.goalReminderDetail.defaultMessage)).not.toBeInTheDocument();
+       });
+     });
+-    describe('weekly learning goal is already set', () => {
+-      beforeEach(async () => {
+-        setTabData({
+-          course_goals: {
+-            weekly_learning_goal_enabled: true,
+-            selected_goal: {
+-              subscribed_to_reminders: true,
+-              days_per_week: 3,
+-            },
++
++    it('has button for weekly learning goal selected', async () => {
++      setTabData({
++        course_goals: {
++          weekly_learning_goal_enabled: true,
++          selected_goal: {
++            subscribed_to_reminders: true,
++            days_per_week: 3,
+           },
+-        });
+-        await fetchAndRender();
++        },
++      });
++      await fetchAndRender();
++
++      const button = await screen.queryByTestId('weekly-learning-goal-input-Regular');
++      expect(button).toBeInTheDocument();
++      expect(button).toHaveClass('flag-button-selected');
++    });
++
++    it('renders weekly learning goal card if ProctoringInfoPanel is not shown', async () => {
++      setTabData({
++        course_goals: {
++          weekly_learning_goal_enabled: true,
++        },
++      });
++      axiosMock.onGet(proctoringInfoUrl).reply(404);
++      await fetchAndRender();
++      expect(screen.queryByTestId('weekly-learning-goal-card')).toBeInTheDocument();
++    });
++
++    it('renders weekly learning goal card if ProctoringInfoPanel is not enabled', async () => {
++      setTabData({
++        course_goals: {
++          weekly_learning_goal_enabled: true,
++          enableProctoredExams: false,
++        },
+       });
++      await fetchAndRender();
++      expect(screen.queryByTestId('weekly-learning-goal-card')).toBeInTheDocument();
++    });
++
++    it('renders weekly learning goal card if ProctoringInfoPanel is enabled', async () => {
++      setTabData({
++        course_goals: {
++          weekly_learning_goal_enabled: true,
++          enableProctoredExams: true,
++        },
++      });
++      await fetchAndRender();
++      expect(screen.queryByTestId('weekly-learning-goal-card')).toBeInTheDocument();
+     });
+   });
+ 
+@@ -1172,6 +1208,7 @@ describe('Outline Tab', () => {
+ 
+     it('does not appear for 404', async () => {
+       axiosMock.onGet(proctoringInfoUrl).reply(404);
++      await fetchAndRender();
+       expect(screen.queryByRole('link', { name: 'Review instructions and system requirements' })).not.toBeInTheDocument();
+     });
+ 
+diff --git a/src/course-home/outline-tab/widgets/LearningGoalButton.jsx b/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+index bd9e7bd..f1edbed 100644
+--- a/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
++++ b/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+@@ -10,7 +10,7 @@ import messages from '../messages';
+ 
+ function LearningGoalButton({
+   level,
+-  currentGoal,
++  isSelected,
+   handleSelect,
+   intl,
+ }) {
+@@ -43,14 +43,14 @@ function LearningGoalButton({
+       title={intl.formatMessage(values.title)}
+       text={intl.formatMessage(values.text)}
+       handleSelect={() => handleSelect(values.daysPerWeek)}
+-      isSelected={currentGoal === values.daysPerWeek}
++      isSelected={isSelected}
+     />
+   );
+ }
+ 
+ LearningGoalButton.propTypes = {
+   level: PropTypes.string.isRequired,
+-  currentGoal: PropTypes.number.isRequired,
++  isSelected: PropTypes.bool.isRequired,
+   handleSelect: PropTypes.func.isRequired,
+   intl: intlShape.isRequired,
+ };
+diff --git a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+index 146618f..3d68c00 100644
+--- a/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
++++ b/src/course-home/outline-tab/widgets/ProctoringInfoPanel.jsx
+@@ -8,7 +8,9 @@ import { Button } from '@edx/paragon';
+ import messages from '../messages';
+ import { getProctoringInfoData } from '../../data/api';
+ 
+-function ProctoringInfoPanel({ courseId, username, intl }) {
++function ProctoringInfoPanel({
++  courseId, username, intl, isResolved,
++}) {
+   const [link, setLink] = useState('');
+   const [onboardingPastDue, setOnboardingPastDue] = useState(false);
+   const [showInfoPanel, setShowInfoPanel] = useState(false);
+@@ -95,7 +97,13 @@ function ProctoringInfoPanel({ courseId, username, intl }) {
+             setOnboardingPastDue(response.onboarding_past_due);
+           }
+         },
+-      );
++      )
++      .catch(() => {
++        /* Do nothing. API throws 404 when class does not have proctoring */
++      })
++      .finally(() => {
++        isResolved();
++      });
+   }, []);
+ 
+   let onboardingExamButton = null;
+@@ -186,6 +194,7 @@ ProctoringInfoPanel.propTypes = {
+   courseId: PropTypes.string.isRequired,
+   username: PropTypes.string,
+   intl: intlShape.isRequired,
++  isResolved: PropTypes.func.isRequired,
+ };
+ 
+ ProctoringInfoPanel.defaultProps = {
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index a5ec039..2ebfd82 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -63,17 +63,17 @@ function WeeklyLearningGoalCard({
+         >
+           <LearningGoalButton
+             level="casual"
+-            currentGoal={daysPerWeekGoal}
++            isSelected={daysPerWeekGoal === 1}
+             handleSelect={handleSelect}
+           />
+           <LearningGoalButton
+             level="regular"
+-            currentGoal={daysPerWeekGoal}
++            isSelected={daysPerWeekGoal === 3}
+             handleSelect={handleSelect}
+           />
+           <LearningGoalButton
+             level="intense"
+-            currentGoal={daysPerWeekGoal}
++            isSelected={daysPerWeekGoal === 5}
+             handleSelect={handleSelect}
+           />
+         </div>
+-- 
+2.34.1
+

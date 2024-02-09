@@ -1,0 +1,409 @@
+From 973f3d68aa9a8023dd21317332441ebe09c11754 Mon Sep 17 00:00:00 2001
+From: Nick <ndalfonso@edx.org>
+Date: Tue, 16 Jun 2020 09:55:04 -0400
+Subject: [PATCH 0140/1021] AA-133 mfe dates banner (#79)
+
+- dates banner on dates tab
+---
+ src/alerts/enrollment-alert/hooks.js       |  2 +-
+ src/course-header/CourseTabsNavigation.jsx |  1 -
+ src/course-home/outline-tab/OutlineTab.jsx |  2 +-
+ src/data/api.js                            | 23 +++++++
+ src/data/thunks.js                         | 31 ++++++---
+ src/dates-banner/DatesBanner.jsx           | 43 +++++++++++++
+ src/dates-banner/DatesBannerContainer.jsx  | 74 ++++++++++++++++++++++
+ src/dates-banner/messages.js               | 66 +++++++++++++++++++
+ src/dates-tab/DatesTab.jsx                 |  2 +
+ src/tab-page/LoadedTabPage.jsx             |  2 +-
+ 10 files changed, 234 insertions(+), 12 deletions(-)
+ create mode 100644 src/dates-banner/DatesBanner.jsx
+ create mode 100644 src/dates-banner/DatesBannerContainer.jsx
+ create mode 100644 src/dates-banner/messages.js
+
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index d0b5b51..b7e83ff 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -8,7 +8,7 @@ import { postCourseEnrollment } from './data/api';
+ 
+ 
+ export function useEnrollmentAlert(courseId) {
+-  const course = useModel('courses', courseId);
++  const course = useModel('courseHomeMetadata', courseId);
+   const code = course.isStaff ? 'clientStaffEnrollmentAlert' : 'clientEnrollmentAlert';
+   const isVisible = course && course.isEnrolled !== undefined && !course.isEnrolled;
+ 
+diff --git a/src/course-header/CourseTabsNavigation.jsx b/src/course-header/CourseTabsNavigation.jsx
+index a24c30e..3efdb39 100644
+--- a/src/course-header/CourseTabsNavigation.jsx
++++ b/src/course-header/CourseTabsNavigation.jsx
+@@ -36,7 +36,6 @@ CourseTabsNavigation.propTypes = {
+   className: PropTypes.string,
+   tabs: PropTypes.arrayOf(PropTypes.shape({
+     title: PropTypes.string.isRequired,
+-    priority: PropTypes.number.isRequired,
+     slug: PropTypes.string.isRequired,
+     url: PropTypes.string.isRequired,
+   })).isRequired,
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 2be2a3d..1e3d9fa 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -29,7 +29,7 @@ export default function OutlineTab() {
+     enrollmentEnd,
+     enrollmentMode,
+     isEnrolled,
+-  } = useModel('courses', courseId);
++  } = useModel('courseHomeMetadata', courseId);
+ 
+   const {
+     courseBlocks: {
+diff --git a/src/data/api.js b/src/data/api.js
+index 1fda3d9..38ad54f 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -40,12 +40,30 @@ function normalizeMetadata(metadata) {
+   };
+ }
+ 
++function normalizeCourseHomeCourseMetadata(metadata) {
++  const data = camelCaseObject(metadata);
++  return {
++    ...data,
++    tabs: data.tabs.map(tab => ({
++      slug: tab.tabId,
++      title: tab.title,
++      url: tab.url,
++    })),
++  };
++}
++
+ export async function getCourseMetadata(courseId) {
+   const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
+   const { data } = await getAuthenticatedHttpClient().get(url);
+   return normalizeMetadata(data);
+ }
+ 
++export async function getCourseHomeCourseMetadata(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
++  const { data } = await getAuthenticatedHttpClient().get(url);
++  return normalizeCourseHomeCourseMetadata(data);
++}
++
+ export async function getDatesTabData(courseId, version) {
+   const url = `${getConfig().LMS_BASE_URL}/api/course_home/${version}/dates/${courseId}`;
+   try {
+@@ -208,3 +226,8 @@ export async function getResumeBlock(courseId) {
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+   return camelCaseObject(data);
+ }
++
++export async function updateCourseDeadlines(courseId) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`);
++  await getAuthenticatedHttpClient().post(url.href, { course_key: courseId });
++}
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index 5139647..98f2353 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -5,6 +5,8 @@ import {
+   getSequenceMetadata,
+   getDatesTabData,
+   getOutlineTabData,
++  getCourseHomeCourseMetadata,
++  updateCourseDeadlines,
+ } from './api';
+ import {
+   addModelsMap, updateModel, updateModels, updateModelsMap, addModel,
+@@ -95,24 +97,27 @@ export function fetchTab(courseId, tab, version, getTabData) {
+   return async (dispatch) => {
+     dispatch(fetchTabRequest({ courseId }));
+     Promise.allSettled([
+-      getCourseMetadata(courseId),
++      getCourseHomeCourseMetadata(courseId),
+       getTabData(courseId, version),
+-    ]).then(([courseMetadataResult, tabDataResult]) => {
+-      const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
++    ]).then(([courseHomeCourseMetadataResult, tabDataResult]) => {
++      const fetchedCourseHomeMetaData = courseHomeCourseMetadataResult.status === 'fulfilled';
+       const fetchedTabData = tabDataResult.status === 'fulfilled';
+ 
+-      if (fetchedMetadata) {
++      if (fetchedCourseHomeMetaData) {
+         /*
+          * NOTE: The "courses" models created by this thunk do not include an array of sectionIds.
+          * If that data is required for some use case, then fetchTab will need to call
+          * getCourseBlocks as well.  See fetchCourse above.
+          */
+         dispatch(addModel({
+-          modelType: 'courses',
+-          model: courseMetadataResult.value,
++          modelType: 'courseHomeMetadata',
++          model: {
++            id: courseId,
++            ...courseHomeCourseMetadataResult.value,
++          },
+         }));
+       } else {
+-        logError(courseMetadataResult.reason);
++        logError(courseHomeCourseMetadataResult.reason);
+       }
+ 
+       if (fetchedTabData) {
+@@ -127,7 +132,7 @@ export function fetchTab(courseId, tab, version, getTabData) {
+         logError(tabDataResult.reason);
+       }
+ 
+-      if (fetchedMetadata && fetchedTabData) {
++      if (fetchedCourseHomeMetaData && fetchedTabData) {
+         dispatch(fetchTabSuccess({ courseId }));
+       } else {
+         dispatch(fetchTabFailure({ courseId }));
+@@ -164,3 +169,13 @@ export function fetchSequence(sequenceId) {
+     }
+   };
+ }
++
++export function resetDeadlines(courseId, tab, getTabData) {
++  return async (dispatch) => {
++    updateCourseDeadlines(courseId).then(() => {
++      if (tab === 'dates') {
++        dispatch(getTabData(courseId));
++      }
++    });
++  };
++}
+diff --git a/src/dates-banner/DatesBanner.jsx b/src/dates-banner/DatesBanner.jsx
+new file mode 100644
+index 0000000..6c8d4a0
+--- /dev/null
++++ b/src/dates-banner/DatesBanner.jsx
+@@ -0,0 +1,43 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from './messages';
++
++function DatesBanner(props) {
++  const {
++    intl,
++    name,
++    bannerClickHandler,
++  } = props;
++
++  return (
++    <div className="banner rounded my-2 p-3 container-fluid border border-primary-200 bg-info-100">
++      <div className="row justify-content-between">
++        <div className={name === 'datesTabInfoBanner' ? 'col-12' : 'col-9'}>
++          <strong>
++            {intl.formatMessage(messages[`datesBanner.${name}.header`])}
++          </strong>
++          {intl.formatMessage(messages[`datesBanner.${name}.body`])}
++        </div>
++        {bannerClickHandler && (
++          <button type="button" className="btn rounded align-self-center border border-primary bg-white mr-3" onClick={bannerClickHandler}>
++            {intl.formatMessage(messages[`datesBanner.${name}.button`])}
++          </button>
++        )}
++      </div>
++    </div>
++  );
++}
++
++DatesBanner.propTypes = {
++  intl: intlShape.isRequired,
++  name: PropTypes.string.isRequired,
++  bannerClickHandler: PropTypes.func,
++};
++
++DatesBanner.defaultProps = {
++  bannerClickHandler: null,
++};
++
++export default injectIntl(DatesBanner);
+diff --git a/src/dates-banner/DatesBannerContainer.jsx b/src/dates-banner/DatesBannerContainer.jsx
+new file mode 100644
+index 0000000..982c625
+--- /dev/null
++++ b/src/dates-banner/DatesBannerContainer.jsx
+@@ -0,0 +1,74 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { useDispatch, useSelector } from 'react-redux';
++
++import { useModel } from '../model-store';
++
++import DatesBanner from './DatesBanner';
++import { fetchDatesTab, resetDeadlines } from '../data/thunks';
++
++function DatesBannerContainer(props) {
++  const {
++    model,
++  } = props;
++
++  const {
++    courseId,
++  } = useSelector(state => state.courseware);
++
++  const {
++    datesBannerInfo,
++  } = useModel(model, courseId);
++
++  const {
++    contentTypeGatingEnabled,
++    missedDeadlines,
++    missedGatedContent,
++    verifiedUpgradeLink,
++  } = datesBannerInfo;
++
++  const {
++    isSelfPaced,
++  } = useModel('courseHomeMetadata', courseId);
++
++  const dispatch = useDispatch();
++  const upgradeToCompleteGraded = model === 'dates' && contentTypeGatingEnabled && !missedDeadlines;
++  const upgradeToReset = !upgradeToCompleteGraded && missedDeadlines && missedGatedContent;
++  const resetDates = !upgradeToCompleteGraded && missedDeadlines && !missedGatedContent;
++  const datesBanners = [
++    { name: 'datesTabInfoBanner', shouldDisplay: model === 'dates' && !missedDeadlines && isSelfPaced },
++    {
++      name: 'upgradeToCompleteGradedBanner',
++      shouldDisplay: upgradeToCompleteGraded,
++      clickHandler: () => window.location.replace(verifiedUpgradeLink),
++    },
++    {
++      name: 'upgradeToResetBanner',
++      shouldDisplay: upgradeToReset,
++      clickHandler: () => window.location.replace(verifiedUpgradeLink),
++    },
++    {
++      name: 'resetDatesBanner',
++      shouldDisplay: resetDates,
++      clickHandler: () => dispatch(resetDeadlines(courseId, model, fetchDatesTab)),
++    },
++  ];
++
++  return (
++    <>
++      {datesBanners.map((banner) => banner.shouldDisplay && (
++        <DatesBanner
++          name={banner.name}
++          bannerClickHandler={banner.clickHandler}
++          key={banner.name}
++        />
++      ))}
++    </>
++  );
++}
++
++DatesBannerContainer.propTypes = {
++  model: PropTypes.string.isRequired,
++};
++
++export default DatesBannerContainer;
+diff --git a/src/dates-banner/messages.js b/src/dates-banner/messages.js
+new file mode 100644
+index 0000000..cae3f82
+--- /dev/null
++++ b/src/dates-banner/messages.js
+@@ -0,0 +1,66 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'datesBanner.datesTabInfoBanner.header': {
++    id: 'datesBanner.datesTabInfoBanner.header',
++    defaultMessage: "We've built a suggested schedule to help you stay on track. ",
++    description: 'Strong text in Dates Tab Info Banner',
++  },
++  'datesBanner.datesTabInfoBanner.body': {
++    id: 'datesBanner.datesTabInfoBanner.body',
++    defaultMessage: `But don't worry—it's flexible so you can learn at your own pace. If you happen to fall behind on
++      our suggested dates, you'll be able to adjust them to keep yourself on track.`,
++    description: 'Body in Dates Tab Info Banner',
++  },
++  'datesBanner.upgradeToCompleteGradedBanner.header': {
++    id: 'datesBanner.upgradeToCompleteGradedBanner.header',
++    defaultMessage: 'You are auditing this course, ',
++    description: 'Strong text in Upgrade To Complete Graded Banner',
++  },
++  'datesBanner.upgradeToCompleteGradedBanner.body': {
++    id: 'datesBanner.upgradeToCompleteGradedBanner.body',
++    defaultMessage: `which means that you are unable to participate in graded assignments. To complete graded
++      assignments as part of this course, you can upgrade today.`,
++    description: 'Body in Upgrade To Complete Graded Banner',
++  },
++  'datesBanner.upgradeToCompleteGradedBanner.button': {
++    id: 'datesBanner.upgradeToCompleteGradedBanner.button',
++    defaultMessage: 'Upgrade now',
++    description: 'Button in Upgrade To Complete Graded Banner',
++  },
++  'datesBanner.upgradeToResetBanner.header': {
++    id: 'datesBanner.upgradeToResetBanner.header',
++    defaultMessage: 'You are auditing this course, ',
++    description: 'Strong text in Upgrade To Reset Banner',
++  },
++  'datesBanner.upgradeToResetBanner.body': {
++    id: 'datesBanner.upgradeToResetBanner.body',
++    defaultMessage: `which means that you are unable to participate in graded assignments. It looks like you missed 
++      some important deadlines based on our suggested schedule. To complete graded assignments as part of this course 
++      and shift the past due assignments into the future, you can upgrade today.`,
++    description: 'Body in Upgrade To Reset Banner',
++  },
++  'datesBanner.upgradeToResetBanner.button': {
++    id: 'datesBanner.upgradeToResetBanner.button',
++    defaultMessage: 'Upgrade to shift due dates',
++    description: 'Button in Upgrade To Reset Banner',
++  },
++  'datesBanner.resetDatesBanner.header': {
++    id: 'datesBanner.resetDatesBanner.header',
++    defaultMessage: 'It looks like you missed some important deadlines based on our suggested schedule. ',
++    description: 'Strong text in Reset Dates Banner',
++  },
++  'datesBanner.resetDatesBanner.body': {
++    id: 'datesBanner.resetDatesBanner.body',
++    defaultMessage: `To keep yourself on track, you can update this schedule and shift the past due assignments into 
++      the future. Don’t worry—you won’t lose any of the progress you’ve made when you shift your due dates.`,
++    description: 'Body in Reset Dates Banner',
++  },
++  'datesBanner.resetDatesBanner.button': {
++    id: 'datesBanner.resetDatesBanner.button',
++    defaultMessage: 'Reset my deadlines',
++    description: 'Button in Reset Dates Banner',
++  },
++});
++
++export default messages;
+diff --git a/src/dates-tab/DatesTab.jsx b/src/dates-tab/DatesTab.jsx
+index 088d268..54403e9 100644
+--- a/src/dates-tab/DatesTab.jsx
++++ b/src/dates-tab/DatesTab.jsx
+@@ -3,10 +3,12 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from './messages';
+ import Timeline from './Timeline';
++import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ 
+ function DatesTab({ intl }) {
+   return (
+     <>
++      <DatesBannerContainer model="dates" />
+       <h2 className="mb-4">
+         {intl.formatMessage(messages.title)}
+       </h2>
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 8e538b4..8978841 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -20,7 +20,7 @@ function LoadedTabPage({
+     org,
+     tabs,
+     title,
+-  } = useModel('courses', courseId);
++  } = useModel('courseHomeMetadata', courseId);
+ 
+   return (
+     <>
+-- 
+2.34.1
+

@@ -1,0 +1,26 @@
+From 2075a0b3dd2a228ea5947dc8e48aadd1f1366dd3 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Tue, 27 Jul 2021 11:52:51 -0400
+Subject: [PATCH 0556/1021] fix: grey out problem scores when a learner does
+ not have access, instead of when a learner does have access (#565)
+
+---
+ .../progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx  | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+index 29179f7..2a90551 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/ProblemScoreDrawer.jsx
+@@ -10,7 +10,7 @@ function ProblemScoreDrawer({ intl, problemScores, subsection }) {
+   return (
+     <span className="row w-100 m-0 x-small ml-4 pt-2 pl-1 text-gray-700 flex-nowrap">
+       <span id="problem-score-label" className="col-auto p-0">{intl.formatMessage(messages.problemScoreLabel)}</span>
+-      <div className={classNames('col', 'p-0', { 'greyed-out': subsection.learnerHasAccess })}>
++      <div className={classNames('col', 'p-0', { 'greyed-out': !subsection.learnerHasAccess })}>
+         <ul className="list-unstyled row w-100 m-0" aria-labelledby="problem-score-label">
+           {problemScores.map(problemScore => (
+             <li className="ml-3">{problemScore.earned}/{problemScore.possible}</li>
+-- 
+2.34.1
+

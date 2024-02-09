@@ -1,0 +1,90 @@
+From 88005ea5d2ac41f7dd1e43b9702b2991676d0480 Mon Sep 17 00:00:00 2001
+From: Kyle McCormick <kmccormick@edx.org>
+Date: Fri, 9 Apr 2021 10:36:04 -0400
+Subject: [PATCH 0422/1021] refactor!: clean up unused references to
+ lms_web_url (#409)
+
+Before edx-platform version 19ba691,
+only `lms_web_url` was exposed from the course
+blocks API. Now that the API also exposes
+`legacy_web_url`, we can stop falling back
+to `lms_web_url` when `legacy_web_url` is
+absent.
+
+TNL-7796
+---
+ src/course-home/data/api.js                    |  7 +++----
+ src/courseware/data/api.js                     |  6 ++----
+ src/shared/data/__factories__/block.factory.js | 11 -----------
+ 3 files changed, 5 insertions(+), 19 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index afcae8e..1e7104d 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -56,13 +56,12 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+           effortTime: block.effort_time,
+           icon: block.icon,
+           id: block.id,
+-          // Fall back to `lms_web_url` until `legacy_web_url` is added to API (TNL-7796).
+-          legacyWebUrl: block.legacy_web_url || block.lms_web_url,
+-          // The presence of an LMS URL for the sequence indicates that we want this
++          legacyWebUrl: block.legacy_web_url,
++          // The presence of an legacy URL for the sequence indicates that we want this
+           // sequence to be a clickable link in the outline (even though, if the new
+           // courseware experience is active, we will ignore `legacyWebUrl` and build a
+           // link to the MFE ourselves).
+-          showLink: !!(block.legacy_web_url || block.lms_web_url),
++          showLink: !!block.legacy_web_url,
+           title: block.display_name,
+         };
+         break;
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 72c36b0..c9fdc61 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -38,8 +38,7 @@ export function normalizeBlocks(courseId, blocks) {
+           effortTime: block.effort_time,
+           id: block.id,
+           title: block.display_name,
+-          // Fall back to `lms_web_url` until `legacy_web_url` is added to API (TNL-7796).
+-          legacyWebUrl: block.legacy_web_url || block.lms_web_url,
++          legacyWebUrl: block.legacy_web_url,
+           unitIds: block.children || [],
+         };
+         break;
+@@ -48,8 +47,7 @@ export function normalizeBlocks(courseId, blocks) {
+           graded: block.graded,
+           id: block.id,
+           title: block.display_name,
+-          // Fall back to `lms_web_url` until `legacy_web_url` is added to API (TNL-7796).
+-          legacyWebUrl: block.legacy_web_url || block.lms_web_url,
++          legacyWebUrl: block.legacy_web_url,
+         };
+         break;
+       default:
+diff --git a/src/shared/data/__factories__/block.factory.js b/src/shared/data/__factories__/block.factory.js
+index 83fc96e..f037c02 100644
+--- a/src/shared/data/__factories__/block.factory.js
++++ b/src/shared/data/__factories__/block.factory.js
+@@ -46,17 +46,6 @@ Factory.define('block')
+       return `${host}/xblock/${id}`;
+     },
+   )
+-  .attr(
+-    'lms_web_url',
+-    ['legacy_web_url', 'host', 'courseId', 'id'],
+-    (url, host, courseId, id) => {
+-      if (url) {
+-        return url;
+-      }
+-
+-      return `${host}/courses/${courseId}/jump_to/${id}`;
+-    },
+-  )
+   .attr(
+     'legacy_web_url',
+     ['legacy_web_url', 'host', 'courseId', 'id'],
+-- 
+2.34.1
+

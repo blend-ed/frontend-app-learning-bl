@@ -1,0 +1,1012 @@
+From cc8ee33dcdf8a4b74289538a03e5c8140b0a2341 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 18 Feb 2022 13:55:19 -0500
+Subject: [PATCH 0818/1021] chore: update to paragon 17.0.0
+
+- Drop our custom breakpoints (identical to paragon's)
+- Drop our custom useWindowSize (and adapt to paragon's version
+  not providing a size initially at component mount)
+- Drop our dependency on react-responsive
+- Drop our dependency on react-break
+---
+ package-lock.json                             | 21 +-----
+ package.json                                  |  4 +-
+ src/course-home/progress-tab/ProgressTab.jsx  | 24 +++----
+ .../progress-tab/ProgressTab.test.jsx         | 26 ++-----
+ .../grades/course-grade/CourseGradeFooter.jsx | 20 ++----
+ src/courseware/course/Course.jsx              | 24 +++++--
+ src/courseware/course/Course.test.jsx         |  6 +-
+ src/courseware/course/NotificationTray.jsx    | 10 ++-
+ .../course/NotificationTray.test.jsx          |  8 +--
+ .../course/celebration/CelebrationModal.jsx   | 26 +++----
+ .../course/course-exit/CourseCelebration.jsx  | 26 ++++---
+ src/courseware/course/sequence/Sequence.jsx   |  4 +-
+ .../course/sequence/Sequence.test.jsx         | 10 +--
+ .../sequence/lock-paywall/LockPaywall.jsx     | 14 ++--
+ .../SequenceNavigation.jsx                    |  5 +-
+ .../tabs/useIndexOfLastVisibleChild.js        |  3 +-
+ src/generic/tabs/useWindowSize.js             | 49 -------------
+ src/setupTest.js                              | 22 ------
+ .../StreakCelebrationModal.jsx                | 69 +++++++++----------
+ .../StreakCelebrationModal.test.jsx           | 22 ++----
+ src/tour/Checkpoint.jsx                       |  2 +-
+ 21 files changed, 138 insertions(+), 257 deletions(-)
+ delete mode 100644 src/generic/tabs/useWindowSize.js
+
+diff --git a/package-lock.json b/package-lock.json
+index 1f2c427..16cab0b 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -4070,9 +4070,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "16.24.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-16.24.0.tgz",
+-      "integrity": "sha512-LRm7acHjnYc7bTRLy0+LVYVS18Khk09YSNvHAx5/yOhXLK3lrtwNDOmERdnrsL/MURlSPACfzBnHTmG4NpfTpw==",
++      "version": "17.0.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-17.0.0.tgz",
++      "integrity": "sha512-ysj3dQPIGTf+kztoLqP8geLt3fzNSRPIn6k9KTQD0dvl6f28R8C3V/kgfH4HoCaVbvpImeuyaGyYo/4cBmoOoA==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+@@ -8277,11 +8277,6 @@
+         "fill-range": "^7.0.1"
+       }
+     },
+-    "breakjs": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/breakjs/-/breakjs-1.0.0.tgz",
+-      "integrity": "sha1-7INToGhi60OWLergkHLuZqTNhFk="
+-    },
+     "browser-process-hrtime": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/browser-process-hrtime/-/browser-process-hrtime-1.0.0.tgz",
+@@ -20604,16 +20599,6 @@
+         "warning": "^4.0.3"
+       }
+     },
+-    "react-break": {
+-      "version": "1.3.2",
+-      "resolved": "https://registry.npmjs.org/react-break/-/react-break-1.3.2.tgz",
+-      "integrity": "sha512-gm5paFth+ac+Ag35l1X0/V/XmdQn+Y+YggNInqaVXGHBrsODCBu8aXQpOsilYl+MfY6TL3eCJpkwuX1FVhDcpg==",
+-      "requires": {
+-        "babel-runtime": "^6.10.0",
+-        "breakjs": "^1.0.0",
+-        "prop-types": "^15.6.0"
+-      }
+-    },
+     "react-clientside-effect": {
+       "version": "1.2.5",
+       "resolved": "https://registry.npmjs.org/react-clientside-effect/-/react-clientside-effect-1.2.5.tgz",
+diff --git a/package.json b/package.json
+index 3588d7a..587e7fb 100644
+--- a/package.json
++++ b/package.json
+@@ -36,7 +36,7 @@
+     "@edx/frontend-enterprise-utils": "1.1.1",
+     "@edx/frontend-lib-special-exams": "1.15.5",
+     "@edx/frontend-platform": "1.14.3",
+-    "@edx/paragon": "16.24.0",
++    "@edx/paragon": "17.0.0",
+     "@edx/frontend-component-header": "^2.4.2",
+     "@fortawesome/fontawesome-svg-core": "1.2.36",
+     "@fortawesome/free-brands-svg-icons": "5.15.4",
+@@ -51,11 +51,9 @@
+     "lodash.camelcase": "4.3.0",
+     "prop-types": "15.7.2",
+     "react": "17.0.2",
+-    "react-break": "1.3.2",
+     "react-dom": "17.0.2",
+     "react-helmet": "6.1.0",
+     "react-redux": "7.2.6",
+-    "react-responsive": "8.2.0",
+     "react-router": "5.2.1",
+     "react-router-dom": "5.3.0",
+     "react-share": "4.4.0",
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index d9a22c4..1a3fe82 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -1,6 +1,6 @@
+ import React from 'react';
+-import { layoutGenerator } from 'react-break';
+ import { useSelector } from 'react-redux';
++import { breakpoints, useWindowSize } from '@edx/paragon';
+ 
+ import CertificateStatus from './certificate-status/CertificateStatus';
+ import CourseCompletion from './course-completion/CourseCompletion';
+@@ -23,13 +23,15 @@ function ProgressTab() {
+ 
+   const applyLockedOverlay = gradesFeatureIsFullyLocked ? 'locked-overlay' : '';
+ 
+-  const layout = layoutGenerator({
+-    mobile: 0,
+-    desktop: 992,
+-  });
++  const windowWidth = useWindowSize().width;
++  if (windowWidth === undefined) {
++    // Bail because we don't want to load <CertificateStatus/> twice, emitting 'visited' events both times.
++    // This is a hacky solution, since the user can resize the screen and still get two visited events.
++    // But I'm leaving a larger refactor as an exercise to a future reader.
++    return null;
++  }
+ 
+-  const OnMobile = layout.is('mobile');
+-  const OnDesktop = layout.isAtLeast('desktop');
++  const wideScreen = windowWidth >= breakpoints.large.minWidth;
+   return (
+     <>
+       <ProgressHeader />
+@@ -37,9 +39,7 @@ function ProgressTab() {
+         {/* Main body */}
+         <div className="col-12 col-md-8 p-0">
+           <CourseCompletion />
+-          <OnMobile>
+-            <CertificateStatus />
+-          </OnMobile>
++          {!wideScreen && <CertificateStatus />}
+           <CourseGrade />
+           <div className={`grades my-4 p-4 rounded shadow-sm ${applyLockedOverlay}`} aria-hidden={gradesFeatureIsFullyLocked}>
+             <GradeSummary />
+@@ -49,9 +49,7 @@ function ProgressTab() {
+ 
+         {/* Side panel */}
+         <div className="col-12 col-md-4 p-0 px-md-4">
+-          <OnDesktop>
+-            <CertificateStatus />
+-          </OnDesktop>
++          {wideScreen && <CertificateStatus />}
+           <RelatedLinks />
+         </div>
+       </div>
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index e3824fa..9f6fedb 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -3,6 +3,7 @@ import { Factory } from 'rosie';
+ import { getConfig } from '@edx/frontend-platform';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { breakpoints } from '@edx/paragon';
+ import MockAdapter from 'axios-mock-adapter';
+ 
+ import {
+@@ -64,6 +65,7 @@ describe('Progress Tab', () => {
+ 
+     it('sends event on click of dates tab link', async () => {
+       await fetchAndRender();
++      sendTrackEvent.mockClear();
+ 
+       const datesTabLink = screen.getByRole('link', { name: 'Dates' });
+       fireEvent.click(datesTabLink);
+@@ -79,6 +81,7 @@ describe('Progress Tab', () => {
+ 
+     it('sends event on click of outline tab link', async () => {
+       await fetchAndRender();
++      sendTrackEvent.mockClear();
+ 
+       const outlineTabLink = screen.getAllByRole('link', { name: 'Course Outline' });
+       fireEvent.click(outlineTabLink[1]); // outlineTabLink[0] corresponds to the link in the DetailedGrades component
+@@ -286,7 +289,6 @@ describe('Progress Tab', () => {
+     });
+ 
+     it('sends events on click of upgrade button in locked content header (CourseGradeHeader)', async () => {
+-      sendTrackEvent.mockClear();
+       setTabData({
+         completion_summary: {
+           complete_count: 1,
+@@ -323,6 +325,7 @@ describe('Progress Tab', () => {
+         ],
+       });
+       await fetchAndRender();
++      sendTrackEvent.mockClear();
+       expect(screen.getByText('locked feature')).toBeInTheDocument();
+       expect(screen.getByText('Unlock to view grades and work towards a certificate.')).toBeInTheDocument();
+ 
+@@ -779,8 +782,8 @@ describe('Progress Tab', () => {
+     });
+ 
+     it('sends event on click of subsection link', async () => {
+-      sendTrackEvent.mockClear();
+       await fetchAndRender();
++      sendTrackEvent.mockClear();
+       expect(screen.getByText('Detailed grades')).toBeInTheDocument();
+ 
+       const subsectionLink = screen.getByRole('link', { name: 'First subsection' });
+@@ -796,8 +799,8 @@ describe('Progress Tab', () => {
+     });
+ 
+     it('sends event on click of course outline link', async () => {
+-      sendTrackEvent.mockClear();
+       await fetchAndRender();
++      sendTrackEvent.mockClear();
+       expect(screen.getByText('Detailed grades')).toBeInTheDocument();
+ 
+       const outlineLink = screen.getAllByRole('link', { name: 'Course Outline' })[0];
+@@ -837,22 +840,7 @@ describe('Progress Tab', () => {
+ 
+   describe('Certificate Status', () => {
+     beforeAll(() => {
+-      Object.defineProperty(window, 'matchMedia', {
+-        writable: true,
+-        value: jest.fn().mockImplementation(query => {
+-          const matches = (query === 'screen and (min-width: 992px)');
+-          return {
+-            matches,
+-            media: query,
+-            onchange: null,
+-            addListener: jest.fn(), // deprecated
+-            removeListener: jest.fn(), // deprecated
+-            addEventListener: jest.fn(),
+-            removeEventListener: jest.fn(),
+-            dispatchEvent: jest.fn(),
+-          };
+-        }),
+-      });
++      global.innerWidth = breakpoints.large.minWidth;
+     });
+ 
+     describe('enrolled user', () => {
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+index 701896c..39443a0 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+@@ -2,11 +2,9 @@ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ 
+-import { layoutGenerator } from 'react-break';
+-
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { CheckCircle, WarningFilled } from '@edx/paragon/icons';
+-import { Icon } from '@edx/paragon';
++import { breakpoints, Icon, useWindowSize } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+ 
+ import GradeRangeTooltip from './GradeRangeTooltip';
+@@ -27,13 +25,7 @@ function CourseGradeFooter({ intl, passingGrade }) {
+     },
+   } = useModel('progress', courseId);
+ 
+-  const layout = layoutGenerator({
+-    mobile: 0,
+-    tablet: 768,
+-  });
+-
+-  const OnMobile = layout.is('mobile');
+-  const OnAtLeastTablet = layout.isAtLeast('tablet');
++  const wideScreen = useWindowSize().width >= breakpoints.medium.minWidth;
+ 
+   const hasLetterGrades = Object.keys(gradeRange).length > 1; // A pass/fail course will only have one key
+   let footerText = intl.formatMessage(messages.courseGradeFooterNonPassing, { passingGrade });
+@@ -66,7 +58,7 @@ function CourseGradeFooter({ intl, passingGrade }) {
+         {icon}
+       </div>
+       <div className="col-11 pl-2 px-0">
+-        <OnMobile>
++        {!wideScreen && (
+           <span className="h5 align-bottom">
+             {footerText}
+             {hasLetterGrades && (
+@@ -76,8 +68,8 @@ function CourseGradeFooter({ intl, passingGrade }) {
+               </span>
+             )}
+           </span>
+-        </OnMobile>
+-        <OnAtLeastTablet>
++        )}
++        {wideScreen && (
+           <span className="h4 m-0 align-bottom">
+             {footerText}
+             {hasLetterGrades && (
+@@ -87,7 +79,7 @@ function CourseGradeFooter({ intl, passingGrade }) {
+               </span>
+             )}
+           </span>
+-        </OnAtLeastTablet>
++        )}
+       </div>
+     </div>
+   );
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index a9a681d..e6d8552 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
+ import { Helmet } from 'react-helmet';
+ import { useDispatch } from 'react-redux';
+ import { getConfig } from '@edx/frontend-platform';
++import { breakpoints, useWindowSize } from '@edx/paragon';
+ 
+ import { AlertList } from '../../generic/user-messages';
+ 
+@@ -14,7 +15,6 @@ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import NotificationTrigger from './NotificationTrigger';
+ 
+ import { useModel } from '../../generic/model-store';
+-import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWindowSize';
+ import { getLocalStorage, setLocalStorage } from '../../data/localStorage';
+ import { getSessionStorage, setSessionStorage } from '../../data/sessionStorage';
+ 
+@@ -28,6 +28,7 @@ function Course({
+   nextSequenceHandler,
+   previousSequenceHandler,
+   unitNavigationHandler,
++  windowWidth,
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+   const sequence = useModel('sequences', sequenceId);
+@@ -59,8 +60,8 @@ function Course({
+   const daysPerWeek = courseGoals?.selectedGoal?.daysPerWeek;
+ 
+   // Responsive breakpoints for showing the notification button/tray
+-  const shouldDisplayNotificationTriggerInCourse = useWindowSize().width >= responsiveBreakpoints.small.minWidth;
+-  const shouldDisplayNotificationTrayOpenOnLoad = useWindowSize().width > responsiveBreakpoints.medium.minWidth;
++  const shouldDisplayNotificationTriggerInCourse = windowWidth >= breakpoints.small.minWidth;
++  const shouldDisplayNotificationTrayOpenOnLoad = windowWidth > breakpoints.medium.minWidth;
+ 
+   // Course specific notification tray open/closed persistance by browser session
+   if (!getSessionStorage(`notificationTrayStatus.${courseId}`)) {
+@@ -177,6 +178,7 @@ Course.propTypes = {
+   nextSequenceHandler: PropTypes.func.isRequired,
+   previousSequenceHandler: PropTypes.func.isRequired,
+   unitNavigationHandler: PropTypes.func.isRequired,
++  windowWidth: PropTypes.number.isRequired,
+ };
+ 
+ Course.defaultProps = {
+@@ -185,4 +187,18 @@ Course.defaultProps = {
+   unitId: null,
+ };
+ 
+-export default Course;
++function CourseWrapper(props) {
++  // useWindowSize initially returns an undefined width intentionally at first.
++  // See https://www.joshwcomeau.com/react/the-perils-of-rehydration/ for why.
++  // But <Course> has some tricky window-size-dependent, session-storage-setting logic and React would yell at us if
++  // we exited that component early, before hitting all the useState() calls.
++  // So just skip all that until we have a window size available.
++  const windowWidth = useWindowSize().width;
++  if (windowWidth === undefined) {
++    return null;
++  }
++
++  return <Course {...props} windowWidth={windowWidth} />;
++}
++
++export default CourseWrapper;
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 24d37e5..77d1937 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -1,17 +1,15 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
++import { breakpoints } from '@edx/paragon';
+ import {
+   loadUnit, render, screen, waitFor, getByRole, initializeTestStore, fireEvent,
+ } from '../../setupTest';
+ import Course from './Course';
+ import { handleNextSectionCelebration } from './celebration';
+ import * as celebrationUtils from './celebration/utils';
+-import useWindowSize from '../../generic/tabs/useWindowSize';
+ 
+ jest.mock('@edx/frontend-platform/analytics');
+ jest.mock('./NotificationTray', () => () => <div data-testid="NotificationTray" />);
+-jest.mock('../../generic/tabs/useWindowSize');
+-useWindowSize.mockReturnValue({ width: 1200 });
+ 
+ const recordFirstSectionCelebration = jest.fn();
+ celebrationUtils.recordFirstSectionCelebration = recordFirstSectionCelebration;
+@@ -37,6 +35,7 @@ describe('Course', () => {
+     });
+     getItemSpy = jest.spyOn(Object.getPrototypeOf(window.sessionStorage), 'getItem');
+     setItemSpy = jest.spyOn(Object.getPrototypeOf(window.sessionStorage), 'setItem');
++    global.innerWidth = breakpoints.extraLarge.minWidth;
+   });
+ 
+   afterAll(() => {
+@@ -104,7 +103,6 @@ describe('Course', () => {
+   });
+ 
+   it('displays notification trigger and toggles active class on click', async () => {
+-    useWindowSize.mockReturnValue({ width: 1200 });
+     render(<Course {...mockData} />);
+ 
+     const notificationTrigger = screen.getByRole('button', { name: /Show notification tray/i });
+diff --git a/src/courseware/course/NotificationTray.jsx b/src/courseware/course/NotificationTray.jsx
+index 0d284dc..76946d7 100644
+--- a/src/courseware/course/NotificationTray.jsx
++++ b/src/courseware/course/NotificationTray.jsx
+@@ -3,12 +3,16 @@ import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Icon, IconButton } from '@edx/paragon';
++import {
++  breakpoints,
++  Icon,
++  IconButton,
++  useWindowSize,
++} from '@edx/paragon';
+ import { ArrowBackIos, Close } from '@edx/paragon/icons';
+ 
+ import messages from './messages';
+ import { useModel } from '../../generic/model-store';
+-import useWindowSize, { responsiveBreakpoints } from '../../generic/tabs/useWindowSize';
+ import UpgradeNotification from '../../generic/upgrade-notification/UpgradeNotification';
+ 
+ function NotificationTray({
+@@ -30,7 +34,7 @@ function NotificationTray({
+     verifiedMode,
+   } = course;
+ 
+-  const shouldDisplayFullScreen = useWindowSize().width < responsiveBreakpoints.large.minWidth;
++  const shouldDisplayFullScreen = useWindowSize().width < breakpoints.large.minWidth;
+ 
+   // After three seconds, update notificationSeen (to hide red dot)
+   useEffect(() => { setTimeout(onNotificationSeen, 3000); }, []);
+diff --git a/src/courseware/course/NotificationTray.test.jsx b/src/courseware/course/NotificationTray.test.jsx
+index 12a1d07..ccb51e7 100644
+--- a/src/courseware/course/NotificationTray.test.jsx
++++ b/src/courseware/course/NotificationTray.test.jsx
+@@ -3,6 +3,7 @@ import { Factory } from 'rosie';
+ import MockAdapter from 'axios-mock-adapter';
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { breakpoints } from '@edx/paragon';
+ 
+ import { fetchCourse } from '../data';
+ import {
+@@ -11,10 +12,8 @@ import {
+ import initializeStore from '../../store';
+ import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
+ import NotificationTray from './NotificationTray';
+-import useWindowSize from '../../generic/tabs/useWindowSize';
+ 
+ initializeMockApp();
+-jest.mock('../../generic/tabs/useWindowSize');
+ jest.mock('@edx/frontend-platform/analytics');
+ 
+ describe('NotificationTray', () => {
+@@ -37,6 +36,7 @@ describe('NotificationTray', () => {
+   }
+ 
+   beforeEach(async () => {
++    global.innerWidth = breakpoints.large.minWidth;
+     store = initializeStore();
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+     axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
+@@ -46,7 +46,7 @@ describe('NotificationTray', () => {
+   });
+ 
+   it('renders notification tray and close tray button', async () => {
+-    useWindowSize.mockReturnValue({ width: 1200 });
++    global.innerWidth = breakpoints.extraLarge.minWidth;
+     const toggleNotificationTray = jest.fn();
+     const testData = {
+       ...mockData,
+@@ -81,7 +81,7 @@ describe('NotificationTray', () => {
+   });
+ 
+   it('renders notification tray with full screen "Back to course" at responsive view', async () => {
+-    useWindowSize.mockReturnValue({ width: 991 });
++    global.innerWidth = breakpoints.medium.maxWidth;
+     const toggleNotificationTray = jest.fn();
+     const testData = {
+       ...mockData,
+diff --git a/src/courseware/course/celebration/CelebrationModal.jsx b/src/courseware/course/celebration/CelebrationModal.jsx
+index 5284dbd..e59818b 100644
+--- a/src/courseware/course/celebration/CelebrationModal.jsx
++++ b/src/courseware/course/celebration/CelebrationModal.jsx
+@@ -1,8 +1,13 @@
+ import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { ActionRow, Button, StandardModal } from '@edx/paragon';
+-import { layoutGenerator } from 'react-break';
++import {
++  ActionRow,
++  breakpoints,
++  Button,
++  StandardModal,
++  useWindowSize,
++} from '@edx/paragon';
+ 
+ import ClapsMobile from './assets/claps_280x201.gif';
+ import ClapsTablet from './assets/claps_456x328.gif';
+@@ -15,14 +20,7 @@ function CelebrationModal({
+   courseId, intl, isOpen, onClose, ...rest
+ }) {
+   const { org } = useModel('coursewareMeta', courseId);
+-
+-  const layout = layoutGenerator({
+-    mobile: 0,
+-    tablet: 400,
+-  });
+-
+-  const OnMobile = layout.is('mobile');
+-  const OnAtLeastTablet = layout.isAtLeast('tablet');
++  const wideScreen = useWindowSize().width >= breakpoints.small.minWidth;
+ 
+   useEffect(() => {
+     if (isOpen) {
+@@ -47,12 +45,8 @@ function CelebrationModal({
+     >
+       <>
+         <p className="text-center">{intl.formatMessage(messages.completed)}</p>
+-        <OnMobile>
+-          <img src={ClapsMobile} alt="" className="img-fluid" />
+-        </OnMobile>
+-        <OnAtLeastTablet>
+-          <img src={ClapsTablet} alt="" className="img-fluid w-100" />
+-        </OnAtLeastTablet>
++        {!wideScreen && <img src={ClapsMobile} alt="" className="img-fluid" />}
++        {wideScreen && <img src={ClapsTablet} alt="" className="img-fluid w-100" />}
+         <p className="mt-3 text-center">
+           <strong>{intl.formatMessage(messages.earned)}</strong> {intl.formatMessage(messages.share)}
+         </p>
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 71a18b8..e190770 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -5,10 +5,15 @@ import { faLinkedinIn } from '@fortawesome/free-brands-svg-icons';
+ import {
+   FormattedDate, FormattedMessage, injectIntl, intlShape,
+ } from '@edx/frontend-platform/i18n';
+-import { layoutGenerator } from 'react-break';
+ import { Helmet } from 'react-helmet';
+ import { useDispatch, useSelector } from 'react-redux';
+-import { Alert, Button, Hyperlink } from '@edx/paragon';
++import {
++  Alert,
++  breakpoints,
++  Button,
++  Hyperlink,
++  useWindowSize,
++} from '@edx/paragon';
+ import { CheckCircle } from '@edx/paragon/icons';
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+@@ -32,14 +37,7 @@ import CourseRecommendations from './CourseRecommendations';
+ const LINKEDIN_BLUE = '#2867B2';
+ 
+ function CourseCelebration({ intl }) {
+-  const layout = layoutGenerator({
+-    mobile: 0,
+-    tablet: 768,
+-  });
+-
+-  const OnMobile = layout.is('mobile');
+-  const OnAtLeastTablet = layout.isAtLeast('tablet');
+-
++  const wideScreen = useWindowSize().width >= breakpoints.medium.minWidth;
+   const { courseId } = useSelector(state => state.courseware);
+   const dispatch = useDispatch();
+   const {
+@@ -273,21 +271,21 @@ function CourseCelebration({ intl }) {
+           />
+         </div>
+         <div className="col-12 mt-3 mb-4 px-0 px-md-5 text-center">
+-          <OnMobile>
++          {!wideScreen && (
+             <img
+               src={CelebrationMobile}
+               alt={`${intl.formatMessage(messages.congratulationsImage)}`}
+               className="img-fluid"
+             />
+-          </OnMobile>
+-          <OnAtLeastTablet>
++          )}
++          {wideScreen && (
+             <img
+               src={CelebrationDesktop}
+               alt={`${intl.formatMessage(messages.congratulationsImage)}`}
+               className="img-fluid"
+               style={{ width: '36rem' }}
+             />
+-          </OnAtLeastTablet>
++          )}
+         </div>
+         <div className="col-12 px-0 px-md-5">
+           {certHeader && (
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 1cc30d9..b5b1b7e 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -12,10 +12,10 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useSelector } from 'react-redux';
+ import { history } from '@edx/frontend-platform';
+ import SequenceExamWrapper from '@edx/frontend-lib-special-exams';
++import { breakpoints, useWindowSize } from '@edx/paragon';
+ 
+ import PageLoading from '../../../generic/PageLoading';
+ import { UserMessagesContext, ALERT_TYPES } from '../../../generic/user-messages';
+-import useWindowSize, { responsiveBreakpoints } from '../../../generic/tabs/useWindowSize';
+ import { useModel } from '../../../generic/model-store';
+ 
+ import CourseLicense from '../course-license';
+@@ -53,7 +53,7 @@ function Sequence({
+   const unit = useModel('units', unitId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+   const sequenceMightBeUnit = useSelector(state => state.courseware.sequenceMightBeUnit);
+-  const shouldDisplayNotificationTriggerInSequence = useWindowSize().width < responsiveBreakpoints.small.minWidth;
++  const shouldDisplayNotificationTriggerInSequence = useWindowSize().width < breakpoints.small.minWidth;
+ 
+   const handleNext = () => {
+     const nextIndex = sequence.unitIds.indexOf(unitId) + 1;
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index f1215dc..611e7fd 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -1,16 +1,14 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { breakpoints } from '@edx/paragon';
+ import {
+   loadUnit, render, screen, fireEvent, waitFor, initializeTestStore,
+ } from '../../../setupTest';
+ import Sequence from './Sequence';
+ import { fetchSequenceFailure } from '../../data/slice';
+-import useWindowSize from '../../../generic/tabs/useWindowSize';
+ 
+ jest.mock('@edx/frontend-platform/analytics');
+-jest.mock('../../../generic/tabs/useWindowSize');
+-useWindowSize.mockReturnValue({ width: 1200 });
+ 
+ describe('Sequence', () => {
+   let mockData;
+@@ -36,6 +34,10 @@ describe('Sequence', () => {
+     };
+   });
+ 
++  beforeEach(() => {
++    global.innerWidth = breakpoints.extraLarge.minWidth;
++  });
++
+   it('renders correctly without data', async () => {
+     const testStore = await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true }, false);
+     render(<Sequence {...mockData} {...{ unitId: undefined, sequenceId: undefined }} />, { store: testStore });
+@@ -406,7 +408,7 @@ describe('Sequence', () => {
+     });
+ 
+     it('does not render notification tray in sequence by default if in responsive view', async () => {
+-      useWindowSize.mockReturnValue({ width: 991 });
++      global.innerWidth = breakpoints.medium.maxWidth;
+       const { container } = render(<Sequence {...mockData} />);
+       // unable to test the absence of 'Notifications' by finding it by text, using the class of the tray instead:
+       expect(container).not.toHaveClass('notification-tray-container');
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index 3ea40b1..7a452c3 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -3,12 +3,11 @@ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Alert } from '@edx/paragon';
++import { Alert, breakpoints, useWindowSize } from '@edx/paragon';
+ import { Locked } from '@edx/paragon/icons';
+ import messages from './messages';
+ import certificateLocked from '../../../../generic/assets/edX_locked_certificate.png';
+ import { useModel } from '../../../../generic/model-store';
+-import useWindowSize, { responsiveBreakpoints } from '../../../../generic/tabs/useWindowSize';
+ import { UpgradeButton } from '../../../../generic/upgrade-button';
+ import {
+   VerifiedCertBullet,
+@@ -31,15 +30,14 @@ function LockPaywall({
+ 
+   // the following variables are set and used for resposive layout to work with
+   // whether the NotificationTray is open or not and if there's an offer with longer text
+-  const shouldDisplayBulletPointsBelowCertificate = useWindowSize().width
+-    <= responsiveBreakpoints.large.minWidth;
+-  const shouldDisplayGatedContentOneColumn = useWindowSize().width <= responsiveBreakpoints.extraLarge.minWidth
++  const shouldDisplayBulletPointsBelowCertificate = useWindowSize().width <= breakpoints.large.minWidth;
++  const shouldDisplayGatedContentOneColumn = useWindowSize().width <= breakpoints.extraLarge.minWidth
+     && notificationTrayVisible;
+-  const shouldDisplayGatedContentTwoColumns = useWindowSize().width < responsiveBreakpoints.large.minWidth
++  const shouldDisplayGatedContentTwoColumns = useWindowSize().width < breakpoints.large.minWidth
+     && notificationTrayVisible;
+-  const shouldDisplayGatedContentTwoColumnsHalf = useWindowSize().width <= responsiveBreakpoints.large.minWidth
++  const shouldDisplayGatedContentTwoColumnsHalf = useWindowSize().width <= breakpoints.large.minWidth
+     && !notificationTrayVisible;
+-  const shouldWrapTextOnButton = useWindowSize().width > responsiveBreakpoints.extraSmall.minWidth;
++  const shouldWrapTextOnButton = useWindowSize().width > breakpoints.extraSmall.minWidth;
+ 
+   if (!verifiedMode) {
+     return null;
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 3ce8394..07af6d2 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -1,6 +1,6 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import { Button } from '@edx/paragon';
++import { breakpoints, Button, useWindowSize } from '@edx/paragon';
+ import { ChevronLeft, ChevronRight } from '@edx/paragon/icons';
+ import classNames from 'classnames';
+ import {
+@@ -17,7 +17,6 @@ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import { useSequenceNavigationMetadata } from './hooks';
+ import { useModel } from '../../../../generic/model-store';
+ import { LOADED } from '../../../data/slice';
+-import useWindowSize, { responsiveBreakpoints } from '../../../../generic/tabs/useWindowSize';
+ 
+ import messages from './messages';
+ /** [MM-P2P] Experiment */
+@@ -44,7 +43,7 @@ function SequenceNavigation({
+     sequence.gatedContent !== undefined && sequence.gatedContent.gated
+   ) : undefined;
+ 
+-  const shouldDisplayNotificationTriggerInSequence = useWindowSize().width < responsiveBreakpoints.small.minWidth;
++  const shouldDisplayNotificationTriggerInSequence = useWindowSize().width < breakpoints.small.minWidth;
+ 
+   const renderUnitButtons = () => {
+     if (isLocked) {
+diff --git a/src/generic/tabs/useIndexOfLastVisibleChild.js b/src/generic/tabs/useIndexOfLastVisibleChild.js
+index b36494b..de76589 100644
+--- a/src/generic/tabs/useIndexOfLastVisibleChild.js
++++ b/src/generic/tabs/useIndexOfLastVisibleChild.js
+@@ -1,6 +1,5 @@
+ import { useLayoutEffect, useRef, useState } from 'react';
+-
+-import useWindowSize from './useWindowSize';
++import { useWindowSize } from '@edx/paragon';
+ 
+ const invisibleStyle = {
+   position: 'absolute',
+diff --git a/src/generic/tabs/useWindowSize.js b/src/generic/tabs/useWindowSize.js
+deleted file mode 100644
+index 199b5fa..0000000
+--- a/src/generic/tabs/useWindowSize.js
++++ /dev/null
+@@ -1,49 +0,0 @@
+-import { useState, useEffect } from 'react';
+-
+-// NOTE: These are the breakpoints used in Bootstrap v4.0.0 as seen in
+-// the documentation (https://getbootstrap.com/docs/4.0/layout/overview/#responsive-breakpoints)
+-export const responsiveBreakpoints = {
+-  extraSmall: {
+-    maxWidth: 575.98,
+-  },
+-  small: {
+-    minWidth: 576,
+-    maxWidth: 767.98,
+-  },
+-  medium: {
+-    minWidth: 768,
+-    maxWidth: 991.98,
+-  },
+-  large: {
+-    minWidth: 992,
+-    maxWidth: 1199.98,
+-  },
+-  extraLarge: {
+-    minWidth: 1200,
+-  },
+-};
+-
+-export default function useWindowSize() {
+-  const isClient = typeof global === 'object';
+-
+-  const getSize = () => ({
+-    width: isClient ? global.innerWidth : undefined,
+-    height: isClient ? global.innerHeight : undefined,
+-  });
+-
+-  const [windowSize, setWindowSize] = useState(getSize);
+-
+-  useEffect(() => {
+-    if (!isClient) {
+-      return false;
+-    }
+-
+-    const handleResize = () => {
+-      setWindowSize(getSize());
+-    };
+-    global.addEventListener('resize', handleResize);
+-    return () => global.removeEventListener('resize', handleResize);
+-  }, []);
+-
+-  return windowSize;
+-}
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 9e6c251..30697cc 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -45,28 +45,6 @@ global.IntersectionObserver = jest.fn(function mockIntersectionObserver() {
+   this.disconnect = jest.fn();
+ });
+ 
+-// Mock media queries because any component that uses `react-break` for responsive breakpoints will
+-// run into `TypeError: window.matchMedia is not a function`. This avoids that for all of our tests now.
+-Object.defineProperty(window, 'matchMedia', {
+-  writable: true,
+-  value: jest.fn().mockImplementation(query => {
+-    // Returns true given a mediaQuery for a screen size greater than 768px (this exact query is what react-break sends)
+-    // Without this, if we hardcode `matches` to either true or false, either all or none of the breakpoints match,
+-    // respectively.
+-    const matches = (query === 'screen and (min-width: 768px)');
+-    return {
+-      matches,
+-      media: query,
+-      onchange: null,
+-      addListener: jest.fn(), // deprecated
+-      removeListener: jest.fn(), // deprecated
+-      addEventListener: jest.fn(),
+-      removeEventListener: jest.fn(),
+-      dispatchEvent: jest.fn(),
+-    };
+-  }),
+-});
+-
+ export const authenticatedUser = {
+   userId: 'abc123',
+   username: 'MockUser',
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index fd14d2a..831219e 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -8,9 +8,8 @@ import {
+ } from '@edx/frontend-platform/i18n';
+ import { Lightbulb, MoneyFilled } from '@edx/paragon/icons';
+ import {
+-  Alert, Icon, ModalDialog, Spinner,
++  Alert, breakpoints, Icon, ModalDialog, Spinner, useWindowSize,
+ } from '@edx/paragon';
+-import { layoutGenerator } from 'react-break';
+ import { useDispatch } from 'react-redux';
+ import { UpgradeNowButton } from '../../generic/upgrade-button';
+ 
+@@ -69,13 +68,7 @@ function StreakModal({
+   const [discountPercent, setDiscountPercent] = useState(-1);
+   const queryingDiscount = discountPercent < 0;
+ 
+-  const layout = layoutGenerator({
+-    mobile: 0,
+-    desktop: 575,
+-  });
+-
+-  const OnMobile = layout.is('mobile');
+-  const OnDesktop = layout.isAtLeast('desktop');
++  const wideScreen = useWindowSize().width >= breakpoints.small.minWidth;
+   const dispatch = useDispatch();
+ 
+   useEffect(() => {
+@@ -169,12 +162,8 @@ function StreakModal({
+       <ModalDialog.Body className="modal-body">
+         <p>{intl.formatMessage(messages.streakBody)}</p>
+         <p className="modal-image">
+-          <OnMobile>
+-            <img src={StreakMobileImage} alt="" className="img-fluid" />
+-          </OnMobile>
+-          <OnDesktop>
+-            <img src={StreakDesktopImage} alt="" className="img-fluid" />
+-          </OnDesktop>
++          {!wideScreen && <img src={StreakMobileImage} alt="" className="img-fluid" />}
++          {wideScreen && <img src={StreakDesktopImage} alt="" className="img-fluid" />}
+         </p>
+         { queryingDiscount && (
+           <Spinner animation="border" variant="primary" role="status" />
+@@ -211,29 +200,33 @@ function StreakModal({
+       <ModalDialog.Footer className="modal-footer d-block">
+         { !queryingDiscount && showOffer && (
+           <>
+-            <OnMobile>
+-              <UpgradeNowButton
+-                className="upgrade mb-3"
+-                size="sm"
+-                offer={offer}
+-                variant="brand"
+-                verifiedMode={mode}
+-              />
+-              <ModalDialog.CloseButton variant="outline-brand" className="btn-sm">
+-                {intl.formatMessage(messages.streakButtonAA759)}
+-              </ModalDialog.CloseButton>
+-            </OnMobile>
+-            <OnDesktop>
+-              <UpgradeNowButton
+-                className="upgrade mb-3"
+-                offer={offer}
+-                variant="brand"
+-                verifiedMode={mode}
+-              />
+-              <ModalDialog.CloseButton variant="outline-brand">
+-                {intl.formatMessage(messages.streakButtonAA759)}
+-              </ModalDialog.CloseButton>
+-            </OnDesktop>
++            {!wideScreen && (
++              <>
++                <UpgradeNowButton
++                  className="upgrade mb-3"
++                  size="sm"
++                  offer={offer}
++                  variant="brand"
++                  verifiedMode={mode}
++                />
++                <ModalDialog.CloseButton variant="outline-brand" className="btn-sm">
++                  {intl.formatMessage(messages.streakButtonAA759)}
++                </ModalDialog.CloseButton>
++              </>
++            )}
++            {wideScreen && (
++              <>
++                <UpgradeNowButton
++                  className="upgrade mb-3"
++                  offer={offer}
++                  variant="brand"
++                  verifiedMode={mode}
++                />
++                <ModalDialog.CloseButton variant="outline-brand">
++                  {intl.formatMessage(messages.streakButtonAA759)}
++                </ModalDialog.CloseButton>
++              </>
++            )}
+           </>
+         )}
+         { !queryingDiscount && !showOffer && (
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index 9528ab3..79dd55b 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -3,6 +3,7 @@ import { Factory } from 'rosie';
+ import { camelCaseObject, getConfig } from '@edx/frontend-platform';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { breakpoints } from '@edx/paragon';
+ import MockAdapter from 'axios-mock-adapter';
+ 
+ import {
+@@ -56,6 +57,10 @@ describe('Loaded Tab Page', () => {
+     axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+   });
+ 
++  beforeEach(() => {
++    global.innerWidth = breakpoints.medium.minWidth;
++  });
++
+   it('shows streak celebration modal', async () => {
+     await renderModal();
+ 
+@@ -86,22 +91,7 @@ describe('Loaded Tab Page', () => {
+   });
+ 
+   it('shows discount version of streak celebration modal when available', async () => {
+-    Object.defineProperty(window, 'matchMedia', {
+-      writable: true,
+-      value: jest.fn().mockImplementation(query => {
+-        const matches = !!(query === 'screen and (min-width: 575px)');
+-        return {
+-          matches,
+-          media: query,
+-          onchange: null,
+-          addListener: jest.fn(), // deprecated
+-          removeListener: jest.fn(), // deprecated
+-          addEventListener: jest.fn(),
+-          removeEventListener: jest.fn(),
+-          dispatchEvent: jest.fn(),
+-        };
+-      }),
+-    });
++    global.innerWidth = breakpoints.extraSmall.maxWidth;
+     setDiscount(14);
+     await renderModal();
+ 
+diff --git a/src/tour/Checkpoint.jsx b/src/tour/Checkpoint.jsx
+index 4f45e0f..a54cca9 100644
+--- a/src/tour/Checkpoint.jsx
++++ b/src/tour/Checkpoint.jsx
+@@ -1,6 +1,6 @@
+ import React, { useEffect, useState } from 'react';
+-import { useMediaQuery } from 'react-responsive';
+ import PropTypes from 'prop-types';
++import { useMediaQuery } from '@edx/paragon';
+ import { createPopper } from '@popperjs/core';
+ 
+ import CheckpointActionRow from './CheckpointActionRow';
+-- 
+2.34.1
+

@@ -1,0 +1,157 @@
+From f9fbc1eb49085a679bacf325bd7c78877ee32bf0 Mon Sep 17 00:00:00 2001
+From: Bianca Severino <bseverino@edx.org>
+Date: Mon, 28 Jun 2021 10:12:58 -0400
+Subject: [PATCH 0512/1021] fix: add missing check for graded units (#508)
+
+This fixes a bug where if the learner needs an integrity signature, but
+the unit is not graded, neither the honor code panel nor the unit
+content would display.
+---
+ src/courseware/course/sequence/Unit.jsx      | 15 ++++-
+ src/courseware/course/sequence/Unit.test.jsx | 63 +++++++++++++-------
+ 2 files changed, 54 insertions(+), 24 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 2c11e00..73c2f9c 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -98,6 +98,7 @@ function Unit({
+   const [iframeHeight, setIframeHeight] = useState(0);
+   const [hasLoaded, setHasLoaded] = useState(false);
+   const [modalOptions, setModalOptions] = useState({ open: false });
++  const [shouldDisplayHonorCode, setShouldDisplayHonorCode] = useState(false);
+ 
+   const unit = useModel('units', id);
+   const course = useModel('coursewareMeta', courseId);
+@@ -110,6 +111,14 @@ function Unit({
+   // Do not remove this hook.  See function description.
+   useLoadBearingHook(id);
+ 
++  useEffect(() => {
++    if (userNeedsIntegritySignature && unit.graded) {
++      setShouldDisplayHonorCode(true);
++    } else {
++      setShouldDisplayHonorCode(false);
++    }
++  }, [userNeedsIntegritySignature]);
++
+   // We use this ref so that we can hold a reference to the currently active event listener.
+   const messageEventListenerRef = useRef(null);
+   useEffect(() => {
+@@ -169,7 +178,7 @@ function Unit({
+       { mmp2p.meta.showLock && (
+         <MMP2PLockPaywall options={mmp2p} />
+       )}
+-      {!mmp2p.meta.blockContent && unit.graded && userNeedsIntegritySignature && (
++      {!mmp2p.meta.blockContent && shouldDisplayHonorCode && (
+         <Suspense
+           fallback={(
+             <PageLoading
+@@ -181,7 +190,7 @@ function Unit({
+         </Suspense>
+       )}
+       { /** [MM-P2P] Experiment (conditional) */ }
+-      {!mmp2p.meta.blockContent && !userNeedsIntegritySignature && !hasLoaded && (
++      {!mmp2p.meta.blockContent && !shouldDisplayHonorCode && !hasLoaded && (
+         <PageLoading
+           srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+         />
+@@ -212,7 +221,7 @@ function Unit({
+         />
+       )}
+       { /** [MM-P2P] Experiment (conditional) */ }
+-      { !mmp2p.meta.blockContent && !userNeedsIntegritySignature && (
++      { !mmp2p.meta.blockContent && !shouldDisplayHonorCode && (
+         <div className="unit-iframe-wrapper">
+           <iframe
+             id="unit-iframe"
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index e3ee314..20bb9d5 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -11,21 +11,32 @@ describe('Unit', () => {
+     'courseMetadata',
+     { content_type_gating_enabled: true },
+   );
+-  const unitBlocks = [Factory.build(
+-    'block',
+-    { type: 'problem', graded: 'true' },
+-    { courseId: courseMetadata.id },
+-  ), Factory.build(
+-    'block',
+-    {
+-      type: 'vertical',
+-      contains_content_type_gated_content: true,
+-      bookmarked: true,
+-      graded: true,
+-    },
+-    { courseId: courseMetadata.id },
+-  )];
+-  const [unit, unitThatContainsGatedContent] = unitBlocks;
++  const courseMetadataNeedsSignature = Factory.build(
++    'courseMetadata',
++    { user_needs_integrity_signature: true },
++  );
++  const unitBlocks = [
++    Factory.build(
++      'block',
++      { type: 'problem', graded: 'true' },
++      { courseId: courseMetadata.id },
++    ), Factory.build(
++      'block',
++      {
++        type: 'vertical',
++        contains_content_type_gated_content: true,
++        bookmarked: true,
++        graded: true,
++      },
++      { courseId: courseMetadata.id },
++    ),
++    Factory.build(
++      'block',
++      { type: 'problem', graded: false },
++      { courseId: courseMetadata.id },
++    ),
++  ];
++  const [unit, unitThatContainsGatedContent, ungradedUnit] = unitBlocks;
+ 
+   beforeAll(async () => {
+     await initializeTestStore({ courseMetadata, unitBlocks });
+@@ -52,18 +63,28 @@ describe('Unit', () => {
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+   });
+ 
+-  it('displays HonorCode when userNeedsIntegritySignature is true', async () => {
+-    const signatureMetadata = Factory.build(
+-      'courseMetadata',
+-      { user_needs_integrity_signature: true },
++  it('does not display HonorCode for ungraded units', async () => {
++    const signatureStore = await initializeTestStore(
++      { courseMetadata: courseMetadataNeedsSignature, unitBlocks },
++      false,
+     );
++    const signatureData = {
++      id: ungradedUnit.id,
++      courseId: courseMetadataNeedsSignature.id,
++      format: 'Homework',
++    };
++    render(<Unit {...signatureData} />, { store: signatureStore });
++    expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
++  });
++
++  it('displays HonorCode for graded units if user needs integrity signature', async () => {
+     const signatureStore = await initializeTestStore(
+-      { courseMetadata: signatureMetadata, unitBlocks },
++      { courseMetadata: courseMetadataNeedsSignature, unitBlocks },
+       false,
+     );
+     const signatureData = {
+       id: unit.id,
+-      courseId: signatureMetadata.id,
++      courseId: courseMetadataNeedsSignature.id,
+       format: 'Homework',
+     };
+     render(<Unit {...signatureData} />, { store: signatureStore });
+-- 
+2.34.1
+

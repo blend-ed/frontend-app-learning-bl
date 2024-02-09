@@ -1,0 +1,388 @@
+From d017c3194e43adfe5c53e6d9778895347c41399d Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 16 Feb 2021 14:36:05 -0500
+Subject: [PATCH 0385/1021] feat: Show effort estimation if the backend
+ provides it (#357)
+
+AA-614
+---
+ .../__factories__/courseBlocks.factory.js     |  2 +
+ .../data/__snapshots__/redux.test.js.snap     |  6 ++
+ src/course-home/data/api.js                   |  6 ++
+ src/course-home/outline-tab/Section.jsx       |  6 +-
+ src/course-home/outline-tab/SequenceLink.jsx  | 12 ++--
+ .../sequence-navigation/UnitNavigation.jsx    | 14 +++-
+ .../UnitNavigationEffortEstimate.jsx          | 66 +++++++++++++++++++
+ src/courseware/data/api.js                    |  8 ++-
+ src/shared/effort-estimate/EffortEstimate.jsx | 62 +++++++++++++++++
+ src/shared/effort-estimate/index.js           |  3 +
+ 10 files changed, 176 insertions(+), 9 deletions(-)
+ create mode 100644 src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+ create mode 100644 src/shared/effort-estimate/EffortEstimate.jsx
+ create mode 100644 src/shared/effort-estimate/index.js
+
+diff --git a/src/course-home/data/__factories__/courseBlocks.factory.js b/src/course-home/data/__factories__/courseBlocks.factory.js
+index a31a409..5604172 100644
+--- a/src/course-home/data/__factories__/courseBlocks.factory.js
++++ b/src/course-home/data/__factories__/courseBlocks.factory.js
+@@ -65,6 +65,8 @@ export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
+       type: 'chapter',
+       display_name: 'Title of Section',
+       complete: options.complete || false,
++      effort_time: 15,
++      effort_activities: 2,
+       resume_block: options.resumeBlock || false,
+       children: sequenceBlock.map(block => block.id),
+     },
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 585552c..e837efe 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -353,6 +353,8 @@ Object {
+         "courseBlocks": Object {
+           "courses": Object {
+             "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
++              "effortActivities": undefined,
++              "effortTime": undefined,
+               "id": "course-v1:edX+DemoX+Demo_Course_1",
+               "sectionIds": Array [
+                 "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+@@ -364,6 +366,8 @@ Object {
+             "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2": Object {
+               "complete": false,
+               "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++              "effortActivities": 2,
++              "effortTime": 15,
+               "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+               "resumeBlock": false,
+               "sequenceIds": Array [
+@@ -377,6 +381,8 @@ Object {
+               "complete": false,
+               "description": null,
+               "due": null,
++              "effortActivities": undefined,
++              "effortTime": undefined,
+               "icon": null,
+               "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+               "sectionId": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 366fdfd..3f265f6 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -26,6 +26,8 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+     switch (block.type) {
+       case 'course':
+         models.courses[block.id] = {
++          effortActivities: block.effort_activities,
++          effortTime: block.effort_time,
+           id: courseId,
+           title: block.display_name,
+           sectionIds: block.children || [],
+@@ -35,6 +37,8 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+       case 'chapter':
+         models.sections[block.id] = {
+           complete: block.complete,
++          effortActivities: block.effort_activities,
++          effortTime: block.effort_time,
+           id: block.id,
+           title: block.display_name,
+           resumeBlock: block.resume_block,
+@@ -47,6 +51,8 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+           complete: block.complete,
+           description: block.description,
+           due: block.due,
++          effortActivities: block.effort_activities,
++          effortTime: block.effort_time,
+           icon: block.icon,
+           id: block.id,
+           showLink: !!block.lms_web_url, // we reconstruct the url ourselves as an MFE-internal <Link>
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index cf06eec..b76126f 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -5,8 +5,11 @@ import { Collapsible, IconButton } from '@edx/paragon';
+ import { faCheckCircle as fasCheckCircle, faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';
+ import { faCheckCircle as farCheckCircle } from '@fortawesome/free-regular-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++
++import EffortEstimate from '../../shared/effort-estimate';
+ import SequenceLink from './SequenceLink';
+ import { useModel } from '../../generic/model-store';
++
+ import genericMessages from '../../generic/messages';
+ import messages from './messages';
+ 
+@@ -60,10 +63,11 @@ function Section({
+         )}
+       </div>
+       <div className="col-10 ml-3 p-0 font-weight-bold text-dark-500">
+-        {title}
++        <span className="align-middle">{title}</span>
+         <span className="sr-only">
+           , {intl.formatMessage(complete ? messages.completedSection : messages.incompleteSection)}
+         </span>
++        <EffortEstimate className="ml-3 align-middle" block={section} />
+       </div>
+     </div>
+   );
+diff --git a/src/course-home/outline-tab/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+index d903699..530d278 100644
+--- a/src/course-home/outline-tab/SequenceLink.jsx
++++ b/src/course-home/outline-tab/SequenceLink.jsx
+@@ -12,6 +12,7 @@ import { faCheckCircle as fasCheckCircle } from '@fortawesome/free-solid-svg-ico
+ import { faCheckCircle as farCheckCircle } from '@fortawesome/free-regular-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ 
++import EffortEstimate from '../../shared/effort-estimate';
+ import { useModel } from '../../generic/model-store';
+ import messages from './messages';
+ 
+@@ -62,10 +63,13 @@ function SequenceLink({
+               />
+             )}
+           </div>
+-          <div className="col-10 p-0 ml-3 text-break">{displayTitle}</div>
+-          <span className="sr-only">
+-            , {intl.formatMessage(complete ? messages.completedAssignment : messages.incompleteAssignment)}
+-          </span>
++          <div className="col-10 p-0 ml-3 text-break">
++            <span className="align-middle">{displayTitle}</span>
++            <span className="sr-only">
++              , {intl.formatMessage(complete ? messages.completedAssignment : messages.incompleteAssignment)}
++            </span>
++            <EffortEstimate className="ml-3 align-middle" block={sequence} />
++          </div>
+         </div>
+         {due && (
+           <div className="row w-100 m-0 ml-3 pl-3">
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+index d86350f..26610f9 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+@@ -8,6 +8,7 @@ import { useSelector } from 'react-redux';
+ 
+ import { getCourseExitNavigation } from '../../course-exit';
+ 
++import UnitNavigationEffortEstimate from './UnitNavigationEffortEstimate';
+ import { useSequenceNavigationMetadata } from './hooks';
+ import messages from './messages';
+ 
+@@ -28,8 +29,15 @@ function UnitNavigation({
+     const buttonText = (isLastUnit && exitText) ? exitText : intl.formatMessage(messages.nextButton);
+     const disabled = isLastUnit && !exitActive;
+     return (
+-      <Button variant="outline-primary" className="next-button" onClick={buttonOnClick} disabled={disabled}>
+-        {buttonText}
++      <Button
++        variant="outline-primary"
++        className="next-button d-flex align-items-center justify-content-center"
++        onClick={buttonOnClick}
++        disabled={disabled}
++      >
++        <UnitNavigationEffortEstimate sequenceId={sequenceId} unitId={unitId}>
++          {buttonText}
++        </UnitNavigationEffortEstimate>
+         <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
+       </Button>
+     );
+@@ -39,7 +47,7 @@ function UnitNavigation({
+     <div className="unit-navigation d-flex">
+       <Button
+         variant="outline-secondary"
+-        className="previous-button mr-2"
++        className="previous-button mr-2 d-flex align-items-center justify-content-center"
+         disabled={isFirstUnit}
+         onClick={onClickPrevious}
+       >
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+new file mode 100644
+index 0000000..fda5330
+--- /dev/null
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+@@ -0,0 +1,66 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { useSelector } from 'react-redux';
++
++import EffortEstimate from '../../../../shared/effort-estimate';
++import { sequenceIdsSelector } from '../../../data';
++import { useModel } from '../../../../generic/model-store';
++
++// This component exists to peek ahead at the next subsection or section and grab its estimated effort.
++// If we should be showing the next block's effort, we display the title and effort instead of "Next".
++// This code currently tries to handle both section and subsection estimates. But once AA-659 happens, it can be
++// simplified to one or the other code path.
++
++function UnitNavigationEffortEstimate({ children, sequenceId, unitId }) {
++  const sequenceIds = useSelector(sequenceIdsSelector);
++  const sequenceIndex = sequenceIds.indexOf(sequenceId);
++  const nextSequenceId = sequenceIndex < sequenceIds.length - 1 ? sequenceIds[sequenceIndex + 1] : null;
++  const sequence = useModel('sequences', sequenceId);
++  const nextSequence = useModel('sequences', nextSequenceId);
++  const nextSection = useModel('sections', nextSequence ? nextSequence.sectionId : null);
++
++  if (!sequence || !nextSequence) {
++    return children;
++  }
++
++  const isLastUnitInSequence = sequence.unitIds.indexOf(unitId) === sequence.unitIds.length - 1;
++  if (!isLastUnitInSequence) {
++    return children;
++  }
++
++  let blockToShow = nextSequence;
++  // The experimentation code currently only sets effort on either sequences, sections, or nothing. If we don't have
++  // sequence info, we are either doing sections or nothing. Let's look into it.
++  if (!nextSequence.effortActivities && !nextSequence.effortTime) {
++    if (!nextSection.effortActivities && !nextSection.effortTime) {
++      return children; // control group - no effort estimates at all
++    }
++
++    // Are we at a section border? If so, let's show the next section's effort estimates
++    if (sequence.sectionId !== nextSequence.sectionId) {
++      blockToShow = nextSection;
++    }
++  }
++
++  // Note: we don't use `children` here - we replace it with the next section name.
++  // AA-659: remember to add a translation for Next Up
++  return (
++    <div className="d-inline-block text-wrap">
++      Next Up: {blockToShow.title}
++      <EffortEstimate className="d-block mt-1" block={blockToShow} />
++    </div>
++  );
++}
++
++UnitNavigationEffortEstimate.propTypes = {
++  children: PropTypes.node,
++  sequenceId: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
++};
++
++UnitNavigationEffortEstimate.defaultProps = {
++  children: null,
++  unitId: null,
++};
++
++export default UnitNavigationEffortEstimate;
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 85ee870..51c285c 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -13,6 +13,8 @@ export function normalizeBlocks(courseId, blocks) {
+     switch (block.type) {
+       case 'course':
+         models.courses[block.id] = {
++          effortActivities: block.effort_activities,
++          effortTime: block.effort_time,
+           id: courseId,
+           title: block.display_name,
+           sectionIds: block.children || [],
+@@ -21,6 +23,8 @@ export function normalizeBlocks(courseId, blocks) {
+         break;
+       case 'chapter':
+         models.sections[block.id] = {
++          effortActivities: block.effort_activities,
++          effortTime: block.effort_time,
+           id: block.id,
+           title: block.display_name,
+           sequenceIds: block.children || [],
+@@ -29,6 +33,8 @@ export function normalizeBlocks(courseId, blocks) {
+ 
+       case 'sequential':
+         models.sequences[block.id] = {
++          effortActivities: block.effort_activities,
++          effortTime: block.effort_time,
+           id: block.id,
+           title: block.display_name,
+           lmsWebUrl: block.lms_web_url,
+@@ -92,7 +98,7 @@ export async function getCourseBlocks(courseId) {
+   url.searchParams.append('course_id', courseId);
+   url.searchParams.append('username', authenticatedUser ? authenticatedUser.username : '');
+   url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children,show_gated_sections,graded,special_exam_info,has_scheduled_content');
++  url.searchParams.append('requested_fields', 'children,effort_activities,effort_time,show_gated_sections,graded,special_exam_info,has_scheduled_content');
+ 
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+   return normalizeBlocks(courseId, data.blocks);
+diff --git a/src/shared/effort-estimate/EffortEstimate.jsx b/src/shared/effort-estimate/EffortEstimate.jsx
+new file mode 100644
+index 0000000..5568500
+--- /dev/null
++++ b/src/shared/effort-estimate/EffortEstimate.jsx
+@@ -0,0 +1,62 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++
++// This component shows an effort estimate provided by the backend block data. Either time, activities, or both.
++// Right now it is an experiment, and AA-659 is its cleanup ticket.
++
++function EffortEstimate(props) {
++  const {
++    block: {
++      effortActivities,
++      effortTime,
++    },
++    className,
++  } = props;
++
++  // FIXME: This is not properly internationalized. This is just an experiment right now, so I chose to not mark
++  // FIXME: the strings for translation. That should be fixed if/when this is made real code. AA-659
++  const minuteCount = Math.ceil(effortTime / 60); // effortTime is in seconds
++  const minutes = (
++    <>
++      {minuteCount}
++      <span aria-hidden="true"> min</span>
++      <span className="sr-only"> {minuteCount === 1 ? 'minute' : 'minutes'}</span>
++    </>
++  );
++  const activities = <>{effortActivities} {effortActivities === 1 ? 'activity' : 'activities'}</>;
++  let content = null;
++
++  if (effortTime && effortActivities) {
++    content = <>{minutes} + {activities}</>;
++  } else if (effortTime) {
++    content = <>{minutes}</>;
++  } else if (effortActivities) {
++    content = <>{activities}</>;
++  } else {
++    return null;
++  }
++
++  return (
++    <span
++      className={classNames('text-gray-500 text-monospace', className)}
++      style={{ fontSize: '0.8em' }}
++    >
++      {content}
++    </span>
++  );
++}
++
++EffortEstimate.defaultProps = {
++  className: null,
++};
++
++EffortEstimate.propTypes = {
++  block: PropTypes.shape({
++    effortActivities: PropTypes.number,
++    effortTime: PropTypes.number,
++  }).isRequired,
++  className: PropTypes.string,
++};
++
++export default EffortEstimate;
+diff --git a/src/shared/effort-estimate/index.js b/src/shared/effort-estimate/index.js
+new file mode 100644
+index 0000000..2ca4d12
+--- /dev/null
++++ b/src/shared/effort-estimate/index.js
+@@ -0,0 +1,3 @@
++import EffortEstimate from './EffortEstimate';
++
++export default EffortEstimate;
+-- 
+2.34.1
+

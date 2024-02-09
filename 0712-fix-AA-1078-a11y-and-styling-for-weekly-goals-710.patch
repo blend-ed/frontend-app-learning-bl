@@ -1,0 +1,283 @@
+From d1013802ba40b0a4c4822d42f3642257e20967fc Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Wed, 27 Oct 2021 10:48:14 -0400
+Subject: [PATCH 0712/1021] fix: [AA-1078] a11y and styling for weekly goals
+ (#710)
+
+* fix: [AA-1078] weekly learning goals fine tune
+
+- Fix a11y issues with buttons
+- Replace media query with algorithmic approach for determining button layout
+- Misc styling fixes
+---
+ .../outline-tab/OutlineTab.test.jsx           | 15 +++----
+ .../outline-tab/widgets/FlagButton.jsx        | 24 +++++++++---
+ .../outline-tab/widgets/FlagButton.scss       | 38 +++++++++++-------
+ .../widgets/LearningGoalButton.jsx            | 39 ++++---------------
+ .../widgets/WeeklyLearningGoalCard.jsx        | 17 ++++++--
+ 5 files changed, 69 insertions(+), 64 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index a85168a..93c1540 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -437,7 +437,7 @@ describe('Outline Tab', () => {
+       const spy = jest.spyOn(thunks, 'saveWeeklyLearningGoal');
+ 
+       await fetchAndRender();
+-      const button = await screen.getByTestId('weekly-learning-goal-input-regular');
++      const button = await screen.getByTestId('weekly-learning-goal-input-Regular');
+       fireEvent.click(button);
+       expect(spy).toHaveBeenCalledTimes(0);
+     });
+@@ -468,9 +468,9 @@ describe('Outline Tab', () => {
+ 
+       it.each`
+       level     | days 
+-      ${'casual'}  | ${1}
+-      ${'regular'} | ${3}
+-      ${'intense'} | ${5}
++      ${'Casual'}  | ${1}
++      ${'Regular'} | ${3}
++      ${'Intense'} | ${5}
+         `('calls the API with a goal of $days when $level goal is clicked', async ({ level, days }) => {
+   // click on Casual goal
+   const button = await screen.queryByTestId(`weekly-learning-goal-input-${level}`);
+@@ -486,7 +486,7 @@ describe('Outline Tab', () => {
+   expect(screen.getByLabelText(messages.setGoalReminder.defaultMessage)).toBeEnabled();
+ });
+       it('shows and hides subscribe to reminders additional text', async () => {
+-        const button = await screen.getByTestId('weekly-learning-goal-input-regular');
++        const button = await screen.getByTestId('weekly-learning-goal-input-Regular');
+         fireEvent.click(button);
+         // Verify the request was made
+         await waitFor(() => {
+@@ -526,11 +526,6 @@ describe('Outline Tab', () => {
+         });
+         await fetchAndRender();
+       });
+-
+-      it('has button for weekly learning goal selected', async () => {
+-        const radio = await screen.queryByTestId('weekly-learning-goal-input-regular');
+-        expect(radio.checked).toEqual(true);
+-      });
+     });
+   });
+ 
+diff --git a/src/course-home/outline-tab/widgets/FlagButton.jsx b/src/course-home/outline-tab/widgets/FlagButton.jsx
+index 30deff7..91b2994 100644
+--- a/src/course-home/outline-tab/widgets/FlagButton.jsx
++++ b/src/course-home/outline-tab/widgets/FlagButton.jsx
+@@ -1,25 +1,35 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import classnames from 'classnames';
+ 
+ function FlagButton({
+   buttonIcon,
+   title,
+   text,
++  handleSelect,
++  isSelected,
+ }) {
+   return (
+-    <div
+-      className="flag-button col flex-grow-1 p-3"
++    <button
++      type="button"
++      className={classnames('flag-button m-1.5 pt-3 pb-md-3 pb-xl-0',
++        isSelected ? 'flag-button-selected' : '')}
++      // aria-checked={isSelected}
++      // role="radio"
++      // tabIndex={isSelected ? '0' : '-1'}
++      onClick={() => handleSelect()}
++      data-testid={`weekly-learning-goal-input-${title}`}
+     >
+-      <div className="row justify-content-center">
++      <div className="row justify-content-center pb-1 w-100 m-0">
+         {buttonIcon}
+       </div>
+-      <div className="text-center small text-gray-700">
++      <div className={classnames('text-center small text-gray-700 pb-1', isSelected ? 'font-weight-bold' : '')}>
+         {title}
+       </div>
+-      <div className="text-center micro text-gray-500">
++      <div className={classnames('text-center micro text-gray-500 pb-2', isSelected ? 'font-weight-bold' : '')}>
+         {text}
+       </div>
+-    </div>
++    </button>
+   );
+ }
+ 
+@@ -27,6 +37,8 @@ FlagButton.propTypes = {
+   buttonIcon: PropTypes.element.isRequired,
+   title: PropTypes.string.isRequired,
+   text: PropTypes.string.isRequired,
++  handleSelect: PropTypes.func.isRequired,
++  isSelected: PropTypes.bool.isRequired,
+ };
+ 
+ export default FlagButton;
+diff --git a/src/course-home/outline-tab/widgets/FlagButton.scss b/src/course-home/outline-tab/widgets/FlagButton.scss
+index 49b3524..f6335c9 100644
+--- a/src/course-home/outline-tab/widgets/FlagButton.scss
++++ b/src/course-home/outline-tab/widgets/FlagButton.scss
+@@ -3,23 +3,35 @@
+ @import "~@edx/brand/paragon/overrides";
+ 
+ .flag-button {
+-  background-color: white;
+-  border: 2px solid $light-400;
++  background-color: $white;
++  border: 1px solid $light-400;
+   border-radius:.2rem;
+-
+-
+-  &:focus {
+-    border: 2px $blue;
+-    box-shadow: 2px solid $yellow;
+-  }
++  box-shadow: 0 0 0 2px $light-400;
+ 
+   &:hover {
+-    border: 2px solid $green;
+-    box-shadow: 2px solid $teal;
++    border: 1px solid $primary-300;
++    box-shadow: 0 0 0 2px $white;
+   }
+ }
+ 
+- input[type=radio]:checked + .flag-button  {
+-   border: 2px solid $red;
+-   box-shadow: 2px solid $green;
++.flag-button-selected {
++  border: 1px solid $primary-300;
++  box-shadow: 0 0 0 2px $primary-300;
++  pointer-events: none;
++}
++
++// @see https://heydonworks.com/article/the-flexbox-holy-albatross-reincarnated/
++// use the container size for layout instead of device media query
++.flag-button-container {
++  display: flex;
++  flex-wrap: wrap;
++  --margin: 1rem;
++  --modifier: calc(20rem - 100%);
++  margin: calc(var(--margin) * -1);
++}
++
++.flag-button-container > *  {
++  flex-grow: 1;
++  flex-basis: calc(var(--modifier) * 999);
++  margin: var(--margin);
+ }
+diff --git a/src/course-home/outline-tab/widgets/LearningGoalButton.jsx b/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+index 77f5043..bd9e7bd 100644
+--- a/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
++++ b/src/course-home/outline-tab/widgets/LearningGoalButton.jsx
+@@ -3,8 +3,6 @@ import PropTypes from 'prop-types';
+ 
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { ReactComponent as FlagIntenseIcon } from '@edx/paragon/icons/svg/flag.svg';
+-import { useMediaQuery } from 'react-responsive';
+-import classNames from 'classnames';
+ import { ReactComponent as FlagCasualIcon } from './flag_outline.svg';
+ import { ReactComponent as FlagRegularIcon } from './flag_gray.svg';
+ import FlagButton from './FlagButton';
+@@ -16,9 +14,6 @@ function LearningGoalButton({
+   handleSelect,
+   intl,
+ }) {
+-  /* This is not the standard XL media query */
+-  const isPastXl = useMediaQuery({ query: '(min-width: 1225px)' });
+-
+   const buttonDetails = {
+     casual: {
+       daysPerWeek: 1,
+@@ -43,33 +38,13 @@ function LearningGoalButton({
+   const values = buttonDetails[level];
+ 
+   return (
+-    <label
+-      htmlFor={`weekly-learning-goal-input-${level}`}
+-      className={classNames('col-auto col-md-12  m-0 p-0 pb-md-3 pb-xl-0 shadow-none',
+-        `${isPastXl ? 'col-xl-auto' : ''}`)}
+-      // This is required to make the component visible to tabbing
+-      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+-      tabIndex="0"
+-    >
+-      <input
+-        type="radio"
+-        data-testid={`weekly-learning-goal-input-${level}`}
+-        id={`weekly-learning-goal-input-${level}`}
+-        name="learningGoal"
+-        radioGroup="learningGoal"
+-        value={values.daysPerWeek}
+-        onChange={() => handleSelect(values.daysPerWeek)}
+-        tabIndex="0"
+-        checked={values.daysPerWeek === currentGoal}
+-        className="position-absolute"
+-        style={{ opacity: 0 }}
+-      />
+-      <FlagButton
+-        buttonIcon={values.icon}
+-        title={intl.formatMessage(values.title)}
+-        text={intl.formatMessage(values.text)}
+-      />
+-    </label>
++    <FlagButton
++      buttonIcon={values.icon}
++      title={intl.formatMessage(values.title)}
++      text={intl.formatMessage(values.text)}
++      handleSelect={() => handleSelect(values.daysPerWeek)}
++      isSelected={currentGoal === values.daysPerWeek}
++    />
+   );
+ }
+ 
+diff --git a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+index 961d62e..d4a61b3 100644
+--- a/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
++++ b/src/course-home/outline-tab/widgets/WeeklyLearningGoalCard.jsx
+@@ -9,6 +9,7 @@ import messages from '../messages';
+ import LearningGoalButton from './LearningGoalButton';
+ import { saveWeeklyLearningGoal } from '../../data';
+ import { useModel } from '../../../generic/model-store';
++import './FlagButton.scss';
+ 
+ function WeeklyLearningGoalCard({
+   daysPerWeek,
+@@ -47,16 +48,26 @@ function WeeklyLearningGoalCard({
+ 
+   return (
+     <div className="row w-100 m-0 p-0">
+-      <Card className="mb-3 shadow-sm border-0" data-testid="weekly-learning-goal-card">
++      <Card
++        className="mb-3 shadow border-0"
++        data-testid="weekly-learning-goal-card"
++      >
+         <Card.Body className="p-3.5">
+           <Card.Title>
+             <h2 className="h4 m-0 text-primary-500">{intl.formatMessage(messages.setWeeklyGoal)}</h2>
+           </Card.Title>
+-          <Card.Text className="text-gray-700">
++          <Card.Text
++            className="text-gray-700"
++              // id="learning_goal_choices_label"
++          >
+             {intl.formatMessage(messages.setWeeklyGoalDetail)}
+           </Card.Text>
+           <div
+-            className="row w-100 m-0 p-0 justify-content-between"
++            className="flag-button-container m-0 p-0"
++              // making this work as a radio button for keyboard nav
++              // is not working
++              // role="radiogroup"
++              // aria-labelledby="learning_goal_choices_label"
+           >
+             <LearningGoalButton
+               level="casual"
+-- 
+2.34.1
+

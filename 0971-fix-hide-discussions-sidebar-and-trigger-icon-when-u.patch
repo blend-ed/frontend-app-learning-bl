@@ -1,0 +1,67 @@
+From 53c8e01c28cfc9c36861ab9169812eaa2290ad67 Mon Sep 17 00:00:00 2001
+From: Awais Ansari <79941147+awais-ansari@users.noreply.github.com>
+Date: Mon, 9 Jan 2023 14:29:42 +0500
+Subject: [PATCH 0971/1021] fix: hide discussions sidebar and trigger icon when
+ unit does not exist or enableInContext is false. (#1039)
+
+* fix: removed nonCourseWare topics from topics
+
+* fix: hide discussions sidebar and trigger icon when enableInContext is false
+---
+ .../sidebar/sidebars/discussions/DiscussionsSidebar.jsx     | 6 ++++--
+ .../sidebar/sidebars/discussions/DiscussionsTrigger.jsx     | 4 +++-
+ src/courseware/data/thunks.js                               | 2 +-
+ 3 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+index b52d810..918a3a9 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -16,10 +16,12 @@ function DiscussionsSidebar({ intl }) {
+     courseId,
+   } = useContext(SidebarContext);
+   const topic = useModel('discussionTopics', unitId);
+-  if (!topic?.id) {
++  const discussionsUrl = `${getConfig().DISCUSSIONS_MFE_BASE_URL}/${courseId}/category/${unitId}`;
++
++  if (!topic?.id || !topic?.enabledInContext) {
+     return null;
+   }
+-  const discussionsUrl = `${getConfig().DISCUSSIONS_MFE_BASE_URL}/${courseId}/category/${unitId}`;
++
+   return (
+     <SidebarBase
+       title={intl.formatMessage(messages.discussionsTitle)}
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
+index 15cc0a8..5f8dc4a 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsTrigger.jsx
+@@ -32,9 +32,11 @@ function DiscussionsTrigger({
+       dispatch(getCourseDiscussionTopics(courseId));
+     }
+   }, [courseId, baseUrl]);
+-  if (!topic.id) {
++
++  if (!topic?.id || !topic?.enabledInContext) {
+     return null;
+   }
++
+   return (
+     <SidebarTriggerBase onClick={onClick} ariaLabel={intl.formatMessage(messages.openDiscussionsTrigger)}>
+       <Icon src={QuestionAnswer} className="m-0 m-auto" />
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index ae023b5..cf8edff 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -242,7 +242,7 @@ export function getCourseDiscussionTopics(courseId) {
+         const topics = await getCourseTopics(courseId);
+         dispatch(updateModels({
+           modelType: 'discussionTopics',
+-          models: topics,
++          models: topics.filter(topic => topic.usageKey),
+           idField: 'usageKey',
+         }));
+       }
+-- 
+2.34.1
+

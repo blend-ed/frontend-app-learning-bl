@@ -1,0 +1,149 @@
+From b9409014009b29d64ae788d4085137da681d9221 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Thu, 16 Jul 2020 10:14:18 -0400
+Subject: [PATCH 0166/1021] fix: Use activeUnitIndex instead of position, and
+ remove the latter (#110)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+We were inconsistently using “position” - a 1-indexed value - in JS arrays which are 0-indexed.  We had an existing, normalized property called “activeUnitIndex” which we now use everywhere instead.  The value is modified back to 1-indexed before being returned to the server.
+---
+ src/courseware/CoursewareContainer.jsx |  4 +---
+ src/courseware/data/api.js             |  5 ++---
+ src/courseware/data/redux.test.js      | 10 +++++-----
+ src/courseware/data/thunks.js          | 12 ++++++------
+ 4 files changed, 14 insertions(+), 17 deletions(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index fc0ea4e..2a5f223 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -125,10 +125,8 @@ function useContentRedirect(courseStatus, sequenceStatus) {
+ 
+   useEffect(() => {
+     if (sequenceStatus === 'loaded' && sequenceId && !unitId) {
+-      // The position may be null, in which case we'll just assume 0.
+       if (sequence.unitIds !== undefined && sequence.unitIds.length > 0) {
+-        const unitIndex = sequence.position || 0;
+-        const nextUnitId = sequence.unitIds[unitIndex];
++        const nextUnitId = sequence.unitIds[sequence.activeUnitIndex];
+         // This is a replace because we don't want this change saved in the browser's history.
+         history.replace(`/course/${courseId}/${sequence.id}/${nextUnitId}`);
+       }
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 0ce1303..ea5bb4b 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -151,7 +151,6 @@ function normalizeSequenceMetadata(sequence) {
+       title: sequence.display_name,
+       gatedContent: camelCaseObject(sequence.gated_content),
+       isTimeLimited: sequence.is_time_limited,
+-      position: sequence.position || 1,
+       // Position comes back from the server 1-indexed. Adjust here.
+       activeUnitIndex: sequence.position ? sequence.position - 1 : 0,
+       saveUnitPosition: sequence.save_position,
+@@ -200,13 +199,13 @@ export async function getBlockCompletion(courseId, sequenceId, usageKey) {
+   return false;
+ }
+ 
+-export async function postSequencePosition(courseId, sequenceId, position) {
++export async function postSequencePosition(courseId, sequenceId, activeUnitIndex) {
+   // Post data sent to this endpoint must be url encoded
+   // TODO: Remove the need for this to be the case.
+   // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+   const urlEncoded = new URLSearchParams();
+   // Position is 1-indexed on the server and 0-indexed in this app. Adjust here.
+-  urlEncoded.append('position', position + 1);
++  urlEncoded.append('position', activeUnitIndex + 1);
+   const requestConfig = {
+     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+   };
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index 9792887..32bfed8 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -211,10 +211,10 @@ describe('Data layer integration tests', () => {
+     describe('Test saveSequencePosition', () => {
+       const gotoPositionURL = `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/xmodule_handler/goto_position`;
+ 
+-      it('Should change and revert sequence model position in case of error', async () => {
++      it('Should change and revert sequence model activeUnitIndex in case of error', async () => {
+         axiosMock.onPost(gotoPositionURL).networkError();
+ 
+-        const oldPosition = store.getState().models.sequences[sequenceId].position;
++        const oldPosition = store.getState().models.sequences[sequenceId].activeUnitIndex;
+         const newPosition = 123;
+ 
+         await executeThunk(
+@@ -225,10 +225,10 @@ describe('Data layer integration tests', () => {
+ 
+         expect(loggingService.logError).toHaveBeenCalled();
+         expect(axiosMock.history.post[0].url).toEqual(gotoPositionURL);
+-        expect(store.getState().models.sequences[sequenceId].position).toEqual(oldPosition);
++        expect(store.getState().models.sequences[sequenceId].activeUnitIndex).toEqual(oldPosition);
+       });
+ 
+-      it('Should update sequence model position', async () => {
++      it('Should update sequence model activeUnitIndex', async () => {
+         axiosMock.onPost(gotoPositionURL).reply(201, {});
+ 
+         const newPosition = 123;
+@@ -240,7 +240,7 @@ describe('Data layer integration tests', () => {
+         );
+ 
+         expect(axiosMock.history.post[0].url).toEqual(gotoPositionURL);
+-        expect(store.getState().models.sequences[sequenceId].position).toEqual(newPosition);
++        expect(store.getState().models.sequences[sequenceId].activeUnitIndex).toEqual(newPosition);
+       });
+     });
+   });
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 3dde911..6092b2e 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -131,27 +131,27 @@ export function checkBlockCompletion(courseId, sequenceId, unitId) {
+   };
+ }
+ 
+-export function saveSequencePosition(courseId, sequenceId, position) {
++export function saveSequencePosition(courseId, sequenceId, activeUnitIndex) {
+   return async (dispatch, getState) => {
+     const { models } = getState();
+-    const initialPosition = models.sequences[sequenceId].position;
++    const initialActiveUnitIndex = models.sequences[sequenceId].activeUnitIndex;
+     // Optimistically update the position.
+     dispatch(updateModel({
+       modelType: 'sequences',
+       model: {
+         id: sequenceId,
+-        position,
++        activeUnitIndex,
+       },
+     }));
+     try {
+-      await postSequencePosition(courseId, sequenceId, position);
++      await postSequencePosition(courseId, sequenceId, activeUnitIndex);
+       // Update again under the assumption that the above call succeeded, since it doesn't return a
+       // meaningful response.
+       dispatch(updateModel({
+         modelType: 'sequences',
+         model: {
+           id: sequenceId,
+-          position,
++          activeUnitIndex,
+         },
+       }));
+     } catch (error) {
+@@ -160,7 +160,7 @@ export function saveSequencePosition(courseId, sequenceId, position) {
+         modelType: 'sequences',
+         model: {
+           id: sequenceId,
+-          position: initialPosition,
++          activeUnitIndex: initialActiveUnitIndex,
+         },
+       }));
+     }
+-- 
+2.34.1
+

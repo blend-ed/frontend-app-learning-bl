@@ -1,0 +1,1651 @@
+From 6a376b20c71b56bca246dc67207b8738f9374b6e Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 31 Mar 2021 15:00:14 -0400
+Subject: [PATCH 0416/1021] AA-722: Progress Tab (#391)
+
+---
+ package-lock.json                             |  63 +++++---
+ package.json                                  |   2 +-
+ src/course-home/data/api.js                   |  26 ++-
+ .../progress-tab/CertificateBanner.jsx        |  74 ---------
+ src/course-home/progress-tab/Chapter.jsx      |  36 -----
+ .../progress-tab/CreditRequirements.jsx       | 151 ------------------
+ src/course-home/progress-tab/DueDateTime.jsx  |  36 -----
+ .../progress-tab/ProblemScores.jsx            |  37 -----
+ .../progress-tab/ProgressGraph.jsx            |   0
+ .../progress-tab/ProgressHeader.jsx           |  39 +++++
+ src/course-home/progress-tab/ProgressTab.jsx  |  68 ++++----
+ src/course-home/progress-tab/Subsection.jsx   |  77 ---------
+ .../certificate-status/CertificateStatus.jsx  |  12 ++
+ .../course-completion/CourseCompletion.jsx    |  35 ++++
+ .../grades/course-grade/CourseGrade.jsx       |  13 ++
+ .../grades/detailed-grades/DetailedGrades.jsx |  57 +++++++
+ .../detailed-grades/DetailedGradesTable.jsx   |  78 +++++++++
+ .../grade-summary/AssignmentTypeCell.jsx      |  30 ++++
+ .../DroppableAssignmentFootnote.jsx           |  41 +++++
+ .../grades/grade-summary/GradeSummary.jsx     |  49 ++++++
+ .../grade-summary/GradeSummaryHeader.jsx      |  34 ++++
+ .../grade-summary/GradeSummaryTable.jsx       | 123 ++++++++++++++
+ .../grade-summary/GradeSummaryTableFooter.jsx |  39 +++++
+ .../progress-tab/grades/messages.js           |  52 ++++++
+ src/course-home/progress-tab/messages.js      | 117 +-------------
+ .../related-links/RelatedLinks.jsx            |  34 ++++
+ .../progress-tab/related-links/messages.js    |  26 +++
+ 27 files changed, 746 insertions(+), 603 deletions(-)
+ delete mode 100644 src/course-home/progress-tab/CertificateBanner.jsx
+ delete mode 100644 src/course-home/progress-tab/Chapter.jsx
+ delete mode 100644 src/course-home/progress-tab/CreditRequirements.jsx
+ delete mode 100644 src/course-home/progress-tab/DueDateTime.jsx
+ delete mode 100644 src/course-home/progress-tab/ProblemScores.jsx
+ delete mode 100644 src/course-home/progress-tab/ProgressGraph.jsx
+ create mode 100644 src/course-home/progress-tab/ProgressHeader.jsx
+ delete mode 100644 src/course-home/progress-tab/Subsection.jsx
+ create mode 100644 src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+ create mode 100644 src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+ create mode 100644 src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+ create mode 100644 src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+ create mode 100644 src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+ create mode 100644 src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+ create mode 100644 src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+ create mode 100644 src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+ create mode 100644 src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+ create mode 100644 src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+ create mode 100644 src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+ create mode 100644 src/course-home/progress-tab/grades/messages.js
+ create mode 100644 src/course-home/progress-tab/related-links/RelatedLinks.jsx
+ create mode 100644 src/course-home/progress-tab/related-links/messages.js
+
+diff --git a/package-lock.json b/package-lock.json
+index cf44f4b..d389fa6 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1413,9 +1413,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "13.16.0",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-13.16.0.tgz",
+-      "integrity": "sha512-E1XCpiHoD0TaTUV6o5FxfkxfUhtBmSsUCmR7LSTPXpiuI7ouK2PxbRoxCT8CnHbSAeeYKN0vPHNGEd9hFRm7zg==",
++      "version": "13.17.3",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-13.17.3.tgz",
++      "integrity": "sha512-fUjrfNmeWIpEsroK0JuajIBHHh0BIvZTnBusTRqzvl5fFivNuhEdcG33oEZSVvfyRYtCgtnWmSRbvN5vGhjK6g==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+@@ -1440,12 +1440,17 @@
+         "uncontrollable": "7.2.1"
+       },
+       "dependencies": {
++        "@fortawesome/fontawesome-common-types": {
++          "version": "0.2.35",
++          "resolved": "https://registry.npmjs.org/@fortawesome/fontawesome-common-types/-/fontawesome-common-types-0.2.35.tgz",
++          "integrity": "sha512-IHUfxSEDS9dDGqYwIW7wTN6tn/O8E0n5PcAHz9cAaBoZw6UpG20IG/YM3NNLaGPwPqgjBAFjIURzqoQs3rrtuw=="
++        },
+         "@fortawesome/free-solid-svg-icons": {
+-          "version": "5.15.2",
+-          "resolved": "https://registry.npmjs.org/@fortawesome/free-solid-svg-icons/-/free-solid-svg-icons-5.15.2.tgz",
+-          "integrity": "sha512-ZfCU+QjaFsdNZmOGmfqEWhzI3JOe37x5dF4kz9GeXvKn/sTxhqMtZ7mh3lBf76SvcYY5/GKFuyG7p1r4iWMQqw==",
++          "version": "5.15.3",
++          "resolved": "https://registry.npmjs.org/@fortawesome/free-solid-svg-icons/-/free-solid-svg-icons-5.15.3.tgz",
++          "integrity": "sha512-XPeeu1IlGYqz4VWGRAT5ukNMd4VHUEEJ7ysZ7pSSgaEtNvSo+FLurybGJVmiqkQdK50OkSja2bfZXOeyMGRD8Q==",
+           "requires": {
+-            "@fortawesome/fontawesome-common-types": "^0.2.34"
++            "@fortawesome/fontawesome-common-types": "^0.2.35"
+           }
+         }
+       }
+@@ -6979,9 +6984,9 @@
+       "dev": true
+     },
+     "detect-node-es": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/detect-node-es/-/detect-node-es-1.0.0.tgz",
+-      "integrity": "sha512-S4AHriUkTX9FoFvL4G8hXDcx6t3gp2HpfCza3Q0v6S78gul2hKWifLQbeW+ZF89+hSm2ZIc/uF3J97ZgytgTRg=="
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/detect-node-es/-/detect-node-es-1.1.0.tgz",
++      "integrity": "sha512-ypdmJU/TbBby2Dxibuv7ZLW3Bs1QEmM7nHjEANfohJLvE0XVujisn1qPJcZxg+qDucsr+bP6fLD1rPS3AhJ7EQ=="
+     },
+     "detect-port-alt": {
+       "version": "1.1.6",
+@@ -7147,9 +7152,9 @@
+       }
+     },
+     "domutils": {
+-      "version": "2.4.4",
+-      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.4.4.tgz",
+-      "integrity": "sha512-jBC0vOsECI4OMdD0GC9mGn7NXPLb+Qt6KW1YDQzeQYRUFKmNG8lh7mO5HiELfr+lLQE7loDVI4QcAxV80HS+RA==",
++      "version": "2.5.0",
++      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.5.0.tgz",
++      "integrity": "sha512-Ho16rzNMOFk2fPwChGh3D2D9OEHAfG19HgmRR2l+WLSsIstNsAYBzePH412bL0y5T44ejABIVfTHQ8nqi/tBCg==",
+       "requires": {
+         "dom-serializer": "^1.0.1",
+         "domelementtype": "^2.0.1",
+@@ -17353,18 +17358,18 @@
+       }
+     },
+     "react-bootstrap": {
+-      "version": "1.5.1",
+-      "resolved": "https://registry.npmjs.org/react-bootstrap/-/react-bootstrap-1.5.1.tgz",
+-      "integrity": "sha512-jbJNGx9n4JvKgxlvT8DLKSeF3VcqnPJXS9LFdzoZusiZCCGoYecZ9qSCBH5n2A+kjmuura9JkvxI9l7HD+bIdQ==",
++      "version": "1.5.2",
++      "resolved": "https://registry.npmjs.org/react-bootstrap/-/react-bootstrap-1.5.2.tgz",
++      "integrity": "sha512-mGKPY5+lLd7Vtkx2VFivoRkPT4xAHazuFfIhJLTEgHlDfIUSePn7qrmpZe5gXH9zvHV0RsBaQ9cLfXjxnZrOpA==",
+       "requires": {
+-        "@babel/runtime": "^7.4.2",
++        "@babel/runtime": "^7.13.8",
+         "@restart/context": "^2.1.4",
+-        "@restart/hooks": "^0.3.21",
++        "@restart/hooks": "^0.3.26",
+         "@types/classnames": "^2.2.10",
+         "@types/invariant": "^2.2.33",
+         "@types/prop-types": "^15.7.3",
+         "@types/react": ">=16.9.35",
+-        "@types/react-transition-group": "^4.4.0",
++        "@types/react-transition-group": "^4.4.1",
+         "@types/warning": "^3.0.0",
+         "classnames": "^2.2.6",
+         "dom-helpers": "^5.1.2",
+@@ -17373,8 +17378,18 @@
+         "prop-types-extra": "^1.1.0",
+         "react-overlays": "^5.0.0",
+         "react-transition-group": "^4.4.1",
+-        "uncontrollable": "^7.0.0",
++        "uncontrollable": "^7.2.1",
+         "warning": "^4.0.3"
++      },
++      "dependencies": {
++        "@babel/runtime": {
++          "version": "7.13.10",
++          "resolved": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.13.10.tgz",
++          "integrity": "sha512-4QPkjJq6Ns3V/RgpEahRk+AGfL0eO6RHHtTWoNNr5mO49G6B5+X6d6THgWEAvTrznU5xYpbAlVKRYcsCgh/Akw==",
++          "requires": {
++            "regenerator-runtime": "^0.13.4"
++          }
++        }
+       }
+     },
+     "react-break": {
+@@ -21369,11 +21384,11 @@
+       "integrity": "sha512-gN3vgMISAgacF7sqsLPByqoePooY3n2emTH59Ur5d/M8eg4WTWu1xp8i8DHjohftIyEx0S08RiYxbffr4j8Peg=="
+     },
+     "use-sidecar": {
+-      "version": "1.0.4",
+-      "resolved": "https://registry.npmjs.org/use-sidecar/-/use-sidecar-1.0.4.tgz",
+-      "integrity": "sha512-A5ggIS3/qTdxCAlcy05anO2/oqXOfpmxnpRE1Jm+fHHtCvUvNSZDGqgOSAXPriBVAcw2fMFFkh5v5KqrFFhCMA==",
++      "version": "1.0.5",
++      "resolved": "https://registry.npmjs.org/use-sidecar/-/use-sidecar-1.0.5.tgz",
++      "integrity": "sha512-k9jnrjYNwN6xYLj1iaGhonDghfvmeTmYjAiGvOr7clwKfPjMXJf4/HOr7oT5tJwYafgp2tG2l3eZEOfoELiMcA==",
+       "requires": {
+-        "detect-node-es": "^1.0.0",
++        "detect-node-es": "^1.1.0",
+         "tslib": "^1.9.3"
+       }
+     },
+diff --git a/package.json b/package.json
+index bc8ef5c..17710f1 100644
+--- a/package.json
++++ b/package.json
+@@ -39,7 +39,7 @@
+     "@edx/frontend-component-footer": "10.1.4",
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-platform": "1.8.4",
+-    "@edx/paragon": "13.16.0",
++    "@edx/paragon": "13.17.3",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 17adeb8..84468b7 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -124,20 +124,18 @@ export async function getDatesTabData(courseId) {
+ }
+ 
+ export async function getProgressTabData(courseId) {
+-  global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
+-  // TODO: (AA-213) update once flag is in place
+-  // const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
+-  // try {
+-  //   const { data } = await getAuthenticatedHttpClient().get(url);
+-  //   return camelCaseObject(data);
+-  // } catch (error) {
+-  //   const { httpErrorStatus } = error && error.customAttributes;
+-  //   if (httpErrorStatus === 404) {
+-  //     global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
+-  //     return {};
+-  //   }
+-  //   throw error;
+-  // }
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
++  try {
++    const { data } = await getAuthenticatedHttpClient().get(url);
++    return camelCaseObject(data);
++  } catch (error) {
++    const { httpErrorStatus } = error && error.customAttributes;
++    if (httpErrorStatus === 404) {
++      global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
++      return {};
++    }
++    throw error;
++  }
+ }
+ 
+ export async function getProctoringInfoData(courseId) {
+diff --git a/src/course-home/progress-tab/CertificateBanner.jsx b/src/course-home/progress-tab/CertificateBanner.jsx
+deleted file mode 100644
+index e6f1687..0000000
+--- a/src/course-home/progress-tab/CertificateBanner.jsx
++++ /dev/null
+@@ -1,74 +0,0 @@
+-import React from 'react';
+-import { useDispatch, useSelector } from 'react-redux';
+-
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { requestCert } from '../data/thunks';
+-
+-import { useModel } from '../../generic/model-store';
+-import messages from './messages';
+-import VerifiedCert from '../../generic/assets/edX_certificate.png';
+-
+-function CertificateBanner({ intl }) {
+-  const {
+-    courseId,
+-  } = useSelector(state => state.courseHome);
+-
+-  const {
+-    certificateData,
+-    enrollmentMode,
+-  } = useModel('progress', courseId);
+-
+-  if (certificateData === null || enrollmentMode === 'audit') { return null; }
+-  const { certUrl, certDownloadUrl } = certificateData;
+-  const dispatch = useDispatch();
+-  function requestHandler() {
+-    dispatch(requestCert(courseId));
+-  }
+-  return (
+-    <section className="banner rounded my-4 p-4 container-fluid border border-primary-200 bg-info-100 row">
+-      <div className="col-12 col-sm-9">
+-        <div>
+-          <div className="font-weight-bold">{certificateData.title}</div>
+-          <div className="mt-1">{certificateData.msg}</div>
+-        </div>
+-        {certUrl && (
+-          <div>
+-            <a className="btn btn-primary my-3" href={certUrl} rel="noopener noreferrer" target="_blank">
+-              {intl.formatMessage(messages.viewCert)}
+-              <span className="sr-only">{intl.formatMessage(messages.opensNewWindow)}</span>
+-            </a>
+-          </div>
+-        )}
+-        {!certUrl && certificateData.isDownloadable && (
+-          <div>
+-            <a className="btn btn-primary my-3" href={certDownloadUrl} rel="noopener noreferrer" target="_blank">
+-              {intl.formatMessage(messages.downloadCert)}
+-              <span className="sr-only">{intl.formatMessage(messages.opensNewWindow)}</span>
+-            </a>
+-          </div>
+-        )}
+-        {!certUrl && !certificateData.isDownloadable && certificateData.isRequestable && (
+-          <div className="my-3">
+-            <button className="btn btn-primary" type="button" onClick={requestHandler}>
+-              {intl.formatMessage(messages.requestCert)}
+-            </button>
+-          </div>
+-        )}
+-      </div>
+-      <div className="col-0 col-sm-3 d-none d-sm-block">
+-        <img
+-          alt={intl.formatMessage(messages.certAlt)}
+-          src={VerifiedCert}
+-          className="float-right"
+-          style={{ height: '120px' }}
+-        />
+-      </div>
+-    </section>
+-  );
+-}
+-
+-CertificateBanner.propTypes = {
+-  intl: intlShape.isRequired,
+-};
+-
+-export default injectIntl(CertificateBanner);
+diff --git a/src/course-home/progress-tab/Chapter.jsx b/src/course-home/progress-tab/Chapter.jsx
+deleted file mode 100644
+index 74c0034..0000000
+--- a/src/course-home/progress-tab/Chapter.jsx
++++ /dev/null
+@@ -1,36 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import Subsection from './Subsection';
+-
+-export default function Chapter({
+-  chapter,
+-}) {
+-  if (chapter.displayName === 'hidden') { return null; }
+-  const { subsections } = chapter;
+-  return (
+-    <section className="border-top border-light-500">
+-      <div className="row">
+-        <div className="lead font-weight-normal col-12 col-sm-3 my-3 border-right border-light-500">
+-          {chapter.displayName}
+-        </div>
+-        <div className="col-12 col-sm-9">
+-          {subsections.map((subsection) => (
+-            <Subsection
+-              key={subsection.url}
+-              subsection={subsection}
+-            />
+-          ))}
+-        </div>
+-      </div>
+-    </section>
+-  );
+-}
+-
+-Chapter.propTypes = {
+-  chapter: PropTypes.shape({
+-    displayName: PropTypes.string,
+-    subsections: PropTypes.arrayOf(PropTypes.shape({
+-      url: PropTypes.string,
+-    })),
+-  }).isRequired,
+-};
+diff --git a/src/course-home/progress-tab/CreditRequirements.jsx b/src/course-home/progress-tab/CreditRequirements.jsx
+deleted file mode 100644
+index c74448a..0000000
+--- a/src/course-home/progress-tab/CreditRequirements.jsx
++++ /dev/null
+@@ -1,151 +0,0 @@
+-import React from 'react';
+-import { useSelector } from 'react-redux';
+-
+-import {
+-  FormattedDate, FormattedTime, injectIntl, intlShape,
+-} from '@edx/frontend-platform/i18n';
+-
+-import { useModel } from '../../generic/model-store';
+-import messages from './messages';
+-
+-function CreditRequirements({ intl }) {
+-  const {
+-    courseId,
+-  } = useSelector(state => state.courseHome);
+-
+-  const {
+-    creditCourseRequirements,
+-    creditSupportUrl,
+-    verificationData,
+-    userTimezone,
+-  } = useModel('progress', courseId);
+-
+-  if (creditCourseRequirements === null) { return null; }
+-  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+-  const eligibility = creditCourseRequirements.eligibilityStatus;
+-  let message;
+-  switch (eligibility) {
+-    case 'not_eligible':
+-      message = intl.formatMessage(messages.creditNotEligible);
+-      break;
+-    case 'eligible':
+-      message = intl.formatMessage(messages.creditEligible);
+-      break;
+-    case 'partial_eligible':
+-      message = intl.formatMessage(messages.creditPartialEligible);
+-      break;
+-    default:
+-      break;
+-  }
+-
+-  const completed = `✓ ${intl.formatMessage(messages.completed)} `;
+-
+-  const { status } = verificationData;
+-  let verificationMessage;
+-  let verificationLinkMessage = '';
+-
+-  switch (status) {
+-    case 'none':
+-    case 'expired':
+-      verificationMessage = `${intl.formatMessage(messages.notStarted)}; `;
+-      verificationLinkMessage = intl.formatMessage(messages.notStarted);
+-      break;
+-    case 'approved':
+-      verificationMessage = completed;
+-      break;
+-    case 'pending':
+-      verificationMessage = intl.formatMessage(messages.pending);
+-      break;
+-    case 'must_reverify':
+-      verificationMessage = `${intl.formatMessage(messages.rejected)}; `;
+-      verificationLinkMessage = intl.formatMessage(messages.tryAgain);
+-      break;
+-    default:
+-      break;
+-  }
+-  return (
+-    <section className="banner rounded row border border-primary-300 my-2">
+-      <div className="col ml-4 my-3">
+-        <div className="row font-weight-bold">
+-          {intl.formatMessage(messages.courseCreditHeader)}
+-        </div>
+-        <div className="row mb-2">{message}</div>
+-        {creditCourseRequirements.requirements.map((requirement) => (
+-          <div key={requirement.displayName} className="row w-50 border-bottom">
+-            <div className="col-4">
+-              {requirement.displayName}
+-              {requirement.minGrade && (
+-                <span>{` ${requirement.minGrade}%`}</span>
+-              )}
+-            </div>
+-            <div className="col-8">
+-              {!requirement.status && (
+-                intl.formatMessage(messages.notMet)
+-              )}
+-              {(requirement.status === 'failed' || requirement.status === 'declined') && (
+-                intl.formatMessage(messages.failed)
+-              )}
+-              {requirement.status === 'submitted' && (
+-                intl.formatMessage(messages.submitted)
+-              )}
+-              {requirement.status === 'satisfied' && (
+-                <span>
+-                  {completed}
+-                  {requirement.statusDate && (
+-                    <span>
+-                      <FormattedDate
+-                        value={requirement.statusDate}
+-                        day="numeric"
+-                        month="short"
+-                        weekday="short"
+-                        year="numeric"
+-                        {...timezoneFormatArgs}
+-                      /> <FormattedTime
+-                        value={requirement.statusDate}
+-                      />
+-                    </span>
+-                  )}
+-                </span>
+-              )}
+-            </div>
+-          </div>
+-        ))}
+-        <div className="row w-50 border-bottom">
+-          <div className="col-4">Verification Status </div>
+-          <div className="col-8">
+-            {verificationMessage}
+-            {verificationLinkMessage && (
+-              <a href={verificationData.link}>{verificationLinkMessage}</a>
+-            )}
+-            {status === 'approved' && verificationData.statusDate && (
+-              <span>
+-                <FormattedDate
+-                  value={verificationData.statusDate}
+-                  day="numeric"
+-                  month="short"
+-                  weekday="short"
+-                  year="numeric"
+-                  {...timezoneFormatArgs}
+-                />
+-              </span>
+-            )}
+-          </div>
+-        </div>
+-        {eligibility === 'eligible' && (
+-          <div className="mt-3 row">
+-            <a className="btn btn-primary" href={creditCourseRequirements.dashboardUrl}>{intl.formatMessage(messages.purchaseCredit)}</a>
+-          </div>
+-        )}
+-        <div className="mt-3 row">
+-          <a href={creditSupportUrl}>{intl.formatMessage(messages.learnMoreCredit)}</a>
+-        </div>
+-      </div>
+-    </section>
+-  );
+-}
+-
+-CreditRequirements.propTypes = {
+-  intl: intlShape.isRequired,
+-};
+-
+-export default injectIntl(CreditRequirements);
+diff --git a/src/course-home/progress-tab/DueDateTime.jsx b/src/course-home/progress-tab/DueDateTime.jsx
+deleted file mode 100644
+index 81d80e7..0000000
+--- a/src/course-home/progress-tab/DueDateTime.jsx
++++ /dev/null
+@@ -1,36 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { useSelector } from 'react-redux';
+-import { FormattedDate, FormattedTime } from '@edx/frontend-platform/i18n';
+-import { useModel } from '../../generic/model-store';
+-
+-export default function DueDateTime({
+-  due,
+-}) {
+-  const {
+-    courseId,
+-  } = useSelector(state => state.courseHome);
+-  const {
+-    userTimezone,
+-  } = useModel('progress', courseId);
+-  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+-
+-  return (
+-    <em className="ml-0">
+-      due <FormattedDate
+-        value={due}
+-        day="numeric"
+-        month="short"
+-        weekday="short"
+-        year="numeric"
+-        {...timezoneFormatArgs}
+-      /> <FormattedTime
+-        value={due}
+-      />
+-    </em>
+-  );
+-}
+-
+-DueDateTime.propTypes = {
+-  due: PropTypes.string.isRequired,
+-};
+diff --git a/src/course-home/progress-tab/ProblemScores.jsx b/src/course-home/progress-tab/ProblemScores.jsx
+deleted file mode 100644
+index 22cf908..0000000
+--- a/src/course-home/progress-tab/ProblemScores.jsx
++++ /dev/null
+@@ -1,37 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import messages from './messages';
+-
+-function ProblemScores({
+-  intl,
+-  scoreName,
+-  problemScores,
+-}) {
+-  return (
+-    <div className="row mt-1">
+-      <dl className="d-flex flex-wrap small text-gray-500">
+-        <dt className="mr-3">{intl.formatMessage(messages[`${scoreName}`])}</dt>
+-        {problemScores.map((problem, index) => {
+-          const key = scoreName + index;
+-          return (
+-            <dd className="mr-3" key={key}>{problem.earned}/{problem.possible}</dd>
+-          );
+-        })}
+-      </dl>
+-    </div>
+-  );
+-}
+-
+-ProblemScores.propTypes = {
+-  intl: intlShape.isRequired,
+-  scoreName: PropTypes.string.isRequired,
+-  problemScores: PropTypes.arrayOf(PropTypes.shape({
+-    possible: PropTypes.number,
+-    earned: PropTypes.number,
+-    id: PropTypes.string,
+-  })).isRequired,
+-};
+-
+-export default injectIntl(ProblemScores);
+diff --git a/src/course-home/progress-tab/ProgressGraph.jsx b/src/course-home/progress-tab/ProgressGraph.jsx
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/src/course-home/progress-tab/ProgressHeader.jsx b/src/course-home/progress-tab/ProgressHeader.jsx
+new file mode 100644
+index 0000000..62c99a7
+--- /dev/null
++++ b/src/course-home/progress-tab/ProgressHeader.jsx
+@@ -0,0 +1,39 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button } from '@edx/paragon';
++
++import { useModel } from '../../generic/model-store';
++
++import messages from './messages';
++
++function ProgressHeader({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const { administrator } = getAuthenticatedUser();
++
++  const { studioUrl } = useModel('progress', courseId);
++
++  return (
++    <>
++      <div className="row w-100 m-0 mb-4 justify-content-between">
++        <h1>{intl.formatMessage(messages.progressHeader)}</h1>
++        {administrator && studioUrl && (
++          <Button variant="outline-primary" size="sm" className="align-self-center" href={studioUrl}>
++            {intl.formatMessage(messages.studioLink)}
++          </Button>
++        )}
++      </div>
++    </>
++  );
++}
++
++ProgressHeader.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(ProgressHeader);
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index 53f5201..ea3569a 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -1,48 +1,36 @@
+ import React from 'react';
+-import { useSelector } from 'react-redux';
+-import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { useModel } from '../../generic/model-store';
+-import Chapter from './Chapter';
+-import CertificateBanner from './CertificateBanner';
+-import messages from './messages';
+-import CreditRequirements from './CreditRequirements';
+ 
+-function ProgressTab({ intl }) {
+-  const {
+-    courseId,
+-  } = useSelector(state => state.courseHome);
+-
+-  const { administrator } = getAuthenticatedUser();
+-
+-  const {
+-    coursewareSummary,
+-    studioUrl,
+-  } = useModel('progress', courseId);
++import CertificateStatus from './certificate-status/CertificateStatus';
++import CourseCompletion from './course-completion/CourseCompletion';
++import CourseGrade from './grades/course-grade/CourseGrade';
++import DetailedGrades from './grades/detailed-grades/DetailedGrades';
++import GradeSummary from './grades/grade-summary/GradeSummary';
++import ProgressHeader from './ProgressHeader';
++import RelatedLinks from './related-links/RelatedLinks';
+ 
++function ProgressTab() {
+   return (
+-    <section>
+-      {administrator && studioUrl && (
+-        <div className="row mb-3 mr-3 justify-content-end">
+-          <a className="btn-sm border border-info" href={studioUrl}>
+-            {intl.formatMessage(messages.studioLink)}
+-          </a>
++    <>
++      <ProgressHeader />
++      <div className="row w-100 m-0">
++        {/* Main body */}
++        <div className="col-12 col-lg-8 p-0">
++          <CourseCompletion />
++          <CourseGrade />
++          <div className="my-4 p-4 rounded shadow-sm">
++            <GradeSummary />
++            <DetailedGrades />
++          </div>
+         </div>
+-      )}
+-      <CertificateBanner />
+-      <CreditRequirements />
+-      {coursewareSummary.map((chapter) => (
+-        <Chapter
+-          key={chapter.displayName}
+-          chapter={chapter}
+-        />
+-      ))}
+-    </section>
++
++        {/* Side panel */}
++        <div className="col-12 col-lg-4 p-0 px-lg-4">
++          <CertificateStatus />
++          <RelatedLinks />
++        </div>
++      </div>
++    </>
+   );
+ }
+ 
+-ProgressTab.propTypes = {
+-  intl: intlShape.isRequired,
+-};
+-
+-export default injectIntl(ProgressTab);
++export default ProgressTab;
+diff --git a/src/course-home/progress-tab/Subsection.jsx b/src/course-home/progress-tab/Subsection.jsx
+deleted file mode 100644
+index d65f507..0000000
+--- a/src/course-home/progress-tab/Subsection.jsx
++++ /dev/null
+@@ -1,77 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import messages from './messages';
+-
+-import DueDateTime from './DueDateTime';
+-import ProblemScores from './ProblemScores';
+-
+-function Subsection({
+-  intl,
+-  subsection,
+-}) {
+-  const scoreName = subsection.graded ? 'problem' : 'practice';
+-
+-  const { earned, possible } = subsection.gradedTotal;
+-
+-  const showTotalScore = ((possible > 0) || (earned > 0)) && subsection.showGrades;
+-
+-  // screen reader information
+-  const totalScoreSr = intl.formatMessage(messages.pointsEarned, { earned, total: possible });
+-
+-  return (
+-    <section className="my-3 ml-3">
+-      <div className="row">
+-        <a className="h6" href={subsection.url}>
+-          {/* eslint-disable-next-line react/no-danger */}
+-          <div dangerouslySetInnerHTML={{ __html: subsection.displayName }} />
+-          {showTotalScore && <span className="sr-only">{totalScoreSr}</span>}
+-        </a>
+-        {showTotalScore && <span className="small ml-1 mb-2">({earned}/{possible}) {subsection.percentGraded}%</span>}
+-      </div>
+-      <div className="row small">
+-        {subsection.format && <div className="mr-1">{subsection.format}</div>}
+-        {subsection.due !== null && <DueDateTime due={subsection.due} />}
+-      </div>
+-      {subsection.problemScores.length > 0 && subsection.showGrades && (
+-        <ProblemScores scoreName={scoreName} problemScores={subsection.problemScores} />
+-      )}
+-      {subsection.problemScores.length > 0 && !subsection.showGrades && subsection.showCorrectness === 'past_due' && (
+-        <div className="row small">{intl.formatMessage(messages[`${scoreName}HiddenUntil`])}</div>
+-      )}
+-      {subsection.problemScores.length > 0 && !subsection.showGrades && !(subsection.showCorrectness === 'past_due')
+-      && <div className="row small">{intl.formatMessage(messages[`${scoreName}Hidden`])}</div>}
+-      {(subsection.problemScores.length === 0) && (
+-        <div className="row small">{intl.formatMessage(messages.noScores)}</div>
+-      )}
+-    </section>
+-  );
+-}
+-
+-Subsection.propTypes = {
+-  intl: intlShape.isRequired,
+-  subsection: PropTypes.shape({
+-    graded: PropTypes.bool.isRequired,
+-    url: PropTypes.string.isRequired,
+-    showGrades: PropTypes.bool.isRequired,
+-    gradedTotal: PropTypes.shape({
+-      possible: PropTypes.number,
+-      earned: PropTypes.number,
+-      graded: PropTypes.bool,
+-    }).isRequired,
+-    showCorrectness: PropTypes.string.isRequired,
+-    due: PropTypes.string,
+-    problemScores: PropTypes.arrayOf(PropTypes.shape({
+-      possible: PropTypes.number,
+-      earned: PropTypes.number,
+-      id: PropTypes.string,
+-    })).isRequired,
+-    format: PropTypes.string,
+-    // override: PropTypes.object,
+-    displayName: PropTypes.string.isRequired,
+-    percentGraded: PropTypes.number.isRequired,
+-  }).isRequired,
+-};
+-
+-export default injectIntl(Subsection);
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+new file mode 100644
+index 0000000..e3c5af1
+--- /dev/null
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -0,0 +1,12 @@
++import React from 'react';
++
++function CertificateStatus() {
++  return (
++    <section className="text-dark-700 rounded shadow-sm mb-4 p-4">
++      {/* TODO: AA-719 */}
++      <h3 className="h4">Certificate status</h3>
++    </section>
++  );
++}
++
++export default CertificateStatus;
+diff --git a/src/course-home/progress-tab/course-completion/CourseCompletion.jsx b/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+new file mode 100644
+index 0000000..2e19a78
+--- /dev/null
++++ b/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+@@ -0,0 +1,35 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import { useModel } from '../../../generic/model-store';
++
++function CourseCompletion() {
++  // TODO: AA-720
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    completionSummary: {
++      completeCount,
++      incompleteCount,
++      lockedCount,
++    },
++  } = useModel('progress', courseId);
++
++  const total = completeCount + incompleteCount + lockedCount;
++  const completePercentage = ((completeCount / total) * 100).toFixed(0);
++  const incompletePercentage = ((incompleteCount / total) * 100).toFixed(0);
++  const lockedPercentage = ((lockedCount / total) * 100).toFixed(0);
++
++  return (
++    <section className="text-dark-700 mb-4 rounded shadow-sm p-4">
++      <h2>Course completion</h2>
++      <p className="small">This represents how much course content you have completed.</p>
++      Complete: {completePercentage}%
++      Incomplete: {incompletePercentage}%
++      Locked: {lockedPercentage}%
++    </section>
++  );
++}
++
++export default CourseCompletion;
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+new file mode 100644
+index 0000000..25798c7
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -0,0 +1,13 @@
++import React from 'react';
++
++function CourseGrade() {
++  return (
++    <section className="text-dark-700 my-4 rounded shadow-sm p-4">
++      {/* TODO: AA-721 */}
++      <h2>Grades</h2>
++      <p className="small">This represents your weighted grade against the grade needed to pass this course.</p>
++    </section>
++  );
++}
++
++export default CourseGrade;
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+new file mode 100644
+index 0000000..8ed819b
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -0,0 +1,57 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import { Link } from 'react-router-dom';
++
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { useModel } from '../../../../generic/model-store';
++
++import DetailedGradesTable from './DetailedGradesTable';
++
++import messages from '../messages';
++
++function DetailedGrades({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    sectionScores,
++  } = useModel('progress', courseId);
++
++  const hasSectionScores = sectionScores.length > 0;
++
++  const outlineLink = (
++    <Link
++      className="text-dark-700"
++      style={{ textDecoration: 'underline' }}
++      to={`/course/${courseId}/home`}
++    >
++      {intl.formatMessage(messages.courseOutline)}
++    </Link>
++  );
++
++  return (
++    <section className="text-dark-700 mb-4">
++      <h3 className="h4 mb-3">{intl.formatMessage(messages.detailedGrades)}</h3>
++      {hasSectionScores && (
++        <DetailedGradesTable sectionScores={sectionScores} />
++      )}
++      {!hasSectionScores && (
++        <p className="small">You currently have no graded problem scores.</p>
++      )}
++      <p className="x-small">
++        <FormattedMessage
++          id="progress.ungradedAlert"
++          defaultMessage="For progress on ungraded aspects of the course, view your {outlineLink}."
++          values={{ outlineLink }}
++        />
++      </p>
++    </section>
++  );
++}
++
++DetailedGrades.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(DetailedGrades);
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+new file mode 100644
+index 0000000..eb74749
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -0,0 +1,78 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { DataTable } from '@edx/paragon';
++
++import messages from '../messages';
++
++function DetailedGradesTable({ intl, sectionScores }) {
++  return (
++    sectionScores.map((chapter) => {
++      const subsectionScores = chapter.subsections.filter(
++        (subsection) => !!(
++          subsection.hasGradedAssignment
++          && subsection.showGrades
++          && (subsection.numPointsPossible > 0 || subsection.numPointsEarned > 0)),
++      );
++
++      if (subsectionScores.length === 0) {
++        return null;
++      }
++
++      const detailedGradesData = subsectionScores.map((subsection) => {
++        const title = <a href={subsection.url} className="text-dark-700 small">{subsection.displayName}</a>;
++        return {
++          subsectionTitle: title,
++          score: `${subsection.numPointsEarned}/${subsection.numPointsPossible}`,
++        };
++      });
++
++      return (
++        <div className="my-3" key={`${chapter.displayName}-grades-table`}>
++          <DataTable
++            data={detailedGradesData}
++            itemCount={detailedGradesData.length}
++            columns={[
++              {
++                Header: chapter.displayName,
++                accessor: 'subsectionTitle',
++                headerClassName: 'h5 mb-0',
++                cellClassName: 'mw-100',
++              },
++              {
++                Header: `${intl.formatMessage(messages.score)}`,
++                accessor: 'score',
++                headerClassName: 'justify-content-end h5 mb-0',
++                cellClassName: 'float-right text-right small',
++              },
++            ]}
++          >
++            <DataTable.Table />
++          </DataTable>
++        </div>
++      );
++    })
++  );
++}
++
++DetailedGradesTable.propTypes = {
++  intl: intlShape.isRequired,
++  sectionScores: PropTypes.arrayOf(PropTypes.shape({
++    displayName: PropTypes.string.isRequired,
++    subsections: PropTypes.arrayOf(PropTypes.shape({
++      displayName: PropTypes.string.isRequired,
++      numPointsEarned: PropTypes.number.isRequired,
++      numPointsPossible: PropTypes.number.isRequired,
++      url: PropTypes.string.isRequired,
++    })),
++  })).isRequired,
++};
++
++DetailedGradesTable.defaultProps = {
++  sectionScores: {
++    subsections: [],
++  },
++};
++
++export default injectIntl(DetailedGradesTable);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+new file mode 100644
+index 0000000..585bf0e
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -0,0 +1,30 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++function AssignmentTypeCell({ assignmentType, footnoteMarker, footnoteId }) {
++  return (
++    <div className="small">
++      {assignmentType}
++      {footnoteId && footnoteMarker && (
++        <sup>
++          <a id={`${footnoteId}-ref`} className="text-dark-700" href={`#${footnoteId}-footnote`} aria-describedby="grade-summary-footnote-label">
++            {footnoteMarker}
++          </a>
++        </sup>
++      )}
++    </div>
++  );
++}
++
++AssignmentTypeCell.propTypes = {
++  assignmentType: PropTypes.string.isRequired,
++  footnoteId: PropTypes.string,
++  footnoteMarker: PropTypes.string,
++};
++
++AssignmentTypeCell.defaultProps = {
++  footnoteId: '',
++  footnoteMarker: '',
++};
++
++export default AssignmentTypeCell;
+diff --git a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+new file mode 100644
+index 0000000..7a608ac
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+@@ -0,0 +1,41 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from '../messages';
++
++function DroppableAssignmentFootnote({ footnotes, intl }) {
++  return (
++    <>
++      <span id="grade-summary-footnote-label" className="sr-only">{intl.formatMessage(messages.footnotesTitle)}</span>
++      <ul className="list-unstyled mt-2">
++        {footnotes.map((footnote, index) => (
++          <li id={`${footnote.id}-footnote`} key={footnote.id} className="x-small mt-1">
++            <sup>{index + 1}</sup>
++            <FormattedMessage
++              id="progress.footnotes.droppableAssignments"
++              defaultMessage="The lowest {numDroppable, plural, one{# {assignmentType} score} other{# {assignmentType} scores}} will be dropped."
++              values={{
++                numDroppable: footnote.numDroppable,
++                assignmentType: footnote.assignmentType,
++              }}
++            />
++            <a className="sr-only" href={`#${footnote.id}-ref`}>{intl.formatMessage(messages.backToContent)}</a>
++          </li>
++        ))}
++      </ul>
++    </>
++  );
++}
++
++DroppableAssignmentFootnote.propTypes = {
++  footnotes: PropTypes.arrayOf(PropTypes.shape({
++    assignmentType: PropTypes.string.isRequired,
++    id: PropTypes.string.isRequired,
++    numDroppable: PropTypes.number.isRequired,
++  })).isRequired,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(DroppableAssignmentFootnote);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+new file mode 100644
+index 0000000..0ca88f6
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummary.jsx
+@@ -0,0 +1,49 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import { useModel } from '../../../../generic/model-store';
++
++import GradeSummaryHeader from './GradeSummaryHeader';
++import GradeSummaryTable from './GradeSummaryTable';
++
++function GradeSummary() {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    sectionScores,
++    gradingPolicy: {
++      assignmentPolicies,
++    },
++  } = useModel('progress', courseId);
++
++  if (assignmentPolicies.length === 0) {
++    return null;
++  }
++
++  // accumulate grades for individual assignment types
++  const gradeByAssignmentType = {};
++  assignmentPolicies.forEach(assignment => {
++    gradeByAssignmentType[assignment.type] = { numPointsEarned: 0, numPointsPossible: 0 };
++  });
++
++  sectionScores.forEach((chapter) => {
++    chapter.subsections.forEach((subsection) => {
++      if (subsection.hasGradedAssignment) {
++        gradeByAssignmentType[subsection.assignmentType].numPointsEarned += subsection.numPointsEarned;
++        gradeByAssignmentType[subsection.assignmentType].numPointsPossible += subsection.numPointsPossible;
++      }
++    });
++  });
++
++  return (
++    <section className="text-dark-700 mb-4">
++      <GradeSummaryHeader />
++      <GradeSummaryTable
++        gradeByAssignmentType={gradeByAssignmentType}
++      />
++    </section>
++  );
++}
++
++export default GradeSummary;
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+new file mode 100644
+index 0000000..dea5108
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+@@ -0,0 +1,34 @@
++import React from 'react';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Icon, OverlayTrigger, Popover } from '@edx/paragon';
++import { InfoOutline } from '@edx/paragon/icons';
++
++import messages from '../messages';
++
++function GradeSummaryHeader({ intl }) {
++  return (
++    <div className="row w-100 m-0 align-items-center">
++      <h3 className="h4 mb-3 mr-2">{intl.formatMessage(messages.gradeSummary)}</h3>
++      <OverlayTrigger
++        trigger={['hover', 'click']}
++        placement="top"
++        overlay={(
++          <Popover>
++            <Popover.Content className="small text-dark-700">
++              {intl.formatMessage(messages.gradeSummaryTooltip)}
++            </Popover.Content>
++          </Popover>
++        )}
++      >
++        <Icon src={InfoOutline} className="mb-3" style={{ height: '1rem', width: '1rem' }} />
++      </OverlayTrigger>
++    </div>
++  );
++}
++
++GradeSummaryHeader.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(GradeSummaryHeader);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+new file mode 100644
+index 0000000..4d407ff
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -0,0 +1,123 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { DataTable } from '@edx/paragon';
++import { useModel } from '../../../../generic/model-store';
++
++import AssignmentTypeCell from './AssignmentTypeCell';
++import DroppableAssignmentFootnote from './DroppableAssignmentFootnote';
++import GradeSummaryTableFooter from './GradeSummaryTableFooter';
++
++import messages from '../messages';
++
++function GradeSummaryTable({
++  gradeByAssignmentType, intl,
++}) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    gradingPolicy: {
++      assignmentPolicies,
++    },
++  } = useModel('progress', courseId);
++
++  const footnotes = [];
++
++  const calculateWeightedGrade = (numPointsEarned, numPointsPossible, assignmentWeight) => (
++    numPointsPossible > 0 ? ((numPointsEarned * assignmentWeight * 100) / numPointsPossible).toFixed(0) : 0
++  );
++
++  const getFootnoteId = (assignment) => {
++    const footnoteId = assignment.shortLabel ? assignment.shortLabel : assignment.type;
++    return footnoteId.replace(/[^A-Za-z0-9.-_]+/g, '-');
++  };
++
++  const gradeSummaryData = assignmentPolicies.map((assignment) => {
++    let footnoteId = '';
++    let footnoteMarker = '';
++
++    if (assignment.numDroppable > 0) {
++      footnoteId = getFootnoteId(assignment);
++      footnotes.push({
++        id: footnoteId,
++        numDroppable: assignment.numDroppable,
++        assignmentType: assignment.type,
++      });
++
++      footnoteMarker = footnotes.length;
++    }
++
++    const weightedGrade = calculateWeightedGrade(
++      gradeByAssignmentType[assignment.type].numPointsEarned,
++      gradeByAssignmentType[assignment.type].numPointsPossible,
++      assignment.weight,
++    );
++
++    return {
++      type: { footnoteId, footnoteMarker, type: assignment.type },
++      weight: `${assignment.weight * 100}%`,
++      score: `${gradeByAssignmentType[assignment.type].numPointsEarned}/${gradeByAssignmentType[assignment.type].numPointsPossible}`,
++      weightedGrade: `${weightedGrade}%`,
++    };
++  });
++
++  return (
++    <>
++      <DataTable
++        data={gradeSummaryData}
++        itemCount={gradeSummaryData.length}
++        columns={[
++          {
++            Header: `${intl.formatMessage(messages.assignmentType)}`,
++            accessor: 'type',
++            // eslint-disable-next-line react/prop-types
++            Cell: ({ value }) => (
++              <AssignmentTypeCell
++                assignmentType={value.type} // eslint-disable-line react/prop-types
++                footnoteId={value.footnoteId} // eslint-disable-line react/prop-types
++                footnoteMarker={value.footnoteMarker} // eslint-disable-line react/prop-types
++              />
++            ),
++            headerClassName: 'h5 mb-0',
++          },
++          {
++            Header: `${intl.formatMessage(messages.weight)}`,
++            accessor: 'weight',
++            headerClassName: 'justify-content-end h5 mb-0',
++            cellClassName: 'float-right small',
++          },
++          {
++            Header: `${intl.formatMessage(messages.score)}`,
++            accessor: 'score',
++            headerClassName: 'justify-content-end h5 mb-0',
++            cellClassName: 'float-right small',
++          },
++          {
++            Header: `${intl.formatMessage(messages.weightedGrade)}`,
++            accessor: 'weightedGrade',
++            headerClassName: 'justify-content-end h5 mb-0 text-right',
++            cellClassName: 'float-right font-weight-bold small',
++          },
++        ]}
++      >
++        <DataTable.Table />
++        <GradeSummaryTableFooter />
++      </DataTable>
++
++      {footnotes && (
++        <DroppableAssignmentFootnote footnotes={footnotes} />
++      )}
++    </>
++  );
++}
++
++GradeSummaryTable.propTypes = {
++  gradeByAssignmentType: PropTypes.shape({}).isRequired,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(GradeSummaryTable);
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+new file mode 100644
+index 0000000..a8cf041
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTableFooter.jsx
+@@ -0,0 +1,39 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { DataTable } from '@edx/paragon';
++import { useModel } from '../../../../generic/model-store';
++
++import messages from '../messages';
++
++function GradeSummaryTableFooter({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    courseGrade: {
++      isPassing,
++      percent,
++    },
++  } = useModel('progress', courseId);
++
++  const bgColor = isPassing ? 'bg-success-100' : 'bg-warning-100';
++  const totalGrade = percent * 100;
++
++  return (
++    <DataTable.TableFooter className={`border-top border-primary ${bgColor}`}>
++      <div className="row w-100 m-0">
++        <div id="weighted-grade-summary" className="col-8 p-0 small">{intl.formatMessage(messages.weightedGradeSummary)}</div>
++        <div aria-labelledby="weighted-grade-summary" className="col-4 p-0 text-right font-weight-bold small">{totalGrade}%</div>
++      </div>
++    </DataTable.TableFooter>
++  );
++}
++
++GradeSummaryTableFooter.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(GradeSummaryTableFooter);
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+new file mode 100644
+index 0000000..9881cca
+--- /dev/null
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -0,0 +1,52 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  assignmentType: {
++    id: 'progress.assignmentType',
++    defaultMessage: 'Assignment type',
++  },
++  backToContent: {
++    id: 'progress.footnotes.backToContent',
++    defaultMessage: 'Back to content',
++  },
++  courseOutline: {
++    id: 'progress.courseOutline',
++    defaultMessage: 'Course Outline',
++  },
++  detailedGrades: {
++    id: 'progress.detailedGrades',
++    defaultMessage: 'Detailed grades',
++  },
++  footnotesTitle: {
++    id: 'progress.footnotes.title',
++    defaultMessage: 'Grade summary footnotes',
++  },
++  gradeSummary: {
++    id: 'progress.gradeSummary',
++    defaultMessage: 'Grade summary',
++  },
++  gradeSummaryTooltip: {
++    id: 'progress.gradeSummary.tooltip',
++    defaultMessage: "Your course assignment's weight is determined by your instructor. "
++      + 'By multiplying your score by the weight for that assignment type, your weighted grade is calculated. '
++      + "Your weighted grade is what's used to determine if you pass the course.",
++  },
++  score: {
++    id: 'progress.score',
++    defaultMessage: 'Score',
++  },
++  weight: {
++    id: 'progress.weight',
++    defaultMessage: 'Weight',
++  },
++  weightedGrade: {
++    id: 'progress.weightedGrade',
++    defaultMessage: 'Weighted grade',
++  },
++  weightedGradeSummary: {
++    id: 'progress.weightedGradeSummary',
++    defaultMessage: 'Your current weighted grade summary',
++  },
++});
++
++export default messages;
+diff --git a/src/course-home/progress-tab/messages.js b/src/course-home/progress-tab/messages.js
+index 87bae7f..3cd3e38 100644
+--- a/src/course-home/progress-tab/messages.js
++++ b/src/course-home/progress-tab/messages.js
+@@ -1,123 +1,14 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  problem: {
+-    id: 'learning.progress.badge.problem',
+-    defaultMessage: 'Problem Scores: ',
+-  },
+-  practice: {
+-    id: 'learning.progress.badge.practice',
+-    defaultMessage: 'Practice Scores: ',
+-  },
+-  problemHiddenUntil: {
+-    id: 'learning.progress.badge.problemHiddenUntil',
+-    defaultMessage: 'Problem scores are hidden until the due date.',
+-  },
+-  practiceHiddenUntil: {
+-    id: 'learning.progress.badge.practiceHiddenUntil',
+-    defaultMessage: 'Practice scores are hidden until the due date.',
+-  },
+-  problemHidden: {
+-    id: 'learning.progress.badge.probHidden',
+-    defaultMessage: 'problemlem scores are hidden.',
+-  },
+-  practiceHidden: {
+-    id: 'learning.progress.badge.practiceHidden',
+-    defaultMessage: 'Practice scores are hidden.',
+-  },
+-  noScores: {
+-    id: 'learning.progress.badge.noScores',
+-    defaultMessage: 'No problem scores in this section.',
+-  },
+-  pointsEarned: {
+-    id: 'learning.progress.badge.scoreEarned',
+-    defaultMessage: '{earned} of {total} possible points',
+-  },
+-  viewCert: {
+-    id: 'learning.progress.badge.viewCert',
+-    defaultMessage: 'View Certificate',
+-  },
+-  downloadCert: {
+-    id: 'learning.progress.badge.downloadCert',
+-    defaultMessage: 'Download Your Certificate',
+-  },
+-  requestCert: {
+-    id: 'learning.progress.badge.requestCert',
+-    defaultMessage: 'Request Certificate',
+-  },
+-  opensNewWindow: {
+-    id: 'learning.progress.badge.opensNewWindow',
+-    defaultMessage: 'Opens in a new browser window',
+-  },
+-  certAlt: {
+-    id: 'learning.progress.badge.certAlt',
+-    defaultMessage: 'Example Certificate',
+-    description: 'Alternate text displayed when the example certificate image cannot be displayed.',
++  progressHeader: {
++    id: 'progress.header',
++    defaultMessage: 'Your progress',
+   },
+   studioLink: {
+-    id: 'learning.progress.badge.studioLink',
++    id: 'progress.link.studio',
+     defaultMessage: 'View grading in Studio',
+   },
+-  courseCreditHeader: {
+-    id: 'learning.progress.courseCreditHeader',
+-    defaultMessage: 'Course Credit Eligibility',
+-  },
+-  creditNotEligible: {
+-    id: 'learning.progress.creditNotEligible',
+-    defaultMessage: 'You are not eligible for course credit because you have not met the requirements for credit.',
+-  },
+-  creditEligible: {
+-    id: 'learning.progress.creditEligible',
+-    defaultMessage: 'You have met the requirements for credit in this course.',
+-  },
+-  creditPartialEligible: {
+-    id: 'learning.progress.creditPartialEligible',
+-    defaultMessage: 'You have not met the minimum requirements for credit.',
+-  },
+-  start: {
+-    id: 'learning.progress.startVerification',
+-    defaultMessage: 'Start now',
+-  },
+-  tryAgain: {
+-    id: 'learning.progress.start',
+-    defaultMessage: 'Try again',
+-  },
+-  notStarted: {
+-    id: 'learning.progress.notStarted',
+-    defaultMessage: 'Not started',
+-  },
+-  failed: {
+-    id: 'learning.progress.failed',
+-    defaultMessage: 'Incomplete',
+-  },
+-  notMet: {
+-    id: 'learning.progress.notMet',
+-    defaultMessage: 'Not met',
+-  },
+-  pending: {
+-    id: 'learning.progress.pending',
+-    defaultMessage: 'Pending',
+-  },
+-  rejected: {
+-    id: 'learning.progress.rejected',
+-    defaultMessage: 'Rejected',
+-  },
+-  completed: {
+-    id: 'learning.progress.completed',
+-    defaultMessage: 'Completed',
+-  },
+-  submitted: {
+-    id: 'learning.progress.submitted',
+-    defaultMessage: 'Submitted',
+-  },
+-  learnMoreCredit: {
+-    id: 'learning.progress.learnMoreCredit',
+-    defaultMessage: 'Learn more about course credit',
+-  },
+-  purchaseCredit: {
+-    id: 'learning.progress.purchaseCredit',
+-    defaultMessage: 'Purchase course credit',
+-  },
+ });
+ 
+ export default messages;
+diff --git a/src/course-home/progress-tab/related-links/RelatedLinks.jsx b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+new file mode 100644
+index 0000000..8f1a07a
+--- /dev/null
++++ b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+@@ -0,0 +1,34 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import { Link } from 'react-router-dom';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from './messages';
++
++function RelatedLinks({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  return (
++    <section className="mb-4 x-small">
++      <h3 className="h4">{intl.formatMessage(messages.relatedLinks)}</h3>
++      <ul className="pl-4">
++        <li>
++          <Link to={`course/${courseId}/dates`}>{intl.formatMessage(messages.datesCardLink)}</Link>
++          <p>{intl.formatMessage(messages.datesCardDescription)}</p>
++        </li>
++        <li>
++          <Link to={`course/${courseId}/home`}>{intl.formatMessage(messages.outlineCardLink)}</Link>
++          <p>{intl.formatMessage(messages.outlineCardDescription)}</p>
++        </li>
++      </ul>
++    </section>
++  );
++}
++
++RelatedLinks.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(RelatedLinks);
+diff --git a/src/course-home/progress-tab/related-links/messages.js b/src/course-home/progress-tab/related-links/messages.js
+new file mode 100644
+index 0000000..b696f88
+--- /dev/null
++++ b/src/course-home/progress-tab/related-links/messages.js
+@@ -0,0 +1,26 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  datesCardDescription: {
++    id: 'progress.relatedLinks.datesCard.description',
++    defaultMessage: 'A schedule view of your course due dates and upcoming assignments.',
++  },
++  datesCardLink: {
++    id: 'progress.relatedLinks.datesCard.link',
++    defaultMessage: 'Dates',
++  },
++  outlineCardDescription: {
++    id: 'progress.relatedLinks.outlineCard.description',
++    defaultMessage: 'A birds-eye view of your course content.',
++  },
++  outlineCardLink: {
++    id: 'progress.relatedLinks.outlineCard.link',
++    defaultMessage: 'Course Outline',
++  },
++  relatedLinks: {
++    id: 'progress.relatedLinks',
++    defaultMessage: 'Related links',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

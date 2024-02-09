@@ -1,0 +1,898 @@
+From a36da4cd84a9b7ec88dbcb55956de616e832510b Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 2 Jun 2021 14:31:13 -0400
+Subject: [PATCH 0482/1021] AA-807: progress tab eventing (#470)
+
+---
+ .../__factories__/progressTabData.factory.js  |   1 +
+ .../data/__snapshots__/redux.test.js.snap     |   1 +
+ .../progress-tab/ProgressTab.test.jsx         | 391 ++++++++++++++++++
+ .../certificate-status/CertificateStatus.jsx  |  59 ++-
+ .../grades/course-grade/CourseGradeHeader.jsx |  16 +-
+ .../grades/detailed-grades/DetailedGrades.jsx |  21 +-
+ .../detailed-grades/DetailedGradesTable.jsx   |  31 +-
+ .../related-links/RelatedLinks.jsx            |  21 +-
+ 8 files changed, 532 insertions(+), 9 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+index 1ca91f0..6e2a198 100644
+--- a/src/course-home/data/__factories__/progressTabData.factory.js
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -22,6 +22,7 @@ Factory.define('progressTabData')
+         subsections: [
+           {
+             assignment_type: 'Homework',
++            block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
+             display_name: 'First subsection',
+             has_graded_assignment: true,
+             num_points_earned: 0,
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index b576350..208b309 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -568,6 +568,7 @@ Object {
+             "subsections": Array [
+               Object {
+                 "assignmentType": "Homework",
++                "blockKey": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345",
+                 "displayName": "First subsection",
+                 "hasGradedAssignment": true,
+                 "numPointsEarned": 0,
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index a10dbc7..f6a3abc 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
+ import { getConfig } from '@edx/frontend-platform';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import MockAdapter from 'axios-mock-adapter';
+ 
+@@ -52,6 +53,42 @@ describe('Progress Tab', () => {
+     logUnhandledRequests(axiosMock);
+   });
+ 
++  describe('Related links', () => {
++    beforeEach(() => {
++      sendTrackEvent.mockClear();
++    });
++
++    it('sends event on click of dates tab link', async () => {
++      await fetchAndRender();
++
++      const datesTabLink = screen.getByRole('link', { name: 'Dates' });
++      fireEvent.click(datesTabLink);
++
++      expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++      expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.related_links.clicked', {
++        org_key: 'edX',
++        courserun_key: courseId,
++        is_staff: false,
++        link_clicked: 'dates',
++      });
++    });
++
++    it('sends event on click of outline tab link', async () => {
++      await fetchAndRender();
++
++      const outlineTabLink = screen.getAllByRole('link', { name: 'Course Outline' });
++      fireEvent.click(outlineTabLink[1]); // outlineTabLink[0] corresponds to the link in the DetailedGrades component
++
++      expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++      expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.related_links.clicked', {
++        org_key: 'edX',
++        courserun_key: courseId,
++        is_staff: false,
++        link_clicked: 'course_outline',
++      });
++    });
++  });
++
+   describe('Course Grade', () => {
+     it('renders Course Grade', async () => {
+       await fetchAndRender();
+@@ -184,6 +221,38 @@ describe('Progress Tab', () => {
+       expect(screen.getAllByRole('link', 'Unlock now')).toHaveLength(3);
+     });
+ 
++    it('sends event on click of upgrade button in locked content header', async () => {
++      sendTrackEvent.mockClear();
++      setTabData({
++        completion_summary: {
++          complete_count: 1,
++          incomplete_count: 1,
++          locked_count: 1,
++        },
++        verified_mode: {
++          access_expiration_date: '2050-01-01T12:00:00',
++          currency: 'USD',
++          currency_symbol: '$',
++          price: 149,
++          sku: 'ABCD1234',
++          upgrade_url: 'edx.org/upgrade',
++        },
++      });
++      await fetchAndRender();
++      expect(screen.getByText('locked feature')).toBeInTheDocument();
++      expect(screen.getByText('Unlock to view grades and work towards a certificate.')).toBeInTheDocument();
++
++      const upgradeButton = screen.getAllByRole('link', 'Unlock now')[0];
++      fireEvent.click(upgradeButton);
++
++      expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++      expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.grades_upgrade.clicked', {
++        org_key: 'edX',
++        courserun_key: courseId,
++        is_staff: false,
++      });
++    });
++
+     it('renders locked feature preview with no upgrade button when user has locked content but cannot upgrade', async () => {
+       setTabData({
+         completion_summary: {
+@@ -354,6 +423,39 @@ describe('Progress Tab', () => {
+       expect(screen.getByRole('link', { name: 'Second subsection' }));
+     });
+ 
++    it('sends event on click of subsection link', async () => {
++      sendTrackEvent.mockClear();
++      await fetchAndRender();
++      expect(screen.getByText('Detailed grades')).toBeInTheDocument();
++
++      const subsectionLink = screen.getByRole('link', { name: 'First subsection' });
++      fireEvent.click(subsectionLink);
++
++      expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++      expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.detailed_grades_assignment.clicked', {
++        org_key: 'edX',
++        courserun_key: courseId,
++        is_staff: false,
++        assignment_block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++      });
++    });
++
++    it('sends event on click of course outline link', async () => {
++      sendTrackEvent.mockClear();
++      await fetchAndRender();
++      expect(screen.getByText('Detailed grades')).toBeInTheDocument();
++
++      const outlineLink = screen.getAllByRole('link', { name: 'Course Outline' })[0];
++      fireEvent.click(outlineLink);
++
++      expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++      expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.detailed_grades.course_outline_link.clicked', {
++        org_key: 'edX',
++        courserun_key: courseId,
++        is_staff: false,
++      });
++    });
++
+     it('render message when section scores are not populated', async () => {
+       setTabData({
+         section_scores: [],
+@@ -387,6 +489,7 @@ describe('Progress Tab', () => {
+     describe('enrolled user', () => {
+       beforeEach(async () => {
+         setMetadata({ is_enrolled: true });
++        sendTrackEvent.mockClear();
+       });
+ 
+       it('Displays text for nonPassing case when learner does not have a passing grade', async () => {
+@@ -394,6 +497,20 @@ describe('Progress Tab', () => {
+         expect(screen.getByText('In order to qualify for a certificate, you must have a passing grade.')).toBeInTheDocument();
+       });
+ 
++      it('sends event when visiting progress tab when learner is not passing', async () => {
++        await fetchAndRender();
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'not_passing',
++          certificate_status_variant: 'not_passing',
++        });
++      });
++
+       it('Displays text for inProgress case when more content is scheduled and the learner does not have a passing grade', async () => {
+         setTabData({
+           has_scheduled_content: true,
+@@ -402,6 +519,23 @@ describe('Progress Tab', () => {
+         expect(screen.getByText('It looks like there is more content in this course that will be released in the future. Look out for email updates or check back on your course for when this content will be available.')).toBeInTheDocument();
+       });
+ 
++      it('sends event when visiting progress tab when user has scheduled content', async () => {
++        setTabData({
++          has_scheduled_content: true,
++        });
++        await fetchAndRender();
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'not_passing',
++          certificate_status_variant: 'has_scheduled_content',
++        });
++      });
++
+       it('Displays request certificate link', async () => {
+         setTabData({
+           certificate_data: { cert_status: 'requesting' },
+@@ -411,6 +545,34 @@ describe('Progress Tab', () => {
+         expect(screen.getByRole('button', { name: 'Request certificate' })).toBeInTheDocument();
+       });
+ 
++      it('sends events on view of progress tab and on click of request certificate link', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'requesting' },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'passing',
++          certificate_status_variant: 'requesting',
++        });
++
++        const requestCertificateLink = screen.getByRole('button', { name: 'Request certificate' });
++        fireEvent.click(requestCertificateLink);
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(2);
++        expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.course_progress.certificate_status.clicked', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          certificate_status_variant: 'requesting',
++        });
++      });
++
+       it('Displays verify identity link', async () => {
+         setTabData({
+           certificate_data: { cert_status: 'unverified' },
+@@ -421,6 +583,35 @@ describe('Progress Tab', () => {
+         expect(screen.getByRole('link', { name: 'Verify ID' })).toBeInTheDocument();
+       });
+ 
++      it('sends events on view of progress tab and on click of ID verification link', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'unverified' },
++          user_has_passing_grade: true,
++          verification_data: { link: 'test' },
++        });
++        await fetchAndRender();
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'passing',
++          certificate_status_variant: 'unverified',
++        });
++
++        const idVerificationLink = screen.getByRole('link', { name: 'Verify ID' });
++        fireEvent.click(idVerificationLink);
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(2);
++        expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.course_progress.certificate_status.clicked', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          certificate_status_variant: 'unverified',
++        });
++      });
++
+       it('Displays verification pending message', async () => {
+         setTabData({
+           certificate_data: { cert_status: 'unverified' },
+@@ -432,6 +623,25 @@ describe('Progress Tab', () => {
+         expect(screen.queryByRole('link', { name: 'Verify ID' })).not.toBeInTheDocument();
+       });
+ 
++      it('sends event when visiting progress tab with ID verification pending message', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'unverified' },
++          verification_data: { status: 'pending' },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'passing',
++          certificate_status_variant: 'unverified',
++        });
++      });
++
+       it('Displays download link', async () => {
+         setTabData({
+           certificate_data: {
+@@ -444,6 +654,37 @@ describe('Progress Tab', () => {
+         expect(screen.getByRole('link', { name: 'Download my certificate' })).toBeInTheDocument();
+       });
+ 
++      it('sends events on view of progress tab and on click of downloadable certificate link', async () => {
++        setTabData({
++          certificate_data: {
++            cert_status: 'downloadable',
++            download_url: 'fake.download.url',
++          },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'passing',
++          certificate_status_variant: 'earned_downloadable',
++        });
++
++        const downloadCertificateLink = screen.getByRole('link', { name: 'Download my certificate' });
++        fireEvent.click(downloadCertificateLink);
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(2);
++        expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.course_progress.certificate_status.clicked', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          certificate_status_variant: 'earned_downloadable',
++        });
++      });
++
+       it('Displays webview link', async () => {
+         setTabData({
+           certificate_data: {
+@@ -456,6 +697,37 @@ describe('Progress Tab', () => {
+         expect(screen.getByRole('link', { name: 'View my certificate' })).toBeInTheDocument();
+       });
+ 
++      it('sends events on view of progress tab and on click of view certificate link', async () => {
++        setTabData({
++          certificate_data: {
++            cert_status: 'downloadable',
++            cert_web_view_url: '/certificates/cooluuidgoeshere',
++          },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'passing',
++          certificate_status_variant: 'earned_viewable',
++        });
++
++        const viewCertificateLink = screen.getByRole('link', { name: 'View my certificate' });
++        fireEvent.click(viewCertificateLink);
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(2);
++        expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.course_progress.certificate_status.clicked', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          certificate_status_variant: 'earned_viewable',
++        });
++      });
++
+       it('Displays certificate is earned but unavailable message', async () => {
+         setTabData({
+           certificate_data: { cert_status: 'earned_but_not_available' },
+@@ -465,6 +737,57 @@ describe('Progress Tab', () => {
+         expect(screen.queryByText('Certificate status')).toBeInTheDocument();
+       });
+ 
++      it('sends event when visiting the progress tab when cert is earned but unavailable', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'earned_but_not_available' },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'passing',
++          certificate_status_variant: 'earned_but_not_available',
++        });
++      });
++
++      it('sends event with correct grade variant for passing with letter grades', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'earned_but_not_available' },
++          grading_policy: {
++            assignment_policies: [
++              {
++                num_droppable: 1,
++                num_total: 2,
++                short_label: 'HW',
++                type: 'Homework',
++                weight: 1,
++              },
++            ],
++            grade_range: {
++              A: 0.9,
++              B: 0.8,
++            },
++          },
++          user_has_passing_grade: true,
++        });
++        await fetchAndRender();
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'passing_grades',
++          certificate_status_variant: 'earned_but_not_available',
++        });
++      });
++
+       it('Displays upgrade link when available', async () => {
+         setTabData({
+           certificate_data: { cert_status: 'audit_passing' },
+@@ -479,6 +802,36 @@ describe('Progress Tab', () => {
+         expect(screen.getByRole('link', { name: 'Upgrade now' })).toBeInTheDocument();
+       });
+ 
++      it('sends events on view of progress tab and when audit learner clicks upgrade link', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'audit_passing' },
++          verified_mode: {
++            upgrade_url: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++          },
++        });
++        await fetchAndRender();
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'not_passing',
++          certificate_status_variant: 'audit_passing',
++        });
++
++        const upgradeLink = screen.getByRole('link', { name: 'Upgrade now' });
++        fireEvent.click(upgradeLink);
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(2);
++        expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.course_progress.certificate_status.clicked', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          certificate_status_variant: 'audit_passing',
++        });
++      });
++
+       it('Displays nothing if audit only', async () => {
+         setTabData({
+           certificate_data: { cert_status: 'audit_passing' },
+@@ -490,6 +843,23 @@ describe('Progress Tab', () => {
+         expect(screen.queryByRole('link', { name: 'Upgrade now' })).not.toBeInTheDocument();
+       });
+ 
++      it('sends event when visiting the progress tab even when audit user cannot upgrade (i.e. certificate component does not render)', async () => {
++        setTabData({
++          certificate_data: { cert_status: 'audit_passing' },
++        });
++        await fetchAndRender();
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'not_passing',
++          certificate_status_variant: 'audit_passing_missed_upgrade_deadline',
++        });
++      });
++
+       it('Does not display the certificate component if it does not match any statuses', async () => {
+         setTabData({
+           certificate_data: {
+@@ -501,6 +871,27 @@ describe('Progress Tab', () => {
+         await fetchAndRender();
+         expect(screen.queryByTestId('certificate-status-component')).not.toBeInTheDocument();
+       });
++
++      it('sends event when visiting progress tab, although no certificate statuses match', async () => {
++        setTabData({
++          certificate_data: {
++            cert_status: 'bogus_status',
++          },
++          user_has_passing_grade: true,
++        });
++        setMetadata({ is_enrolled: true });
++        await fetchAndRender();
++
++        expect(sendTrackEvent).toHaveBeenCalledTimes(1);
++        expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.course_progress.visited', {
++          org_key: 'edX',
++          courserun_key: courseId,
++          is_staff: false,
++          track_variant: 'audit',
++          grade_variant: 'passing',
++          certificate_status_variant: 'certificate_status_disabled',
++        });
++      });
+     });
+ 
+     it('Does not display the certificate component if the user is not enrolled', async () => {
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index f89c3cb..32ce199 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -1,5 +1,7 @@
+-import React from 'react';
++import React, { useEffect } from 'react';
+ import { useDispatch, useSelector } from 'react-redux';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import {
+   FormattedDate, FormattedMessage, injectIntl, intlShape,
+ } from '@edx/frontend-platform/i18n';
+@@ -19,11 +21,16 @@ function CertificateStatus({ intl }) {
+ 
+   const {
+     isEnrolled,
++    org,
+   } = useModel('courseHomeMeta', courseId);
+ 
+   const {
+     certificateData,
+     end,
++    enrollmentMode,
++    gradingPolicy: {
++      gradeRange,
++    },
+     hasScheduledContent,
+     userHasPassingGrade,
+     verificationData,
+@@ -37,6 +44,7 @@ function CertificateStatus({ intl }) {
+     userHasPassingGrade,
+   );
+   const dispatch = useDispatch();
++  const { administrator } = getAuthenticatedUser();
+ 
+   let certStatus;
+   let certWebViewUrl;
+@@ -49,21 +57,31 @@ function CertificateStatus({ intl }) {
+   }
+ 
+   let certCase;
++  let certEventName = certStatus;
+   let body;
+   let buttonAction;
+   let buttonLocation;
+   let buttonText;
+   let endDate;
+ 
++  let gradeEventName = 'not_passing';
++  if (userHasPassingGrade) {
++    gradeEventName = Object.entries(gradeRange).length > 1 ? 'passing_grades' : 'passing';
++  }
++
+   const dashboardLink = <DashboardLink />;
+   const idVerificationSupportLink = <IdVerificationSupportLink />;
+   const profileLink = <ProfileLink />;
+ 
+-  if (mode === COURSE_EXIT_MODES.nonPassing) {
++  if (mode === COURSE_EXIT_MODES.disabled) {
++    certEventName = 'certificate_status_disabled';
++  } else if (mode === COURSE_EXIT_MODES.nonPassing) {
+     certCase = 'notPassing';
++    certEventName = 'not_passing';
+     body = intl.formatMessage(messages[`${certCase}Body`]);
+   } else if (mode === COURSE_EXIT_MODES.inProgress) {
+     certCase = 'inProgress';
++    certEventName = 'has_scheduled_content';
+     body = intl.formatMessage(messages[`${certCase}Body`]);
+   } else if (mode === COURSE_EXIT_MODES.celebration) {
+     switch (certStatus) {
+@@ -106,9 +124,11 @@ function CertificateStatus({ intl }) {
+         );
+ 
+         if (certWebViewUrl) {
++          certEventName = 'earned_viewable';
+           buttonLocation = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
+           buttonText = intl.formatMessage(messages.viewableButton);
+         } else if (downloadUrl) {
++          certEventName = 'earned_downloadable';
+           buttonLocation = downloadUrl;
+           buttonText = intl.formatMessage(messages.downloadableButton);
+         }
+@@ -136,22 +156,45 @@ function CertificateStatus({ intl }) {
+           buttonText = intl.formatMessage(messages[`${certCase}Button`]);
+         } else {
+           certCase = null; // Do not render the certificate component if the upgrade deadline has passed
++          certEventName = 'audit_passing_missed_upgrade_deadline';
+         }
+         break;
+ 
+       // This code shouldn't be hit but coding defensively since switch expects a default statement
+       default:
+         certCase = null;
++        certEventName = 'no_certificate_status';
+         break;
+     }
+   }
+ 
++  // Log visit to progress tab
++  useEffect(() => {
++    sendTrackEvent('edx.ui.lms.course_progress.visited', {
++      org_key: org,
++      courserun_key: courseId,
++      is_staff: administrator,
++      track_variant: enrollmentMode,
++      grade_variant: gradeEventName,
++      certificate_status_variant: certEventName,
++    });
++  }, []);
++
+   if (!certCase) {
+     return null;
+   }
+ 
+   const header = intl.formatMessage(messages[`${certCase}Header`]);
+ 
++  const logCertificateStatusButtonClicked = () => {
++    sendTrackEvent('edx.ui.lms.course_progress.certificate_status.clicked', {
++      org_key: org,
++      courserun_key: courseId,
++      is_staff: administrator,
++      certificate_status_variant: certEventName,
++    });
++  };
++
+   return (
+     <section data-testid="certificate-status-component" className="text-dark-700 mb-4">
+       <Card className="bg-light-200 shadow-sm border-0">
+@@ -163,7 +206,17 @@ function CertificateStatus({ intl }) {
+             {body}
+           </Card.Text>
+           {buttonText && (buttonLocation || buttonAction) && (
+-            <Button variant="outline-brand" onClick={buttonAction} href={buttonLocation} block>{buttonText}</Button>
++            <Button
++              variant="outline-brand"
++              onClick={() => {
++                logCertificateStatusButtonClicked(certStatus);
++                if (buttonAction) { buttonAction(); }
++              }}
++              href={buttonLocation}
++              block
++            >
++              {buttonText}
++            </Button>
+           )}
+         </Card.Body>
+       </Card>
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+index d0ef033..4512848 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+@@ -1,6 +1,8 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ 
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Locked } from '@edx/paragon/icons';
+ import { Button, Icon } from '@edx/paragon';
+@@ -12,9 +14,21 @@ function CourseGradeHeader({ intl }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
++  const {
++    org,
++  } = useModel('courseHomeMeta', courseId);
+   const {
+     verifiedMode,
+   } = useModel('progress', courseId);
++
++  const { administrator } = getAuthenticatedUser();
++  const logUpgradeButtonClick = () => {
++    sendTrackEvent('edx.ui.lms.course_progress.grades_upgrade.clicked', {
++      org_key: org,
++      courserun_key: courseId,
++      is_staff: administrator,
++    });
++  };
+   return (
+     <div className="row w-100 m-0 p-4 rounded-top bg-primary-500 text-white">
+       <div className={`col-12 ${verifiedMode ? 'col-md-9' : ''} p-0`}>
+@@ -38,7 +52,7 @@ function CourseGradeHeader({ intl }) {
+       </div>
+       {verifiedMode && (
+         <div className="col-12 col-md-3 mt-3 mt-md-0 p-0 align-self-center text-right">
+-          <Button variant="brand" size="sm" href={verifiedMode.upgradeUrl}>
++          <Button variant="brand" size="sm" href={verifiedMode.upgradeUrl} onClick={logUpgradeButtonClick}>
+             {intl.formatMessage(messages.courseGradePreviewUpgradeButton)}
+           </Button>
+         </div>
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 29eb6d8..908ec65 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -2,6 +2,8 @@ import React from 'react';
+ import { useSelector } from 'react-redux';
+ 
+ import { getConfig } from '@edx/frontend-platform';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Hyperlink } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+@@ -11,18 +13,33 @@ import DetailedGradesTable from './DetailedGradesTable';
+ import messages from '../messages';
+ 
+ function DetailedGrades({ intl }) {
++  const { administrator } = getAuthenticatedUser();
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
+-
++  const {
++    org,
++  } = useModel('courseHomeMeta', courseId);
+   const {
+     sectionScores,
+   } = useModel('progress', courseId);
+ 
+   const hasSectionScores = sectionScores.length > 0;
+ 
++  const logOutlineLinkClick = () => {
++    sendTrackEvent('edx.ui.lms.course_progress.detailed_grades.course_outline_link.clicked', {
++      org_key: org,
++      courserun_key: courseId,
++      is_staff: administrator,
++    });
++  };
++
+   const outlineLink = (
+-    <Hyperlink className="muted-link inline-link" destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}>
++    <Hyperlink
++      className="muted-link inline-link"
++      destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}
++      onClick={logOutlineLinkClick}
++    >
+       {intl.formatMessage(messages.courseOutline)}
+     </Hyperlink>
+   );
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index eb74749..77514bb 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -1,12 +1,31 @@
+ import React from 'react';
++import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
+ 
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { DataTable } from '@edx/paragon';
+ 
+ import messages from '../messages';
++import { useModel } from '../../../../generic/model-store';
+ 
+ function DetailedGradesTable({ intl, sectionScores }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++  const {
++    org,
++  } = useModel('courseHomeMeta', courseId);
++  const { administrator } = getAuthenticatedUser();
++  const logSubsectionClicked = (blockKey) => {
++    sendTrackEvent('edx.ui.lms.course_progress.detailed_grades_assignment.clicked', {
++      org_key: org,
++      courserun_key: courseId,
++      is_staff: administrator,
++      assignment_block_key: blockKey,
++    });
++  };
+   return (
+     sectionScores.map((chapter) => {
+       const subsectionScores = chapter.subsections.filter(
+@@ -21,7 +40,17 @@ function DetailedGradesTable({ intl, sectionScores }) {
+       }
+ 
+       const detailedGradesData = subsectionScores.map((subsection) => {
+-        const title = <a href={subsection.url} className="text-dark-700 small">{subsection.displayName}</a>;
++        const title = (
++          <a
++            href={subsection.url}
++            className="text-dark-700 small"
++            onClick={() => {
++              logSubsectionClicked(subsection.blockKey);
++            }}
++          >
++            {subsection.displayName}
++          </a>
++        );
+         return {
+           subsectionTitle: title,
+           score: `${subsection.numPointsEarned}/${subsection.numPointsPossible}`,
+diff --git a/src/course-home/progress-tab/related-links/RelatedLinks.jsx b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+index 2ac5d35..2759ceb 100644
+--- a/src/course-home/progress-tab/related-links/RelatedLinks.jsx
++++ b/src/course-home/progress-tab/related-links/RelatedLinks.jsx
+@@ -1,28 +1,45 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
++
+ import { getConfig } from '@edx/frontend-platform';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Hyperlink } from '@edx/paragon';
+ 
+ import messages from './messages';
++import { useModel } from '../../../generic/model-store';
+ 
+ function RelatedLinks({ intl }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
++  const {
++    org,
++  } = useModel('courseHomeMeta', courseId);
++
++  const { administrator } = getAuthenticatedUser();
++  const logLinkClicked = (linkName) => {
++    sendTrackEvent('edx.ui.lms.course_progress.related_links.clicked', {
++      org_key: org,
++      courserun_key: courseId,
++      is_staff: administrator,
++      link_clicked: linkName,
++    });
++  };
+ 
+   return (
+     <section className="mb-4 x-small">
+       <h3 className="h4">{intl.formatMessage(messages.relatedLinks)}</h3>
+       <ul className="pl-4">
+         <li>
+-          <Hyperlink destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/dates`}>
++          <Hyperlink destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/dates`} onClick={() => logLinkClicked('dates')}>
+             {intl.formatMessage(messages.datesCardLink)}
+           </Hyperlink>
+           <p>{intl.formatMessage(messages.datesCardDescription)}</p>
+         </li>
+         <li>
+-          <Hyperlink destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}>
++          <Hyperlink destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`} onClick={() => logLinkClicked('course_outline')}>
+             {intl.formatMessage(messages.outlineCardLink)}
+           </Hyperlink>
+           <p>{intl.formatMessage(messages.outlineCardDescription)}</p>
+-- 
+2.34.1
+

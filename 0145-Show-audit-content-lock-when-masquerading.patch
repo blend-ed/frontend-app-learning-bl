@@ -1,0 +1,25 @@
+From 24051232afc12034368645dcd1f8eeedc1260d57 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Tue, 9 Jun 2020 15:20:12 -0700
+Subject: [PATCH 0145/1021] Show audit content lock when masquerading
+
+---
+ src/courseware/course/sequence/Unit.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 1f8f874..6068ca2 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -103,7 +103,7 @@ function Unit({
+         isBookmarked={unit.bookmarked}
+         isProcessing={unit.bookmarkedUpdateState === 'loading'}
+       />
+-      { contentTypeGatingEnabled && unit.graded && enrollmentMode === 'audit' && (
++      { contentTypeGatingEnabled && unit.graded && (
+         <Suspense
+           fallback={(
+             <PageLoading
+-- 
+2.34.1
+

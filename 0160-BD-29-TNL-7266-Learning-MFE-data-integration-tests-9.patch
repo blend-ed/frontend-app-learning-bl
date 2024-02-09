@@ -1,0 +1,1675 @@
+From eac9bf9c929a53083c6b989d0b0b90f133d5f12a Mon Sep 17 00:00:00 2001
+From: Demid <grrrr@protonmail.com>
+Date: Thu, 9 Jul 2020 17:39:37 +0300
+Subject: [PATCH 0160/1021] [BD-29] [TNL-7266] Learning MFE data integration
+ tests (#95)
+
+* Add test for fetchCourse
+
+* Add tests for fetchDatesTab, fetchOutlineTab, fetchSequence and resetDeadlines
+
+* Implement fetch tabs tests
+
+* Add fail test case for fetchSequence
+
+* Add success test for fetchSequence
+
+* Add test for resetDeadlines
+
+* Update test group name
+
+* Add empty tests for courseware and bookmarks
+
+* Fix wrong field in saveSequencePosition thunk
+
+* Add tests for courseware data layer
+
+* Temporary commit
+
+* Split tests after rebase
+
+* Revert "Fix wrong field in saveSequencePosition thunk"
+
+This reverts commit 4394d363c58ad929f81e587ce4da2241528494b5.
+
+* Fix test for position
+
+* Move executeThunk into utils
+
+* Add test for all reducers
+
+* Add expect statements for logs
+
+* Remove redundant snapshot tests and add some specific checks
+
+* Polishing
+
+* Remove redundant checks
+
+* Fix bug in normalizer and update test
+
+* Upgrade @edx/frontend-platform dependency
+
+* Utilize MockAuthService instead of manual auth package mocking
+
+* Update tests after breaking changes in master
+
+* Remove redundant snapshot check
+---
+ package-lock.json                             |  46 ++-
+ package.json                                  |   6 +-
+ .../courseHomeMetadata.factory.js             |  23 ++
+ .../__factories__/datesTabData.factory.js     |  25 ++
+ src/course-home/data/__factories__/index.js   |   3 +
+ .../__factories__/outlineTabData.factory.js   |  15 +
+ .../data/__snapshots__/redux.test.js.snap     | 204 +++++++++++++
+ src/course-home/data/redux.test.js            | 155 ++++++++++
+ .../course/bookmark/data/redux.test.js        | 107 +++++++
+ .../data/__factories__/block.factory.js       |  54 ++++
+ .../__factories__/courseBlocks.factory.js     |  37 +++
+ .../__factories__/courseMetadata.factory.js   | 111 +++++++
+ src/courseware/data/__factories__/index.js    |   4 +
+ .../__factories__/sequenceMetadata.factory.js |  55 ++++
+ .../data/__factories__/tab.factory.js         |  16 ++
+ .../data/__snapshots__/redux.test.js.snap     | 265 +++++++++++++++++
+ src/courseware/data/api.js                    |   1 +
+ src/courseware/data/redux.test.js             | 272 ++++++++++++++++++
+ src/utils.js                                  |   8 +
+ 19 files changed, 1394 insertions(+), 13 deletions(-)
+ create mode 100644 src/course-home/data/__factories__/courseHomeMetadata.factory.js
+ create mode 100644 src/course-home/data/__factories__/datesTabData.factory.js
+ create mode 100644 src/course-home/data/__factories__/index.js
+ create mode 100644 src/course-home/data/__factories__/outlineTabData.factory.js
+ create mode 100644 src/course-home/data/__snapshots__/redux.test.js.snap
+ create mode 100644 src/course-home/data/redux.test.js
+ create mode 100644 src/courseware/course/bookmark/data/redux.test.js
+ create mode 100644 src/courseware/data/__factories__/block.factory.js
+ create mode 100644 src/courseware/data/__factories__/courseBlocks.factory.js
+ create mode 100644 src/courseware/data/__factories__/courseMetadata.factory.js
+ create mode 100644 src/courseware/data/__factories__/index.js
+ create mode 100644 src/courseware/data/__factories__/sequenceMetadata.factory.js
+ create mode 100644 src/courseware/data/__factories__/tab.factory.js
+ create mode 100644 src/courseware/data/__snapshots__/redux.test.js.snap
+ create mode 100644 src/courseware/data/redux.test.js
+ create mode 100644 src/utils.js
+
+diff --git a/package-lock.json b/package-lock.json
+index bf5cd89..48f8d0c 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2529,9 +2529,9 @@
+       }
+     },
+     "@cospired/i18n-iso-languages": {
+-      "version": "2.1.1",
+-      "resolved": "https://registry.npmjs.org/@cospired/i18n-iso-languages/-/i18n-iso-languages-2.1.1.tgz",
+-      "integrity": "sha512-dmlPmVw51tQzCJkYvtWWXxuvsAkNvCmUnvjMWyo7Qd318YeEZalCUInUgdhKU985gk2wkITtdakPYqk5GrJ99A=="
++      "version": "2.1.2",
++      "resolved": "https://registry.npmjs.org/@cospired/i18n-iso-languages/-/i18n-iso-languages-2.1.2.tgz",
++      "integrity": "sha512-XylKOsWRyQm9sNanZnppRORXTLaL34uThyBQpTFwOGAYvNg9PeYsyTTfLA1FTCh02RV+kiwt/O/y14DR/OqpWg=="
+     },
+     "@edx/eslint-config": {
+       "version": "1.1.4",
+@@ -2665,13 +2665,13 @@
+       }
+     },
+     "@edx/frontend-platform": {
+-      "version": "1.3.1",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-platform/-/frontend-platform-1.3.1.tgz",
+-      "integrity": "sha512-RAJ6IciIX+ZwXhlBfxOOB0sjNNpBQaN/eDLsgztL9MxEmuAvQtbvQBBJAum6qsVZpKzOZYhtRYFyWoHTuyzFZA==",
++      "version": "1.5.1",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-platform/-/frontend-platform-1.5.1.tgz",
++      "integrity": "sha512-JUXxkqphBR64WKGBNK8Zv9uuBxB46r01UZtFjW63+Ufauo0v+rWHgHisSAKeFOhiuAgAPpd4vSjGYUXqH1ozMQ==",
+       "requires": {
+-        "@cospired/i18n-iso-languages": "2.1.1",
++        "@cospired/i18n-iso-languages": "2.1.2",
+         "axios": "0.18.1",
+-        "form-urlencoded": "4.1.3",
++        "form-urlencoded": "4.1.4",
+         "glob": "7.1.6",
+         "history": "4.10.1",
+         "i18n-iso-countries": "4.3.1",
+@@ -4376,6 +4376,24 @@
+         "is-buffer": "^2.0.2"
+       }
+     },
++    "axios-mock-adapter": {
++      "version": "1.18.1",
++      "resolved": "https://registry.npmjs.org/axios-mock-adapter/-/axios-mock-adapter-1.18.1.tgz",
++      "integrity": "sha512-kFBZsG1Ma5yxjRGHq5KuuL55mPb7WzFULhypquEhzPg8SH5CXICb+qwC2CCA5u+GQVpiqGPwKSRkd3mBCs6gdw==",
++      "dev": true,
++      "requires": {
++        "fast-deep-equal": "^3.1.1",
++        "is-buffer": "^2.0.3"
++      },
++      "dependencies": {
++        "fast-deep-equal": {
++          "version": "3.1.3",
++          "resolved": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
++          "integrity": "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==",
++          "dev": true
++        }
++      }
++    },
+     "axobject-query": {
+       "version": "2.1.1",
+       "resolved": "https://registry.npmjs.org/axobject-query/-/axobject-query-2.1.1.tgz",
+@@ -9031,9 +9049,9 @@
+       }
+     },
+     "form-urlencoded": {
+-      "version": "4.1.3",
+-      "resolved": "https://registry.npmjs.org/form-urlencoded/-/form-urlencoded-4.1.3.tgz",
+-      "integrity": "sha512-z0YJtPuq0BSOrErlpj+o1KHTRaOH6LN16043ZVK2Wk5uUGpX308PJ5ZJDtU++ndoZkzASHVclUTD2mb1jHzqlA=="
++      "version": "4.1.4",
++      "resolved": "https://registry.npmjs.org/form-urlencoded/-/form-urlencoded-4.1.4.tgz",
++      "integrity": "sha512-R7Vytos0gMYuPQTMwnNzvK9PBItNV+Qkm/pvghEZI3j2kMrzZmJlczAgHFmt12VV+IRYQXgTlSGP1PKAsMCIUA=="
+     },
+     "formidable": {
+       "version": "1.2.1",
+@@ -16586,6 +16604,12 @@
+         "inherits": "^2.0.1"
+       }
+     },
++    "rosie": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/rosie/-/rosie-2.0.1.tgz",
++      "integrity": "sha1-wlDEeHzkULcqqe/yZQn2hYmBT6I=",
++      "dev": true
++    },
+     "rsvp": {
+       "version": "4.8.5",
+       "resolved": "https://registry.npmjs.org/rsvp/-/rsvp-4.8.5.tgz",
+diff --git a/package.json b/package.json
+index cd56a31..3abe0bd 100644
+--- a/package.json
++++ b/package.json
+@@ -36,7 +36,7 @@
+   "dependencies": {
+     "@edx/frontend-component-footer": "^10.0.6",
+     "@edx/frontend-component-header": "^2.0.3",
+-    "@edx/frontend-platform": "^1.3.1",
++    "@edx/frontend-platform": "^1.5.1",
+     "@edx/paragon": "^7.2.1",
+     "@fortawesome/fontawesome-svg-core": "^1.2.26",
+     "@fortawesome/free-brands-svg-icons": "^5.12.0",
+@@ -60,11 +60,13 @@
+   },
+   "devDependencies": {
+     "@edx/frontend-build": "^3.0.0",
++    "axios-mock-adapter": "^1.18.1",
+     "codecov": "^3.6.1",
+     "es-check": "^5.1.0",
+     "glob": "^7.1.6",
+     "husky": "^3.1.0",
+     "jest": "^24.9.0",
+-    "reactifex": "^1.1.1"
++    "reactifex": "^1.1.1",
++    "rosie": "^2.0.1"
+   }
+ }
+diff --git a/src/course-home/data/__factories__/courseHomeMetadata.factory.js b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+new file mode 100644
+index 0000000..8991163
+--- /dev/null
++++ b/src/course-home/data/__factories__/courseHomeMetadata.factory.js
+@@ -0,0 +1,23 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('courseHomeMetadata')
++  .sequence(
++    'course_id',
++    (courseId) => `course-v1:edX+DemoX+Demo_Course_${courseId}`,
++  )
++  .option('courseTabs', [])
++  .option('host', 'http://localhost:18000')
++  .attrs({
++    is_staff: false,
++    number: 'DemoX',
++    org: 'edX',
++    title: 'Demonstration Course',
++    is_self_paced: false,
++  })
++  .attr('tabs', ['courseTabs', 'host'], (courseTabs, host) => courseTabs.map(
++    tab => ({
++      tab_id: tab.slug,
++      title: tab.title,
++      url: `${host}${tab.url}`,
++    }),
++  ));
+diff --git a/src/course-home/data/__factories__/datesTabData.factory.js b/src/course-home/data/__factories__/datesTabData.factory.js
+new file mode 100644
+index 0000000..73b9dd9
+--- /dev/null
++++ b/src/course-home/data/__factories__/datesTabData.factory.js
+@@ -0,0 +1,25 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('datesTabData')
++  .attrs({
++    dates_banner_info: {
++      content_type_gating_enabled: false,
++      missed_gated_content: false,
++      missed_deadlines: false,
++    },
++    course_date_blocks: [
++      {
++        date: '2013-02-05T05:00:00Z',
++        date_type: 'course-start-date',
++        description: '',
++        learner_has_access: true,
++        link: '',
++        title: 'Course Starts',
++      },
++    ],
++    missed_deadlines: false,
++    missed_gated_content: false,
++    learner_is_full_access: true,
++    user_timezone: null,
++    verified_upgrade_link: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++  });
+diff --git a/src/course-home/data/__factories__/index.js b/src/course-home/data/__factories__/index.js
+new file mode 100644
+index 0000000..a268057
+--- /dev/null
++++ b/src/course-home/data/__factories__/index.js
+@@ -0,0 +1,3 @@
++import './courseHomeMetadata.factory';
++import './datesTabData.factory';
++import './outlineTabData.factory';
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+new file mode 100644
+index 0000000..10c7321
+--- /dev/null
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -0,0 +1,15 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++import '../../../courseware/data/__factories__/courseBlocks.factory';
++
++Factory.define('outlineTabData')
++  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .option('host', 'http://localhost:18000')
++  .attr('course_tools', ['host', 'courseId'], (host, courseId) => ({
++    analytics_id: 'edx.bookmarks',
++    title: 'Bookmarks',
++    url: `${host}/courses/${courseId}/bookmarks/`,
++  }))
++  .attr('course_blocks', ['courseId'], courseId => ({
++    blocks: Factory.build('courseBlocks', { courseId }).blocks,
++  }));
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+new file mode 100644
+index 0000000..8473c1c
+--- /dev/null
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -0,0 +1,204 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Data layer integration tests Should initialize store 1`] = `
++Object {
++  "courseHome": Object {
++    "courseId": null,
++    "courseStatus": "loading",
++  },
++  "courseware": Object {
++    "courseId": null,
++    "courseStatus": "loading",
++    "sequenceId": null,
++    "sequenceStatus": "loading",
++  },
++  "models": Object {},
++}
++`;
++
++exports[`Data layer integration tests Test fetchDatesTab Should fetch, normalize, and save metadata 1`] = `
++Object {
++  "courseHome": Object {
++    "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++    "courseStatus": "loaded",
++  },
++  "courseware": Object {
++    "courseId": null,
++    "courseStatus": "loading",
++    "sequenceId": null,
++    "sequenceStatus": "loading",
++  },
++  "models": Object {
++    "courses": Object {
++      "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "isSelfPaced": false,
++        "isStaff": false,
++        "number": "DemoX",
++        "org": "edX",
++        "tabs": Array [
++          Object {
++            "slug": "courseware",
++            "title": "Course",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
++          },
++          Object {
++            "slug": "discussion",
++            "title": "Discussion",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/discussion/forum/",
++          },
++          Object {
++            "slug": "wiki",
++            "title": "Wiki",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course_wiki",
++          },
++          Object {
++            "slug": "progress",
++            "title": "Progress",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress",
++          },
++          Object {
++            "slug": "instructor",
++            "title": "Instructor",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
++          },
++        ],
++        "title": "Demonstration Course",
++      },
++    },
++    "dates": Object {
++      "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "courseDateBlocks": Array [
++          Object {
++            "date": "2013-02-05T05:00:00Z",
++            "dateType": "course-start-date",
++            "description": "",
++            "learnerHasAccess": true,
++            "link": "",
++            "title": "Course Starts",
++          },
++        ],
++        "datesBannerInfo": Object {
++          "contentTypeGatingEnabled": false,
++          "missedDeadlines": false,
++          "missedGatedContent": false,
++        },
++        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "learnerIsFullAccess": true,
++        "missedDeadlines": false,
++        "missedGatedContent": false,
++        "userTimezone": null,
++        "verifiedUpgradeLink": "http://localhost:18130/basket/add/?sku=8CF08E5",
++      },
++    },
++  },
++}
++`;
++
++exports[`Data layer integration tests Test fetchOutlineTab Should fetch, normalize, and save metadata 1`] = `
++Object {
++  "courseHome": Object {
++    "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++    "courseStatus": "loaded",
++  },
++  "courseware": Object {
++    "courseId": null,
++    "courseStatus": "loading",
++    "sequenceId": null,
++    "sequenceStatus": "loading",
++  },
++  "models": Object {
++    "courses": Object {
++      "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "isSelfPaced": false,
++        "isStaff": false,
++        "number": "DemoX",
++        "org": "edX",
++        "tabs": Array [
++          Object {
++            "slug": "courseware",
++            "title": "Course",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
++          },
++          Object {
++            "slug": "discussion",
++            "title": "Discussion",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/discussion/forum/",
++          },
++          Object {
++            "slug": "wiki",
++            "title": "Wiki",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course_wiki",
++          },
++          Object {
++            "slug": "progress",
++            "title": "Progress",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress",
++          },
++          Object {
++            "slug": "instructor",
++            "title": "Instructor",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
++          },
++        ],
++        "title": "Demonstration Course",
++      },
++    },
++    "outline": Object {
++      "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "courseBlocks": Object {
++          "courses": Object {
++            "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd4": Object {
++              "id": "course-v1:edX+DemoX+Demo_Course_1",
++              "sectionIds": Array [
++                "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++              ],
++              "title": "bcdabcdabcdabcdabcdabcdabcdabcd4",
++            },
++          },
++          "sections": Object {
++            "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
++              "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++              "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++              "sequenceIds": Array [
++                "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++              ],
++              "title": "bcdabcdabcdabcdabcdabcdabcdabcd3",
++            },
++          },
++          "sequences": Object {
++            "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2": Object {
++              "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++              "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++              "sectionId": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++              "title": "bcdabcdabcdabcdabcdabcdabcdabcd2",
++              "unitIds": Array [
++                "block-v1:edX+DemoX+Demo_Course+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++              ],
++            },
++          },
++          "units": Object {
++            "block-v1:edX+DemoX+Demo_Course+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1": Object {
++              "graded": false,
++              "id": "block-v1:edX+DemoX+Demo_Course+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++              "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++              "sequenceId": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++              "title": "bcdabcdabcdabcdabcdabcdabcdabcd1",
++            },
++          },
++        },
++        "courseTools": Object {
++          "analyticsId": "edx.bookmarks",
++          "title": "Bookmarks",
++          "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/bookmarks/",
++        },
++        "datesWidget": undefined,
++        "id": "course-v1:edX+DemoX+Demo_Course_1",
++      },
++    },
++  },
++}
++`;
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+new file mode 100644
+index 0000000..b21e111
+--- /dev/null
++++ b/src/course-home/data/redux.test.js
+@@ -0,0 +1,155 @@
++import { configureStore } from '@reduxjs/toolkit';
++import { Factory } from 'rosie';
++import MockAdapter from 'axios-mock-adapter';
++
++import { configure, getAuthenticatedHttpClient, MockAuthService } from '@edx/frontend-platform/auth';
++import { getConfig, mergeConfig } from '@edx/frontend-platform';
++import { logError } from '@edx/frontend-platform/logging';
++
++import * as thunks from './thunks';
++
++import executeThunk from '../../utils';
++
++import { reducer as courseHomeReducer } from './slice';
++import { reducer as coursewareReducer } from '../../courseware/data/slice';
++import { reducer as modelsReducer } from '../../generic/model-store';
++
++import './__factories__';
++import '../../courseware/data/__factories__/courseMetadata.factory';
++
++jest.mock('@edx/frontend-platform/logging', () => ({ logError: jest.fn() }));
++
++mergeConfig({
++  authenticatedUser: {
++    userId: 'abc123',
++    username: 'Mock User',
++    roles: [],
++    administrator: false,
++  },
++});
++configure(MockAuthService, {
++  config: getConfig(),
++  loggingService: {
++    logInfo: jest.fn(),
++    logError: jest.fn(),
++  },
++});
++
++const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++
++
++describe('Data layer integration tests', () => {
++  const courseMetadata = Factory.build('courseMetadata');
++  const courseHomeMetadata = Factory.build(
++    'courseHomeMetadata', {
++      course_id: courseMetadata.id,
++    },
++    { courseTabs: courseMetadata.tabs },
++  );
++
++  const courseId = courseMetadata.id;
++  const courseBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course`;
++  const courseMetadataBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata`;
++
++  const courseUrl = `${courseBaseUrl}/${courseId}`;
++  const courseMetadataUrl = `${courseMetadataBaseUrl}/${courseId}`;
++
++  let store;
++
++  beforeEach(() => {
++    axiosMock.reset();
++    logError.mockReset();
++
++    store = configureStore({
++      reducer: {
++        models: modelsReducer,
++        courseware: coursewareReducer,
++        courseHome: courseHomeReducer,
++      },
++    });
++  });
++
++  it('Should initialize store', () => {
++    expect(store.getState()).toMatchSnapshot();
++  });
++
++  describe('Test fetchDatesTab', () => {
++    const datesBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dates`;
++
++    it('Should fail to fetch if error occurs', async () => {
++      axiosMock.onGet(courseUrl).networkError();
++      axiosMock.onGet(courseMetadataUrl).networkError();
++      axiosMock.onGet(`${datesBaseUrl}/${courseId}`).networkError();
++
++      await executeThunk(thunks.fetchDatesTab(courseId), store.dispatch);
++
++      expect(logError).toHaveBeenCalled();
++      expect(store.getState().courseHome.courseStatus).toEqual('failed');
++    });
++
++    it('Should fetch, normalize, and save metadata', async () => {
++      const datesTabData = Factory.build('datesTabData');
++
++      const datesUrl = `${datesBaseUrl}/${courseId}`;
++
++      axiosMock.onGet(courseUrl).reply(200, courseMetadata);
++      axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadata);
++      axiosMock.onGet(datesUrl).reply(200, datesTabData);
++
++      await executeThunk(thunks.fetchDatesTab(courseId), store.dispatch);
++
++      const state = store.getState();
++      expect(state.courseHome.courseStatus).toEqual('loaded');
++      expect(state).toMatchSnapshot();
++    });
++  });
++
++  describe('Test fetchOutlineTab', () => {
++    const outlineBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline`;
++
++    it('Should result in fetch failure if error occurs', async () => {
++      axiosMock.onGet(courseUrl).networkError();
++      axiosMock.onGet(courseMetadataUrl).networkError();
++      axiosMock.onGet(`${outlineBaseUrl}/${courseId}`).networkError();
++
++      await executeThunk(thunks.fetchOutlineTab(courseId), store.dispatch);
++
++      expect(logError).toHaveBeenCalled();
++      expect(store.getState().courseHome.courseStatus).toEqual('failed');
++    });
++
++    it('Should fetch, normalize, and save metadata', async () => {
++      const outlineTabData = Factory.build('outlineTabData', { courseId });
++
++      const outlineUrl = `${outlineBaseUrl}/${courseId}`;
++
++      axiosMock.onGet(courseUrl).reply(200, courseMetadata);
++      axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadata);
++      axiosMock.onGet(outlineUrl).reply(200, outlineTabData);
++
++      await executeThunk(thunks.fetchOutlineTab(courseId), store.dispatch);
++
++      const state = store.getState();
++      expect(state.courseHome.courseStatus).toEqual('loaded');
++      expect(state).toMatchSnapshot();
++    });
++  });
++
++  describe('Test resetDeadlines', () => {
++    it('Should reset course deadlines', async () => {
++      const resetUrl = `${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`;
++      axiosMock.onPost(resetUrl).reply(201);
++
++      const getTabDataMock = jest.fn(() => ({
++        type: 'MOCK_ACTION',
++      }));
++
++      await executeThunk(thunks.resetDeadlines(courseId, getTabDataMock), store.dispatch);
++
++      expect(axiosMock.history.post[0].url).toEqual(resetUrl);
++      expect(axiosMock.history.post[0].data).toEqual(`{"course_key":"${courseId}"}`);
++
++      expect(getTabDataMock).toHaveBeenCalledWith(courseId);
++    });
++  });
++});
+diff --git a/src/courseware/course/bookmark/data/redux.test.js b/src/courseware/course/bookmark/data/redux.test.js
+new file mode 100644
+index 0000000..4c801f9
+--- /dev/null
++++ b/src/courseware/course/bookmark/data/redux.test.js
+@@ -0,0 +1,107 @@
++import { configureStore } from '@reduxjs/toolkit';
++import MockAdapter from 'axios-mock-adapter';
++
++import { configure, getAuthenticatedHttpClient, MockAuthService } from '@edx/frontend-platform/auth';
++import { getConfig, mergeConfig } from '@edx/frontend-platform';
++import { logError } from '@edx/frontend-platform/logging';
++
++import * as thunks from './thunks';
++
++import executeThunk from '../../../../utils';
++
++import { reducer as modelsReducer } from '../../../../generic/model-store';
++
++jest.mock('@edx/frontend-platform/logging', () => ({ logError: jest.fn() }));
++
++const authenticatedUser = {
++  userId: 'abc123',
++  username: 'Mock User',
++  roles: [],
++  administrator: false,
++};
++mergeConfig({
++  authenticatedUser,
++});
++configure(MockAuthService, {
++  config: getConfig(),
++  loggingService: {
++    logInfo: jest.fn(),
++    logError: jest.fn(),
++  },
++});
++
++const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++
++
++describe('Data layer integration tests', () => {
++  const unitId = 'unitId';
++
++  let store;
++
++  beforeEach(() => {
++    axiosMock.reset();
++    logError.mockReset();
++
++    store = configureStore({
++      reducer: {
++        models: modelsReducer,
++      },
++    });
++  });
++
++  describe('Test addBookmark', () => {
++    const createBookmarkURL = `${getConfig().LMS_BASE_URL}/api/bookmarks/v1/bookmarks/`;
++
++    it('Should fail to create bookmark in case of error', async () => {
++      axiosMock.onPost(createBookmarkURL).networkError();
++
++      await executeThunk(thunks.addBookmark(unitId), store.dispatch);
++
++      expect(logError).toHaveBeenCalled();
++      expect(axiosMock.history.post[0].url).toEqual(createBookmarkURL);
++      expect(store.getState().models.units[unitId]).toEqual(expect.objectContaining({
++        bookmarked: false,
++        bookmarkedUpdateState: 'failed',
++      }));
++    });
++
++    it('Should create bookmark and update model state', async () => {
++      axiosMock.onPost(createBookmarkURL).reply(201);
++
++      await executeThunk(thunks.addBookmark(unitId), store.dispatch);
++
++      expect(store.getState().models.units[unitId]).toEqual(expect.objectContaining({
++        bookmarked: true,
++        bookmarkedUpdateState: 'loaded',
++      }));
++    });
++  });
++
++  describe('Test removeBookmark', () => {
++    const deleteBookmarkURL = `${getConfig().LMS_BASE_URL}/api/bookmarks/v1/bookmarks/${authenticatedUser.username},${unitId}/`;
++
++    it('Should fail to remove bookmark in case of error', async () => {
++      axiosMock.onDelete(deleteBookmarkURL).networkError();
++
++      await executeThunk(thunks.removeBookmark(unitId), store.dispatch);
++
++      expect(logError).toHaveBeenCalled();
++      expect(axiosMock.history.delete[0].url).toEqual(deleteBookmarkURL);
++      expect(store.getState().models.units[unitId]).toEqual(expect.objectContaining({
++        bookmarked: true,
++        bookmarkedUpdateState: 'failed',
++      }));
++    });
++
++    it('Should delete bookmark and update model state', async () => {
++      axiosMock.onDelete(deleteBookmarkURL).reply(201);
++
++      await executeThunk(thunks.removeBookmark(unitId), store.dispatch);
++
++      expect(store.getState().models.units[unitId]).toEqual(expect.objectContaining({
++        bookmarked: false,
++        bookmarkedUpdateState: 'loaded',
++      }));
++    });
++  });
++});
+diff --git a/src/courseware/data/__factories__/block.factory.js b/src/courseware/data/__factories__/block.factory.js
+new file mode 100644
+index 0000000..915dc9b
+--- /dev/null
++++ b/src/courseware/data/__factories__/block.factory.js
+@@ -0,0 +1,54 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('block')
++  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .option('host', 'http://localhost:18000')
++  // Generating block_id that is similar to md5 hash, but still deterministic
++  .sequence('block_id', id => ('abcd'.repeat(8) + id).slice(-32))
++  .attrs({
++    graded: false,
++    type: 'course',
++    children: [],
++  })
++  .attr('display_name', ['display_name', 'block_id'], (displayName, blockId) => {
++    if (displayName) {
++      return displayName;
++    }
++
++    return blockId;
++  })
++  .attr(
++    'id',
++    ['id', 'block_id', 'type', 'courseId'],
++    (id, blockId, type, courseId) => {
++      if (id) {
++        return id;
++      }
++
++      const courseInfo = courseId.split(':')[1];
++
++      return `block-v1:${courseInfo}+type@${type}+block@${blockId}`;
++    },
++  )
++  .attr(
++    'student_view_url',
++    ['student_view_url', 'host', 'id'],
++    (url, host, id) => {
++      if (url) {
++        return url;
++      }
++
++      return `${host}/xblock/${id}`;
++    },
++  )
++  .attr(
++    'lms_web_url',
++    ['lms_web_url', 'host', 'courseId', 'id'],
++    (url, host, courseId, id) => {
++      if (url) {
++        return url;
++      }
++
++      return `${host}/courses/${courseId}/jump_to/${id}`;
++    },
++  );
+diff --git a/src/courseware/data/__factories__/courseBlocks.factory.js b/src/courseware/data/__factories__/courseBlocks.factory.js
+new file mode 100644
+index 0000000..d269eb2
+--- /dev/null
++++ b/src/courseware/data/__factories__/courseBlocks.factory.js
+@@ -0,0 +1,37 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++import './block.factory';
++
++Factory.define('courseBlocks')
++  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .option('unit', ['courseId'], courseId => Factory.build(
++    'block',
++    { type: 'vertical' },
++    { courseId },
++  ))
++  .option('sequence', ['courseId', 'unit'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'sequential', children: [child.id] },
++    { courseId },
++  ))
++  .option('section', ['courseId', 'sequence'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'chapter', children: [child.id] },
++    { courseId },
++  ))
++  .option('course', ['courseId', 'section'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'course', children: [child.id] },
++    { courseId },
++  ))
++  .attr(
++    'blocks',
++    ['course', 'section', 'sequence', 'unit'],
++    (course, section, sequence, unit) => ({
++      [course.id]: course,
++      [section.id]: section,
++      [sequence.id]: sequence,
++      [unit.id]: unit,
++    }),
++  )
++  .attr('root', ['course'], course => course.id);
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+new file mode 100644
+index 0000000..44372db
+--- /dev/null
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -0,0 +1,111 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++import './tab.factory';
++
++Factory.define('courseMetadata')
++  .sequence('id', (id) => `course-v1:edX+DemoX+Demo_Course_${id}`)
++  .attrs({
++    can_show_upgrade_sock: false,
++    content_type_gating_enabled: false,
++    course_expired_message: null,
++    effort: null,
++    end: null,
++    enrollment_start: null,
++    enrollment_end: null,
++    name: 'Demonstration Course',
++    number: 'DemoX',
++    offer_html: null,
++    org: 'edX',
++    short_description: null,
++    start: '2013-02-05T05:00:00Z',
++    start_display: 'Feb. 5, 2013',
++    start_type: 'timestamp',
++    pacing: 'instructor',
++    enrollment: {
++      mode: null,
++      is_active: null,
++    },
++    verified_mode: {
++      currency: 'USD',
++      upgrade_url: 'http://localhost:18130/basket/add/?sku=8CF08E5',
++      sku: '8CF08E5',
++      price: 149,
++      currency_symbol: '$',
++    },
++    show_calculator: false,
++    is_staff: false,
++    can_load_courseware: {
++      has_access: true,
++      user_fragment: null,
++      developer_message: null,
++      user_message: null,
++      error_code: null,
++      additional_context_user_message: null,
++    },
++    notes: {
++      visible: true,
++      enabled: false,
++    },
++    marketing_url: null,
++  }).attr(
++    'tabs', ['tabs', 'id'], (passedTabs, id) => {
++      if (passedTabs) {
++        return passedTabs;
++      }
++
++      const tabs = [
++        Factory.build(
++          'tab',
++          {
++            title: 'Course',
++            priority: 0,
++            slug: 'courseware',
++            type: 'courseware',
++          },
++          { courseId: id, path: 'course/' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Discussion',
++            priority: 1,
++            slug: 'discussion',
++            type: 'discussion',
++          },
++          { courseId: id, path: 'discussion/forum/' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Wiki',
++            priority: 2,
++            slug: 'wiki',
++            type: 'wiki',
++          },
++          { courseId: id, path: 'course_wiki' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Progress',
++            priority: 3,
++            slug: 'progress',
++            type: 'progress',
++          },
++          { courseId: id, path: 'progress' },
++        ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Instructor',
++            priority: 4,
++            slug: 'instructor',
++            type: 'instructor',
++          },
++          { courseId: id, path: 'instructor' },
++        ),
++      ];
++
++      return tabs;
++    },
++  );
+diff --git a/src/courseware/data/__factories__/index.js b/src/courseware/data/__factories__/index.js
+new file mode 100644
+index 0000000..08cc70a
+--- /dev/null
++++ b/src/courseware/data/__factories__/index.js
+@@ -0,0 +1,4 @@
++import './block.factory';
++import './courseBlocks.factory';
++import './courseMetadata.factory';
++import './sequenceMetadata.factory';
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+new file mode 100644
+index 0000000..ac9fa4f
+--- /dev/null
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -0,0 +1,55 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++import './block.factory';
++
++Factory.define('sequenceMetadata')
++  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .option('unitBlock', ['courseId'], courseId => Factory.build(
++    'block',
++    { type: 'vertical' },
++    { courseId },
++  ))
++  .option(
++    'sequenceBlock', ['courseId', 'unitBlock'], (courseId, unitBlock) => (
++      Factory.build(
++        'block',
++        { type: 'sequential', children: [unitBlock.id] },
++        { courseId },
++      )
++    ),
++  )
++  .attr('element_id', ['sequenceBlock'], sequenceBlock => sequenceBlock.block_id)
++  .attr('item_id', ['sequenceBlock'], sequenceBlock => sequenceBlock.id)
++  .attr('display_name', ['sequenceBlock'], sequenceBlock => sequenceBlock.display_name)
++  .attr('ajax_url', ['sequenceBlock'], sequenceBlock => `${sequenceBlock.student_view_url}/handler/xmodule_handler}`)
++  .attr('gated_content', ['sequenceBlock'], sequenceBlock => ({
++    gated: false,
++    prereq_url: null,
++    prereq_id: null,
++    prereq_section_name: null,
++    gated_section_name: sequenceBlock.display_name,
++  }))
++  .attr('items', ['unitBlock', 'sequenceBlock'], (unitBlock, sequenceBlock) => ([
++    {
++      href: '',
++      graded: unitBlock.graded,
++      id: unitBlock.id,
++      bookmarked: false,
++      path: `Chapter Display Name > ${sequenceBlock.display_name} > ${unitBlock.display_name}`,
++      type: 'other',
++      complete: null,
++      content: '',
++      page_title: unitBlock.display_name,
++    },
++  ]))
++  .attrs({
++    exclude_units: true,
++    position: null,
++    next_url: null,
++    tag: 'sequential',
++    save_position: true,
++    prev_url: null,
++    is_time_limited: false,
++    show_completion: true,
++    banner_text: null,
++  });
+diff --git a/src/courseware/data/__factories__/tab.factory.js b/src/courseware/data/__factories__/tab.factory.js
+new file mode 100644
+index 0000000..1f5f84e
+--- /dev/null
++++ b/src/courseware/data/__factories__/tab.factory.js
+@@ -0,0 +1,16 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++Factory.define('tab')
++  .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
++  .option('path', 'course/')
++  .attrs({
++    title: 'Course',
++    priority: 0,
++    slug: 'courseware',
++    type: 'courseware',
++  })
++  .attr(
++    'url',
++    ['courseId', 'path'],
++    (courseId, path) => `/courses/${courseId}/${path}`,
++  );
+diff --git a/src/courseware/data/__snapshots__/redux.test.js.snap b/src/courseware/data/__snapshots__/redux.test.js.snap
+new file mode 100644
+index 0000000..ae6dbd5
+--- /dev/null
++++ b/src/courseware/data/__snapshots__/redux.test.js.snap
+@@ -0,0 +1,265 @@
++// Jest Snapshot v1, https://goo.gl/fbAQLP
++
++exports[`Data layer integration tests Test fetchCourse Should fetch, normalize, and save metadata 1`] = `
++Object {
++  "courseware": Object {
++    "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++    "courseStatus": "loaded",
++    "sequenceId": null,
++    "sequenceStatus": "loading",
++  },
++  "models": Object {
++    "courses": Object {
++      "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "canLoadCourseware": Object {
++          "additionalContextUserMessage": null,
++          "developerMessage": null,
++          "errorCode": null,
++          "hasAccess": true,
++          "userFragment": null,
++          "userMessage": null,
++        },
++        "canShowUpgradeSock": false,
++        "celebrations": undefined,
++        "contentTypeGatingEnabled": false,
++        "courseExpiredMessage": null,
++        "end": null,
++        "enrollmentEnd": null,
++        "enrollmentMode": null,
++        "enrollmentStart": null,
++        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "isEnrolled": null,
++        "isStaff": false,
++        "marketingUrl": null,
++        "notes": Object {
++          "enabled": false,
++          "visible": true,
++        },
++        "number": "DemoX",
++        "offerHtml": null,
++        "org": "edX",
++        "sectionIds": Array [
++          "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++        ],
++        "showCalculator": false,
++        "start": "2013-02-05T05:00:00Z",
++        "tabs": Array [
++          Object {
++            "priority": 0,
++            "slug": "courseware",
++            "title": "Course",
++            "type": "courseware",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
++          },
++          Object {
++            "priority": 1,
++            "slug": "discussion",
++            "title": "Discussion",
++            "type": "discussion",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/discussion/forum/",
++          },
++          Object {
++            "priority": 2,
++            "slug": "wiki",
++            "title": "Wiki",
++            "type": "wiki",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course_wiki",
++          },
++          Object {
++            "priority": 3,
++            "slug": "progress",
++            "title": "Progress",
++            "type": "progress",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress",
++          },
++          Object {
++            "priority": 4,
++            "slug": "instructor",
++            "title": "Instructor",
++            "type": "instructor",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
++          },
++        ],
++        "title": "bcdabcdabcdabcdabcdabcdabcdabcd4",
++        "verifiedMode": Object {
++          "currency": "USD",
++          "currencySymbol": "$",
++          "price": 149,
++          "sku": "8CF08E5",
++          "upgradeUrl": "http://localhost:18130/basket/add/?sku=8CF08E5",
++        },
++      },
++    },
++    "sections": Object {
++      "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
++        "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++        "sequenceIds": Array [
++          "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++        ],
++        "title": "bcdabcdabcdabcdabcdabcdabcdabcd3",
++      },
++    },
++    "sequences": Object {
++      "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2": Object {
++        "id": "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++        "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/jump_to/block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++        "sectionId": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++        "title": "bcdabcdabcdabcdabcdabcdabcdabcd2",
++        "unitIds": Array [
++          "block-v1:edX+DemoX+Demo_Course_1+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++        ],
++      },
++    },
++    "units": Object {
++      "block-v1:edX+DemoX+Demo_Course_1+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1": Object {
++        "graded": false,
++        "id": "block-v1:edX+DemoX+Demo_Course_1+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++        "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/jump_to/block-v1:edX+DemoX+Demo_Course_1+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++        "sequenceId": "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++        "title": "bcdabcdabcdabcdabcdabcdabcdabcd1",
++      },
++    },
++  },
++}
++`;
++
++exports[`Data layer integration tests Test fetchSequence Should fetch and normalize metadata, and then update existing models with sequence metadata 1`] = `
++Object {
++  "courseware": Object {
++    "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++    "courseStatus": "loaded",
++    "sequenceId": "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++    "sequenceStatus": "loaded",
++  },
++  "models": Object {
++    "courses": Object {
++      "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "canLoadCourseware": Object {
++          "additionalContextUserMessage": null,
++          "developerMessage": null,
++          "errorCode": null,
++          "hasAccess": true,
++          "userFragment": null,
++          "userMessage": null,
++        },
++        "canShowUpgradeSock": false,
++        "celebrations": undefined,
++        "contentTypeGatingEnabled": false,
++        "courseExpiredMessage": null,
++        "end": null,
++        "enrollmentEnd": null,
++        "enrollmentMode": null,
++        "enrollmentStart": null,
++        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "isEnrolled": null,
++        "isStaff": false,
++        "marketingUrl": null,
++        "notes": Object {
++          "enabled": false,
++          "visible": true,
++        },
++        "number": "DemoX",
++        "offerHtml": null,
++        "org": "edX",
++        "sectionIds": Array [
++          "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++        ],
++        "showCalculator": false,
++        "start": "2013-02-05T05:00:00Z",
++        "tabs": Array [
++          Object {
++            "priority": 0,
++            "slug": "courseware",
++            "title": "Course",
++            "type": "courseware",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
++          },
++          Object {
++            "priority": 1,
++            "slug": "discussion",
++            "title": "Discussion",
++            "type": "discussion",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/discussion/forum/",
++          },
++          Object {
++            "priority": 2,
++            "slug": "wiki",
++            "title": "Wiki",
++            "type": "wiki",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course_wiki",
++          },
++          Object {
++            "priority": 3,
++            "slug": "progress",
++            "title": "Progress",
++            "type": "progress",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress",
++          },
++          Object {
++            "priority": 4,
++            "slug": "instructor",
++            "title": "Instructor",
++            "type": "instructor",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
++          },
++        ],
++        "title": "bcdabcdabcdabcdabcdabcdabcdabcd4",
++        "verifiedMode": Object {
++          "currency": "USD",
++          "currencySymbol": "$",
++          "price": 149,
++          "sku": "8CF08E5",
++          "upgradeUrl": "http://localhost:18130/basket/add/?sku=8CF08E5",
++        },
++      },
++    },
++    "sections": Object {
++      "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
++        "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++        "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++        "sequenceIds": Array [
++          "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++        ],
++        "title": "bcdabcdabcdabcdabcdabcdabcdabcd3",
++      },
++    },
++    "sequences": Object {
++      "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2": Object {
++        "activeUnitIndex": 0,
++        "bannerText": null,
++        "gatedContent": Object {
++          "gated": false,
++          "gatedSectionName": "bcdabcdabcdabcdabcdabcdabcdabcd2",
++          "prereqId": null,
++          "prereqSectionName": null,
++          "prereqUrl": null,
++        },
++        "id": "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++        "isTimeLimited": false,
++        "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/jump_to/block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++        "position": 1,
++        "saveUnitPosition": true,
++        "sectionId": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd3",
++        "showCompletion": true,
++        "title": "bcdabcdabcdabcdabcdabcdabcdabcd2",
++        "unitIds": Array [
++          "block-v1:edX+DemoX+Demo_Course_1+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++        ],
++      },
++    },
++    "units": Object {
++      "block-v1:edX+DemoX+Demo_Course_1+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1": Object {
++        "bookmarked": false,
++        "complete": null,
++        "contentType": "other",
++        "graded": false,
++        "id": "block-v1:edX+DemoX+Demo_Course_1+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++        "lmsWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/jump_to/block-v1:edX+DemoX+Demo_Course_1+type@vertical+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
++        "sequenceId": "block-v1:edX+DemoX+Demo_Course_1+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
++        "title": "bcdabcdabcdabcdabcdabcdabcdabcd1",
++      },
++    },
++  },
++}
++`;
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 22155bf..fa4a5c6 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -152,6 +152,7 @@ function normalizeSequenceMetadata(sequence) {
+       title: sequence.display_name,
+       gatedContent: camelCaseObject(sequence.gated_content),
+       isTimeLimited: sequence.is_time_limited,
++      position: sequence.position || 1,
+       // Position comes back from the server 1-indexed. Adjust here.
+       activeUnitIndex: sequence.position ? sequence.position - 1 : 0,
+       saveUnitPosition: sequence.save_position,
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+new file mode 100644
+index 0000000..64a64df
+--- /dev/null
++++ b/src/courseware/data/redux.test.js
+@@ -0,0 +1,272 @@
++import { configureStore } from '@reduxjs/toolkit';
++import { Factory } from 'rosie';
++import MockAdapter from 'axios-mock-adapter';
++
++import { configure, getAuthenticatedHttpClient, MockAuthService } from '@edx/frontend-platform/auth';
++import { getConfig, mergeConfig } from '@edx/frontend-platform';
++import { logError } from '@edx/frontend-platform/logging';
++
++import * as thunks from './thunks';
++
++import executeThunk from '../../utils';
++
++import { reducer as coursewareReducer } from './slice';
++import { reducer as modelsReducer } from '../../generic/model-store';
++
++import './__factories__';
++
++jest.mock('@edx/frontend-platform/logging', () => ({ logError: jest.fn() }));
++
++mergeConfig({
++  authenticatedUser: {
++    userId: 'abc123',
++    username: 'Mock User',
++    roles: [],
++    administrator: false,
++  },
++});
++configure(MockAuthService, {
++  config: getConfig(),
++  loggingService: {
++    logInfo: jest.fn(),
++    logError: jest.fn(),
++  },
++});
++
++const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++
++
++describe('Data layer integration tests', () => {
++  const courseBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course`;
++  const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
++  const sequenceBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence`;
++
++  // building minimum set of api responses to test all thunks
++  const courseMetadata = Factory.build('courseMetadata');
++  const courseId = courseMetadata.id;
++  const unitBlock = Factory.build(
++    'block',
++    { type: 'vertical' },
++    { courseId },
++  );
++  const sequenceBlock = Factory.build(
++    'block',
++    { type: 'sequential', children: [unitBlock.id] },
++    { courseId },
++  );
++  const courseBlocks = Factory.build(
++    'courseBlocks',
++    { courseId },
++    { unit: unitBlock, sequence: sequenceBlock },
++  );
++  const sequenceMetadata = Factory.build(
++    'sequenceMetadata',
++    { courseId },
++    { unitBlock, sequenceBlock },
++  );
++
++  const courseUrl = `${courseBaseUrl}/${courseId}`;
++  const sequenceId = sequenceMetadata.item_id;
++  const sequenceUrl = `${sequenceBaseUrl}/${sequenceMetadata.item_id}`;
++  const unitId = sequenceMetadata.items[0].id;
++
++  let store;
++
++  beforeEach(() => {
++    axiosMock.reset();
++    logError.mockReset();
++
++    store = configureStore({
++      reducer: {
++        models: modelsReducer,
++        courseware: coursewareReducer,
++      },
++    });
++  });
++
++  describe('Test fetchCourse', () => {
++    it('Should fail to fetch course and blocks if request error happens', async () => {
++      axiosMock.onGet(courseUrl).networkError();
++      axiosMock.onGet(courseBlocksUrlRegExp).networkError();
++
++      await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
++
++      expect(logError).toHaveBeenCalled();
++      expect(store.getState().courseware).toEqual(expect.objectContaining({
++        courseId,
++        courseStatus: 'failed',
++      }));
++    });
++
++    it('Should fetch, normalize, and save metadata, but with denied status', async () => {
++      const forbiddenCourseMetadata = Factory.build('courseMetadata', {
++        can_load_courseware: {
++          has_access: false,
++        },
++      });
++      const forbiddenCourseBlocks = Factory.build('courseBlocks', { courseId: forbiddenCourseMetadata.id });
++
++      const forbiddenCourseUrl = `${courseBaseUrl}/${forbiddenCourseMetadata.id}`;
++
++      axiosMock.onGet(forbiddenCourseUrl).reply(200, forbiddenCourseMetadata);
++      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, forbiddenCourseBlocks);
++
++      await executeThunk(thunks.fetchCourse(forbiddenCourseMetadata.id), store.dispatch);
++
++      const state = store.getState();
++
++      expect(state.courseware.courseStatus).toEqual('denied');
++
++      // check that at least one key camel cased, thus course data normalized
++      expect(state.models.courses[forbiddenCourseMetadata.id].canLoadCourseware).not.toBeUndefined();
++    });
++
++    it('Should fetch, normalize, and save metadata', async () => {
++      axiosMock.onGet(courseUrl).reply(200, courseMetadata);
++      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++
++      await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
++
++      const state = store.getState();
++
++      expect(state.courseware.courseStatus).toEqual('loaded');
++
++      // check that at least one key camel cased, thus course data normalized
++      expect(state.models.courses[courseId].canLoadCourseware).not.toBeUndefined();
++
++      expect(state).toMatchSnapshot();
++    });
++  });
++
++  describe('Test fetchSequence', () => {
++    it('Should result in fetch failure if error occurs', async () => {
++      axiosMock.onGet(sequenceUrl).networkError();
++
++      await executeThunk(thunks.fetchSequence(sequenceId), store.dispatch);
++
++      expect(logError).toHaveBeenCalled();
++      expect(store.getState().courseware.sequenceStatus).toEqual('failed');
++    });
++
++    it('Should fetch and normalize metadata, and then update existing models with sequence metadata', async () => {
++      axiosMock.onGet(courseUrl).reply(200, courseMetadata);
++      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++      axiosMock.onGet(sequenceUrl).reply(200, sequenceMetadata);
++
++      // setting course with blocks before sequence to check that blocks receive
++      // additional information after fetchSequence call.
++      await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
++
++      // ensure that initial state has no additional sequence info
++      const initialState = store.getState();
++      expect(initialState.models.sequences).toEqual({
++        [sequenceBlock.id]: expect.not.objectContaining({
++          gatedContent: expect.any(Object),
++          activeUnitIndex: expect.any(Number),
++        }),
++      });
++      expect(initialState.models.units).toEqual({
++        [unitBlock.id]: expect.not.objectContaining({
++          complete: null,
++          bookmarked: expect.any(Boolean),
++        }),
++      });
++
++      await executeThunk(thunks.fetchSequence(sequenceBlock.id), store.dispatch);
++
++      const state = store.getState();
++
++      expect(state.courseware.sequenceStatus).toEqual('loaded');
++
++      // ensure that additional information appeared in store
++      expect(state.models.sequences).toEqual({
++        [sequenceBlock.id]: expect.objectContaining({
++          gatedContent: expect.any(Object),
++          activeUnitIndex: expect.any(Number),
++        }),
++      });
++      expect(state.models.units).toEqual({
++        [unitBlock.id]: expect.objectContaining({
++          complete: null,
++          bookmarked: expect.any(Boolean),
++        }),
++      });
++
++      expect(state).toMatchSnapshot();
++    });
++  });
++
++  describe('Thunks that require fetched sequences', () => {
++    beforeEach(async () => {
++      // thunks tested in this block rely on fact, that store already has
++      // some info about sequence
++      axiosMock.onGet(sequenceUrl).reply(200, sequenceMetadata);
++      await executeThunk(thunks.fetchSequence(sequenceMetadata.item_id), store.dispatch);
++    });
++
++    describe('Test checkBlockCompletion', () => {
++      const getCompletionURL = `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/xmodule_handler/get_completion`;
++
++      it('Should fail to check completion and log error', async () => {
++        axiosMock.onPost(getCompletionURL).networkError();
++
++        await executeThunk(
++          thunks.checkBlockCompletion(courseId, sequenceId, unitId),
++          store.dispatch,
++          store.getState,
++        );
++
++        expect(logError).toHaveBeenCalled();
++        expect(axiosMock.history.post[0].url).toEqual(getCompletionURL);
++      });
++
++      it('Should update complete field of unit model', async () => {
++        axiosMock.onPost(getCompletionURL).reply(201, { complete: true });
++
++        await executeThunk(
++          thunks.checkBlockCompletion(courseId, sequenceId, unitId),
++          store.dispatch,
++          store.getState,
++        );
++
++        expect(store.getState().models.units[unitId].complete).toBeTruthy();
++      });
++    });
++
++    describe('Test saveSequencePosition', () => {
++      const gotoPositionURL = `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/xmodule_handler/goto_position`;
++
++      it('Should change and revert sequence model position in case of error', async () => {
++        axiosMock.onPost(gotoPositionURL).networkError();
++
++        const oldPosition = store.getState().models.sequences[sequenceId].position;
++        const newPosition = 123;
++
++        await executeThunk(
++          thunks.saveSequencePosition(courseId, sequenceId, newPosition),
++          store.dispatch,
++          store.getState,
++        );
++
++        expect(logError).toHaveBeenCalled();
++        expect(axiosMock.history.post[0].url).toEqual(gotoPositionURL);
++        expect(store.getState().models.sequences[sequenceId].position).toEqual(oldPosition);
++      });
++
++      it('Should update sequence model position', async () => {
++        axiosMock.onPost(gotoPositionURL).reply(201, {});
++
++        const newPosition = 123;
++
++        await executeThunk(
++          thunks.saveSequencePosition(courseId, sequenceId, newPosition),
++          store.dispatch,
++          store.getState,
++        );
++
++        expect(axiosMock.history.post[0].url).toEqual(gotoPositionURL);
++        expect(store.getState().models.sequences[sequenceId].position).toEqual(newPosition);
++      });
++    });
++  });
++});
+diff --git a/src/utils.js b/src/utils.js
+new file mode 100644
+index 0000000..5e1d83e
+--- /dev/null
++++ b/src/utils.js
+@@ -0,0 +1,8 @@
++// Helper, that is used to forcibly finalize all promises
++// in thunk before running matcher against state.
++const executeThunk = async (thunk, dispatch, getState) => {
++  await thunk(dispatch, getState);
++  await new Promise(setImmediate);
++};
++
++export default executeThunk;
+-- 
+2.34.1
+

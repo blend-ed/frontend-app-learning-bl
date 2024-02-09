@@ -1,0 +1,449 @@
+From c39b3ae4c5a9f07ed43cc48a207f8cc95d0109e8 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 21 Oct 2021 12:50:14 -0400
+Subject: [PATCH 0705/1021] fix: don't show 3-day streak discount if it won't
+ provide a discount (#658)
+
+Also, this will pull the actual discount percent from ecommerce,
+instead of hardcoding it.
+
+AA-1012
+---
+ .../__factories__/courseMetadata.factory.js   |  1 +
+ src/courseware/data/api.js                    |  1 +
+ .../upgrade-button/UpgradeNowButton.jsx       |  2 +-
+ src/setupTest.js                              |  2 +-
+ .../courseMetadataBase.factory.js             |  6 +-
+ .../StreakCelebrationModal.jsx                | 89 ++++++++++++++----
+ .../StreakCelebrationModal.test.jsx           | 90 +++++++++++++++----
+ src/shared/streak-celebration/messages.js     |  2 +-
+ src/tab-page/LoadedTabPage.jsx                |  4 +-
+ 9 files changed, 155 insertions(+), 42 deletions(-)
+
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index a8ca74a..3f77e82 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -63,4 +63,5 @@ Factory.define('courseMetadata')
+     related_programs: null,
+     user_needs_integrity_signature: false,
+     recommendations: null,
++    username: 'testuser',
+   });
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 941426e..e05b07a 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -221,6 +221,7 @@ function normalizeMetadata(metadata) {
+     relatedPrograms: camelCaseObject(data.related_programs),
+     userNeedsIntegritySignature: data.user_needs_integrity_signature,
+     isMasquerading: data.original_user_is_staff && !data.is_staff,
++    username: data.username,
+   };
+ }
+ 
+diff --git a/src/generic/upgrade-button/UpgradeNowButton.jsx b/src/generic/upgrade-button/UpgradeNowButton.jsx
+index c262fd4..127e437 100644
+--- a/src/generic/upgrade-button/UpgradeNowButton.jsx
++++ b/src/generic/upgrade-button/UpgradeNowButton.jsx
+@@ -15,7 +15,7 @@ function UpgradeNowButton(props) {
+     ...rest
+   } = props;
+ 
+-  // Prefer offer's url in case it is ever different (though it is not at time of this writing)
++  // Prefer offer's url in case it is different (might hold a coupon code that the normal does not)
+   const url = offer ? offer.upgradeUrl : verifiedMode.upgradeUrl;
+ 
+   return (
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 2fb761b..2afe10c 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -123,7 +123,7 @@ export function loadUnit(message = messageEvent) {
+ export function logUnhandledRequests(axiosMock) {
+   axiosMock.onAny().reply((config) => {
+     // eslint-disable-next-line no-console
+-    console.log(config.method, config.url.href);
++    console.log(config.method, config.url);
+     return [200, {}];
+   });
+ }
+diff --git a/src/shared/data/__factories__/courseMetadataBase.factory.js b/src/shared/data/__factories__/courseMetadataBase.factory.js
+index 9c822cf..9afe868 100644
+--- a/src/shared/data/__factories__/courseMetadataBase.factory.js
++++ b/src/shared/data/__factories__/courseMetadataBase.factory.js
+@@ -12,10 +12,10 @@ export default new Factory()
+     original_user_is_staff: false,
+     number: 'DemoX',
+     org: 'edX',
+-    verifiedMode: {
+-      upgradeUrl: 'test',
++    verified_mode: {
++      upgrade_url: 'test',
+       price: 10,
+-      currencySymbol: '$',
++      currency_symbol: '$',
+     },
+   })
+   .attr(
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index f8fac94..ec203bc 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -1,11 +1,14 @@
+ import React, { useEffect, useState } from 'react';
+ import PropTypes from 'prop-types';
++import { camelCaseObject, getConfig } from '@edx/frontend-platform';
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import {
+   FormattedMessage, injectIntl, intlShape,
+ } from '@edx/frontend-platform/i18n';
+ import { Lightbulb, MoneyFilled } from '@edx/paragon/icons';
+ import {
+-  Alert, Icon, ModalDialog,
++  Alert, Icon, ModalDialog, Spinner,
+ } from '@edx/paragon';
+ import { layoutGenerator } from 'react-break';
+ import { useDispatch } from 'react-redux';
+@@ -41,18 +44,31 @@ function getRandomFactoid(intl, streakLength) {
+   return factoids[Math.floor(Math.random() * (factoids.length))];
+ }
+ 
++async function calculateVoucherDiscount(voucher, sku, username) {
++  const urlBase = `${getConfig().ECOMMERCE_BASE_URL}/api/v2/baskets/calculate`;
++  const url = `${urlBase}/?code=${voucher}&sku=${sku}&username=${username}`;
++  return getAuthenticatedHttpClient().get(url)
++    .then(res => camelCaseObject(res));
++}
++
+ function StreakModal({
+   courseId, metadataModel, streakLengthToCelebrate, intl, isStreakCelebrationOpen,
+-  closeStreakCelebration, StreakDiscountCouponEnabled, verifiedMode, ...rest
++  closeStreakCelebration, streakDiscountCouponEnabled, verifiedMode, ...rest
+ }) {
+   if (!isStreakCelebrationOpen) {
+     return null;
+   }
+-  const { org, celebrations } = useModel(metadataModel, courseId);
++  const { org, celebrations, username } = useModel(metadataModel, courseId);
+   const factoid = getRandomFactoid(intl, streakLengthToCelebrate);
+   // eslint-disable-next-line no-unused-vars
+   const [randomFactoid, setRandomFactoid] = useState(factoid); // Don't change factoid on re-render
+ 
++  // Open edX Folks: if you create a voucher with this code, the MFE will notice and show the discount
++  const discountCode = 'ZGY11119949';
++  // Negative means "we don't know yet" vs zero meaning no discount available
++  const [discountPercent, setDiscountPercent] = useState(-1);
++  const queryingDiscount = discountPercent < 0;
++
+   const layout = layoutGenerator({
+     mobile: 0,
+     desktop: 575,
+@@ -68,6 +84,37 @@ function StreakModal({
+     }
+   }, [isStreakCelebrationOpen, org, courseId]);
+ 
++  // Ask ecommerce to calculate discount savings
++  useEffect(() => {
++    if (streakDiscountCouponEnabled && verifiedMode && getConfig().ECOMMERCE_BASE_URL) {
++      calculateVoucherDiscount(discountCode, verifiedMode.sku, username)
++        .then(
++          (result) => {
++            const { totalInclTax, totalInclTaxExclDiscounts } = result.data;
++            if (totalInclTaxExclDiscounts && totalInclTax !== totalInclTaxExclDiscounts) {
++              // Just store the percent (rather than using these values directly), because ecommerce doesn't give us
++              // the currency symbol to use, so we want to use the symbol that LMS gives us. And I don't want to assume
++              // ecommerce's currency is the same as the LMS. So we'll keep using the values in verifiedMode, just
++              // multiplied by the calculated percentage.
++              setDiscountPercent(1 - totalInclTax / totalInclTaxExclDiscounts);
++              sendTrackEvent('edx.bi.course.streak_discount_enabled', {
++                course_id: courseId,
++                sku: verifiedMode.sku,
++              });
++            } else {
++              setDiscountPercent(0);
++            }
++          },
++          () => {
++            // ignore any errors - we just won't show the discount to the user then
++            setDiscountPercent(0);
++          },
++        );
++    } else {
++      setDiscountPercent(0);
++    }
++  }, [streakDiscountCouponEnabled, username, verifiedMode]);
++
+   function CloseText() {
+     return (
+       <span>
+@@ -82,21 +129,25 @@ function StreakModal({
+   let offer;
+ 
+   if (verifiedMode) {
+-    upgradeUrl = `${verifiedMode.upgradeUrl}&code=ZGY11119949`;
++    upgradeUrl = `${verifiedMode.upgradeUrl}`;
+     mode = {
+       currencySymbol: verifiedMode.currencySymbol,
+       price: verifiedMode.price,
+       upgradeUrl,
+     };
+ 
+-    offer = {
+-      discountedPrice: `${verifiedMode.currencySymbol}${(mode.price * 0.85).toFixed(2).toString()}`,
+-      originalPrice: `${verifiedMode.currencySymbol}${mode.price.toString()}`,
+-      upgradeUrl: mode.upgradeUrl,
+-    };
++    if (discountPercent > 0) {
++      const discountMultipler = 1 - discountPercent;
++      offer = {
++        discountedPrice: `${verifiedMode.currencySymbol}${(mode.price * discountMultipler).toFixed(2).toString()}`,
++        originalPrice: `${verifiedMode.currencySymbol}${mode.price.toString()}`,
++        upgradeUrl: `${mode.upgradeUrl}&code=${discountCode}`,
++      };
++    }
+   }
+ 
+   const title = `${streakLengthToCelebrate} ${intl.formatMessage(messages.streakHeader)}`;
++  const showOffer = offer && streakDiscountCouponEnabled;
+ 
+   return (
+     <ModalDialog
+@@ -125,7 +176,10 @@ function StreakModal({
+             <img src={StreakDesktopImage} alt="" className="img-fluid" />
+           </OnDesktop>
+         </p>
+-        { !StreakDiscountCouponEnabled && (
++        { queryingDiscount && (
++          <Spinner animation="border" variant="primary" role="status" />
++        )}
++        { !queryingDiscount && !showOffer && (
+           <div className="d-flex py-3 bg-light-300">
+             <Icon className="col-small ml-3" src={Lightbulb} />
+             <div className="col-11 factoid-wrapper">
+@@ -133,13 +187,15 @@ function StreakModal({
+             </div>
+           </div>
+         )}
+-        { StreakDiscountCouponEnabled && (
++        { !queryingDiscount && showOffer && (
+           <Alert variant="success" className="px-0">
+             <div className="d-flex">
+               <Icon className="col-small ml-3 text-success-500" src={MoneyFilled} />
+               <div className="col-11 factoid-wrapper">
+                 <b>{intl.formatMessage(messages.congratulations)}</b>
+-                &nbsp;{intl.formatMessage(messages.streakDiscountMessage)}&nbsp;
++                &nbsp;{intl.formatMessage(messages.streakDiscountMessage, {
++                  percent: (discountPercent * 100).toFixed(0),
++                })}&nbsp;
+                 <FormattedMessage
+                   id="learning.streakCelebration.streakCelebrationCouponEndDateMessage"
+                   defaultMessage="Ends {date}."
+@@ -153,7 +209,7 @@ function StreakModal({
+         )}
+       </ModalDialog.Body>
+       <ModalDialog.Footer className="modal-footer d-block">
+-        { StreakDiscountCouponEnabled && (
++        { !queryingDiscount && showOffer && (
+           <>
+             <OnMobile>
+               <UpgradeNowButton
+@@ -180,7 +236,7 @@ function StreakModal({
+             </OnDesktop>
+           </>
+         )}
+-        { !StreakDiscountCouponEnabled && (
++        { !queryingDiscount && !showOffer && (
+           <ModalDialog.CloseButton className="px-5" variant="primary"><CloseText /></ModalDialog.CloseButton>
+         )}
+       </ModalDialog.Footer>
+@@ -190,9 +246,9 @@ function StreakModal({
+ 
+ StreakModal.defaultProps = {
+   isStreakCelebrationOpen: false,
++  streakDiscountCouponEnabled: false,
+   streakLengthToCelebrate: -1,
+   verifiedMode: {},
+-  StreakDiscountCouponEnabled: false,
+ };
+ 
+ StreakModal.propTypes = {
+@@ -202,10 +258,11 @@ StreakModal.propTypes = {
+   intl: intlShape.isRequired,
+   isStreakCelebrationOpen: PropTypes.bool,
+   closeStreakCelebration: PropTypes.func.isRequired,
+-  StreakDiscountCouponEnabled: PropTypes.bool,
++  streakDiscountCouponEnabled: PropTypes.bool,
+   verifiedMode: PropTypes.shape({
+     currencySymbol: PropTypes.string,
+     price: PropTypes.number,
++    sku: PropTypes.string,
+     upgradeUrl: PropTypes.string,
+   }),
+ };
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+index a89b0b1..bfabfa1 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.test.jsx
+@@ -1,26 +1,62 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
++import { camelCaseObject, getConfig } from '@edx/frontend-platform';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+-import { initializeTestStore, render, screen } from '../../setupTest';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import MockAdapter from 'axios-mock-adapter';
++
++import {
++  act,
++  initializeMockApp,
++  initializeTestStore,
++  render,
++  screen,
++} from '../../setupTest';
+ import StreakModal from './StreakCelebrationModal';
+ 
++initializeMockApp();
+ jest.mock('@edx/frontend-platform/analytics');
+ 
+ describe('Loaded Tab Page', () => {
+-  const mockData = { metadataModel: 'coursewareMeta' };
++  let mockData;
++  let testStore;
++  let axiosMock;
++  const calculateUrl = `${getConfig().ECOMMERCE_BASE_URL}/api/v2/baskets/calculate/?code=ZGY11119949&sku=8CF08E5&username=testuser`;
++  const courseMetadata = Factory.build('courseMetadata', { celebrations: { streak_length_to_celebrate: 3 } });
++
++  function setDiscount(percent) {
++    mockData.streakDiscountCouponEnabled = true;
++    axiosMock.onGet(calculateUrl).reply(200, {
++      total_incl_tax: 100 - percent,
++      total_incl_tax_excl_discounts: 100,
++    });
++  }
++
++  function setDiscountError() {
++    mockData.streakDiscountCouponEnabled = true;
++    axiosMock.onGet(calculateUrl).reply(500);
++  }
++
++  async function renderModal() {
++    await act(async () => render(<StreakModal {...mockData} />, { store: testStore }));
++  }
+ 
+   beforeAll(async () => {
+-    mockData.isStreakCelebrationOpen = true;
+-    mockData.streakLengthToCelebrate = 3;
++    mockData = { // props for StreakModal
++      closeStreakCelebration: jest.fn(),
++      courseId: courseMetadata.id,
++      isStreakCelebrationOpen: true,
++      metadataModel: 'coursewareMeta',
++      streakLengthToCelebrate: 3,
++      verifiedMode: camelCaseObject(courseMetadata.verified_mode),
++    };
++
++    testStore = await initializeTestStore({ courseMetadata }, false);
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+   });
+ 
+   it('shows streak celebration modal', async () => {
+-    const courseMetadata = Factory.build('courseMetadata', { celebrations: { streakLengthToCelebrate: 3 } });
+-    mockData.courseId = courseMetadata.id;
+-    mockData.verifiedMode = courseMetadata.verifiedMode;
+-    mockData.closeStreakCelebration = jest.fn();
+-    const testStore = await initializeTestStore({ courseMetadata }, false);
+-    render(<StreakModal {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++    await renderModal();
+ 
+     expect(screen.getByText('3 day streak')).toBeInTheDocument();
+     expect(screen.getByText('Keep it up, you’re on a roll!')).toBeInTheDocument();
+@@ -32,7 +68,23 @@ describe('Loaded Tab Page', () => {
+     });
+   });
+ 
+-  it('shows streak celebration discount modal', async () => {
++  it('shows normal streak celebration modal when discount call fails', async () => {
++    setDiscountError();
++    await renderModal();
++
++    // This text is only for the non-discount case
++    expect(screen.getByText('Keep it up')).toBeInTheDocument();
++  });
++
++  it('shows normal streak celebration modal when discount is zero', async () => {
++    setDiscount(0);
++    await renderModal();
++
++    // This text is only for the non-discount case
++    expect(screen.getByText('Keep it up')).toBeInTheDocument();
++  });
++
++  it('shows discount version of streak celebration modal when available', async () => {
+     Object.defineProperty(window, 'matchMedia', {
+       writable: true,
+       value: jest.fn().mockImplementation(query => {
+@@ -49,15 +101,17 @@ describe('Loaded Tab Page', () => {
+         };
+       }),
+     });
+-    const courseMetadata = Factory.build('courseMetadata', { celebrations: { shouldCelebrateStreak: 3 } });
+-    mockData.courseId = courseMetadata.id;
+-    mockData.verifiedMode = courseMetadata.verifiedMode;
+-    mockData.StreakDiscountCouponEnabled = true;
+-    const testStore = await initializeTestStore({ courseMetadata }, false);
+-    render(<StreakModal {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++    setDiscount(14);
++    await renderModal();
++
+     const endDateText = `Ends ${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString({ timeZone: 'UTC' })}.`;
+-    expect(screen.getByText('You’ve unlocked a 15% off discount when you upgrade this course for a limited time only.')).toBeInTheDocument();
++    expect(screen.getByText('You’ve unlocked a 14% off discount when you upgrade this course for a limited time only.')).toBeInTheDocument();
+     expect(screen.getByText(endDateText)).toBeInTheDocument();
+     expect(screen.getByText('Continue with course')).toBeInTheDocument();
++    expect(screen.queryByText('Keep it up')).not.toBeInTheDocument();
++    expect(sendTrackEvent).toHaveBeenCalledWith('edx.bi.course.streak_discount_enabled', {
++      course_id: mockData.courseId,
++      sku: mockData.verifiedMode.sku,
++    });
+   });
+ });
+diff --git a/src/shared/streak-celebration/messages.js b/src/shared/streak-celebration/messages.js
+index dcff6e9..e137bb2 100644
+--- a/src/shared/streak-celebration/messages.js
++++ b/src/shared/streak-celebration/messages.js
+@@ -39,7 +39,7 @@ const messages = defineMessages({
+   },
+   streakDiscountMessage: {
+     id: 'learning.streakCelebration.streakDiscountMessage',
+-    defaultMessage: 'You’ve unlocked a 15% off discount when you upgrade this course for a limited time only.',
++    defaultMessage: 'You’ve unlocked a {percent}% off discount when you upgrade this course for a limited time only.',
+     description: 'This message describes a discount the user becomes eligible for when they hit their three day streak',
+   },
+ });
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index d3df7d2..22a8563 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -37,7 +37,7 @@ function LoadedTabPage({
+   const activeTab = tabs.filter(tab => tab.slug === activeTabSlug)[0];
+ 
+   const streakLengthToCelebrate = celebrations && celebrations.streakLengthToCelebrate;
+-  const StreakDiscountCouponEnabled = celebrations && celebrations.streakDiscountEnabled && verifiedMode;
++  const streakDiscountCouponEnabled = celebrations && celebrations.streakDiscountEnabled && verifiedMode;
+   const [isStreakCelebrationOpen,, closeStreakCelebration] = useToggle(streakLengthToCelebrate);
+ 
+   return (
+@@ -59,7 +59,7 @@ function LoadedTabPage({
+         streakLengthToCelebrate={streakLengthToCelebrate}
+         isStreakCelebrationOpen={!!isStreakCelebrationOpen}
+         closeStreakCelebration={closeStreakCelebration}
+-        StreakDiscountCouponEnabled={StreakDiscountCouponEnabled}
++        streakDiscountCouponEnabled={streakDiscountCouponEnabled}
+         verifiedMode={verifiedMode}
+       />
+       <main id="main-content" className="d-flex flex-column flex-grow-1">
+-- 
+2.34.1
+

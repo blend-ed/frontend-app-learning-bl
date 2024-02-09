@@ -1,0 +1,562 @@
+From 24ca1aa7307cc0f3913410190090b20263f3740d Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Wed, 11 Mar 2020 11:43:17 -0400
+Subject: [PATCH 0076/1021] Improve sequence padding and containers on mobile
+ (#27)
+
+TNL-7072.
+- Refactors some of the css container/content class naming
+- Moved UnitNavigation out of the Sequence and into its own component.
+- Fixes an issue with course tabs where multi-word titles would wrap text.
+---
+ src/courseware/course/Course.jsx            |  7 +-
+ src/courseware/course/SequenceContainer.jsx | 56 ++++++-------
+ src/courseware/sequence/Sequence.jsx        | 64 ++++-----------
+ src/courseware/sequence/Unit.jsx            | 36 ++++-----
+ src/courseware/sequence/UnitNavigation.jsx  | 68 ++++++++++++++++
+ src/courseware/sequence/messages.js         |  5 --
+ src/index.scss                              | 87 +++++++++++++++------
+ src/tabs/Tabs.jsx                           |  4 +-
+ 8 files changed, 197 insertions(+), 130 deletions(-)
+ create mode 100644 src/courseware/sequence/UnitNavigation.jsx
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 9f3e099..294caa7 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -71,7 +71,7 @@ export default function Course({
+         />
+       )}
+       <CourseTabsNavigation tabs={tabs} activeTabSlug="courseware" />
+-      <div className="container-fluid flex-grow-1 d-flex flex-column">
++      <div className="container-fluid">
+         <AlertList
+           className="my-3"
+           topic="course"
+@@ -87,6 +87,9 @@ export default function Course({
+           unitId={unitId}
+           models={models}
+         />
++        <AlertList topic="sequence" />
++      </div>
++      <div className="flex-grow-1 d-flex flex-column">
+         <SequenceContainer
+           key={sequenceId}
+           courseUsageKey={courseUsageKey}
+@@ -97,8 +100,8 @@ export default function Course({
+           onNext={nextSequenceHandler}
+           onPrevious={previousSequenceHandler}
+         />
++        {verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
+       </div>
+-      {verifiedMode && <CourseSock verifiedMode={verifiedMode} />}
+     </>
+   );
+ }
+diff --git a/src/courseware/course/SequenceContainer.jsx b/src/courseware/course/SequenceContainer.jsx
+index 6ab03de..5b288e7 100644
+--- a/src/courseware/course/SequenceContainer.jsx
++++ b/src/courseware/course/SequenceContainer.jsx
+@@ -8,7 +8,6 @@ import { history } from '@edx/frontend-platform';
+ import messages from '../messages';
+ import PageLoading from '../../PageLoading';
+ import Sequence from '../sequence/Sequence';
+-import AlertList from '../../user-messages/AlertList';
+ import { fetchSequenceMetadata, checkBlockCompletion, saveSequencePosition } from '../../data/course-blocks';
+ import { createSequenceIdList } from '../utils';
+ 
+@@ -75,35 +74,32 @@ function SequenceContainer(props) {
+   const isLastUnit = sequenceIds.indexOf(sequenceId) === sequenceIds.length - 1
+     && unitIds.indexOf(unitId) === unitIds.length - 1;
+   return (
+-    <>
+-      <AlertList topic="sequence" />
+-      <div className="course-content-container">
+-        {isLoading ? (
+-          <PageLoading
+-            srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-          />
+-        ) : (
+-          <Sequence
+-            activeUnitId={unitId}
+-            bannerText={bannerText}
+-            courseUsageKey={courseUsageKey}
+-            displayName={displayName}
+-            isFirstUnit={isFirstUnit}
+-            isGated={gatedContent.gated}
+-            isLastUnit={isLastUnit}
+-            onNavigateUnit={handleUnitNavigation}
+-            onNext={onNext}
+-            onPrevious={onPrevious}
+-            prerequisite={{
+-              id: gatedContent.prereqId,
+-              name: gatedContent.gatedSectionName,
+-            }}
+-            showCompletion={showCompletion}
+-            unitIds={unitIds}
+-          />
+-        )}
+-      </div>
+-    </>
++    <div className="sequence-container">
++      {isLoading ? (
++        <PageLoading
++          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++        />
++      ) : (
++        <Sequence
++          activeUnitId={unitId}
++          bannerText={bannerText}
++          courseUsageKey={courseUsageKey}
++          displayName={displayName}
++          isFirstUnit={isFirstUnit}
++          isGated={gatedContent.gated}
++          isLastUnit={isLastUnit}
++          onNavigateUnit={handleUnitNavigation}
++          onNext={onNext}
++          onPrevious={onPrevious}
++          prerequisite={{
++            id: gatedContent.prereqId,
++            name: gatedContent.gatedSectionName,
++          }}
++          showCompletion={showCompletion}
++          unitIds={unitIds}
++        />
++      )}
++    </div>
+ 
+   );
+ }
+diff --git a/src/courseware/sequence/Sequence.jsx b/src/courseware/sequence/Sequence.jsx
+index 394775c..6286364 100644
+--- a/src/courseware/sequence/Sequence.jsx
++++ b/src/courseware/sequence/Sequence.jsx
+@@ -4,16 +4,14 @@ import React, {
+ } from 'react';
+ import PropTypes from 'prop-types';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+-import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+-import { Button } from '@edx/paragon';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import Unit from './Unit';
+ import SequenceNavigation from './SequenceNavigation';
+ import PageLoading from '../../PageLoading';
+ import messages from './messages';
+ import UserMessagesContext from '../../user-messages/UserMessagesContext';
++import UnitNavigation from './UnitNavigation';
+ 
+ const ContentLock = React.lazy(() => import('./content-lock'));
+ 
+@@ -102,7 +100,7 @@ function Sequence({
+   }, [activeUnitId]);
+ 
+   return (
+-    <>
++    <div className="sequence">
+       <SequenceNavigation
+         activeUnitId={activeUnitId}
+         className="mb-4"
+@@ -124,7 +122,7 @@ function Sequence({
+         showCompletion={showCompletion}
+         unitIds={unitIds}
+       />
+-      <div className="flex-grow-1">
++      <div className="unit-container flex-grow-1">
+         {isGated && (
+           <Suspense
+             fallback={(
+@@ -148,50 +146,22 @@ function Sequence({
+             onLoaded={handleUnitLoaded}
+           />
+         )}
+-      </div>
+-      {unitHasLoaded ? (
+-        <div className="unit-content-container below-unit-navigation">
+-          <Button
+-            className="btn-outline-secondary previous-button w-25 mr-2"
+-            disabled={isFirstUnit}
+-            onClick={() => {
++        {unitHasLoaded && (
++          <UnitNavigation
++            isFirstUnit={isFirstUnit}
++            onClickPrevious={() => {
+               logEvent('edx.ui.lms.sequence.previous_selected', 'bottom');
+               handlePrevious();
+             }}
+-          >
+-            <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
+-            <FormattedMessage
+-              id="learn.sequence.navigation.after.unit.previous"
+-              description="The button to go to the previous unit"
+-              defaultMessage="Previous"
+-            />
+-          </Button>
+-          {isLastUnit ? (
+-            <div className="m-2">
+-              <span role="img" aria-hidden="true">&#129303;</span> {/* This is a hugging face emoji */}
+-              {' '}
+-              {intl.formatMessage(messages['learn.end.of.course'])}
+-            </div>
+-          ) : (
+-            <Button
+-              className="btn-outline-primary next-button w-75"
+-              onClick={() => {
+-                logEvent('edx.ui.lms.sequence.next_selected', 'bottom');
+-                handleNext();
+-              }}
+-              disabled={isLastUnit}
+-            >
+-              <FormattedMessage
+-                id="learn.sequence.navigation.after.unit.next"
+-                description="The button to go to the next unit"
+-                defaultMessage="Next"
+-              />
+-              <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
+-            </Button>
+-          )}
+-        </div>
+-      ) : null}
+-    </>
++            onClickNext={() => {
++              logEvent('edx.ui.lms.sequence.next_selected', 'bottom');
++              handleNext();
++            }}
++            isLastUnit={isLastUnit}
++          />
++        )}
++      </div>
++    </div>
+   );
+ }
+ 
+diff --git a/src/courseware/sequence/Unit.jsx b/src/courseware/sequence/Unit.jsx
+index 5503027..07975e8 100644
+--- a/src/courseware/sequence/Unit.jsx
++++ b/src/courseware/sequence/Unit.jsx
+@@ -43,26 +43,26 @@ function Unit({
+   };
+ 
+   return (
+-    <>
+-      <div className="unit-content-container">
+-        <h2 className="mb-0 h4">{displayName}</h2>
+-        <BookmarkButton
+-          onClick={toggleBookmark}
+-          isBookmarked={bookmarked}
+-          isProcessing={bookmarkedUpdateState === 'loading'}
++    <div className="unit">
++      <h2 className="mb-0 h4">{displayName}</h2>
++      <BookmarkButton
++        onClick={toggleBookmark}
++        isBookmarked={bookmarked}
++        isProcessing={bookmarkedUpdateState === 'loading'}
++      />
++      <div className="unit-iframe-wrapper">
++        <iframe
++          id="unit-iframe"
++          title={displayName}
++          ref={iframeRef}
++          src={iframeUrl}
++          allowFullScreen
++          height={iframeHeight}
++          scrolling="no"
++          referrerPolicy="origin"
+         />
+       </div>
+-      <iframe
+-        id="unit-iframe"
+-        title={displayName}
+-        ref={iframeRef}
+-        src={iframeUrl}
+-        allowFullScreen
+-        height={iframeHeight}
+-        scrolling="no"
+-        referrerPolicy="origin"
+-      />
+-    </>
++    </div>
+   );
+ }
+ 
+diff --git a/src/courseware/sequence/UnitNavigation.jsx b/src/courseware/sequence/UnitNavigation.jsx
+new file mode 100644
+index 0000000..988ca21
+--- /dev/null
++++ b/src/courseware/sequence/UnitNavigation.jsx
+@@ -0,0 +1,68 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { Button } from '@edx/paragon';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++
++export default function UnitNavigation(props) {
++  const {
++    isFirstUnit,
++    isLastUnit,
++    onClickPrevious,
++    onClickNext,
++  } = props;
++
++  return (
++    <div className="unit-navigation d-flex">
++      <Button
++        className="btn-outline-secondary previous-button mr-2"
++        disabled={isFirstUnit}
++        onClick={onClickPrevious}
++      >
++        <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
++        <FormattedMessage
++          id="learn.sequence.navigation.after.unit.previous"
++          description="The button to go to the previous unit"
++          defaultMessage="Previous"
++        />
++      </Button>
++      {isLastUnit ? (
++        <div className="m-2">
++          <span role="img" aria-hidden="true">&#129303;</span> {/* This is a hugging face emoji */}
++          {' '}
++          <FormattedMessage
++            id="learn.end.of.course"
++            description="Message shown to students in place of a 'Next' button when they're at the end of a course."
++            defaultMessage="You've reached the end of this course!"
++          />
++        </div>
++      ) : (
++        <Button
++          className="btn-outline-primary next-button"
++          onClick={onClickNext}
++          disabled={isLastUnit}
++        >
++          <FormattedMessage
++            id="learn.sequence.navigation.after.unit.next"
++            description="The button to go to the next unit"
++            defaultMessage="Next"
++          />
++          <FontAwesomeIcon icon={faChevronRight} className="ml-2" size="sm" />
++        </Button>
++      )}
++    </div>
++  );
++}
++
++UnitNavigation.propTypes = {
++  isFirstUnit: PropTypes.bool,
++  isLastUnit: PropTypes.bool,
++  onClickPrevious: PropTypes.func.isRequired,
++  onClickNext: PropTypes.func.isRequired,
++};
++
++UnitNavigation.defaultProps = {
++  isFirstUnit: false,
++  isLastUnit: false,
++};
+diff --git a/src/courseware/sequence/messages.js b/src/courseware/sequence/messages.js
+index 9c04cc9..fc3007b 100644
+--- a/src/courseware/sequence/messages.js
++++ b/src/courseware/sequence/messages.js
+@@ -6,11 +6,6 @@ const messages = defineMessages({
+     defaultMessage: 'Loading locked content messaging...',
+     description: 'Message shown when an interface about locked content is being loaded',
+   },
+-  'learn.end.of.course': {
+-    id: 'learn.end.of.course',
+-    defaultMessage: "You've reached the end of this course!",
+-    description: "Message shown to students in place of a 'Next' button when they're at the end of a course.",
+-  },
+ });
+ 
+ export default messages;
+diff --git a/src/index.scss b/src/index.scss
+index 995bd2d..3954a6e 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -48,6 +48,7 @@ $primary: #1176B2;
+ .course-tabs-navigation {
+   border-bottom: solid 1px #EAEAEA;
+ }
++
+ .nav-underline-tabs {
+   margin: 0 0 -1px;
+   .nav-link {
+@@ -70,19 +71,35 @@ $primary: #1176B2;
+   }
+ }
+ 
+-.course-content-container {
+-  border: solid 1px #EAEAEA;
+-  border-radius: 4px;
+-  margin-bottom: 4rem;
++.sequence-container {
+   display: flex;
+   flex-direction: column;
+   flex-grow: 1;
++  margin-bottom: 4rem;
++  // On mobile, the unit container will be responsible
++  // for container padding.
++  @media (min-width: map-get($grid-breakpoints, 'sm')) {
++    max-width: 1440px;
++    width: 100%;
++    padding: 0 $grid-gutter-width;
++    margin-right: auto;
++    margin-left: auto;
++  }
+ }
+ 
++.sequence {
++  @media (min-width: map-get($grid-breakpoints, 'sm')) {
++    border: solid 1px #EAEAEA;
++    border-radius: 4px;
++  }
++}
+ 
+ .sequence-navigation {
+   display: flex;
+-  margin: -1px -1px 0;
++  @media (min-width: map-get($grid-breakpoints, 'sm')) {
++    margin: -1px -1px 0;
++  }
++
+   .btn {
+     flex-grow: 1;
+     display: block;
+@@ -92,7 +109,7 @@ $primary: #1176B2;
+     position: relative;
+     font-weight: 400;
+     flex-basis: 80%;
+-    padding: .5rem;
++    padding: .625rem .375rem;
+     color: theme-color('gray', 400);
+ 
+     &:hover,
+@@ -100,7 +117,6 @@ $primary: #1176B2;
+     &.active {
+       color: theme-color('gray', 700);
+     }
+-
+     &:focus {
+       z-index: 1;
+     }
+@@ -123,6 +139,7 @@ $primary: #1176B2;
+       margin-left: 0;
+     }
+   }
++
+   .previous-btn, .next-btn {
+     flex-basis: 10em;
+     min-width: 9em;
+@@ -131,47 +148,65 @@ $primary: #1176B2;
+     justify-content: center;
+     align-items: center;
+   }
++
+   .previous-btn {
+-    border-top-left-radius: 4px;
++    border-left-width: 0;
++    @media (min-width: map-get($grid-breakpoints, 'sm')) {
++      border-left-width: 1px;
++      border-top-left-radius: 4px;
++    }
+   }
++
+   .next-btn {
+-    border-top-right-radius: 4px;
++    border-right-width: 0;
++    @media (min-width: map-get($grid-breakpoints, 'sm')) {
++      border-top-right-radius: 4px;
++      border-right-width: 1px;
++    }
+   }
+ }
+ 
+-.unit-content-container {
+-  padding-left: 20px;
+-  padding-right: 20px;
++.unit-container {
++  padding: 0 $grid-gutter-width 2rem;
+   max-width: 1024px;
+   margin-left: auto;
+   margin-right: auto;
+-  width: 100%;
+   @media (min-width: 830px) {
+     padding-left: 40px;
+     padding-right: 40px;
+   }
+ }
+ 
+-.below-unit-navigation {
++.unit-iframe-wrapper {
++  margin: 0 -20px 2rem;
++  @media (min-width: 830px) {
++    margin: 0 -40px 2rem;
++  }
++}
++
++#unit-iframe {
++  width: 100%;
++  border: none;
++  display: block;
++}
++
++.unit-navigation {
+   display: flex;
+   justify-content: center;
+-  margin-top: 2rem;
+-  margin-bottom: 2rem;
+-  padding-left: 6rem;
+-  padding-right: 6rem;
++  max-width: 640px;
++  margin: 0 auto;
+   .previous-button,
+   .next-button {
++    white-space: nowrap;
+     border-radius: 4px;
+     &:focus:before {
+       border-radius: 6px;
+     }
+   }
++  .next-button {
++    flex-basis: 75%;
++  }
++  .previous-button {
++    flex-basis: 25%;
++  }
+ }
+-
+-#unit-iframe {
+-  max-width: 1024px;
+-  width: 100%;
+-  margin: 0 auto;
+-  border: none;
+-  display: block;
+-}
+\ No newline at end of file
+diff --git a/src/tabs/Tabs.jsx b/src/tabs/Tabs.jsx
+index 32e7a58..5630888 100644
+--- a/src/tabs/Tabs.jsx
++++ b/src/tabs/Tabs.jsx
+@@ -65,7 +65,7 @@ export default function Tabs({ children, className, ...attrs }) {
+ 
+     // All tabs will be rendered. Those that would overflow are set to invisible.
+     const wrappedChildren = childrenArray.map((child, index) => (
+-      <li className="nav-item" style={cutOffIndex <= index ? invisibleStyle : null}>
++      <li className="nav-item flex-shrink-0" style={cutOffIndex <= index ? invisibleStyle : null}>
+         {React.cloneElement(child)}
+       </li>
+     ));
+@@ -78,7 +78,7 @@ export default function Tabs({ children, className, ...attrs }) {
+     // it so it can be part of measurements)
+     wrappedChildren.splice(cutOffIndex, 0, (
+       <li
+-        className="nav-item"
++        className="nav-item flex-shrink-0"
+         style={cutOffIndex >= React.Children.count(children) ? invisibleStyle : null}
+         ref={overflowEl}
+       >
+-- 
+2.34.1
+

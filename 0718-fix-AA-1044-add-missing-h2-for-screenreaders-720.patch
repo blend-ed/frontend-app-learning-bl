@@ -1,0 +1,56 @@
+From 7ed1be196005e403998dd7b3b9ee95c04be6bf57 Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Mon, 1 Nov 2021 13:31:19 -0400
+Subject: [PATCH 0718/1021] fix: [AA-1044] add missing h2 for screenreaders
+ (#720)
+
+* fix: [AA-1044] add missing h2 for screenreaders
+
+- Add placeholder h2 tag with message indicating reserve for future use
+- internationalize placeholder text
+---
+ src/courseware/course/sequence/Unit.jsx    | 3 ++-
+ src/courseware/course/sequence/messages.js | 6 ++++++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 3da681b..35b300f 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -17,7 +17,7 @@ import BookmarkButton from '../bookmark/BookmarkButton';
+ import { useModel } from '../../../generic/model-store';
+ import PageLoading from '../../../generic/PageLoading';
+ import { processEvent } from '../../../course-home/data/thunks';
+-import { fetchCourse } from '../../data/thunks';
++import { fetchCourse } from '../../data';
+ /** [MM-P2P] Experiment */
+ import { MMP2PLockPaywall } from '../../../experiments/mm-p2p';
+ 
+@@ -159,6 +159,7 @@ function Unit({
+   return (
+     <div className="unit">
+       <h1 className="mb-0 h3">{unit.title}</h1>
++      <h2 className="sr-only">{intl.formatMessage(messages['learn.header.h2.placeholder'])}</h2>
+       <BookmarkButton
+         unitId={unit.id}
+         isBookmarked={unit.bookmarked}
+diff --git a/src/courseware/course/sequence/messages.js b/src/courseware/course/sequence/messages.js
+index 0f3e43f..e31728e 100644
+--- a/src/courseware/course/sequence/messages.js
++++ b/src/courseware/course/sequence/messages.js
+@@ -26,6 +26,12 @@ const messages = defineMessages({
+     defaultMessage: 'There is no content here.',
+     description: 'Message shown when there is no content to show a user inside a learning sequence.',
+   },
++  'learn.header.h2.placeholder': {
++    id: 'learn.header.h2.placeholder',
++    defaultMessage: 'Level 2 headings may be created by course providers in the future.',
++    description: 'Message spoken by a screenreader indicating that the h2 tag is a placeholder.',
++
++  },
+ });
+ 
+ export default messages;
+-- 
+2.34.1
+

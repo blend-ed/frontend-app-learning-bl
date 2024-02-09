@@ -1,0 +1,104 @@
+From 6f7ec81197e39b76d5b6c0c80742f25b2961152e Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Mon, 29 Jun 2020 04:21:23 +0200
+Subject: [PATCH 0189/1021] [TNL-7268] Fix tests and dependencies after rebase
+
+---
+ src/courseware/course/sequence/Unit.test.jsx             | 4 +++-
+ .../course/sequence/__snapshots__/Unit.test.jsx.snap     | 9 ---------
+ .../sequence/sequence-navigation/UnitIcon.test.jsx       | 4 ++--
+ .../__snapshots__/UnitIcon.test.jsx.snap                 | 4 ++--
+ src/setupTest.js                                         | 3 ++-
+ 5 files changed, 9 insertions(+), 15 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 02ec499..f91734c 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -72,9 +72,11 @@ describe('Unit', () => {
+ 
+     window.postMessage(testMessageWithUnhandledType, '*');
+     // HACK: We don't have a function we could reliably await here, so this test relies on the timeout of `waitFor`.
++    // FIXME: After the last updates `toThrowErrorMatchingSnapshot` (due to a bug) started returning DOM
++    //  after the error, so we had to fall back to `toThrowError` assertion for better readability.
+     await expect(waitFor(
+       () => expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(testMessageWithUnhandledType.payload.height)),
+       { timeout: 100 },
+-    )).rejects.toThrowErrorMatchingSnapshot();
++    )).rejects.toThrowError(/Expected the element to have attribute/);
+   });
+ });
+diff --git a/src/courseware/course/sequence/__snapshots__/Unit.test.jsx.snap b/src/courseware/course/sequence/__snapshots__/Unit.test.jsx.snap
+index cf09688..d166775 100644
+--- a/src/courseware/course/sequence/__snapshots__/Unit.test.jsx.snap
++++ b/src/courseware/course/sequence/__snapshots__/Unit.test.jsx.snap
+@@ -42,15 +42,6 @@ exports[`Unit handles receiving MessageEvent 1`] = `
+           title=\\"3\\""
+ `;
+ 
+-exports[`Unit ignores MessageEvent with unhandled type 1`] = `
+-"[2mexpect([22m[31melement[39m[2m).toHaveAttribute([22m[32m[32m\\"height\\"[39m[32m[39m[2m, [22m[32m[32m\\"300\\"[39m[32m[39m[2m) // element.getAttribute(\\"height\\") === \\"300\\"[22m
+-
+-Expected the element to have attribute:
+-[32m  height=\\"300\\"[39m
+-Received:
+-[31m  height=\\"0\\"[39m"
+-`;
+-
+ exports[`Unit renders correctly 1`] = `
+ <DocumentFragment>
+   <div
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+index e65a911..9ffffa1 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+@@ -4,7 +4,7 @@ import UnitIcon from './UnitIcon';
+ 
+ describe('Unit Icon', () => {
+   const types = {
+-    video: 'fa-film',
++    video: 'fa-video',
+     other: 'fa-book',
+     vertical: 'fa-tasks',
+     problem: 'fa-edit',
+@@ -20,7 +20,7 @@ describe('Unit Icon', () => {
+       }
+ 
+       const { asFragment } = render(<UnitIcon type={key} />);
+-      expect(screen.getByAltText(value)).toBeInTheDocument();
++      expect(screen.getByTestId('icon')).toHaveClass(value);
+       expect(asFragment()).toMatchSnapshot();
+     });
+   });
+diff --git a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
+index 31ed98b..49aeec7 100644
+--- a/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
++++ b/src/courseware/course/sequence/sequence-navigation/__snapshots__/UnitIcon.test.jsx.snap
+@@ -53,8 +53,8 @@ exports[`Unit Icon renders correct icon for vertical unit 1`] = `
+ exports[`Unit Icon renders correct icon for video unit 1`] = `
+ <DocumentFragment>
+   <img
+-    alt="fa-film"
+-    class="fa-film"
++    alt="fa-video"
++    class="fa-video"
+     data-testid="icon"
+   />
+ </DocumentFragment>
+diff --git a/src/setupTest.js b/src/setupTest.js
+index a76bb91..ab9e880 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -50,7 +50,8 @@ import PropTypes from 'prop-types';
+ import { render as rtlRender, screen } from '@testing-library/react';
+ import { Provider } from 'react-redux';
+ import { configureStore } from '@reduxjs/toolkit';
+-import { IntlProvider } from '@edx/frontend-platform/node_modules/react-intl';
++// eslint-disable-next-line import/no-extraneous-dependencies
++import { IntlProvider } from 'react-intl';
+ import { reducer as modelsReducer } from './model-store';
+ import { reducer as coursewareReducer } from './data';
+ import { UserMessagesProvider } from './user-messages';
+-- 
+2.34.1
+

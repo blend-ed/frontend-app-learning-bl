@@ -1,0 +1,33 @@
+From fd94da0a432ebd9df561c8ea9b49afe880c38a6e Mon Sep 17 00:00:00 2001
+From: edX requirements bot
+ <49161187+edx-requirements-bot@users.noreply.github.com>
+Date: Fri, 6 May 2022 06:53:47 -0400
+Subject: [PATCH 0917/1021] feat: Add package-lock file version check (#941)
+
+---
+ .github/workflows/lockfileversion-check.yml | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+ create mode 100644 .github/workflows/lockfileversion-check.yml
+
+diff --git a/.github/workflows/lockfileversion-check.yml b/.github/workflows/lockfileversion-check.yml
+new file mode 100644
+index 0000000..901addd
+--- /dev/null
++++ b/.github/workflows/lockfileversion-check.yml
+@@ -0,0 +1,13 @@
++#check package-lock file version
++
++name: Lockfile Version check
++
++on:
++  push:
++    branches:
++    - master
++  pull_request:
++
++jobs:
++  version-check:
++    uses: edx/.github/.github/workflows/lockfileversion-check.yml@master
+-- 
+2.34.1
+

@@ -1,0 +1,136 @@
+From a604e0be10a9393bd5099f65d6ea2e940be775d4 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Wed, 9 Dec 2020 11:37:23 -0800
+Subject: [PATCH 0330/1021] AA-503: Course Celebration view for users in
+ verification pending state (#301)
+
+Learners were having questions when we would continue showing them the
+'Verify Now' button if they had a submitted a verification attempt
+already.
+---
+ .../course/course-exit/CourseCelebration.jsx  | 33 +++++++++++--------
+ .../course/course-exit/CourseExit.test.jsx    | 12 +++++++
+ src/courseware/course/course-exit/messages.js |  4 +++
+ .../__factories__/courseMetadata.factory.js   |  1 +
+ src/courseware/data/api.js                    |  1 +
+ 5 files changed, 37 insertions(+), 14 deletions(-)
+
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 1f80ce8..db2f2ce 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -46,6 +46,7 @@ function CourseCelebration({ intl }) {
+     relatedPrograms,
+     verifiedMode,
+     verifyIdentityUrl,
++    verificationStatus,
+   } = useModel('courses', courseId);
+ 
+   const {
+@@ -157,23 +158,27 @@ function CourseCelebration({ intl }) {
+       footnote = <DashboardFootnote />;
+       break;
+     case 'unverified':
+-      buttonText = intl.formatMessage(messages.verifyIdentityButton);
+-      buttonEvent = 'verify_id';
+-      buttonLocation = verifyIdentityUrl;
+       certHeader = intl.formatMessage(messages.certificateHeaderUnverified);
+-      // todo: check for idVerificationSupportLink null
+-      message = (
+-        <p>
+-          <FormattedMessage
+-            id="courseCelebration.certificateBody.unverified"
+-            defaultMessage="In order to generate a certificate, you must complete ID verification.
+-              {idVerificationSupportLink} now."
+-            values={{ idVerificationSupportLink }}
+-          />
+-        </p>
+-      );
+       visitEvent = 'celebration_unverified';
+       footnote = <DashboardFootnote />;
++      if (verificationStatus === 'pending') {
++        message = (<p>{intl.formatMessage(messages.verificationPending)}</p>);
++      } else {
++        buttonText = intl.formatMessage(messages.verifyIdentityButton);
++        buttonEvent = 'verify_id';
++        buttonLocation = verifyIdentityUrl;
++        // todo: check for idVerificationSupportLink null
++        message = (
++          <p>
++            <FormattedMessage
++              id="courseCelebration.certificateBody.unverified"
++              defaultMessage="In order to generate a certificate, you must complete ID verification.
++                {idVerificationSupportLink} now."
++              values={{ idVerificationSupportLink }}
++            />
++          </p>
++        );
++      }
+       break;
+     case 'audit_passing':
+     case 'honor_passing':
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index f104177..e6fc38d 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -146,6 +146,18 @@ describe('Course Exit Pages', () => {
+       expect(screen.queryByRole('img', { name: 'Sample certificate' })).not.toBeInTheDocument();
+     });
+ 
++    it('Displays verification pending message', async () => {
++      setMetadata({
++        certificate_data: { cert_status: 'unverified' },
++        verification_status: 'pending',
++        verify_identity_url: `${getConfig().LMS_BASE_URL}/verify_student/verify-now/${defaultMetadata.id}/`,
++      });
++      await fetchAndRender(<CourseCelebration />);
++      expect(screen.getByText('Your ID verification is pending and your certificate will be available once approved.')).toBeInTheDocument();
++      expect(screen.queryByRole('link', { name: 'Verify ID now' })).not.toBeInTheDocument();
++      expect(screen.queryByRole('img', { name: 'Sample certificate' })).not.toBeInTheDocument();
++    });
++
+     it('Displays upgrade link when available', async () => {
+       setMetadata({
+         certificate_data: { cert_status: 'audit_passing' },
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index ec3448f..9d449d0 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -131,6 +131,10 @@ const messages = defineMessages({
+     id: 'courseExit.upgradeLink',
+     defaultMessage: 'upgrade now',
+   },
++  verificationPending: {
++    id: 'courseCelebration.verificationPending',
++    defaultMessage: 'Your ID verification is pending and your certificate will be available once approved.',
++  },
+   verifiedCertificateSupportLink: {
+     id: 'courseExit.verifiedCertificateSupportLink',
+     defaultMessage: 'Learn more about verified certificates',
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 4bb364e..58d06a2 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -56,6 +56,7 @@ Factory.define('courseMetadata')
+     user_has_passing_grade: false,
+     certificate_data: null,
+     verify_identity_url: null,
++    verification_status: 'none',
+     linkedin_add_to_profile_url: null,
+     related_programs: null,
+   }).attr(
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index e8ee16a..ca5505f 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -139,6 +139,7 @@ function normalizeMetadata(metadata) {
+     courseExitPageIsActive: metadata.course_exit_page_is_active,
+     certificateData: camelCaseObject(metadata.certificate_data),
+     verifyIdentityUrl: metadata.verify_identity_url,
++    verificationStatus: metadata.verification_status,
+     linkedinAddToProfileUrl: metadata.linkedin_add_to_profile_url,
+     relatedPrograms: camelCaseObject(metadata.related_programs),
+   };
+-- 
+2.34.1
+

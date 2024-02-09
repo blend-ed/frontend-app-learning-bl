@@ -1,0 +1,52 @@
+From ddc85f2fd326654dc0bd0b058c9c3deb73a6b1a7 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 3 Sep 2020 11:17:42 -0400
+Subject: [PATCH 0245/1021] AA-306: Update twitter hashtag for celebrations
+ (#201)
+
+It's now #myedxjourney instead of #mooc.
+
+Also, fixed the wording of the email share option.
+---
+ src/courseware/course/celebration/SocialIcons.jsx | 4 ++--
+ src/courseware/course/celebration/messages.js     | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/course/celebration/SocialIcons.jsx b/src/courseware/course/celebration/SocialIcons.jsx
+index 2ece285..e3cfdde 100644
+--- a/src/courseware/course/celebration/SocialIcons.jsx
++++ b/src/courseware/course/celebration/SocialIcons.jsx
+@@ -54,7 +54,7 @@ function SocialIcons({ courseId, intl }) {
+         <TwitterShareButton
+           beforeOnClick={() => logClick('twitter')}
+           className="ml-2"
+-          hashtags={['mooc']}
++          hashtags={['myedxjourney']}
+           title={intl.formatMessage(messages.social, { platform: `@${twitterAccount}`, title })}
+           url={marketingUrl}
+         >
+@@ -73,7 +73,7 @@ function SocialIcons({ courseId, intl }) {
+       </FacebookShareButton>
+       <EmailShareButton
+         beforeOnClick={() => logClick('email')}
+-        body={intl.formatMessage(messages.emailBody)}
++        body={`${intl.formatMessage(messages.emailBody)}\n\n`}
+         className="ml-2"
+         subject={intl.formatMessage(messages.emailSubject, { platform: getConfig().SITE_NAME, title })}
+         url={marketingUrl}
+diff --git a/src/courseware/course/celebration/messages.js b/src/courseware/course/celebration/messages.js
+index 6bf0b48..1744187 100644
+--- a/src/courseware/course/celebration/messages.js
++++ b/src/courseware/course/celebration/messages.js
+@@ -20,7 +20,7 @@ const messages = defineMessages({
+   },
+   emailSubject: {
+     id: 'learning.celebration.emailSubject',
+-    defaultMessage: "I'm on my way to completing {title} online with @edxonline!",
++    defaultMessage: "I'm on my way to completing {title} online with {platform}!",
+     description: 'Subject when sharing course progress via email',
+   },
+   forward: {
+-- 
+2.34.1
+

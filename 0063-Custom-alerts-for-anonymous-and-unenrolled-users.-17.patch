@@ -1,0 +1,552 @@
+From c3d0ac141712bd87f5eff86ac25050f8164341b8 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Thu, 5 Mar 2020 10:23:47 -0500
+Subject: [PATCH 0063/1021] Custom alerts for anonymous and unenrolled users.
+ (#17)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* build: bumping version of frontend-platform
+
+We’re going to need to use the new getLoginRedirectUrl helper.
+
+* Adding custom alerts for anonymous and unenrolled users.
+
+- Anonymous users are prompted to sign in or register.
+- Unenrolled users are prompted to enroll.
+
+The alerts themselves are lazy-loaded as necessary, like the ContentLock component.
+
+This PR also adds `customAlerts` to the AlertList, allowing an application to specify custom components to be shown as Alerts for a given alert code.
+
+* refactor: Renaming enrollmentIsActive to isEnrolled
+
+As per review feedback that the former wasn’t clear.
+---
+ package-lock.json                            | 30 ++++++------
+ package.json                                 |  2 +-
+ src/courseware/CourseContainer.jsx           |  2 +
+ src/courseware/course/Course.jsx             | 31 +++++++++++-
+ src/data/course-meta/slice.js                |  1 +
+ src/enrollment-alert/EnrollmentAlert.jsx     | 24 ++++++++++
+ src/enrollment-alert/index.js                |  1 +
+ src/enrollment-alert/messages.js             | 16 +++++++
+ src/hooks.js                                 | 50 ++++++++++++++++++++
+ src/logistration-alert/LogistrationAlert.jsx | 43 +++++++++++++++++
+ src/logistration-alert/index.js              |  1 +
+ src/logistration-alert/messages.js           | 16 +++++++
+ src/user-messages/AlertList.jsx              | 40 +++++++++++-----
+ src/user-messages/UserMessagesProvider.jsx   | 22 +++++++--
+ 14 files changed, 245 insertions(+), 34 deletions(-)
+ create mode 100644 src/enrollment-alert/EnrollmentAlert.jsx
+ create mode 100644 src/enrollment-alert/index.js
+ create mode 100644 src/enrollment-alert/messages.js
+ create mode 100644 src/hooks.js
+ create mode 100644 src/logistration-alert/LogistrationAlert.jsx
+ create mode 100644 src/logistration-alert/index.js
+ create mode 100644 src/logistration-alert/messages.js
+
+diff --git a/package-lock.json b/package-lock.json
+index 9eccf0d..acb745f 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2529,9 +2529,9 @@
+       }
+     },
+     "@cospired/i18n-iso-languages": {
+-      "version": "2.1.0",
+-      "resolved": "https://registry.npmjs.org/@cospired/i18n-iso-languages/-/i18n-iso-languages-2.1.0.tgz",
+-      "integrity": "sha512-r+bqdtVTkO8R07JiBxEc7ckbkXgeIP/X51MxqxODv9gZovc/MBDS6uJVCHg+mtJuldwvSD6L0XF5RzH6qyAacQ=="
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/@cospired/i18n-iso-languages/-/i18n-iso-languages-2.1.1.tgz",
++      "integrity": "sha512-dmlPmVw51tQzCJkYvtWWXxuvsAkNvCmUnvjMWyo7Qd318YeEZalCUInUgdhKU985gk2wkITtdakPYqk5GrJ99A=="
+     },
+     "@edx/eslint-config": {
+       "version": "1.1.4",
+@@ -2665,13 +2665,13 @@
+       }
+     },
+     "@edx/frontend-platform": {
+-      "version": "1.1.11",
+-      "resolved": "https://registry.npmjs.org/@edx/frontend-platform/-/frontend-platform-1.1.11.tgz",
+-      "integrity": "sha512-Nx1nj/WSZ6ELUUOyjAWfHVTJIkWt7MUhN8cHKCwrnvNcXsAAqKkG3ZiLWErmdg+asfvXcn6E6Ipzej6E7t91PA==",
++      "version": "1.3.1",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-platform/-/frontend-platform-1.3.1.tgz",
++      "integrity": "sha512-RAJ6IciIX+ZwXhlBfxOOB0sjNNpBQaN/eDLsgztL9MxEmuAvQtbvQBBJAum6qsVZpKzOZYhtRYFyWoHTuyzFZA==",
+       "requires": {
+-        "@cospired/i18n-iso-languages": "2.1.0",
++        "@cospired/i18n-iso-languages": "2.1.1",
+         "axios": "0.18.1",
+-        "form-urlencoded": "4.1.0",
++        "form-urlencoded": "4.1.3",
+         "glob": "7.1.6",
+         "history": "4.10.1",
+         "i18n-iso-countries": "4.3.1",
+@@ -2682,7 +2682,7 @@
+         "lodash.snakecase": "4.1.1",
+         "pubsub-js": "1.7.0",
+         "react-intl": "2.9.0",
+-        "universal-cookie": "4.0.2"
++        "universal-cookie": "4.0.3"
+       }
+     },
+     "@edx/paragon": {
+@@ -8968,9 +8968,9 @@
+       }
+     },
+     "form-urlencoded": {
+-      "version": "4.1.0",
+-      "resolved": "https://registry.npmjs.org/form-urlencoded/-/form-urlencoded-4.1.0.tgz",
+-      "integrity": "sha512-1F/gR6Lx+KX1PtV2l0Gg+PcJ61h5NLNJBgIK4p+L1V958h5bmPi8GD8enlT1a7Sr32EVzea+qOzpO/gl3mOgZA=="
++      "version": "4.1.3",
++      "resolved": "https://registry.npmjs.org/form-urlencoded/-/form-urlencoded-4.1.3.tgz",
++      "integrity": "sha512-z0YJtPuq0BSOrErlpj+o1KHTRaOH6LN16043ZVK2Wk5uUGpX308PJ5ZJDtU++ndoZkzASHVclUTD2mb1jHzqlA=="
+     },
+     "formidable": {
+       "version": "1.2.1",
+@@ -18939,9 +18939,9 @@
+       }
+     },
+     "universal-cookie": {
+-      "version": "4.0.2",
+-      "resolved": "https://registry.npmjs.org/universal-cookie/-/universal-cookie-4.0.2.tgz",
+-      "integrity": "sha512-n14lhA//lQeYRweP9j9uXsshN9Cs4LunVSnvAGmnA69SofwsjpUU03geaCaPC9LlsH2rkBy99o3zxQyVOldGvA==",
++      "version": "4.0.3",
++      "resolved": "https://registry.npmjs.org/universal-cookie/-/universal-cookie-4.0.3.tgz",
++      "integrity": "sha512-YbEHRs7bYOBTIWedTR9koVEe2mXrq+xdjTJZcoKJK/pQaE6ni28ak2AKXFpevb+X6w3iU5SXzWDiJkmpDRb9qw==",
+       "requires": {
+         "@types/cookie": "^0.3.3",
+         "@types/object-assign": "^4.0.30",
+diff --git a/package.json b/package.json
+index 0f7afd4..723ddb6 100644
+--- a/package.json
++++ b/package.json
+@@ -36,7 +36,7 @@
+   "dependencies": {
+     "@edx/frontend-component-footer": "^10.0.6",
+     "@edx/frontend-component-header": "^2.0.3",
+-    "@edx/frontend-platform": "^1.1.11",
++    "@edx/frontend-platform": "^1.3.1",
+     "@edx/paragon": "^7.2.0",
+     "@fortawesome/fontawesome-svg-core": "^1.2.26",
+     "@fortawesome/free-brands-svg-icons": "^5.12.0",
+diff --git a/src/courseware/CourseContainer.jsx b/src/courseware/CourseContainer.jsx
+index c4e6327..739707d 100644
+--- a/src/courseware/CourseContainer.jsx
++++ b/src/courseware/CourseContainer.jsx
+@@ -66,6 +66,7 @@ function CourseContainer(props) {
+       unitId={unitId}
+       models={models}
+       tabs={props.metadata.tabs}
++      isEnrolled={props.metadata.isEnrolled}
+       verifiedMode={props.metadata.verifiedMode}
+     />
+   );
+@@ -90,6 +91,7 @@ CourseContainer.propTypes = {
+       type: PropTypes.string,
+       url: PropTypes.string,
+     })),
++    isEnrolled: PropTypes.bool,
+     verifiedMode: PropTypes.shape({
+       price: PropTypes.number.isRequired,
+       currency: PropTypes.string.isRequired,
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 01b0b7a..2d47b42 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -10,9 +10,24 @@ import CourseHeader from './CourseHeader';
+ import CourseSock from './course-sock';
+ import CourseTabsNavigation from './CourseTabsNavigation';
+ import InstructorToolbar from '../InstructorToolbar';
++import { useLogistrationAlert, useEnrollmentAlert } from '../../hooks';
++
++const EnrollmentAlert = React.lazy(() => import('../../enrollment-alert'));
++const LogistrationAlert = React.lazy(() => import('../../logistration-alert'));
++
+ 
+ export default function Course({
+-  courseOrg, courseNumber, courseName, courseUsageKey, courseId, sequenceId, unitId, models, tabs, verifiedMode,
++  courseId,
++  courseNumber,
++  courseName,
++  courseOrg,
++  courseUsageKey,
++  isEnrolled,
++  models,
++  sequenceId,
++  tabs,
++  unitId,
++  verifiedMode,
+ }) {
+   const nextSequenceHandler = useCallback(() => {
+     const sequenceIds = createSequenceIdList(models, courseId);
+@@ -36,6 +51,9 @@ export default function Course({
+     }
+   });
+ 
++  useLogistrationAlert();
++  useEnrollmentAlert(isEnrolled);
++
+   return (
+     <>
+       <CourseHeader
+@@ -52,7 +70,14 @@ export default function Course({
+       <main className="d-flex flex-column flex-grow-1">
+         <div className="container-fluid">
+           <CourseTabsNavigation tabs={tabs} className="mb-3" activeTabSlug="courseware" />
+-          <AlertList topic="course" className="mb-3" />
++          <AlertList
++            topic="course"
++            className="mb-3"
++            customAlerts={{
++              clientEnrollmentAlert: EnrollmentAlert,
++              clientLogistrationAlert: LogistrationAlert,
++            }}
++          />
+           <CourseBreadcrumbs
+             courseUsageKey={courseUsageKey}
+             courseId={courseId}
+@@ -85,6 +110,7 @@ Course.propTypes = {
+   courseId: PropTypes.string.isRequired,
+   sequenceId: PropTypes.string.isRequired,
+   unitId: PropTypes.string,
++  isEnrolled: PropTypes.bool,
+   models: PropTypes.objectOf(PropTypes.shape({
+     id: PropTypes.string.isRequired,
+     displayName: PropTypes.string.isRequired,
+@@ -109,5 +135,6 @@ Course.propTypes = {
+ 
+ Course.defaultProps = {
+   unitId: undefined,
++  isEnrolled: false,
+   verifiedMode: null,
+ };
+diff --git a/src/data/course-meta/slice.js b/src/data/course-meta/slice.js
+index 319ee5d..e494174 100644
+--- a/src/data/course-meta/slice.js
++++ b/src/data/course-meta/slice.js
+@@ -17,6 +17,7 @@ const courseMetaSlice = createSlice({
+       org: payload.org,
+       tabs: payload.tabs,
+       userHasAccess: payload.userHasAccess,
++      isEnrolled: payload.enrollment.isActive,
+       verifiedMode: payload.verifiedMode,
+     }),
+     fetchCourseMetadataFailure: (draftState) => {
+diff --git a/src/enrollment-alert/EnrollmentAlert.jsx b/src/enrollment-alert/EnrollmentAlert.jsx
+new file mode 100644
+index 0000000..fc15e53
+--- /dev/null
++++ b/src/enrollment-alert/EnrollmentAlert.jsx
+@@ -0,0 +1,24 @@
++import React from 'react';
++import { getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import Alert from '../user-messages/Alert';
++import messages from './messages';
++
++function EnrollmentAlert({ intl }) {
++  return (
++    <Alert type="error">
++      {intl.formatMessage(messages['learning.enrollment.alert'])}
++      {' '}
++      <a href={`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`}>
++        {intl.formatMessage(messages['learning.enrollment.enroll.now'])}
++      </a>
++    </Alert>
++  );
++}
++
++EnrollmentAlert.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(EnrollmentAlert);
+diff --git a/src/enrollment-alert/index.js b/src/enrollment-alert/index.js
+new file mode 100644
+index 0000000..192d4e2
+--- /dev/null
++++ b/src/enrollment-alert/index.js
+@@ -0,0 +1 @@
++export { default } from './EnrollmentAlert';
+diff --git a/src/enrollment-alert/messages.js b/src/enrollment-alert/messages.js
+new file mode 100644
+index 0000000..b6e96ba
+--- /dev/null
++++ b/src/enrollment-alert/messages.js
+@@ -0,0 +1,16 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learning.enrollment.alert': {
++    id: 'learning.enrollment.alert',
++    defaultMessage: 'You must be enrolled in the course to see course content.',
++    description: 'Message shown to indicate that a user needs to enroll in a course prior to viewing the course content.  Shown as part of an alert, along with a link to enroll.',
++  },
++  'learning.enrollment.enroll.now': {
++    id: 'learning.enrollment.enroll.now',
++    defaultMessage: 'Enroll Now',
++    description: 'A link prompting the user to click on it to enroll in the currently viewed course.',
++  },
++});
++
++export default messages;
+diff --git a/src/hooks.js b/src/hooks.js
+new file mode 100644
+index 0000000..aa543c5
+--- /dev/null
++++ b/src/hooks.js
+@@ -0,0 +1,50 @@
++import { useContext, useState, useEffect } from 'react';
++import { AppContext } from '@edx/frontend-platform/react';
++import UserMessagesContext from './user-messages/UserMessagesContext';
++
++export function useLogistrationAlert() {
++  const { authenticatedUser } = useContext(AppContext);
++  const { add, remove } = useContext(UserMessagesContext);
++  const [alertId, setAlertId] = useState(null);
++  useEffect(() => {
++    if (authenticatedUser === null) {
++      setAlertId(add({
++        code: 'clientLogistrationAlert',
++        dismissible: false,
++        type: 'error',
++        topic: 'course',
++      }));
++    } else if (alertId !== null) {
++      remove(alertId);
++      setAlertId(null);
++    }
++    return () => {
++      if (alertId !== null) {
++        remove(alertId);
++      }
++    };
++  }, [authenticatedUser]);
++}
++
++export function useEnrollmentAlert(isEnrolled) {
++  const { add, remove } = useContext(UserMessagesContext);
++  const [alertId, setAlertId] = useState(null);
++  useEffect(() => {
++    if (!isEnrolled) {
++      setAlertId(add({
++        code: 'clientEnrollmentAlert',
++        dismissible: false,
++        type: 'error',
++        topic: 'course',
++      }));
++    } else if (alertId !== null) {
++      remove(alertId);
++      setAlertId(null);
++    }
++    return () => {
++      if (alertId !== null) {
++        remove(alertId);
++      }
++    };
++  }, [isEnrolled]);
++}
+diff --git a/src/logistration-alert/LogistrationAlert.jsx b/src/logistration-alert/LogistrationAlert.jsx
+new file mode 100644
+index 0000000..0848e99
+--- /dev/null
++++ b/src/logistration-alert/LogistrationAlert.jsx
+@@ -0,0 +1,43 @@
++import React from 'react';
++import { getConfig } from '@edx/frontend-platform';
++import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
++import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
++
++import Alert from '../user-messages/Alert';
++import messages from './messages';
++
++function LogistrationAlert({ intl }) {
++  const signIn = (
++    <a href={`${getLoginRedirectUrl(global.location.href)}`}>
++      {intl.formatMessage(messages['learning.logistration.login'])}
++    </a>
++  );
++
++  // TODO: Pull this registration URL building out into a function, like the login one above.
++  // This is complicated by the fact that we don't have a REGISTER_URL env variable available.
++  const register = (
++    <a href={`${getConfig().LMS_BASE_URL}/register?next=${encodeURIComponent(global.location.href)}`}>
++      {intl.formatMessage(messages['learning.logistration.register'])}
++    </a>
++  );
++
++  return (
++    <Alert type="error">
++      <FormattedMessage
++        id="learning.logistration.alert"
++        description="Prompts the user to sign in or register to see course content."
++        defaultMessage="Please {signIn} or {register} to see course content."
++        values={{
++          signIn,
++          register,
++        }}
++      />
++    </Alert>
++  );
++}
++
++LogistrationAlert.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(LogistrationAlert);
+diff --git a/src/logistration-alert/index.js b/src/logistration-alert/index.js
+new file mode 100644
+index 0000000..2c912f5
+--- /dev/null
++++ b/src/logistration-alert/index.js
+@@ -0,0 +1 @@
++export { default } from './LogistrationAlert';
+diff --git a/src/logistration-alert/messages.js b/src/logistration-alert/messages.js
+new file mode 100644
+index 0000000..b30e713
+--- /dev/null
++++ b/src/logistration-alert/messages.js
+@@ -0,0 +1,16 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learning.logistration.login': {
++    id: 'learning.logistration.login',
++    defaultMessage: 'sign in',
++    description: 'Text in a link, prompting the user to log in.  Used in "learning.logistration.alert"',
++  },
++  'learning.logistration.register': {
++    id: 'learning.logistration.register',
++    defaultMessage: 'register',
++    description: 'Text in a link, prompting the user to create an account.  Used in "learning.logistration.alert"',
++  },
++});
++
++export default messages;
+diff --git a/src/user-messages/AlertList.jsx b/src/user-messages/AlertList.jsx
+index ab5a900..4c433eb 100644
+--- a/src/user-messages/AlertList.jsx
++++ b/src/user-messages/AlertList.jsx
+@@ -1,11 +1,15 @@
+-import React, { useContext } from 'react';
++import React, { useContext, useCallback, Suspense } from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import UserMessagesContext from './UserMessagesContext';
+ import Alert from './Alert';
+ 
+-export default function AlertList({ topic, className }) {
++export default function AlertList({ topic, className, customAlerts }) {
+   const { remove, messages } = useContext(UserMessagesContext);
++  const getAlertComponent = useCallback(
++    (code) => (customAlerts[code] !== undefined ? customAlerts[code] : Alert),
++    [customAlerts],
++  );
+ 
+   const topicMessages = messages.filter(message => !topic || message.topic === topic);
+   if (topicMessages.length === 0) {
+@@ -14,16 +18,20 @@ export default function AlertList({ topic, className }) {
+ 
+   return (
+     <div className={className}>
+-      {topicMessages.map(message => (
+-        <Alert
+-          key={message.id}
+-          type={message.type}
+-          dismissible={message.dismissible}
+-          onDismiss={() => remove(message.id)}
+-        >
+-          {message.text}
+-        </Alert>
+-      ))}
++      {topicMessages.map(message => {
++        const AlertComponent = getAlertComponent(message.code);
++        return (
++          <Suspense key={message.id} fallback={null}>
++            <AlertComponent
++              type={message.type}
++              dismissible={message.dismissible}
++              onDismiss={() => remove(message.id)}
++            >
++              {message.text}
++            </AlertComponent>
++          </Suspense>
++        );
++      })}
+     </div>
+   );
+ }
+@@ -31,9 +39,17 @@ export default function AlertList({ topic, className }) {
+ AlertList.propTypes = {
+   className: PropTypes.string,
+   topic: PropTypes.string,
++  customAlerts: PropTypes.objectOf(
++    PropTypes.oneOfType([
++      PropTypes.object,
++      PropTypes.func,
++      PropTypes.node,
++    ]),
++  ),
+ };
+ 
+ AlertList.defaultProps = {
+   topic: null,
+   className: null,
++  customAlerts: {},
+ };
+diff --git a/src/user-messages/UserMessagesProvider.jsx b/src/user-messages/UserMessagesProvider.jsx
+index f0c8dbc..56f0d83 100644
+--- a/src/user-messages/UserMessagesProvider.jsx
++++ b/src/user-messages/UserMessagesProvider.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React, { useState, useRef } from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import UserMessagesContext from './UserMessagesContext';
+@@ -7,21 +7,35 @@ export default function UserMessagesProvider({ children }) {
+   const [messages, setMessages] = useState([]);
+   const [nextId, setNextId] = useState(1);
+ 
++  const refMessages = useRef(messages);
++
+   const add = ({
+     code, dismissible, text, type, topic, ...others
+   }) => {
+     const id = nextId;
+-    setMessages([...messages, {
++    refMessages.current = [...refMessages.current, {
+       code, dismissible, text, type, topic, ...others, id,
+-    }]);
++    }];
++    setMessages(refMessages.current);
+     setNextId(nextId + 1);
+     return id;
+   };
+-  const remove = id => setMessages(messages.filter(message => message.id !== id));
++
++  const remove = id => {
++    refMessages.current = refMessages.current.filter(message => message.id !== id);
++    setMessages(refMessages.current);
++  };
++
++  const clear = (topic = null) => {
++    refMessages.current = topic === null ? [] : refMessages.current.filter(message => message.topic !== topic);
++
++    setMessages(refMessages.current);
++  };
+ 
+   const value = {
+     add,
+     remove,
++    clear,
+     messages,
+   };
+ 
+-- 
+2.34.1
+

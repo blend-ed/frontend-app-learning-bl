@@ -1,0 +1,166 @@
+From 2a5253444242330d68b6b916accb6949ba12f902 Mon Sep 17 00:00:00 2001
+From: julianajlk <jkang@edx.org>
+Date: Fri, 28 May 2021 13:38:49 -0400
+Subject: [PATCH 0478/1021] fix: gated content banner discount display (#466)
+
+REV-2232
+---
+ .../sequence/lock-paywall/LockPaywall.jsx     | 29 +++++++------------
+ .../lock-paywall/LockPaywall.test.jsx         | 23 +++++++++++++--
+ .../course/sequence/lock-paywall/messages.js  |  7 +----
+ 3 files changed, 32 insertions(+), 27 deletions(-)
+
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index b3ef761..c8b6293 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -5,12 +5,13 @@ import { faCheck } from '@fortawesome/free-solid-svg-icons';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import {
+-  Alert, Button, Icon,
++  Alert, Icon,
+ } from '@edx/paragon';
+ import { Locked } from '@edx/paragon/icons';
+ import messages from './messages';
+ import certificateLocked from '../../../../generic/assets/edX_locked_certificate.png';
+ import { useModel } from '../../../../generic/model-store';
++import { UpgradeButton } from '../../../../generic/upgrade-button';
+ import './LockPaywall.scss';
+ 
+ function LockPaywall({
+@@ -19,6 +20,7 @@ function LockPaywall({
+ }) {
+   const course = useModel('coursewareMeta', courseId);
+   const {
++    offer,
+     org,
+     verifiedMode,
+   } = course;
+@@ -26,11 +28,6 @@ function LockPaywall({
+   if (!verifiedMode) {
+     return null;
+   }
+-  const {
+-    currencySymbol,
+-    price,
+-    upgradeUrl,
+-  } = verifiedMode;
+ 
+   const eventProperties = {
+     org_key: org,
+@@ -75,7 +72,7 @@ function LockPaywall({
+       {intl.formatMessage(messages['learn.lockPaywall.list.bullet3.boldtext'])}
+     </span>
+   );
+-  const nonProfit = (
++  const nonProfitMission = (
+     <span className="font-weight-bold">
+       {intl.formatMessage(messages['learn.lockPaywall.list.bullet4.boldtext'])}
+     </span>
+@@ -141,8 +138,8 @@ function LockPaywall({
+                   <span className="fa-li"><FontAwesomeIcon icon={faCheck} /></span>
+                   <FormattedMessage
+                     id="gatedContent.paragraph.bulletFour"
+-                    defaultMessage="Support our {nonProfit} mission at edX"
+-                    values={{ nonProfit }}
++                    defaultMessage="Support our {nonProfitMission} at edX"
++                    values={{ nonProfitMission }}
+                   />
+                 </li>
+               </ul>
+@@ -154,17 +151,11 @@ function LockPaywall({
+           className="col-md-auto p-md-0 d-md-flex align-items-md-center mr-md-3"
+           style={{ textAlign: 'right' }}
+         >
+-          <Button
+-            className="lock_paywall_upgrade_link"
+-            href={upgradeUrl}
++          <UpgradeButton
++            offer={offer}
+             onClick={logClick}
+-            role="link"
+-          >
+-            {intl.formatMessage(messages['learn.lockPaywall.upgrade.link'], {
+-              currencySymbol,
+-              price,
+-            })}
+-          </Button>
++            verifiedMode={verifiedMode}
++          />
+         </div>
+       </div>
+     </Alert>
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+index 7a453e5..9620c37 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.test.jsx
+@@ -11,12 +11,14 @@ jest.mock('@edx/frontend-platform/analytics');
+ 
+ describe('Lock Paywall', () => {
+   let store;
+-  const mockData = {};
++  const mockData = { metadataModel: 'coursewareMeta' };
+ 
+   beforeAll(async () => {
+     store = await initializeTestStore();
+     const { courseware } = store.getState();
+-    mockData.courseId = courseware.courseId;
++    Object.assign(mockData, {
++      courseId: courseware.courseId,
++    });
+   });
+ 
+   it('displays unlock link with price', () => {
+@@ -31,6 +33,23 @@ describe('Lock Paywall', () => {
+     expect(upgradeLink).toHaveAttribute('href', `${upgradeUrl}`);
+   });
+ 
++  it('displays discounted price if there is an offer/first time purchase', async () => {
++    const courseMetadata = Factory.build('courseMetadata', {
++      offer: {
++        code: 'EDXWELCOME',
++        expiration_date: '2070-01-01T12:00:00Z',
++        original_price: '$100',
++        discounted_price: '$85',
++        percentage: 15,
++        upgrade_url: 'https://example.com/upgrade',
++      },
++    });
++    const testStore = await initializeTestStore({ courseMetadata }, false);
++    render(<LockPaywall {...mockData} courseId={courseMetadata.id} />, { store: testStore });
++
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('$85 ($100)');
++  });
++
+   it('sends analytics event onClick of unlock link', () => {
+     sendTrackEvent.mockClear();
+ 
+diff --git a/src/courseware/course/sequence/lock-paywall/messages.js b/src/courseware/course/sequence/lock-paywall/messages.js
+index 1ae0449..0d39ec4 100644
+--- a/src/courseware/course/sequence/lock-paywall/messages.js
++++ b/src/courseware/course/sequence/lock-paywall/messages.js
+@@ -11,11 +11,6 @@ const messages = defineMessages({
+     defaultMessage: 'Upgrade to gain access to locked features like this one and get the most out of your course.',
+     description: 'Message shown to indicate that a piece of content is unavailable to audit track users.',
+   },
+-  'learn.lockPaywall.upgrade.link': {
+-    id: 'learn.lockPaywall.upgrade.link',
+-    defaultMessage: 'Upgrade for {currencySymbol}{price}',
+-    description: 'A link users can click that navigates their browser to the upgrade payment page.',
+-  },
+   'learn.lockPaywall.example.alt': {
+     id: 'learn.lockPaywall.example.alt',
+     defaultMessage: 'Example Certificate',
+@@ -43,7 +38,7 @@ const messages = defineMessages({
+   },
+   'learn.lockPaywall.list.bullet4.boldtext': {
+     id: 'learn.lockPaywall.list.bullet4.boldtext',
+-    defaultMessage: 'non-profit',
++    defaultMessage: 'non-profit mission',
+     description: 'Bolded text to highlight our non-profit status.',
+   },
+ });
+-- 
+2.34.1
+

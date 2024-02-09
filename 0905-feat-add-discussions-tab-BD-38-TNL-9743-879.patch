@@ -1,0 +1,476 @@
+From 6d42ee9c6f26ce1d396422a96456d9235158dd71 Mon Sep 17 00:00:00 2001
+From: Kshitij Sobti <kshitij@sobti.in>
+Date: Wed, 13 Apr 2022 19:31:29 +0530
+Subject: [PATCH 0905/1021] feat: add discussions tab [BD-38] [TNL-9743] (#879)
+
+* feat: add discussions tab
+
+Adds code to load the discussions MFE in an iframe in the tab so the user isn't redirected to the LMS.
+
+Adds code for the discussions tab, making it dynamically resize based on contents using a postMessage API.
+
+* feat: update path based on user navigation inside discussions MFE
+
+The discussions MFE will send path change events via the postMessage API so that the learning MFE path can be kept in sync. This will allow reloading a page without having the iframe revert to same path each time.
+---
+ src/course-home/data/thunks.js                | 56 +++++++--------
+ .../discussion-tab/DiscussionTab.jsx          | 36 ++++++++++
+ .../discussion-tab/DiscussionTab.test.jsx     | 61 ++++++++++++++++
+ .../course/sidebar/common/SidebarBase.jsx     |  3 +-
+ .../discussions/DiscussionsSidebar.jsx        |  4 +-
+ .../discussions/DiscussionsSidebar.test.jsx   | 69 +++++++++++++++++++
+ src/generic/hooks.js                          | 42 ++++++++++-
+ src/generic/hooks.test.jsx                    | 45 ++++++++++++
+ src/index.jsx                                 |  7 ++
+ 9 files changed, 288 insertions(+), 35 deletions(-)
+ create mode 100644 src/course-home/discussion-tab/DiscussionTab.jsx
+ create mode 100644 src/course-home/discussion-tab/DiscussionTab.test.jsx
+ create mode 100644 src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+ create mode 100644 src/generic/hooks.test.jsx
+
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index e1ca82a..8d65976 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -32,46 +32,38 @@ const eventTypes = {
+ export function fetchTab(courseId, tab, getTabData, targetUserId) {
+   return async (dispatch) => {
+     dispatch(fetchTabRequest({ courseId }));
+-    Promise.allSettled([
+-      getCourseHomeCourseMetadata(courseId, 'outline'),
+-      getTabData(courseId, targetUserId),
+-    ]).then(([courseHomeCourseMetadataResult, tabDataResult]) => {
+-      const fetchedCourseHomeCourseMetadata = courseHomeCourseMetadataResult.status === 'fulfilled';
+-      const fetchedTabData = tabDataResult.status === 'fulfilled';
+-
+-      if (fetchedCourseHomeCourseMetadata) {
+-        dispatch(addModel({
+-          modelType: 'courseHomeMeta',
+-          model: {
+-            id: courseId,
+-            ...courseHomeCourseMetadataResult.value,
+-          },
+-        }));
+-      } else {
+-        logError(courseHomeCourseMetadataResult.reason);
+-      }
+-
+-      if (fetchedTabData) {
++    try {
++      const courseHomeCourseMetadata = await getCourseHomeCourseMetadata(courseId, 'outline');
++      dispatch(addModel({
++        modelType: 'courseHomeMeta',
++        model: {
++          id: courseId,
++          ...courseHomeCourseMetadata,
++        },
++      }));
++      const tabDataResult = getTabData && await getTabData(courseId, targetUserId);
++      if (tabDataResult) {
+         dispatch(addModel({
+           modelType: tab,
+           model: {
+             id: courseId,
+-            ...tabDataResult.value,
++            ...tabDataResult,
+           },
+         }));
+-      } else {
+-        logError(tabDataResult.reason);
+       }
+-
+       // Disable the access-denied path for now - it caused a regression
+-      if (fetchedCourseHomeCourseMetadata && !courseHomeCourseMetadataResult.value.courseAccess.hasAccess) {
++      if (!courseHomeCourseMetadata.courseAccess.hasAccess) {
+         dispatch(fetchTabDenied({ courseId }));
+-      } else if (fetchedCourseHomeCourseMetadata && fetchedTabData) {
+-        dispatch(fetchTabSuccess({ courseId, targetUserId }));
+-      } else {
+-        dispatch(fetchTabFailure({ courseId }));
++      } else if (tabDataResult || !getTabData) {
++        dispatch(fetchTabSuccess({
++          courseId,
++          targetUserId,
++        }));
+       }
+-    });
++    } catch (e) {
++      dispatch(fetchTabFailure({ courseId }));
++      logError(e);
++    }
+   };
+ }
+ 
+@@ -87,6 +79,10 @@ export function fetchOutlineTab(courseId) {
+   return fetchTab(courseId, 'outline', getOutlineTabData);
+ }
+ 
++export function fetchDiscussionTab(courseId) {
++  return fetchTab(courseId, 'discussion');
++}
++
+ export function dismissWelcomeMessage(courseId) {
+   return async () => postDismissWelcomeMessage(courseId);
+ }
+diff --git a/src/course-home/discussion-tab/DiscussionTab.jsx b/src/course-home/discussion-tab/DiscussionTab.jsx
+new file mode 100644
+index 0000000..d4d2d6e
+--- /dev/null
++++ b/src/course-home/discussion-tab/DiscussionTab.jsx
+@@ -0,0 +1,36 @@
++import { getConfig } from '@edx/frontend-platform';
++import { injectIntl } from '@edx/frontend-platform/i18n';
++import React, { useState } from 'react';
++import { useSelector } from 'react-redux';
++import { generatePath, useHistory } from 'react-router';
++import { useParams } from 'react-router-dom';
++import { useIFrameHeight, useIFramePluginEvents } from '../../generic/hooks';
++
++function DiscussionTab() {
++  const { courseId } = useSelector(state => state.courseHome);
++  const { path } = useParams();
++  const [originalPath] = useState(path);
++  const history = useHistory();
++
++  const [, iFrameHeight] = useIFrameHeight();
++  useIFramePluginEvents({
++    'discussions.navigate': (payload) => {
++      const basePath = generatePath('/course/:courseId/discussion', { courseId });
++      history.push(`${basePath}/${payload.path}`);
++    },
++  });
++  const discussionsUrl = `${getConfig().DISCUSSIONS_MFE_BASE_URL}/${courseId}/${originalPath}`;
++  return (
++    <iframe
++      src={discussionsUrl}
++      className="d-flex w-100 border-0"
++      height={iFrameHeight}
++      style={{ minHeight: '60rem' }}
++      title="discussion"
++    />
++  );
++}
++
++DiscussionTab.propTypes = {};
++
++export default injectIntl(DiscussionTab);
+diff --git a/src/course-home/discussion-tab/DiscussionTab.test.jsx b/src/course-home/discussion-tab/DiscussionTab.test.jsx
+new file mode 100644
+index 0000000..08672c5
+--- /dev/null
++++ b/src/course-home/discussion-tab/DiscussionTab.test.jsx
+@@ -0,0 +1,61 @@
++import { getConfig, history } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { AppProvider } from '@edx/frontend-platform/react';
++import { render } from '@testing-library/react';
++import MockAdapter from 'axios-mock-adapter';
++import React from 'react';
++import { Route } from 'react-router';
++import { Factory } from 'rosie';
++import { UserMessagesProvider } from '../../generic/user-messages';
++import {
++  initializeMockApp, messageEvent, screen, waitFor,
++} from '../../setupTest';
++import initializeStore from '../../store';
++import { TabContainer } from '../../tab-page';
++import { appendBrowserTimezoneToUrl } from '../../utils';
++import { fetchDiscussionTab } from '../data/thunks';
++import DiscussionTab from './DiscussionTab';
++
++initializeMockApp();
++jest.mock('@edx/frontend-platform/analytics');
++
++describe('DiscussionTab', () => {
++  let axiosMock;
++  let store;
++  let component;
++
++  beforeEach(() => {
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    store = initializeStore();
++    component = (
++      <AppProvider store={store}>
++        <UserMessagesProvider>
++          <Route path="/course/:courseId/discussion">
++            <TabContainer tab="discussion" fetch={fetchDiscussionTab} slice="courseHome">
++              <DiscussionTab />
++            </TabContainer>
++          </Route>
++        </UserMessagesProvider>
++      </AppProvider>
++    );
++  });
++
++  const courseMetadata = Factory.build('courseHomeMetadata', { user_timezone: 'America/New_York' });
++  const { id: courseId } = courseMetadata;
++
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
++  courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
++
++  beforeEach(() => {
++    axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
++    history.push(`/course/${courseId}/discussion`); // so tab can pull course id from url
++
++    render(component);
++  });
++
++  it('resizes when it gets a size hint from iframe', async () => {
++    window.postMessage({ ...messageEvent, payload: { height: 1234 } }, '*');
++    await waitFor(() => expect(screen.getByTitle('discussion'))
++      .toHaveAttribute('height', String(1234)));
++  });
++});
+diff --git a/src/courseware/course/sidebar/common/SidebarBase.jsx b/src/courseware/course/sidebar/common/SidebarBase.jsx
+index 41454b6..05aa496 100644
+--- a/src/courseware/course/sidebar/common/SidebarBase.jsx
++++ b/src/courseware/course/sidebar/common/SidebarBase.jsx
+@@ -88,7 +88,7 @@ SidebarBase.propTypes = {
+   title: PropTypes.string.isRequired,
+   ariaLabel: PropTypes.string.isRequired,
+   sidebarId: PropTypes.string.isRequired,
+-  className: PropTypes.string.isRequired,
++  className: PropTypes.string,
+   children: PropTypes.element.isRequired,
+   showTitleBar: PropTypes.bool,
+   width: PropTypes.string,
+@@ -97,6 +97,7 @@ SidebarBase.propTypes = {
+ SidebarBase.defaultProps = {
+   width: '31rem',
+   showTitleBar: true,
++  className: '',
+ };
+ 
+ export default injectIntl(SidebarBase);
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+index f781e80..13f4e97 100644
+--- a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.jsx
+@@ -16,7 +16,7 @@ function DiscussionsSidebar({ intl }) {
+     courseId,
+   } = useContext(SidebarContext);
+   const topic = useModel('discussionTopics', unitId);
+-  if (!topic) {
++  if (!topic?.id) {
+     return null;
+   }
+   const discussionsUrl = `${getConfig().DISCUSSIONS_MFE_BASE_URL}/${courseId}/topics/${topic.id}`;
+@@ -31,8 +31,6 @@ function DiscussionsSidebar({ intl }) {
+       <iframe
+         src={`${discussionsUrl}?inContext`}
+         className="d-flex w-100 border-0"
+-        // Need to set minHeight so there is enough space for the add post UI
+-        // TODO: Use postMessage API to dynamically update iframe size.
+         style={{ minHeight: '60rem' }}
+         title={intl.formatMessage(messages.discussionsTitle)}
+       />
+diff --git a/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+new file mode 100644
+index 0000000..bb1d934
+--- /dev/null
++++ b/src/courseware/course/sidebar/sidebars/discussions/DiscussionsSidebar.test.jsx
+@@ -0,0 +1,69 @@
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import MockAdapter from 'axios-mock-adapter';
++import React from 'react';
++import {
++  initializeMockApp, initializeTestStore, render, screen,
++} from '../../../../../setupTest';
++import { executeThunk } from '../../../../../utils';
++import { buildTopicsFromUnits } from '../../../../data/__factories__/discussionTopics.factory';
++import { getCourseDiscussionTopics } from '../../../../data/thunks';
++import SidebarContext from '../../SidebarContext';
++import DiscussionsSidebar from './DiscussionsSidebar';
++
++initializeMockApp();
++
++describe('Discussions Trigger', () => {
++  let axiosMock;
++  let mockData;
++  let courseId;
++  let unitId;
++
++  beforeEach(async () => {
++    const store = await initializeTestStore({
++      excludeFetchCourse: false,
++      excludeFetchSequence: false,
++    });
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    const state = store.getState();
++    courseId = state.courseware.courseId;
++    [unitId] = Object.keys(state.models.units);
++
++    mockData = {
++      courseId,
++      unitId,
++      currentSidebar: 'DISCUSSIONS',
++    };
++
++    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/discussion/v1/courses/${courseId}`).reply(
++      200,
++      {
++        provider: 'openedx',
++      },
++    );
++    axiosMock.onGet(`${getConfig().LMS_BASE_URL}/api/discussion/v2/course_topics/${courseId}`)
++      .reply(200, buildTopicsFromUnits(state.models.units));
++    await executeThunk(getCourseDiscussionTopics(courseId), store.dispatch);
++  });
++
++  function renderWithProvider(testData = {}) {
++    const { container } = render(
++      <SidebarContext.Provider value={{ ...mockData, ...testData }}>
++        <DiscussionsSidebar />
++      </SidebarContext.Provider>,
++    );
++    return container;
++  }
++
++  it('should show up if unit discussions associated with it', async () => {
++    renderWithProvider();
++    expect(screen.queryByTitle('Discussions')).toBeInTheDocument();
++    expect(screen.queryByTitle('Discussions'))
++      .toHaveAttribute('src', `http://localhost:2002/${courseId}/topics/topic-1?inContext`);
++  });
++
++  it('should show nothing if unit has no discussions associated with it', async () => {
++    renderWithProvider({ unitId: 'no-discussion' });
++    expect(screen.queryByTitle('Discussions')).not.toBeInTheDocument();
++  });
++});
+diff --git a/src/generic/hooks.js b/src/generic/hooks.js
+index cce0b53..eaf25e7 100644
+--- a/src/generic/hooks.js
++++ b/src/generic/hooks.js
+@@ -1,6 +1,8 @@
+ /* eslint-disable import/prefer-default-export */
+ 
+-import { useEffect, useRef } from 'react';
++import {
++  useCallback, useEffect, useRef, useState,
++} from 'react';
+ 
+ export function useEventListener(type, handler) {
+   // We use this ref so that we can hold a reference to the currently active event listener.
+@@ -19,3 +21,41 @@ export function useEventListener(type, handler) {
+     return () => global.removeEventListener(type, eventListenerRef.current);
+   }, [type, handler]);
+ }
++
++/**
++ * Hooks up post messages to callbacks
++ * @param {Object.<string, function>} events A mapping of message type to callback
++ */
++export function useIFramePluginEvents(events) {
++  const receiveMessage = useCallback(({ data }) => {
++    const {
++      type,
++      payload,
++    } = data;
++    if (events[type]) {
++      events[type](payload);
++    }
++  }, [events]);
++  useEventListener('message', receiveMessage);
++}
++
++/**
++ * A hook to monitor message about changes in iframe content height
++ * @param onIframeLoaded A callback for when the frame is loaded
++ * @returns {[boolean, number]}
++ */
++export function useIFrameHeight(onIframeLoaded = null) {
++  const [iframeHeight, setIframeHeight] = useState(null);
++  const [hasLoaded, setHasLoaded] = useState(false);
++  const receiveResizeMessage = useCallback(({ height }) => {
++    setIframeHeight(height);
++    if (!hasLoaded && !iframeHeight && height > 0) {
++      setHasLoaded(true);
++      if (onIframeLoaded) {
++        onIframeLoaded();
++      }
++    }
++  }, [setIframeHeight, hasLoaded, iframeHeight, setHasLoaded, onIframeLoaded]);
++  useIFramePluginEvents({ 'plugin.resize': receiveResizeMessage });
++  return [hasLoaded, iframeHeight];
++}
+diff --git a/src/generic/hooks.test.jsx b/src/generic/hooks.test.jsx
+new file mode 100644
+index 0000000..2009419
+--- /dev/null
++++ b/src/generic/hooks.test.jsx
+@@ -0,0 +1,45 @@
++import { render, screen, waitFor } from '@testing-library/react';
++import { useEventListener, useIFrameHeight } from './hooks';
++
++describe('Hooks', () => {
++  test('useEventListener', async () => {
++    const handler = jest.fn();
++    const TestComponent = () => {
++      useEventListener('message', handler);
++      return (<div data-testid="testid" />);
++    };
++    render(<TestComponent />);
++
++    await screen.findByTestId('testid');
++    window.postMessage({ test: 'test' }, '*');
++    await waitFor(() => expect(handler).toHaveBeenCalled());
++  });
++  test('useIFrameHeight', async () => {
++    const onLoaded = jest.fn();
++    const TestComponent = () => {
++      const [hasLoaded, height] = useIFrameHeight(onLoaded);
++      return (
++        <div data-testid="testid">
++          <span data-testid="loaded">
++            {String(hasLoaded)}
++          </span>
++          <span data-testid="height">
++            {String(height)}
++          </span>
++        </div>
++      );
++    };
++    render(<TestComponent />);
++
++    await screen.findByTestId('testid');
++    expect(screen.getByTestId('loaded')).toHaveTextContent('false');
++    expect(screen.getByTestId('height')).toHaveTextContent('null');
++    window.postMessage({
++      type: 'plugin.resize',
++      payload: { height: 1234 },
++    }, '*');
++    await waitFor(() => expect(onLoaded).toHaveBeenCalled());
++    await waitFor(() => expect(screen.getByTestId('loaded')).toHaveTextContent('true'));
++    expect(screen.getByTestId('height')).toHaveTextContent('1234');
++  });
++});
+diff --git a/src/index.jsx b/src/index.jsx
+index eef01fb..7db78a6 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -12,6 +12,8 @@ import { Switch } from 'react-router-dom';
+ 
+ import { messages as footerMessages } from '@edx/frontend-component-footer';
+ import { messages as headerMessages } from '@edx/frontend-component-header';
++import { fetchDiscussionTab } from './course-home/data/thunks';
++import DiscussionTab from './course-home/discussion-tab/DiscussionTab';
+ 
+ import appMessages from './i18n';
+ import { UserMessagesProvider } from './generic/user-messages';
+@@ -51,6 +53,11 @@ subscribe(APP_READY, () => {
+                   <DatesTab />
+                 </TabContainer>
+               </PageRoute>
++              <PageRoute path="/course/:courseId/discussion/:path*">
++                <TabContainer tab="discussion" fetch={fetchDiscussionTab} slice="courseHome">
++                  <DiscussionTab />
++                </TabContainer>
++              </PageRoute>
+               <PageRoute
+                 path={[
+                   '/course/:courseId/progress/:targetUserId/',
+-- 
+2.34.1
+

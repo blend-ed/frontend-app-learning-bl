@@ -1,0 +1,83 @@
+From abc374b60a298107389a3b79ef4b7a8e883bf94c Mon Sep 17 00:00:00 2001
+From: edX requirements bot <testeng+edx-requirements-bot@edx.org>
+Date: Mon, 4 Apr 2022 11:59:16 -0400
+Subject: [PATCH 0895/1021] chore!: Dropped support for Node 12
+
+---
+ .github/workflows/validate.yml |  4 ++--
+ .husky/_/.gitignore            |  1 +
+ .husky/_/husky.sh              | 31 +++++++++++++++++++++++++++++++
+ 3 files changed, 34 insertions(+), 2 deletions(-)
+ create mode 100644 .husky/_/.gitignore
+ create mode 100644 .husky/_/husky.sh
+
+diff --git a/.github/workflows/validate.yml b/.github/workflows/validate.yml
+index 5309c69..0d2bf1b 100644
+--- a/.github/workflows/validate.yml
++++ b/.github/workflows/validate.yml
+@@ -2,7 +2,7 @@ name: validate
+ on:
+   push:
+     branches:
+-    - 'master'
++    - master
+   pull_request:
+     branches:
+     - '**'
+@@ -11,7 +11,7 @@ jobs:
+     runs-on: ubuntu-latest
+     strategy:
+       matrix:
+-        node: [12, 14, 16]
++        node: [16]
+     steps:
+     - uses: actions/checkout@v3
+     - uses: actions/setup-node@v3
+diff --git a/.husky/_/.gitignore b/.husky/_/.gitignore
+new file mode 100644
+index 0000000..f59ec20
+--- /dev/null
++++ b/.husky/_/.gitignore
+@@ -0,0 +1 @@
++*
+\ No newline at end of file
+diff --git a/.husky/_/husky.sh b/.husky/_/husky.sh
+new file mode 100644
+index 0000000..6809ccc
+--- /dev/null
++++ b/.husky/_/husky.sh
+@@ -0,0 +1,31 @@
++#!/bin/sh
++if [ -z "$husky_skip_init" ]; then
++  debug () {
++    if [ "$HUSKY_DEBUG" = "1" ]; then
++      echo "husky (debug) - $1"
++    fi
++  }
++
++  readonly hook_name="$(basename "$0")"
++  debug "starting $hook_name..."
++
++  if [ "$HUSKY" = "0" ]; then
++    debug "HUSKY env variable is set to 0, skipping hook"
++    exit 0
++  fi
++
++  if [ -f ~/.huskyrc ]; then
++    debug "sourcing ~/.huskyrc"
++    . ~/.huskyrc
++  fi
++
++  export readonly husky_skip_init=1
++  sh -e "$0" "$@"
++  exitCode="$?"
++
++  if [ $exitCode != 0 ]; then
++    echo "husky - $hook_name hook exited with code $exitCode (error)"
++  fi
++
++  exit $exitCode
++fi
+-- 
+2.34.1
+

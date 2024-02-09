@@ -1,0 +1,550 @@
+From 1546c62e7f8d5cac84a0ce2c757b5d7b310bbe27 Mon Sep 17 00:00:00 2001
+From: Asad Iqbal <7334669+asadiqbal08@users.noreply.github.com>
+Date: Mon, 20 Dec 2021 18:57:05 +0500
+Subject: [PATCH 0762/1021] feat: Removed course header stuff (#715)
+
+---
+ package-lock.json                             |  15 +++
+ package.json                                  |   1 +
+ src/course-header/AnonymousUserMenu.jsx       |  34 ------
+ .../AuthenticatedUserDropdown.jsx             |  76 -------------
+ src/course-header/Header.jsx                  | 100 ------------------
+ src/course-header/Header.test.jsx             |  29 -----
+ src/course-header/messages.js                 |  46 --------
+ .../goal-unsubscribe/GoalUnsubscribe.jsx      |   2 +-
+ .../CourseTabsNavigation.jsx                  |   0
+ .../CourseTabsNavigation.test.jsx             |   0
+ src/{course-header => course-tabs}/index.js   |   2 +-
+ src/course-tabs/messages.js                   |  11 ++
+ src/courseware/CoursewareContainer.test.jsx   |   2 +-
+ src/generic/messages.js                       |  10 --
+ src/index.scss                                |  23 ----
+ src/tab-page/LoadedTabPage.jsx                |   2 +-
+ src/tab-page/LoadedTabPage.test.jsx           |   2 +-
+ src/tab-page/TabPage.jsx                      |   4 +-
+ 18 files changed, 34 insertions(+), 325 deletions(-)
+ delete mode 100644 src/course-header/AnonymousUserMenu.jsx
+ delete mode 100644 src/course-header/AuthenticatedUserDropdown.jsx
+ delete mode 100644 src/course-header/Header.jsx
+ delete mode 100644 src/course-header/Header.test.jsx
+ delete mode 100644 src/course-header/messages.js
+ rename src/{course-header => course-tabs}/CourseTabsNavigation.jsx (100%)
+ rename src/{course-header => course-tabs}/CourseTabsNavigation.test.jsx (100%)
+ rename src/{course-header => course-tabs}/index.js (59%)
+ create mode 100644 src/course-tabs/messages.js
+
+diff --git a/package-lock.json b/package-lock.json
+index 6f2bd3c..27f2317 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -3964,6 +3964,21 @@
+         }
+       }
+     },
++    "@edx/frontend-component-header": {
++      "version": "2.4.2",
++      "resolved": "https://registry.npmjs.org/@edx/frontend-component-header/-/frontend-component-header-2.4.2.tgz",
++      "integrity": "sha512-xE1rnZ3eM1gEi/69pb1aGTAb+pcQa32c50EyBGrmmaaVemqby94g3MvMvTYO7jjJ5+coBSa9KEHBZ2XRadRknA==",
++      "requires": {
++        "@fortawesome/fontawesome-svg-core": "1.2.36",
++        "@fortawesome/free-brands-svg-icons": "5.15.4",
++        "@fortawesome/free-regular-svg-icons": "5.15.4",
++        "@fortawesome/free-solid-svg-icons": "5.15.4",
++        "@fortawesome/react-fontawesome": "^0.1.14",
++        "babel-polyfill": "6.26.0",
++        "react-responsive": "8.2.0",
++        "react-transition-group": "4.4.2"
++      }
++    },
+     "@edx/frontend-enterprise-utils": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/@edx/frontend-enterprise-utils/-/frontend-enterprise-utils-1.1.1.tgz",
+diff --git a/package.json b/package.json
+index e744d79..b73ceae 100644
+--- a/package.json
++++ b/package.json
+@@ -37,6 +37,7 @@
+     "@edx/frontend-lib-special-exams": "1.14.1",
+     "@edx/frontend-platform": "1.14.3",
+     "@edx/paragon": "16.19.0",
++    "@edx/frontend-component-header": "^2.4.2",
+     "@fortawesome/fontawesome-svg-core": "1.2.36",
+     "@fortawesome/free-brands-svg-icons": "5.15.4",
+     "@fortawesome/free-regular-svg-icons": "5.15.4",
+diff --git a/src/course-header/AnonymousUserMenu.jsx b/src/course-header/AnonymousUserMenu.jsx
+deleted file mode 100644
+index 7539608..0000000
+--- a/src/course-header/AnonymousUserMenu.jsx
++++ /dev/null
+@@ -1,34 +0,0 @@
+-import React from 'react';
+-
+-import { getConfig } from '@edx/frontend-platform';
+-import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Button } from '@edx/paragon';
+-
+-import genericMessages from '../generic/messages';
+-
+-function AnonymousUserMenu({ intl }) {
+-  return (
+-    <div>
+-      <Button
+-        className="mr-3"
+-        variant="outline-primary"
+-        href={`${getConfig().LMS_BASE_URL}/register?next=${encodeURIComponent(global.location.href)}`}
+-      >
+-        {intl.formatMessage(genericMessages.registerSentenceCase)}
+-      </Button>
+-      <Button
+-        variant="primary"
+-        href={`${getLoginRedirectUrl(global.location.href)}`}
+-      >
+-        {intl.formatMessage(genericMessages.signInSentenceCase)}
+-      </Button>
+-    </div>
+-  );
+-}
+-
+-AnonymousUserMenu.propTypes = {
+-  intl: intlShape.isRequired,
+-};
+-
+-export default injectIntl(AnonymousUserMenu);
+diff --git a/src/course-header/AuthenticatedUserDropdown.jsx b/src/course-header/AuthenticatedUserDropdown.jsx
+deleted file mode 100644
+index f5257b2..0000000
+--- a/src/course-header/AuthenticatedUserDropdown.jsx
++++ /dev/null
+@@ -1,76 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faUserCircle } from '@fortawesome/free-solid-svg-icons';
+-
+-import { getConfig } from '@edx/frontend-platform';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Dropdown } from '@edx/paragon';
+-
+-import messages from './messages';
+-
+-function AuthenticatedUserDropdown({ enterpriseLearnerPortalLink, intl, username }) {
+-  let dashboardMenuItem = (
+-    <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/dashboard`}>
+-      {intl.formatMessage(messages.dashboard)}
+-    </Dropdown.Item>
+-  );
+-  if (enterpriseLearnerPortalLink && Object.keys(enterpriseLearnerPortalLink).length > 0) {
+-    dashboardMenuItem = (
+-      <Dropdown.Item href={enterpriseLearnerPortalLink.href}>
+-        {enterpriseLearnerPortalLink.content}
+-      </Dropdown.Item>
+-    );
+-  }
+-  return (
+-    <>
+-      <a className="text-gray-700 mr-3" href={`${getConfig().SUPPORT_URL}`}>{intl.formatMessage(messages.help)}</a>
+-      <Dropdown className="user-dropdown">
+-        <Dropdown.Toggle variant="outline-primary">
+-          <FontAwesomeIcon icon={faUserCircle} className="d-md-none" size="lg" />
+-          <span data-hj-suppress className="d-none d-md-inline">
+-            {username}
+-          </span>
+-        </Dropdown.Toggle>
+-        <Dropdown.Menu className="dropdown-menu-right">
+-          {dashboardMenuItem}
+-          <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/u/${username}`}>
+-            {intl.formatMessage(messages.profile)}
+-          </Dropdown.Item>
+-          <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/account/settings`}>
+-            {intl.formatMessage(messages.account)}
+-          </Dropdown.Item>
+-          {!enterpriseLearnerPortalLink && (
+-            // Users should only see Order History if they do not have an available
+-            // learner portal, because an available learner portal currently means
+-            // that they access content via Subscriptions, in which context an "order"
+-            // is not relevant.
+-            <Dropdown.Item href={getConfig().ORDER_HISTORY_URL}>
+-              {intl.formatMessage(messages.orderHistory)}
+-            </Dropdown.Item>
+-          )}
+-          <Dropdown.Item href={getConfig().LOGOUT_URL}>
+-            {intl.formatMessage(messages.signOut)}
+-          </Dropdown.Item>
+-        </Dropdown.Menu>
+-      </Dropdown>
+-    </>
+-  );
+-}
+-
+-AuthenticatedUserDropdown.propTypes = {
+-  intl: intlShape.isRequired,
+-  username: PropTypes.string.isRequired,
+-  enterpriseLearnerPortalLink: PropTypes.shape({
+-    type: PropTypes.string,
+-    href: PropTypes.string,
+-    content: PropTypes.string,
+-  }),
+-};
+-
+-AuthenticatedUserDropdown.defaultProps = {
+-  enterpriseLearnerPortalLink: undefined,
+-};
+-
+-export default injectIntl(AuthenticatedUserDropdown);
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+deleted file mode 100644
+index ab952fa..0000000
+--- a/src/course-header/Header.jsx
++++ /dev/null
+@@ -1,100 +0,0 @@
+-import React, { useContext } from 'react';
+-import PropTypes from 'prop-types';
+-import { useEnterpriseConfig } from '@edx/frontend-enterprise-utils';
+-import { getConfig } from '@edx/frontend-platform';
+-import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { AppContext } from '@edx/frontend-platform/react';
+-
+-import AnonymousUserMenu from './AnonymousUserMenu';
+-import AuthenticatedUserDropdown from './AuthenticatedUserDropdown';
+-
+-import messages from './messages';
+-
+-function LinkedLogo({
+-  href,
+-  src,
+-  alt,
+-  ...attributes
+-}) {
+-  return (
+-    <a href={href} {...attributes}>
+-      <img className="d-block" src={src} alt={alt} />
+-    </a>
+-  );
+-}
+-
+-LinkedLogo.propTypes = {
+-  href: PropTypes.string.isRequired,
+-  src: PropTypes.string.isRequired,
+-  alt: PropTypes.string.isRequired,
+-};
+-
+-function Header({
+-  courseOrg, courseNumber, courseTitle, intl, showUserDropdown,
+-}) {
+-  const { authenticatedUser } = useContext(AppContext);
+-
+-  const { enterpriseLearnerPortalLink, enterpriseCustomerBrandingConfig } = useEnterpriseConfig(
+-    authenticatedUser,
+-    getConfig().ENTERPRISE_LEARNER_PORTAL_HOSTNAME,
+-    getConfig().LMS_BASE_URL,
+-  );
+-
+-  let headerLogo = (
+-    <LinkedLogo
+-      className="logo"
+-      href={`${getConfig().LMS_BASE_URL}/dashboard`}
+-      src={getConfig().LOGO_URL}
+-      alt={getConfig().SITE_NAME}
+-    />
+-  );
+-  if (enterpriseCustomerBrandingConfig && Object.keys(enterpriseCustomerBrandingConfig).length > 0) {
+-    headerLogo = (
+-      <LinkedLogo
+-        className="logo"
+-        href={enterpriseCustomerBrandingConfig.logoDestination}
+-        src={enterpriseCustomerBrandingConfig.logo}
+-        alt={enterpriseCustomerBrandingConfig.logoAltText}
+-      />
+-    );
+-  }
+-
+-  return (
+-    <header className="course-header">
+-      <a className="sr-only sr-only-focusable" href="#main-content">{intl.formatMessage(messages.skipNavLink)}</a>
+-      <div className="container-xl py-2 d-flex align-items-center">
+-        {headerLogo}
+-        <div className="flex-grow-1 course-title-lockup" style={{ lineHeight: 1 }}>
+-          <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
+-          <span className="d-block m-0 font-weight-bold course-title">{courseTitle}</span>
+-        </div>
+-        {showUserDropdown && authenticatedUser && (
+-          <AuthenticatedUserDropdown
+-            enterpriseLearnerPortalLink={enterpriseLearnerPortalLink}
+-            username={authenticatedUser.username}
+-          />
+-        )}
+-        {showUserDropdown && !authenticatedUser && (
+-          <AnonymousUserMenu />
+-        )}
+-      </div>
+-    </header>
+-  );
+-}
+-
+-Header.propTypes = {
+-  courseOrg: PropTypes.string,
+-  courseNumber: PropTypes.string,
+-  courseTitle: PropTypes.string,
+-  intl: intlShape.isRequired,
+-  showUserDropdown: PropTypes.bool,
+-};
+-
+-Header.defaultProps = {
+-  courseOrg: null,
+-  courseNumber: null,
+-  courseTitle: null,
+-  showUserDropdown: true,
+-};
+-
+-export default injectIntl(Header);
+diff --git a/src/course-header/Header.test.jsx b/src/course-header/Header.test.jsx
+deleted file mode 100644
+index 2889aa7..0000000
+--- a/src/course-header/Header.test.jsx
++++ /dev/null
+@@ -1,29 +0,0 @@
+-import React from 'react';
+-import {
+-  authenticatedUser, initializeMockApp, render, screen,
+-} from '../setupTest';
+-import { Header } from './index';
+-
+-describe('Header', () => {
+-  beforeAll(async () => {
+-    // We need to mock AuthService to implicitly use `getAuthenticatedUser` within `AppContext.Provider`.
+-    await initializeMockApp();
+-  });
+-
+-  it('displays user button', () => {
+-    render(<Header />);
+-    expect(screen.getByRole('button')).toHaveTextContent(authenticatedUser.username);
+-  });
+-
+-  it('displays course data', () => {
+-    const courseData = {
+-      courseOrg: 'course-org',
+-      courseNumber: 'course-number',
+-      courseTitle: 'course-title',
+-    };
+-    render(<Header {...courseData} />);
+-
+-    expect(screen.getByText(`${courseData.courseOrg} ${courseData.courseNumber}`)).toBeInTheDocument();
+-    expect(screen.getByText(courseData.courseTitle)).toBeInTheDocument();
+-  });
+-});
+diff --git a/src/course-header/messages.js b/src/course-header/messages.js
+deleted file mode 100644
+index e35d61a..0000000
+--- a/src/course-header/messages.js
++++ /dev/null
+@@ -1,46 +0,0 @@
+-import { defineMessages } from '@edx/frontend-platform/i18n';
+-
+-const messages = defineMessages({
+-  courseMaterial: {
+-    id: 'learn.navigation.course.tabs.label',
+-    defaultMessage: 'Course Material',
+-    description: 'The accessible label for course tabs navigation',
+-  },
+-  dashboard: {
+-    id: 'header.menu.dashboard.label',
+-    defaultMessage: 'Dashboard',
+-    description: 'The text for the user menu Dashboard navigation link.',
+-  },
+-  help: {
+-    id: 'header.help.label',
+-    defaultMessage: 'Help',
+-    description: 'The text for the link to the Help Center',
+-  },
+-  profile: {
+-    id: 'header.menu.profile.label',
+-    defaultMessage: 'Profile',
+-    description: 'The text for the user menu Profile navigation link.',
+-  },
+-  account: {
+-    id: 'header.menu.account.label',
+-    defaultMessage: 'Account',
+-    description: 'The text for the user menu Account navigation link.',
+-  },
+-  orderHistory: {
+-    id: 'header.menu.orderHistory.label',
+-    defaultMessage: 'Order History',
+-    description: 'The text for the user menu Order History navigation link.',
+-  },
+-  skipNavLink: {
+-    id: 'header.navigation.skipNavLink',
+-    defaultMessage: 'Skip to main content.',
+-    description: 'A link used by screen readers to allow users to skip to the main content of the page.',
+-  },
+-  signOut: {
+-    id: 'header.menu.signOut.label',
+-    defaultMessage: 'Sign Out',
+-    description: 'The label for the user menu Sign Out action.',
+-  },
+-});
+-
+-export default messages;
+diff --git a/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx b/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+index 895e410..24fddde 100644
+--- a/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
++++ b/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+-import { Header } from '../../course-header';
++import { LearningHeader as Header } from '@edx/frontend-component-header';
+ import PageLoading from '../../generic/PageLoading';
+ import { unsubscribeFromCourseGoal } from '../data/api';
+ 
+diff --git a/src/course-header/CourseTabsNavigation.jsx b/src/course-tabs/CourseTabsNavigation.jsx
+similarity index 100%
+rename from src/course-header/CourseTabsNavigation.jsx
+rename to src/course-tabs/CourseTabsNavigation.jsx
+diff --git a/src/course-header/CourseTabsNavigation.test.jsx b/src/course-tabs/CourseTabsNavigation.test.jsx
+similarity index 100%
+rename from src/course-header/CourseTabsNavigation.test.jsx
+rename to src/course-tabs/CourseTabsNavigation.test.jsx
+diff --git a/src/course-header/index.js b/src/course-tabs/index.js
+similarity index 59%
+rename from src/course-header/index.js
+rename to src/course-tabs/index.js
+index 8839c6c..e2236ee 100644
+--- a/src/course-header/index.js
++++ b/src/course-tabs/index.js
+@@ -1,2 +1,2 @@
+-export { default as Header } from './Header';
++/* eslint-disable import/prefer-default-export */
+ export { default as CourseTabsNavigation } from './CourseTabsNavigation';
+diff --git a/src/course-tabs/messages.js b/src/course-tabs/messages.js
+new file mode 100644
+index 0000000..e1230ab
+--- /dev/null
++++ b/src/course-tabs/messages.js
+@@ -0,0 +1,11 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  courseMaterial: {
++    id: 'learn.navigation.course.tabs.label',
++    defaultMessage: 'Course Material',
++    description: 'The accessible label for course tabs navigation',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 304fcd1..737e181 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -159,7 +159,7 @@ describe('CoursewareContainer', () => {
+     const courseId = defaultCourseId;
+ 
+     function assertLoadedHeader(container) {
+-      const courseHeader = container.querySelector('.course-header');
++      const courseHeader = container.querySelector('.learning-header');
+       // Ensure the course number and org appear - this proves we loaded course metadata properly.
+       expect(courseHeader).toHaveTextContent(courseMetadata.number);
+       expect(courseHeader).toHaveTextContent(courseMetadata.org);
+diff --git a/src/generic/messages.js b/src/generic/messages.js
+index ad435a0..fdf916a 100644
+--- a/src/generic/messages.js
++++ b/src/generic/messages.js
+@@ -11,16 +11,6 @@ const messages = defineMessages({
+     defaultMessage: 'register',
+     description: 'Text in a link, prompting the user to create an account.  Used in "learning.logistration.alert"',
+   },
+-  registerSentenceCase: {
+-    id: 'general.register.sentenceCase',
+-    defaultMessage: 'Register',
+-    description: 'Text in a button, prompting the user to register.',
+-  },
+-  signInLowercase: {
+-    id: 'learning.logistration.login', // ID left for historical purposes
+-    defaultMessage: 'sign in',
+-    description: 'Text in a link, prompting the user to log in.  Used in "learning.logistration.alert"',
+-  },
+   signInSentenceCase: {
+     id: 'general.signIn.sentenceCase',
+     defaultMessage: 'Sign in',
+diff --git a/src/index.scss b/src/index.scss
+index f764088..498631b 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -36,29 +36,6 @@
+   }
+ }
+ 
+-.course-header {
+-  min-width: 0;
+-
+-  .course-title-lockup {
+-    min-width: 0;
+-
+-    span {
+-      white-space: nowrap;
+-      overflow: hidden;
+-      text-overflow: ellipsis;
+-      padding-bottom: 0.1rem;
+-    }
+-  }
+-
+-  .user-dropdown {
+-    .btn {
+-      height: 3rem;
+-      @media (max-width: -1 + map-get($grid-breakpoints, "sm")) {
+-        padding: 0 0.5rem;
+-      }
+-    }
+-  }
+-}
+ .course-tabs-navigation {
+   border-bottom: solid 1px #eaeaea;
+ 
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 9ba67ac..12a00f9 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -5,7 +5,7 @@ import { Helmet } from 'react-helmet';
+ import { getConfig } from '@edx/frontend-platform';
+ import { useToggle } from '@edx/paragon';
+ 
+-import { CourseTabsNavigation } from '../course-header';
++import { CourseTabsNavigation } from '../course-tabs';
+ import { useModel } from '../generic/model-store';
+ import { AlertList } from '../generic/user-messages';
+ import StreakModal from '../shared/streak-celebration';
+diff --git a/src/tab-page/LoadedTabPage.test.jsx b/src/tab-page/LoadedTabPage.test.jsx
+index cccbbe7..0c15e9f 100644
+--- a/src/tab-page/LoadedTabPage.test.jsx
++++ b/src/tab-page/LoadedTabPage.test.jsx
+@@ -3,7 +3,7 @@ import { Factory } from 'rosie';
+ import { initializeTestStore, render, screen } from '../setupTest';
+ import LoadedTabPage from './LoadedTabPage';
+ 
+-jest.mock('../course-header/CourseTabsNavigation', () => () => <div data-testid="CourseTabsNavigation" />);
++jest.mock('../course-tabs/CourseTabsNavigation', () => () => <div data-testid="CourseTabsNavigation" />);
+ jest.mock('../instructor-toolbar/InstructorToolbar', () => () => <div data-testid="InstructorToolbar" />);
+ jest.mock('../shared/streak-celebration/StreakCelebrationModal', () => () => <div data-testid="StreakModal" />);
+ jest.mock('../product-tours/ProductTours', () => () => <div data-testid="ProductTours" />);
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index dcd7db8..0b89ee4 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -6,9 +6,9 @@ import { Redirect } from 'react-router';
+ 
+ import Footer from '@edx/frontend-component-footer';
+ import { Toast } from '@edx/paragon';
+-import { Header } from '../course-header';
+-import { getAccessDeniedRedirectUrl } from '../shared/access';
++import { LearningHeader as Header } from '@edx/frontend-component-header';
+ import PageLoading from '../generic/PageLoading';
++import { getAccessDeniedRedirectUrl } from '../shared/access';
+ import { useModel } from '../generic/model-store';
+ 
+ import genericMessages from '../generic/messages';
+-- 
+2.34.1
+

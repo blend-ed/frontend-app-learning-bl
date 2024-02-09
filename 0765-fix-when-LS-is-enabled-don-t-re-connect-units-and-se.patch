@@ -1,0 +1,46 @@
+From fb21f88c022e85685322ced420344ba3514636a6 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 20 Dec 2021 16:55:21 -0500
+Subject: [PATCH 0765/1021] fix: when LS is enabled, don't re-connect units and
+ sequences (#782)
+
+Learning Sequences (LS) don't need to edit unit blocks at all.
+It's not their data and the stitching code didn't have all the
+safety guards that the course block normalizer does in api.js.
+
+This fixes an issue with degenerate course layouts (like problems
+as direct children of sequences) when LS is enabled. It was trying
+to stitch units and sequences together but failing to account for
+unitIds that aren't actual units.
+
+Which is technically still supported by the platform, though not
+possible in Studio. We could try to do something smarter here, but
+that's not LS's job - it should just trust that the unit data is
+correctly normalized already. That unit loading code will
+eventually move to the sequence metadata anyway (ideally) and LS
+won't touch units at all.
+
+AA-1162
+---
+ src/courseware/data/thunks.js | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 2a09862..3ab19c1 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -98,11 +98,6 @@ function mergeLearningSequencesWithCourseBlocks(learningSequencesModels, courseB
+       legacyWebUrl: blocksSequence.legacyWebUrl,
+       unitIds: blocksSequence.unitIds,
+     };
+-
+-    // Add back-references to this sequence for all child units.
+-    blocksSequence.unitIds.forEach(childUnitId => {
+-      mergedModels.units[childUnitId].sequenceId = sequenceId;
+-    });
+   });
+ 
+   // List of Sections comes from Learning Sequences.
+-- 
+2.34.1
+

@@ -1,0 +1,37 @@
+From d320c6b5bc1740538ca52136592e8eb2bc1f3a99 Mon Sep 17 00:00:00 2001
+From: Calen Pennington <cale@edx.org>
+Date: Mon, 20 Jul 2020 11:47:35 -0400
+Subject: [PATCH 0172/1021] Include assignment extraInfo on dates page
+
+---
+ src/course-home/data/__factories__/datesTabData.factory.js | 1 +
+ src/course-home/dates-tab/Day.jsx                          | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/src/course-home/data/__factories__/datesTabData.factory.js b/src/course-home/data/__factories__/datesTabData.factory.js
+index 73b9dd9..ee3b7c3 100644
+--- a/src/course-home/data/__factories__/datesTabData.factory.js
++++ b/src/course-home/data/__factories__/datesTabData.factory.js
+@@ -15,6 +15,7 @@ Factory.define('datesTabData')
+         learner_has_access: true,
+         link: '',
+         title: 'Course Starts',
++        extraInfo: '',
+       },
+     ],
+     missed_deadlines: false,
+diff --git a/src/course-home/dates-tab/Day.jsx b/src/course-home/dates-tab/Day.jsx
+index 09e9abe..2801d69 100644
+--- a/src/course-home/dates-tab/Day.jsx
++++ b/src/course-home/dates-tab/Day.jsx
+@@ -59,6 +59,7 @@ function Day({
+             <div key={item.title + item.date} className={textColor}>
+               <div><span className="font-weight-bold small mt-1">{title}</span>{itemBadges}</div>
+               {item.description && <div className="small mb-2">{item.description}</div>}
++              {item.extraInfo && <div className="small mb-2">{item.extraInfo}</div>}
+             </div>
+           );
+         })}
+-- 
+2.34.1
+

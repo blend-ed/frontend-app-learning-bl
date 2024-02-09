@@ -1,0 +1,1637 @@
+From 8d7fbb5bd8136b6017e15dbdcd117a1616b2b516 Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Thu, 23 Jul 2020 16:41:39 +0200
+Subject: [PATCH 0197/1021] [TNL-7268] refactor tests to use factories
+
+---
+ src/course-home/data/redux.test.js            |   2 -
+ src/courseware/CoursewareContainer.test.jsx   |   1 -
+ .../course/sequence/Sequence.test.jsx         | 305 +++++++++++-------
+ .../course/sequence/SequenceContent.test.jsx  |  38 ++-
+ src/courseware/course/sequence/Unit.test.jsx  |  62 ++--
+ .../SequenceNavigation.jsx                    |   7 +-
+ .../SequenceNavigation.test.jsx               |  96 +++---
+ .../SequenceNavigationDropdown.test.jsx       |  61 ++--
+ .../SequenceNavigationTabs.test.jsx           |  50 ++-
+ .../sequence-navigation/UnitButton.test.jsx   |  70 ++--
+ .../sequence-navigation/UnitIcon.test.jsx     |  24 +-
+ .../UnitNavigation.test.jsx                   |  48 +--
+ .../__factories__/courseBlocks.factory.js     |   4 +-
+ .../__factories__/sequenceMetadata.factory.js |  39 ++-
+ src/courseware/data/redux.test.js             |  13 +-
+ src/setupTest.js                              | 143 ++++----
+ 16 files changed, 579 insertions(+), 384 deletions(-)
+
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index ad226a6..700535d 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -8,8 +8,6 @@ import * as thunks from './thunks';
+ 
+ import executeThunk from '../../utils';
+ 
+-import './__factories__';
+-import '../../courseware/data/__factories__/courseMetadata.factory';
+ import initializeMockApp from '../../setupTest';
+ import initializeStore from '../../store';
+ 
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 1aa1c18..81c480f 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -14,7 +14,6 @@ import tabMessages from '../tab-page/messages';
+ import initializeMockApp from '../setupTest';
+ 
+ import CoursewareContainer from './CoursewareContainer';
+-import './data/__factories__';
+ import buildSimpleCourseBlocks from './data/__factories__/courseBlocks.factory';
+ import initializeStore from '../store';
+ 
+diff --git a/src/courseware/course/sequence/Sequence.test.jsx b/src/courseware/course/sequence/Sequence.test.jsx
+index a452f91..5c6108d 100644
+--- a/src/courseware/course/sequence/Sequence.test.jsx
++++ b/src/courseware/course/sequence/Sequence.test.jsx
+@@ -1,32 +1,67 @@
+ import React from 'react';
+-import { cloneDeep } from 'lodash';
++import { Factory } from 'rosie';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import {
+-  initialState, loadUnit, render, screen, testUnits, fireEvent, waitFor,
++  loadUnit, render, screen, fireEvent, waitFor, initializeTestStore,
+ } from '../../../setupTest';
+ import Sequence from './Sequence';
++import { fetchSequenceFailure } from '../../data/slice';
+ 
+ jest.mock('@edx/frontend-platform/analytics');
+ 
+ describe('Sequence', () => {
+-  const mockData = {
+-    unitId: '3',
+-    sequenceId: '1',
+-    courseId: '1',
+-    unitNavigationHandler: () => {},
+-    nextSequenceHandler: () => {},
+-    previousSequenceHandler: () => {},
+-    intl: {},
+-  };
+-
+-  it('renders correctly without data', () => {
+-    render(<Sequence {...mockData} {...{ unitId: undefined, sequenceId: undefined }} />, { initialState: {} });
++  let mockData;
++  const courseMetadata = Factory.build('courseMetadata');
++  const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
++    'block',
++    { type: 'vertical' },
++    { courseId: courseMetadata.id },
++  ));
++
++  beforeAll(async () => {
++    const store = await initializeTestStore({ courseMetadata, unitBlocks });
++    const { courseware } = store.getState();
++    mockData = {
++      unitId: unitBlocks[0].id,
++      sequenceId: courseware.sequenceId,
++      courseId: courseware.courseId,
++      unitNavigationHandler: () => {},
++      nextSequenceHandler: () => {},
++      previousSequenceHandler: () => {},
++    };
++  });
++
++  it('renders correctly without data', async () => {
++    const testStore = await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true }, false);
++    render(<Sequence {...mockData} {...{ unitId: undefined, sequenceId: undefined }} />, { store: testStore });
++
+     expect(screen.getByText('There is no content here.')).toBeInTheDocument();
+     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+   });
+ 
+   it('renders correctly for gated content', async () => {
+-    const { container } = render(<Sequence {...mockData} {...{ sequenceId: '3' }} />);
++    const sequenceBlock = [Factory.build(
++      'block',
++      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { courseId: courseMetadata.id },
++    )];
++    const gatedContent = {
++      gated: true,
++      prereq_id: `${sequenceBlock[0].id}-prereq`,
++      prereq_section_name: `${sequenceBlock[0].display_name}-prereq`,
++      gated_section_name: sequenceBlock[0].display_name,
++    };
++    const sequenceMetadata = [Factory.build(
++      'sequenceMetadata',
++      { courseId: courseMetadata.id, gated_content: gatedContent },
++      { unitBlocks, sequenceBlock: sequenceBlock[0] },
++    )];
++    const testStore = await initializeTestStore({ unitBlocks, sequenceBlock, sequenceMetadata }, false);
++    const { container } = render(
++      <Sequence {...mockData} {...{ sequenceId: sequenceBlock[0].id }} />,
++      { store: testStore },
++    );
++
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+     // Only `Previous`, `Next` and `Bookmark` buttons.
+     expect(screen.getAllByRole('button').length).toEqual(3);
+@@ -39,10 +74,10 @@ describe('Sequence', () => {
+     expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
+   });
+ 
+-  it('displays error message on sequence load failure', () => {
+-    const testState = cloneDeep(initialState);
+-    testState.courseware.sequenceStatus = 'failed';
+-    render(<Sequence {...mockData} />, { initialState: testState });
++  it('displays error message on sequence load failure', async () => {
++    const testStore = await initializeTestStore({ excludeFetchCourse: true, excludeFetchSequence: true }, false);
++    testStore.dispatch(fetchSequenceFailure({ sequenceId: mockData.sequenceId }));
++    render(<Sequence {...mockData} />, { store: testStore });
+ 
+     expect(screen.getByText('There was an error loading this course.')).toBeInTheDocument();
+   });
+@@ -51,7 +86,7 @@ describe('Sequence', () => {
+     render(<Sequence {...mockData} />);
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+     // Renders navigation buttons plus one button for each unit.
+-    expect(screen.getAllByRole('button').length).toEqual(3 + testUnits.length);
++    expect(screen.getAllByRole('button')).toHaveLength(3 + unitBlocks.length);
+ 
+     loadUnit();
+     await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+@@ -60,21 +95,41 @@ describe('Sequence', () => {
+   });
+ 
+   describe('sequence and unit navigation buttons', () => {
+-    it('navigates to the previous sequence if the unit is the first in the sequence', async () => {
++    let testStore;
++    const sequenceBlock = [Factory.build(
++      'block',
++      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { courseId: courseMetadata.id },
++    ), Factory.build(
++      'block',
++      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { courseId: courseMetadata.id },
++    )];
++
++    beforeAll(async () => {
++      testStore = await initializeTestStore({ courseMetadata, unitBlocks, sequenceBlock }, false);
++    });
++
++    beforeEach(() => {
+       sendTrackEvent.mockClear();
+-      const unitId = '1';
+-      const sequenceId = '2';
+-      const previousSequenceHandler = jest.fn();
+-      render(<Sequence {...mockData} {...{ unitId, sequenceId, previousSequenceHandler }} />);
++    });
++
++    it('navigates to the previous sequence if the unit is the first in the sequence', async () => {
++      const testData = {
++        ...mockData,
++        sequenceId: sequenceBlock[1].id,
++        previousSequenceHandler: jest.fn(),
++      };
++      render(<Sequence {...testData} />, { store: testStore });
+ 
+       const sequencePreviousButton = screen.getByRole('button', { name: /previous/i });
+       fireEvent.click(sequencePreviousButton);
+-      expect(previousSequenceHandler).toHaveBeenCalledTimes(1);
++      expect(testData.previousSequenceHandler).toHaveBeenCalledTimes(1);
+       expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+       expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.sequence.previous_selected', {
+-        current_tab: Number(unitId),
+-        id: unitId,
+-        tab_count: testUnits.length,
++        current_tab: 1,
++        id: testData.unitId,
++        tab_count: unitBlocks.length,
+         widget_placement: 'top',
+       });
+ 
+@@ -83,30 +138,32 @@ describe('Sequence', () => {
+       const unitPreviousButton = screen.getAllByRole('button', { name: /previous/i })
+         .filter(button => button !== sequencePreviousButton)[0];
+       fireEvent.click(unitPreviousButton);
+-      expect(previousSequenceHandler).toHaveBeenCalledTimes(2);
++      expect(testData.previousSequenceHandler).toHaveBeenCalledTimes(2);
+       expect(sendTrackEvent).toHaveBeenCalledTimes(2);
+       expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.sequence.previous_selected', {
+-        current_tab: Number(unitId),
+-        id: unitId,
+-        tab_count: testUnits.length,
++        current_tab: 1,
++        id: testData.unitId,
++        tab_count: unitBlocks.length,
+         widget_placement: 'bottom',
+       });
+     });
+ 
+     it('navigates to the next sequence if the unit is the last in the sequence', async () => {
+-      sendTrackEvent.mockClear();
+-      const unitId = String(testUnits.length);
+-      const sequenceId = '1';
+-      const nextSequenceHandler = jest.fn();
+-      render(<Sequence {...mockData} {...{ unitId, sequenceId, nextSequenceHandler }} />);
++      const testData = {
++        ...mockData,
++        unitId: unitBlocks[unitBlocks.length - 1].id,
++        sequenceId: sequenceBlock[0].id,
++        nextSequenceHandler: jest.fn(),
++      };
++      render(<Sequence {...testData} />, { store: testStore });
+ 
+       const sequenceNextButton = screen.getByRole('button', { name: /next/i });
+       fireEvent.click(sequenceNextButton);
+-      expect(nextSequenceHandler).toHaveBeenCalledTimes(1);
++      expect(testData.nextSequenceHandler).toHaveBeenCalledTimes(1);
+       expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.sequence.next_selected', {
+-        current_tab: Number(unitId),
+-        id: unitId,
+-        tab_count: testUnits.length,
++        current_tab: unitBlocks.length,
++        id: testData.unitId,
++        tab_count: unitBlocks.length,
+         widget_placement: 'top',
+       });
+ 
+@@ -115,141 +172,167 @@ describe('Sequence', () => {
+       const unitNextButton = screen.getAllByRole('button', { name: /next/i })
+         .filter(button => button !== sequenceNextButton)[0];
+       fireEvent.click(unitNextButton);
+-      expect(nextSequenceHandler).toHaveBeenCalledTimes(2);
++      expect(testData.nextSequenceHandler).toHaveBeenCalledTimes(2);
+       expect(sendTrackEvent).toHaveBeenCalledTimes(2);
+       expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.sequence.next_selected', {
+-        current_tab: Number(unitId),
+-        id: unitId,
+-        tab_count: testUnits.length,
++        current_tab: unitBlocks.length,
++        id: testData.unitId,
++        tab_count: unitBlocks.length,
+         widget_placement: 'bottom',
+       });
+     });
+ 
+     it('navigates to the previous/next unit if the unit is not in the corner of the sequence', () => {
+-      sendTrackEvent.mockClear();
+-      const unitNavigationHandler = jest.fn();
+-      const previousSequenceHandler = jest.fn();
+-      const nextSequenceHandler = jest.fn();
+-      render(<Sequence {...mockData} {...{ unitNavigationHandler, previousSequenceHandler, nextSequenceHandler }} />);
++      const unitNumber = 1;
++      const testData = {
++        ...mockData,
++        unitId: unitBlocks[unitNumber].id,
++        sequenceId: sequenceBlock[0].id,
++        unitNavigationHandler: jest.fn(),
++        previousSequenceHandler: jest.fn(),
++        nextSequenceHandler: jest.fn(),
++      };
++      render(<Sequence {...testData} />, { store: testStore });
+ 
+       fireEvent.click(screen.getByRole('button', { name: /previous/i }));
+-      expect(previousSequenceHandler).not.toHaveBeenCalled();
+-      expect(unitNavigationHandler).toHaveBeenCalledWith(String(Number(mockData.unitId) - 1));
++      expect(testData.previousSequenceHandler).not.toHaveBeenCalled();
++      expect(testData.unitNavigationHandler).toHaveBeenCalledWith(unitBlocks[unitNumber - 1].id);
+ 
+       fireEvent.click(screen.getByRole('button', { name: /next/i }));
+-      expect(nextSequenceHandler).not.toHaveBeenCalled();
++      expect(testData.nextSequenceHandler).not.toHaveBeenCalled();
+       // As `previousSequenceHandler` and `nextSequenceHandler` are mocked, we aren't really changing the position here.
+       // Therefore the next unit will still be `the initial one + 1`.
+-      expect(unitNavigationHandler).toHaveBeenNthCalledWith(2, String(Number(mockData.unitId) + 1));
++      expect(testData.unitNavigationHandler).toHaveBeenNthCalledWith(2, unitBlocks[unitNumber + 1].id);
+ 
+       expect(sendTrackEvent).toHaveBeenCalledTimes(2);
+     });
+ 
+     it('handles the `Previous` buttons for the first unit in the first sequence', async () => {
+-      sendTrackEvent.mockClear();
+-      const unitNavigationHandler = jest.fn();
+-      const previousSequenceHandler = jest.fn();
+-      const unitId = '1';
+-      render(<Sequence {...mockData} {...{ unitNavigationHandler, previousSequenceHandler, unitId }} />);
++      const testData = {
++        ...mockData,
++        unitId: unitBlocks[0].id,
++        sequenceId: sequenceBlock[0].id,
++        unitNavigationHandler: jest.fn(),
++        previousSequenceHandler: jest.fn(),
++      };
++      render(<Sequence {...testData} />, { store: testStore });
+       loadUnit();
+       await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+ 
+       screen.getAllByRole('button', { name: /previous/i }).forEach(button => fireEvent.click(button));
+ 
+-      expect(previousSequenceHandler).not.toHaveBeenCalled();
+-      expect(unitNavigationHandler).not.toHaveBeenCalled();
++      expect(testData.previousSequenceHandler).not.toHaveBeenCalled();
++      expect(testData.unitNavigationHandler).not.toHaveBeenCalled();
+       expect(sendTrackEvent).not.toHaveBeenCalled();
+     });
+ 
+     it('handles the `Next` buttons for the last unit in the last sequence', async () => {
+-      sendTrackEvent.mockClear();
+-      const unitNavigationHandler = jest.fn();
+-      const nextSequenceHandler = jest.fn();
+-      const unitId = String(testUnits.length);
+-      const sequenceId = String(Object.keys(initialState.models.sequences).length);
+-      render(<Sequence
+-        {...mockData}
+-        {...{
+-          unitNavigationHandler, nextSequenceHandler, unitId, sequenceId,
+-        }}
+-      />);
++      const testData = {
++        ...mockData,
++        unitId: unitBlocks[unitBlocks.length - 1].id,
++        sequenceId: sequenceBlock[sequenceBlock.length - 1].id,
++        unitNavigationHandler: jest.fn(),
++        nextSequenceHandler: jest.fn(),
++      };
++      render(<Sequence {...testData} />, { store: testStore });
+       loadUnit();
+       await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+ 
+       screen.getAllByRole('button', { name: /next/i }).forEach(button => fireEvent.click(button));
+ 
+-      expect(nextSequenceHandler).toHaveBeenCalledTimes(1);
+-      expect(unitNavigationHandler).not.toHaveBeenCalled();
+-      expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.sequence.next_selected', {
+-        current_tab: Number(unitId),
+-        id: unitId,
+-        tab_count: testUnits.length,
+-        widget_placement: 'top',
+-      });
++      expect(testData.nextSequenceHandler).not.toHaveBeenCalled();
++      expect(testData.unitNavigationHandler).not.toHaveBeenCalled();
++      expect(sendTrackEvent).not.toHaveBeenCalled();
+     });
+ 
+     it('handles the navigation buttons for empty sequence', async () => {
+-      sendTrackEvent.mockClear();
+-      const testState = cloneDeep(initialState);
+-      testState.models.sequences['1'].unitIds = [];
+-
+-      const unitNavigationHandler = jest.fn();
+-      const previousSequenceHandler = jest.fn();
+-      const nextSequenceHandler = jest.fn();
+-      render(<Sequence
+-        {...mockData}
+-        {...{ unitNavigationHandler, previousSequenceHandler, nextSequenceHandler }}
+-      />, { initialState: testState });
++      const testSequenceBlock = [Factory.build(
++        'block',
++        { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++        { courseId: courseMetadata.id },
++      ), Factory.build(
++        'block',
++        { type: 'sequential', children: [] },
++        { courseId: courseMetadata.id },
++      ), Factory.build(
++        'block',
++        { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++        { courseId: courseMetadata.id },
++      )];
++      const testSequenceMetadata = testSequenceBlock.map(block => Factory.build(
++        'sequenceMetadata',
++        { courseId: courseMetadata.id },
++        { unitBlocks: block.children.length ? unitBlocks : [], sequenceBlock: block },
++      ));
++      const innerTestStore = await initializeTestStore({
++        courseMetadata, unitBlocks, sequenceBlock: testSequenceBlock, sequenceMetadata: testSequenceMetadata,
++      }, false);
++      const testData = {
++        ...mockData,
++        unitId: unitBlocks[0].id,
++        sequenceId: testSequenceBlock[1].id,
++        unitNavigationHandler: jest.fn(),
++        previousSequenceHandler: jest.fn(),
++        nextSequenceHandler: jest.fn(),
++      };
++
++      render(<Sequence {...testData} />, { store: innerTestStore });
+       loadUnit();
+       await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+ 
+       screen.getAllByRole('button', { name: /previous/i }).forEach(button => fireEvent.click(button));
+-      expect(previousSequenceHandler).toHaveBeenCalledTimes(2);
+-      expect(unitNavigationHandler).not.toHaveBeenCalled();
++      expect(testData.previousSequenceHandler).toHaveBeenCalledTimes(2);
++      expect(testData.unitNavigationHandler).not.toHaveBeenCalled();
+ 
+       screen.getAllByRole('button', { name: /next/i }).forEach(button => fireEvent.click(button));
+-      expect(nextSequenceHandler).toHaveBeenCalledTimes(2);
+-      expect(unitNavigationHandler).not.toHaveBeenCalled();
++      expect(testData.nextSequenceHandler).toHaveBeenCalledTimes(2);
++      expect(testData.unitNavigationHandler).not.toHaveBeenCalled();
+ 
+       expect(sendTrackEvent).toHaveBeenNthCalledWith(1, 'edx.ui.lms.sequence.previous_selected', {
+         current_tab: 1,
+-        id: mockData.unitId,
++        id: testData.unitId,
+         tab_count: 0,
+         widget_placement: 'top',
+       });
+       expect(sendTrackEvent).toHaveBeenNthCalledWith(2, 'edx.ui.lms.sequence.previous_selected', {
+         current_tab: 1,
+-        id: mockData.unitId,
++        id: testData.unitId,
+         tab_count: 0,
+         widget_placement: 'bottom',
+       });
+       expect(sendTrackEvent).toHaveBeenNthCalledWith(3, 'edx.ui.lms.sequence.next_selected', {
+         current_tab: 1,
+-        id: mockData.unitId,
++        id: testData.unitId,
+         tab_count: 0,
+         widget_placement: 'top',
+       });
+       expect(sendTrackEvent).toHaveBeenNthCalledWith(4, 'edx.ui.lms.sequence.next_selected', {
+         current_tab: 1,
+-        id: mockData.unitId,
++        id: testData.unitId,
+         tab_count: 0,
+         widget_placement: 'bottom',
+       });
+     });
+ 
+     it('handles unit navigation button', () => {
+-      sendTrackEvent.mockClear();
+-      const unitNavigationHandler = jest.fn();
+-      const targetUnit = '4';
+-      render(<Sequence {...mockData} {...{ unitNavigationHandler }} />);
+-
+-      fireEvent.click(screen.getByRole('button', { name: targetUnit }));
+-      expect(unitNavigationHandler).toHaveBeenCalledWith(targetUnit);
++      const currentTabNumber = 1;
++      const targetUnitNumber = 2;
++      const targetUnit = unitBlocks[targetUnitNumber - 1];
++      const testData = {
++        ...mockData,
++        unitId: unitBlocks[currentTabNumber - 1].id,
++        sequenceId: sequenceBlock[0].id,
++        unitNavigationHandler: jest.fn(),
++      };
++      render(<Sequence {...testData} />, { store: testStore });
++
++      fireEvent.click(screen.getByRole('button', { name: targetUnit.display_name }));
++      expect(testData.unitNavigationHandler).toHaveBeenCalledWith(targetUnit.id);
+       expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.sequence.tab_selected', {
+-        current_tab: Number(mockData.unitId),
+-        id: mockData.unitId,
+-        target_tab: Number(targetUnit),
+-        tab_count: testUnits.length,
++        current_tab: currentTabNumber,
++        id: testData.unitId,
++        target_tab: targetUnitNumber,
++        tab_count: unitBlocks.length,
+         widget_placement: 'top',
+       });
+     });
+diff --git a/src/courseware/course/sequence/SequenceContent.test.jsx b/src/courseware/course/sequence/SequenceContent.test.jsx
+index a26521b..23c60a2 100644
+--- a/src/courseware/course/sequence/SequenceContent.test.jsx
++++ b/src/courseware/course/sequence/SequenceContent.test.jsx
+@@ -1,36 +1,44 @@
+ import React from 'react';
+-import { initialState, render, screen } from '../../../setupTest';
++import { initializeTestStore, render, screen } from '../../../setupTest';
+ import SequenceContent from './SequenceContent';
+ 
+ describe('Sequence Content', () => {
+-  const mockData = {
+-    gated: false,
+-    courseId: '1',
+-    sequenceId: '1',
+-    unitId: '1',
+-    unitLoadedHandler: () => {},
+-    intl: {},
+-  };
++  let mockData;
++  let store;
++
++  beforeAll(async () => {
++    store = await initializeTestStore();
++    const { models, courseware } = store.getState();
++    mockData = {
++      gated: false,
++      courseId: courseware.courseId,
++      sequenceId: courseware.sequenceId,
++      unitId: models.sequences[courseware.sequenceId].unitIds[0],
++      unitLoadedHandler: () => {},
++    };
++  });
+ 
+   it('displays loading message', () => {
+-    render(<SequenceContent {...mockData} />, { initialState });
++    render(<SequenceContent {...mockData} />);
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+   });
+ 
+   it('displays messages for the locked content', async () => {
+-    const { container } = render(<SequenceContent {...mockData} gated />, { initialState });
+-    expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
++    const { gatedContent } = store.getState().models.sequences[mockData.sequenceId];
++    const { container } = render(<SequenceContent {...mockData} gated />);
+ 
++    expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+     expect(await screen.findByText('Content Locked')).toBeInTheDocument();
+-    expect(screen.getByText('test-sequence')).toBeInTheDocument();
+     expect(screen.queryByText('Loading locked content messaging...')).not.toBeInTheDocument();
+     expect(container.querySelector('svg')).toHaveClass('fa-lock');
+-    expect(screen.getByText(/You must complete the prerequisite/)).toBeInTheDocument();
++    expect(screen.getByText(
++      `You must complete the prerequisite: '${gatedContent.gatedSectionName}' to access this content.`,
++    )).toBeInTheDocument();
+     expect(screen.getByRole('button', { name: 'Go To Prerequisite Section' })).toBeInTheDocument();
+   });
+ 
+   it('displays message for no content', () => {
+-    render(<SequenceContent {...mockData} unitId={null} />, { initialState });
++    render(<SequenceContent {...mockData} unitId={null} />);
+     expect(screen.getByText('There is no content here.')).toBeInTheDocument();
+   });
+ });
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index 16c23c1..6f65251 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -1,50 +1,66 @@
+ import React from 'react';
+-import { cloneDeep } from 'lodash';
++import { Factory } from 'rosie';
+ import {
+-  initialState, loadUnit, messageEvent, render, screen, waitFor,
++  initializeTestStore, loadUnit, messageEvent, render, screen, waitFor,
+ } from '../../../setupTest';
+ import Unit from './Unit';
+ 
+ describe('Unit', () => {
+-  const mockData = {
+-    id: '3',
+-    courseId: '1',
+-    intl: {},
+-  };
++  let mockData;
++  const courseMetadata = Factory.build(
++    'courseMetadata',
++    { content_type_gating_enabled: true },
++  );
++  const unitBlocks = [Factory.build(
++    'block',
++    { type: 'problem' },
++    { courseId: courseMetadata.id },
++  ), Factory.build(
++    'block',
++    { type: 'vertical', graded: true, bookmarked: true },
++    { courseId: courseMetadata.id },
++  )];
++  const [unit, gradedUnit] = unitBlocks;
++
++  beforeAll(async () => {
++    await initializeTestStore({ courseMetadata, unitBlocks });
++    mockData = {
++      id: unit.id,
++      courseId: courseMetadata.id,
++    };
++  });
+ 
+   it('renders correctly', () => {
+-    render(<Unit {...mockData} />, { initialState });
++    render(<Unit {...mockData} />);
+ 
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
+-    expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(0));
+-    expect(screen.getByTitle(mockData.id)).toHaveAttribute(
++    const renderedUnit = screen.getByTitle(unit.display_name);
++    expect(renderedUnit).toHaveAttribute('height', String(0));
++    expect(renderedUnit).toHaveAttribute(
+       'src', `http://localhost:18000/xblock/${mockData.id}?show_title=0&show_bookmark_button=0`,
+     );
+   });
+ 
+   it('renders proper message for gated content', () => {
+-    // Clone initialState.
+-    const testState = cloneDeep(initialState);
+-    testState.models.units[mockData.id].graded = true;
+-    render(<Unit {...mockData} />, { initialState: testState });
++    render(<Unit {...mockData} id={gradedUnit.id} />);
+ 
+-    expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+     expect(screen.getByText('Loading learning sequence...')).toBeInTheDocument();
++    expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+   });
+ 
+   it('handles receiving MessageEvent', async () => {
+-    render(<Unit {...mockData} />, { initialState });
++    render(<Unit {...mockData} />);
+     loadUnit();
+ 
+     // Loading message is gone now.
+     await waitFor(() => expect(screen.queryByText('Loading learning sequence...')).not.toBeInTheDocument());
+     // Iframe's height is set via message.
+-    expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(messageEvent.payload.height));
++    expect(screen.getByTitle(unit.display_name)).toHaveAttribute('height', String(messageEvent.payload.height));
+   });
+ 
+   it('calls onLoaded after receiving MessageEvent', async () => {
+     const onLoaded = jest.fn();
+-    render(<Unit {...mockData} {...{ onLoaded }} />, { initialState });
++    render(<Unit {...mockData} {...{ onLoaded }} />);
+     loadUnit();
+ 
+     await waitFor(() => expect(onLoaded).toHaveBeenCalledTimes(1));
+@@ -54,24 +70,24 @@ describe('Unit', () => {
+     const onLoaded = jest.fn();
+     // Clone message and set different height.
+     const testMessageWithOtherHeight = { ...messageEvent, payload: { height: 200 } };
+-    render(<Unit {...mockData} {...{ onLoaded }} />, { initialState });
++    render(<Unit {...mockData} {...{ onLoaded }} />);
+     loadUnit();
+ 
+-    await waitFor(() => expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(messageEvent.payload.height)));
++    await waitFor(() => expect(screen.getByTitle(unit.display_name)).toHaveAttribute('height', String(messageEvent.payload.height)));
+     window.postMessage(testMessageWithOtherHeight, '*');
+-    await waitFor(() => expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(testMessageWithOtherHeight.payload.height)));
++    await waitFor(() => expect(screen.getByTitle(unit.display_name)).toHaveAttribute('height', String(testMessageWithOtherHeight.payload.height)));
+     expect(onLoaded).toHaveBeenCalledTimes(1);
+   });
+ 
+   it('ignores MessageEvent with unhandled type', async () => {
+     // Clone message and set different type.
+     const testMessageWithUnhandledType = { ...messageEvent, type: 'wrong type' };
+-    render(<Unit {...mockData} />, { initialState });
++    render(<Unit {...mockData} />);
+     window.postMessage(testMessageWithUnhandledType, '*');
+ 
+     // HACK: We don't have a function we could reliably await here, so this test relies on the timeout of `waitFor`.
+     await expect(waitFor(
+-      () => expect(screen.getByTitle(mockData.id)).toHaveAttribute('height', String(testMessageWithUnhandledType.payload.height)),
++      () => expect(screen.getByTitle(unit.display_name)).toHaveAttribute('height', String(testMessageWithUnhandledType.payload.height)),
+       { timeout: 100 },
+     )).rejects.toThrowError(/Expected the element to have attribute/);
+   });
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 44ab4f7..c5d38cb 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -11,6 +11,7 @@ import UnitButton from './UnitButton';
+ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import { useSequenceNavigationMetadata } from './hooks';
+ import { useModel } from '../../../../generic/model-store';
++import { LOADED } from '../../../data/slice';
+ 
+ export default function SequenceNavigation({
+   unitId,
+@@ -22,8 +23,10 @@ export default function SequenceNavigation({
+ }) {
+   const sequence = useModel('sequences', sequenceId);
+   const { isFirstUnit, isLastUnit } = useSequenceNavigationMetadata(sequenceId, unitId);
+-  const isLocked = sequence.gatedContent !== undefined && sequence.gatedContent.gated;
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
++  const isLocked = sequenceStatus === LOADED ? (
++    sequence.gatedContent !== undefined && sequence.gatedContent.gated
++  ) : undefined;
+ 
+   const renderUnitButtons = () => {
+     if (isLocked) {
+@@ -46,7 +49,7 @@ export default function SequenceNavigation({
+     );
+   };
+ 
+-  return sequenceStatus === 'loaded' && (
++  return sequenceStatus === LOADED && (
+     <nav className={classNames('sequence-navigation', className)}>
+       <Button className="previous-btn" onClick={previousSequenceHandler} disabled={isFirstUnit}>
+         <FontAwesomeIcon icon={faChevronLeft} className="mr-2" size="sm" />
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index 185b73a..4ca50da 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+-import { cloneDeep } from 'lodash';
++import { Factory } from 'rosie';
+ import {
+-  initialState, render, screen, testUnits, fireEvent, getByText,
++  render, screen, fireEvent, getByText, initializeTestStore,
+ } from '../../../../setupTest';
+ import SequenceNavigation from './SequenceNavigation';
+ import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastVisibleChild';
+@@ -11,59 +11,79 @@ jest.mock('../../../../generic/tabs/useIndexOfLastVisibleChild');
+ useIndexOfLastVisibleChild.mockReturnValue([0, null, null]);
+ 
+ describe('Sequence Navigation', () => {
+-  const mockData = {
+-    previousSequenceHandler: () => {},
+-    onNavigate: () => {},
+-    nextSequenceHandler: () => {},
+-    sequenceId: '1',
+-    unitId: '3',
+-  };
+-
+-  it('is empty while loading', () => {
+-    // Clone initialState.
+-    const testState = cloneDeep(initialState);
+-    testState.courseware.sequenceStatus = 'loading';
+-
+-    const { container } = render(
+-      <SequenceNavigation {...mockData} />,
+-      { initialState: testState },
+-    );
++  let mockData;
++  const courseMetadata = Factory.build('courseMetadata');
++  const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
++    'block',
++    { type: 'problem' },
++    { courseId: courseMetadata.id },
++  ));
++
++  beforeAll(async () => {
++    const store = await initializeTestStore({ courseMetadata, unitBlocks });
++    const { courseware } = store.getState();
++    mockData = {
++      unitId: unitBlocks[1].id,
++      sequenceId: courseware.sequenceId,
++      previousSequenceHandler: () => {},
++      onNavigate: () => {},
++      nextSequenceHandler: () => {},
++    };
++  });
++
++  it('is empty while loading', async () => {
++    const testStore = await initializeTestStore({ excludeFetchSequence: true }, false);
++    const { container } = render(<SequenceNavigation {...mockData} />, { store: testStore });
++
+     expect(container).toBeEmptyDOMElement();
+   });
+ 
+   it('renders empty div without unitId', () => {
+-    const { container } = render(<SequenceNavigation {...mockData} unitId={undefined} />, { initialState });
++    const { container } = render(<SequenceNavigation {...mockData} unitId={undefined} />);
+     expect(getByText(container, (content, element) => (
+       element.tagName.toLowerCase() === 'div' && element.getAttribute('style')))).toBeEmptyDOMElement();
+   });
+ 
+-  it('renders locked button for gated content', () => {
+-    const testState = cloneDeep(initialState);
+-    testState.models.sequences['1'].gatedContent = { gated: true };
+-    const onNavigate = jest.fn();
+-    render(<SequenceNavigation {...mockData} {...{ onNavigate }} />, { initialState: testState });
+-
+-    const unitButton = screen.getByTitle(mockData.unitId);
++  it('renders locked button for gated content', async () => {
++    const sequenceBlock = [Factory.build(
++      'block',
++      { type: 'sequential', children: [unitBlocks.map(block => block.id)] },
++      { courseId: courseMetadata.id },
++    )];
++    const sequenceMetadata = [Factory.build(
++      'sequenceMetadata',
++      { courseId: courseMetadata.id, gated_content: { gated: true } },
++      { unitBlocks, sequenceBlock: sequenceBlock[0] },
++    )];
++    const testStore = await initializeTestStore({ unitBlocks, sequenceBlock, sequenceMetadata }, false);
++    const testData = {
++      ...mockData,
++      sequenceId: sequenceBlock[0].id,
++      onNavigate: jest.fn(),
++    };
++    render(<SequenceNavigation {...testData} />, { store: testStore });
++
++    const unitButton = screen.getByTitle(unitBlocks[1].display_name);
+     fireEvent.click(unitButton);
+     // The unit button should not work for gated content.
+-    expect(onNavigate).not.toHaveBeenCalled();
++    expect(testData.onNavigate).not.toHaveBeenCalled();
+     // TODO: Not sure if this is working as expected, because the `contentType="lock"` will be overridden by the value
+     //  from Redux. To make this provide a `fa-icon` lock we could introduce something like `overriddenContentType`.
+-    expect(unitButton.firstChild).toHaveClass('fa-book');
++    expect(unitButton.firstChild).toHaveClass('fa-edit');
+   });
+ 
+   it('renders correctly and handles unit button clicks', () => {
+     const onNavigate = jest.fn();
+-    render(<SequenceNavigation {...mockData} {...{ onNavigate }} />, { initialState });
++    render(<SequenceNavigation {...mockData} {...{ onNavigate }} />);
+ 
+     const unitButtons = screen.getAllByRole('button', { name: /\d+/ });
+-    expect(unitButtons).toHaveLength(testUnits.length);
++    expect(unitButtons).toHaveLength(unitButtons.length);
+     unitButtons.forEach(button => fireEvent.click(button));
+     expect(onNavigate).toHaveBeenCalledTimes(unitButtons.length);
+   });
+ 
+   it('has both navigation buttons enabled for a non-corner unit of the sequence', () => {
+-    render(<SequenceNavigation {...mockData} />, { initialState });
++    render(<SequenceNavigation {...mockData} />);
+ 
+     screen.getAllByRole('button', { name: /previous|next/i }).forEach(button => {
+       expect(button).toBeEnabled();
+@@ -71,7 +91,7 @@ describe('Sequence Navigation', () => {
+   });
+ 
+   it('has the "Previous" button disabled for the first unit of the sequence', () => {
+-    render(<SequenceNavigation {...mockData} unitId="1" />, { initialState });
++    render(<SequenceNavigation {...mockData} unitId={unitBlocks[0].id} />);
+ 
+     expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
+     expect(screen.getByRole('button', { name: /next/i })).toBeEnabled();
+@@ -80,9 +100,8 @@ describe('Sequence Navigation', () => {
+   it('has the "Next" button disabled for the last unit of the sequence', () => {
+     render(<SequenceNavigation
+       {...mockData}
+-      sequenceId="2"
+-      unitId={testUnits.length.toString()}
+-    />, { initialState });
++      unitId={unitBlocks[unitBlocks.length - 1].id}
++    />);
+ 
+     expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
+     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
+@@ -91,10 +110,7 @@ describe('Sequence Navigation', () => {
+   it('handles "Previous" and "Next" click', () => {
+     const previousSequenceHandler = jest.fn();
+     const nextSequenceHandler = jest.fn();
+-    render(<SequenceNavigation
+-      {...mockData}
+-      {...{ previousSequenceHandler, nextSequenceHandler }}
+-    />, { initialState });
++    render(<SequenceNavigation {...mockData} {...{ previousSequenceHandler, nextSequenceHandler }} />);
+ 
+     fireEvent.click(screen.getByRole('button', { name: /previous/i }));
+     expect(previousSequenceHandler).toHaveBeenCalledTimes(1);
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+index 81eb3b7..8a9e380 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationDropdown.test.jsx
+@@ -1,39 +1,53 @@
+ import React from 'react';
++import { Factory } from 'rosie';
++import { getAllByRole } from '@testing-library/dom';
+ import SequenceNavigationDropdown from './SequenceNavigationDropdown';
+ import {
+-  initialState, render, screen, testUnits, fireEvent,
++  render, screen, fireEvent, initializeTestStore,
+ } from '../../../../setupTest';
+ 
+ describe('Sequence Navigation Dropdown', () => {
+-  const mockData = {
+-    unitId: '1',
+-    onNavigate: () => {},
+-    showCompletion: false,
+-    unitIds: testUnits,
+-  };
++  let mockData;
++  const courseMetadata = Factory.build('courseMetadata');
++  const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
++    'block',
++    { type: 'vertical' },
++    { courseId: courseMetadata.id },
++  ));
++
++  beforeAll(async () => {
++    await initializeTestStore({ courseMetadata, unitBlocks });
++    mockData = {
++      unitId: unitBlocks[1].id,
++      unitIds: unitBlocks.map(block => block.id),
++      showCompletion: false,
++      onNavigate: () => {},
++    };
++  });
+ 
+   it('renders correctly without units', () => {
+     render(<SequenceNavigationDropdown {...mockData} unitIds={[]} />);
+     expect(screen.getByRole('button')).toHaveTextContent('0 of 0');
+   });
+ 
+-  testUnits.forEach(unitId => {
+-    it(`displays proper text for unit ${unitId} on mobile`, () => {
+-      render(<SequenceNavigationDropdown {...mockData} unitId={unitId} />, { initialState });
+-      expect(screen.getByRole('button')).toHaveTextContent(`${unitId} of ${testUnits.length}`);
++  unitBlocks.forEach((unit, index) => {
++    it(`displays proper text for unit ${index + 1} on mobile`, () => {
++      render(<SequenceNavigationDropdown {...mockData} unitId={unit.id} />);
++      expect(screen.getByRole('button')).toHaveTextContent(`${index + 1} of ${unitBlocks.length}`);
+     });
+   });
+ 
+-  testUnits.forEach(unitId => {
+-    it(`marks unit ${unitId} as active`, () => {
+-      render(<SequenceNavigationDropdown {...mockData} unitId={unitId} />, { initialState });
++  unitBlocks.forEach((unit, indedx) => {
++    it(`marks unit ${indedx + 1} as active`, () => {
++      const { container } = render(<SequenceNavigationDropdown {...mockData} unitId={unit.id} />);
+ 
++      const dropdownMenu = container.querySelector('.dropdown-menu');
+       // Only the current unit should be marked as active.
+-      screen.getAllByText(/^\d$/).forEach(element => {
+-        if (element.textContent === unitId) {
+-          expect(element.parentElement).toHaveClass('active');
++      getAllByRole(dropdownMenu, 'button', { hidden: true }).forEach(button => {
++        if (button.textContent === unit.display_name) {
++          expect(button).toHaveClass('active');
+         } else {
+-          expect(element.parentElement).not.toHaveClass('active');
++          expect(button).not.toHaveClass('active');
+         }
+       });
+     });
+@@ -41,12 +55,13 @@ describe('Sequence Navigation Dropdown', () => {
+ 
+   it('handles the clicks', () => {
+     const onNavigate = jest.fn();
+-    render(<SequenceNavigationDropdown {...mockData} onNavigate={onNavigate} />, { initialState });
++    const { container } = render(<SequenceNavigationDropdown {...mockData} onNavigate={onNavigate} />);
+ 
+-    screen.getAllByText(/^\d+$/).forEach(element => fireEvent.click(element));
+-    expect(onNavigate).toHaveBeenCalledTimes(testUnits.length);
+-    testUnits.forEach(unit => {
+-      expect(onNavigate).toHaveBeenNthCalledWith(Number(unit), unit);
++    const dropdownMenu = container.querySelector('.dropdown-menu');
++    getAllByRole(dropdownMenu, 'button', { hidden: true }).forEach(button => fireEvent.click(button));
++    expect(onNavigate).toHaveBeenCalledTimes(unitBlocks.length);
++    unitBlocks.forEach((unit, index) => {
++      expect(onNavigate).toHaveBeenNthCalledWith(index + 1, unit.id);
+     });
+   });
+ });
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+index c047181..bb23214 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+@@ -1,7 +1,6 @@
+ import React from 'react';
+-import {
+-  initialState, render, screen, testUnits,
+-} from '../../../../setupTest';
++import { Factory } from 'rosie';
++import { initializeTestStore, render, screen } from '../../../../setupTest';
+ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastVisibleChild';
+ 
+@@ -9,27 +8,48 @@ import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastV
+ jest.mock('../../../../generic/tabs/useIndexOfLastVisibleChild');
+ 
+ describe('Sequence Navigation Tabs', () => {
+-  const mockData = {
+-    unitId: '2',
+-    onNavigate: () => {
+-    },
+-    showCompletion: false,
+-    unitIds: testUnits,
+-  };
++  let mockData;
++
++  const courseMetadata = Factory.build('courseMetadata');
++  const unitBlocks = [Factory.build(
++    'block',
++    { type: 'problem' },
++    { courseId: courseMetadata.id },
++  ), Factory.build(
++    'block',
++    { type: 'video', complete: true },
++    { courseId: courseMetadata.id },
++  ), Factory.build(
++    'block',
++    { type: 'other', complete: true, bookmarked: true },
++    { courseId: courseMetadata.id },
++  )];
++  const activeBlockNumber = 2;
++
++  beforeAll(async () => {
++    await initializeTestStore({ courseMetadata, unitBlocks });
++    mockData = {
++      // Blocks are numbered from 1 in the UI, so we're decreasing this by 1 to have correct block's ID in the array.
++      unitId: unitBlocks[activeBlockNumber - 1].id,
++      onNavigate: () => {},
++      showCompletion: false,
++      unitIds: unitBlocks.map(unit => unit.id),
++    };
++  });
+ 
+   it('renders unit buttons', () => {
+     useIndexOfLastVisibleChild.mockReturnValue([0, null, null]);
+-    render(<SequenceNavigationTabs {...mockData} />, { initialState });
++    render(<SequenceNavigationTabs {...mockData} />);
+ 
+-    expect(screen.getAllByRole('button').length).toEqual(testUnits.length);
++    expect(screen.getAllByRole('button')).toHaveLength(unitBlocks.length);
+   });
+ 
+   it('renders unit buttons and dropdown button', () => {
+     useIndexOfLastVisibleChild.mockReturnValue([-1, null, null]);
+-    render(<SequenceNavigationTabs {...mockData} />, { initialState });
++    render(<SequenceNavigationTabs {...mockData} />);
+ 
+-    expect(screen.getByRole('button', { name: `${mockData.unitId} of ${testUnits.length}` }))
++    expect(screen.getAllByRole('button')).toHaveLength(unitBlocks.length + 1);
++    expect(screen.getByRole('button', { name: `${activeBlockNumber} of ${unitBlocks.length}` }))
+       .toHaveClass('dropdown-button');
+-    expect(screen.getAllByRole('button').length).toEqual(testUnits.length + 1);
+   });
+ });
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+index 08fb90f..5547432 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitButton.test.jsx
+@@ -1,70 +1,76 @@
+ import React from 'react';
+-import { render, screen, fireEvent } from '../../../../setupTest';
++import { Factory } from 'rosie';
++import {
++  fireEvent, initializeTestStore, render, screen,
++} from '../../../../setupTest';
+ import UnitButton from './UnitButton';
+ 
+ describe('Unit Button', () => {
+-  const initialState = {
+-    models: {
+-      units: {
+-        other: {
+-          contentType: 'other',
+-          title: 'other-unit',
+-        },
+-        problem: {
+-          contentType: 'problem',
+-          title: 'problem-unit',
+-          complete: true,
+-          bookmarked: true,
+-        },
+-      },
+-    },
+-  };
++  let mockData;
++  const courseMetadata = Factory.build('courseMetadata');
++  const unitBlocks = [Factory.build(
++    'block',
++    { type: 'problem' },
++    { courseId: courseMetadata.id },
++  ), Factory.build(
++    'block',
++    { type: 'video', complete: true },
++    { courseId: courseMetadata.id },
++  ), Factory.build(
++    'block',
++    { type: 'other', complete: true, bookmarked: true },
++    { courseId: courseMetadata.id },
++  )];
++  const [unit, completedUnit, bookmarkedUnit] = unitBlocks;
+ 
+-  const mockData = {
+-    unitId: 'other',
+-    onClick: () => {},
+-  };
++  beforeAll(async () => {
++    await initializeTestStore({ courseMetadata, unitBlocks });
++    mockData = {
++      unitId: unit.id,
++      onClick: () => {},
++    };
++  });
+ 
+   it('hides title by default', () => {
+-    render(<UnitButton {...mockData} />, { initialState });
+-    expect(screen.getByRole('button')).not.toHaveTextContent('other-unit');
++    render(<UnitButton {...mockData} />);
++    expect(screen.getByRole('button')).not.toHaveTextContent(unit.display_name);
+   });
+ 
+   it('shows title', () => {
+-    render(<UnitButton {...mockData} showTitle />, { initialState });
+-    expect(screen.getByRole('button')).toHaveTextContent('other-unit');
++    render(<UnitButton {...mockData} showTitle />);
++    expect(screen.getByRole('button')).toHaveTextContent(unit.display_name);
+   });
+ 
+   it('does not show completion for non-completed unit', () => {
+-    const { container } = render(<UnitButton {...mockData} />, { initialState });
++    const { container } = render(<UnitButton {...mockData} />);
+     container.querySelectorAll('svg').forEach(icon => {
+       expect(icon).not.toHaveClass('fa-check');
+     });
+   });
+ 
+   it('shows completion for completed unit', () => {
+-    const { container } = render(<UnitButton {...mockData} unitId="problem" />, { initialState });
++    const { container } = render(<UnitButton {...mockData} unitId={completedUnit.id} />);
+     const buttonIcons = container.querySelectorAll('svg');
+-    expect(buttonIcons).toHaveLength(3);
++    expect(buttonIcons).toHaveLength(2);
+     expect(buttonIcons[1]).toHaveClass('fa-check');
+   });
+ 
+   it('hides completion', () => {
+-    const { container } = render(<UnitButton {...mockData} unitId="problem" showCompletion={false} />, { initialState });
++    const { container } = render(<UnitButton {...mockData} unitId={completedUnit.id} showCompletion={false} />);
+     container.querySelectorAll('svg').forEach(icon => {
+       expect(icon).not.toHaveClass('fa-check');
+     });
+   });
+ 
+   it('does not show bookmark', () => {
+-    const { container } = render(<UnitButton {...mockData} />, { initialState });
++    const { container } = render(<UnitButton {...mockData} />);
+     container.querySelectorAll('svg').forEach(icon => {
+       expect(icon).not.toHaveClass('fa-bookmark');
+     });
+   });
+ 
+   it('shows bookmark', () => {
+-    const { container } = render(<UnitButton {...mockData} unitId="problem" />, { initialState });
++    const { container } = render(<UnitButton {...mockData} unitId={bookmarkedUnit.id} />);
+     const buttonIcons = container.querySelectorAll('svg');
+     expect(buttonIcons).toHaveLength(3);
+     expect(buttonIcons[2]).toHaveClass('fa-bookmark');
+@@ -72,7 +78,7 @@ describe('Unit Button', () => {
+ 
+   it('handles the click', () => {
+     const onClick = jest.fn();
+-    render(<UnitButton {...mockData} onClick={onClick} />, { initialState });
++    render(<UnitButton {...mockData} onClick={onClick} />);
+     fireEvent.click(screen.getByRole('button'));
+     expect(onClick).toHaveBeenCalledTimes(1);
+   });
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+index 8bfae84..3e94c8b 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitIcon.test.jsx
+@@ -1,5 +1,6 @@
+ import React from 'react';
+-import { render } from '../../../../setupTest';
++import { Factory } from 'rosie';
++import { initializeTestStore, render } from '../../../../setupTest';
+ import UnitIcon from './UnitIcon';
+ 
+ describe('Unit Icon', () => {
+@@ -12,15 +13,26 @@ describe('Unit Icon', () => {
+     undefined: 'fa-book',
+   };
+ 
+-  Object.entries(types).forEach(([key, value]) => {
+-    it(`renders correct icon for ${key} unit`, () => {
++  const courseMetadata = Factory.build('courseMetadata');
++  const unitBlocks = Object.keys(types).map(contentType => Factory.build(
++    'block',
++    { id: contentType, type: contentType },
++    { courseId: courseMetadata.id },
++  ));
++
++  beforeAll(async () => {
++    await initializeTestStore({ courseMetadata, unitBlocks });
++  });
++
++  unitBlocks.forEach(block => {
++    it(`renders correct icon for ${block.type} unit`, () => {
+       // Suppress warning for undefined prop type.
+-      if (key === 'undefined') {
++      if (block.type === 'undefined') {
+         jest.spyOn(console, 'error').mockImplementation(() => {});
+       }
+ 
+-      const { container } = render(<UnitIcon type={key} />);
+-      expect(container.querySelector('svg')).toHaveClass(value);
++      const { container } = render(<UnitIcon type={block.type} />);
++      expect(container.querySelector('svg')).toHaveClass(types[block.type]);
+     });
+   });
+ });
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+index 4ab8d29..dcfc06f 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.test.jsx
+@@ -1,16 +1,29 @@
+ import React from 'react';
++import { Factory } from 'rosie';
+ import {
+-  initialState, render, screen, testUnits, fireEvent,
++  render, screen, fireEvent, initializeTestStore,
+ } from '../../../../setupTest';
+ import UnitNavigation from './UnitNavigation';
+ 
+ describe('Unit Navigation', () => {
+-  const mockData = {
+-    sequenceId: '1',
+-    unitId: '2',
+-    onClickPrevious: () => {},
+-    onClickNext: () => {},
+-  };
++  let mockData;
++  const courseMetadata = Factory.build('courseMetadata');
++  const unitBlocks = Array.from({ length: 3 }).map(() => Factory.build(
++    'block',
++    { type: 'vertical' },
++    { courseId: courseMetadata.id },
++  ));
++
++  beforeAll(async () => {
++    const store = await initializeTestStore({ courseMetadata, unitBlocks });
++    const { courseware } = store.getState();
++    mockData = {
++      unitId: unitBlocks[1].id,
++      sequenceId: courseware.sequenceId,
++      onClickPrevious: () => {},
++      onClickNext: () => {},
++    };
++  });
+ 
+   it('renders correctly without units', () => {
+     render(<UnitNavigation
+@@ -44,27 +57,24 @@ describe('Unit Navigation', () => {
+     expect(onClickNext).toHaveBeenCalledTimes(1);
+   });
+ 
+-  it('should have the navigation buttons enabled for the non-corner unit in the sequence', () => {
+-    render(<UnitNavigation {...mockData} />, { initialState });
++  it('has the navigation buttons enabled for the non-corner unit in the sequence', () => {
++    render(<UnitNavigation {...mockData} />);
++
+     screen.getAllByRole('button').forEach(button => {
+       expect(button).toBeEnabled();
+     });
+   });
+ 
+-  it('should have the "Previous" button disabled for the first unit in the sequence', () => {
+-    render(<UnitNavigation {...mockData} unitId="1" />, { initialState });
++  it('has the "Previous" button disabled for the first unit in the sequence', () => {
++    render(<UnitNavigation {...mockData} unitId={unitBlocks[0].id} />);
++
+     expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
+     expect(screen.getByRole('button', { name: /next/i })).toBeEnabled();
+   });
+ 
+-  it('should display "learn.end.of.course" message instead of the "Next" button for the last unit in the sequence', () => {
+-    render(
+-      <UnitNavigation
+-        {...mockData}
+-        sequenceId="2"
+-        unitId={testUnits.length.toString()}
+-      />, { initialState },
+-    );
++  it('displays "learn.end.of.course" message instead of the "Next" button for the last unit in the sequence', () => {
++    render(<UnitNavigation {...mockData} unitId={unitBlocks[unitBlocks.length - 1].id} />);
++
+     expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled();
+     expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument();
+     expect(screen.getByText("You've reached the end of this course!")).toBeInTheDocument();
+diff --git a/src/courseware/data/__factories__/courseBlocks.factory.js b/src/courseware/data/__factories__/courseBlocks.factory.js
+index e3d2aa5..3334d9d 100644
+--- a/src/courseware/data/__factories__/courseBlocks.factory.js
++++ b/src/courseware/data/__factories__/courseBlocks.factory.js
+@@ -49,13 +49,13 @@ export default function buildSimpleCourseBlocks(courseId, title, numUnits = 1) {
+     { type: 'chapter', children: [sequenceBlock.id] },
+     { courseId },
+   );
+-  const courseBlock = Factory.build(
++  const courseBlock = options.courseBlocks || Factory.build(
+     'block',
+     { type: 'course', display_name: title, children: [sectionBlock.id] },
+     { courseId },
+   );
+   return {
+-    courseBlocks: Factory.build(
++    courseBlocks: options.courseBlocks || Factory.build(
+       'courseBlocks',
+       { courseId },
+       {
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index 0735672..0ed1571 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -1,6 +1,6 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+-
+ import './block.factory';
++import buildSimpleCourseBlocks from './courseBlocks.factory';
+ 
+ Factory.define('sequenceMetadata')
+   .option('courseId', (courseId) => {
+@@ -33,8 +33,8 @@ Factory.define('sequenceMetadata')
+   .attr('gated_content', ['sequenceBlock'], sequenceBlock => ({
+     gated: false,
+     prereq_url: null,
+-    prereq_id: null,
+-    prereq_section_name: null,
++    prereq_id: `${sequenceBlock.id}-prereq`,
++    prereq_section_name: `${sequenceBlock.display_name}-prereq`,
+     gated_section_name: sequenceBlock.display_name,
+   }))
+   .attr('items', ['unitBlocks', 'sequenceBlock'], (unitBlocks, sequenceBlock) => unitBlocks.map(
+@@ -42,10 +42,10 @@ Factory.define('sequenceMetadata')
+       href: '',
+       graded: unitBlock.graded,
+       id: unitBlock.id,
+-      bookmarked: false,
++      bookmarked: unitBlock.bookmarked || false,
+       path: `Chapter Display Name > ${sequenceBlock.display_name} > ${unitBlock.display_name}`,
+-      type: 'other',
+-      complete: null,
++      type: unitBlock.type,
++      complete: unitBlock.complete || null,
+       content: '',
+       page_title: unitBlock.display_name,
+     }),
+@@ -61,3 +61,30 @@ Factory.define('sequenceMetadata')
+     show_completion: true,
+     banner_text: null,
+   });
++
++/**
++ * Build a simple course and simple metadata for its sequence.
++ */
++export default function buildSimpleCourseAndSequenceMetadata(options = {}) {
++  const courseMetadata = options.courseMetadata || Factory.build('courseMetadata', {
++    can_load_courseware: {
++      has_access: false,
++    },
++  });
++  const courseId = courseMetadata.id;
++  const simpleCourseBlocks = buildSimpleCourseBlocks(courseId, courseMetadata.name, options);
++  const { unitBlocks, sequenceBlock } = simpleCourseBlocks;
++  const sequenceMetadata = options.sequenceMetadata || sequenceBlock.map(block => Factory.build(
++    'sequenceMetadata',
++    { courseId },
++    {
++      unitBlocks,
++      sequenceBlock: block,
++    },
++  ));
++  return {
++    ...simpleCourseBlocks,
++    courseMetadata,
++    sequenceMetadata,
++  };
++}
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index dee86e3..c1dcd4f 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -9,7 +9,6 @@ import * as thunks from './thunks';
+ import executeThunk from '../../utils';
+ 
+ import buildSimpleCourseBlocks from './__factories__/courseBlocks.factory';
+-import './__factories__';
+ import initializeMockApp from '../../setupTest';
+ import initializeStore from '../../store';
+ 
+@@ -29,7 +28,7 @@ describe('Data layer integration tests', () => {
+   const sequenceMetadata = Factory.build(
+     'sequenceMetadata',
+     {},
+-    { courseId, unitBlocks, sequenceBlock },
++    { courseId, unitBlocks: [unitBlock], sequenceBlock },
+   );
+ 
+   const courseUrl = `${courseBaseUrl}/${courseId}`;
+@@ -124,13 +123,13 @@ describe('Data layer integration tests', () => {
+       // ensure that initial state has no additional sequence info
+       let state = store.getState();
+       expect(state.models.sequences).toEqual({
+-        [sequenceBlock.id]: expect.not.objectContaining({
++        [sequenceId]: expect.not.objectContaining({
+           gatedContent: expect.any(Object),
+           activeUnitIndex: expect.any(Number),
+         }),
+       });
+       expect(state.models.units).toEqual({
+-        [unitBlock.id]: expect.not.objectContaining({
++        [unitId]: expect.not.objectContaining({
+           complete: null,
+           bookmarked: expect.any(Boolean),
+         }),
+@@ -144,20 +143,20 @@ describe('Data layer integration tests', () => {
+       expect(state.courseware.sequenceStatus).toEqual('loading');
+       expect(state.courseware.sequenceId).toEqual(null);
+ 
+-      await executeThunk(thunks.fetchSequence(sequenceBlock.id), store.dispatch);
++      await executeThunk(thunks.fetchSequence(sequenceId), store.dispatch);
+ 
+       // Update our state variable again.
+       state = store.getState();
+ 
+       // ensure that additional information appeared in store
+       expect(state.models.sequences).toEqual({
+-        [sequenceBlock.id]: expect.objectContaining({
++        [sequenceId]: expect.objectContaining({
+           gatedContent: expect.any(Object),
+           activeUnitIndex: expect.any(Number),
+         }),
+       });
+       expect(state.models.units).toEqual({
+-        [unitBlock.id]: expect.objectContaining({
++        [unitId]: expect.objectContaining({
+           complete: null,
+           bookmarked: expect.any(Boolean),
+         }),
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 82932e5..17a988a 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -1,22 +1,28 @@
+ import 'core-js/stable';
+ import 'regenerator-runtime/runtime';
+ import '@testing-library/jest-dom';
++import './courseware/data/__factories__';
++import './course-home/data/__factories__';
+ import { getConfig, mergeConfig } from '@edx/frontend-platform';
+ import { configure as configureI18n } from '@edx/frontend-platform/i18n';
+ import { configure as configureLogging } from '@edx/frontend-platform/logging';
+-import { configure as configureAuth, MockAuthService } from '@edx/frontend-platform/auth';
++import { configure as configureAuth, getAuthenticatedHttpClient, MockAuthService } from '@edx/frontend-platform/auth';
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { render as rtlRender } from '@testing-library/react';
+-import { Provider } from 'react-redux';
+ import { configureStore } from '@reduxjs/toolkit';
+ import { IntlProvider } from 'react-intl';
++import MockAdapter from 'axios-mock-adapter';
++import AppProvider from '@edx/frontend-platform/react/AppProvider';
+ import { reducer as courseHomeReducer } from './course-home/data';
+ import { reducer as coursewareReducer } from './courseware/data/slice';
+ import { reducer as modelsReducer } from './generic/model-store';
+ import { UserMessagesProvider } from './generic/user-messages';
+ 
+ import appMessages from './i18n';
++import { fetchCourse, fetchSequence } from './courseware/data';
++import executeThunk from './utils';
++import buildSimpleCourseAndSequenceMetadata from './courseware/data/__factories__/sequenceMetadata.factory';
+ 
+ class MockLoggingService {
+   logInfo = jest.fn();
+@@ -56,71 +62,8 @@ export default function initializeMockApp() {
+ 
+ window.scrollTo = jest.fn();
+ 
+-// Generated units for convenience.
+-const testUnits = [...Array(10).keys()].map(i => String(i + 1));
+-
+-// Base state containing various use-cases.
+-const baseInitialState = {
+-  courseware: {
+-    sequenceStatus: 'loaded',
+-    courseStatus: 'loaded',
+-    courseId: '1',
+-  },
+-  models: {
+-    courses: {
+-      1: {
+-        sectionIds: ['1'],
+-        contentTypeGatingEnabled: true,
+-      },
+-    },
+-    sections: {
+-      1: {
+-        sequenceIds: ['1', '2'],
+-      },
+-    },
+-    sequences: {
+-      1: {
+-        unitIds: testUnits,
+-        showCompletion: true,
+-        title: 'test-sequence',
+-        gatedContent: {
+-          gated: false,
+-          prereqId: '1',
+-          gatedSectionName: 'test-gated-section',
+-        },
+-      },
+-      2: {
+-        unitIds: testUnits,
+-        showCompletion: true,
+-        title: 'test-sequence-2',
+-      },
+-      3: {
+-        unitIds: testUnits,
+-        showCompletion: true,
+-        title: 'test-sequence-3',
+-        bannerText: 'test-banner-3',
+-        gatedContent: {
+-          gated: true,
+-          prereqId: '1',
+-          gatedSectionName: 'test-gated-section',
+-        },
+-      },
+-    },
+-    units: testUnits.reduce(
+-      (acc, unitId) => Object.assign(acc, {
+-        [unitId]: {
+-          id: unitId,
+-          contentType: 'other',
+-          title: unitId,
+-        },
+-      }),
+-      {},
+-    ),
+-  },
+-};
+-
+ // MessageEvent used for indicating that a unit has been loaded.
+-const messageEvent = {
++export const messageEvent = {
+   type: 'plugin.resize',
+   payload: {
+     height: 300,
+@@ -128,22 +71,62 @@ const messageEvent = {
+ };
+ 
+ // Send MessageEvent indicating that a unit has been loaded.
+-function loadUnit(message = messageEvent) {
++export function loadUnit(message = messageEvent) {
+   window.postMessage(message, '*');
+ }
+ 
++let globalStore;
++
++export async function initializeTestStore(options = {}, overrideStore = true) {
++  const store = configureStore({
++    reducer: {
++      models: modelsReducer,
++      courseware: coursewareReducer,
++      courseHome: courseHomeReducer,
++    },
++  });
++  if (overrideStore) {
++    globalStore = store;
++  }
++  initializeMockApp();
++  const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++  axiosMock.reset();
++
++  const {
++    courseBlocks, sequenceBlock, courseMetadata, sequenceMetadata,
++  } = buildSimpleCourseAndSequenceMetadata(options);
++
++  const forbiddenCourseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseMetadata.id}`;
++  const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
++
++  axiosMock.onGet(forbiddenCourseUrl).reply(200, courseMetadata);
++  axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++  sequenceMetadata.forEach(metadata => {
++    const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${metadata.item_id}`;
++    axiosMock.onGet(sequenceMetadataUrl).reply(200, metadata);
++  });
++
++  axiosMock.onAny().reply((config) => {
++    // eslint-disable-next-line no-console
++    console.log(config.url);
++    return [200, {}];
++  });
++
++  // eslint-disable-next-line no-unused-expressions
++  !options.excludeFetchCourse && await executeThunk(fetchCourse(courseMetadata.id), store.dispatch);
++
++  if (!options.excludeFetchSequence) {
++    await Promise.all(sequenceBlock
++      .map(block => executeThunk(fetchSequence(block.id), store.dispatch)));
++  }
++
++  return store;
++}
++
+ function render(
+   ui,
+   {
+-    initialState = baseInitialState,
+-    store = configureStore({
+-      reducer: {
+-        models: modelsReducer,
+-        courseware: coursewareReducer,
+-        courseHome: courseHomeReducer,
+-      },
+-      preloadedState: initialState,
+-    }),
++    store = null,
+     ...renderOptions
+   } = {},
+ ) {
+@@ -151,11 +134,11 @@ function render(
+     return (
+       // eslint-disable-next-line react/jsx-filename-extension
+       <IntlProvider locale="en">
+-        <Provider store={store}>
++        <AppProvider store={store || globalStore}>
+           <UserMessagesProvider>
+             {children}
+           </UserMessagesProvider>
+-        </Provider>
++        </AppProvider>
+       </IntlProvider>
+     );
+   }
+@@ -170,7 +153,7 @@ function render(
+ // Re-export everything.
+ export * from '@testing-library/react';
+ 
+-// Override `render` method; export `screen` too to suppress errors.
++// Override `render` method.
+ export {
+-  render, testUnits, baseInitialState as initialState, messageEvent, loadUnit,
++  render,
+ };
+-- 
+2.34.1
+

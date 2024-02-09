@@ -1,0 +1,139 @@
+From 20390d1e339783f51cac421463ff6a56e16b126b Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Tue, 5 Oct 2021 14:26:05 -0400
+Subject: [PATCH 0670/1021] Revert "feat: Unsubscribe audit users from goal
+ remindners on the course exit page (#660)" (#668)
+
+This reverts commit 55b3396acdaa7afca8cd680f85c7823c7cc98195.
+---
+ src/courseware/course/course-exit/CourseExit.jsx  | 13 +------------
+ .../course/course-exit/CourseExit.test.jsx        | 15 ---------------
+ src/courseware/course/course-exit/data/api.js     | 10 +---------
+ src/courseware/course/course-exit/data/thunks.js  |  9 +--------
+ 4 files changed, 3 insertions(+), 44 deletions(-)
+
+diff --git a/src/courseware/course/course-exit/CourseExit.jsx b/src/courseware/course/course-exit/CourseExit.jsx
+index 35f8e98..37b28cf 100644
+--- a/src/courseware/course/course-exit/CourseExit.jsx
++++ b/src/courseware/course/course-exit/CourseExit.jsx
+@@ -1,4 +1,4 @@
+-import React, { useEffect } from 'react';
++import React from 'react';
+ 
+ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+@@ -11,7 +11,6 @@ import CourseInProgress from './CourseInProgress';
+ import CourseNonPassing from './CourseNonPassing';
+ import { COURSE_EXIT_MODES, getCourseExitMode } from './utils';
+ import messages from './messages';
+-import { unsubscribeFromGoalReminders } from './data/thunks';
+ 
+ import { useModel } from '../../../generic/model-store';
+ 
+@@ -19,7 +18,6 @@ function CourseExit({ intl }) {
+   const { courseId } = useSelector(state => state.courseware);
+   const {
+     certificateData,
+-    enrollmentMode,
+     hasScheduledContent,
+     isEnrolled,
+     userHasPassingGrade,
+@@ -34,15 +32,6 @@ function CourseExit({ intl }) {
+     courseExitPageIsActive,
+   );
+ 
+-  // Audit users cannot fully complete a course, so we will
+-  // unsubscribe them from goal reminders once they reach the course exit page
+-  // to avoid spamming them with goal reminder emails
+-  if (enrollmentMode === 'audit') {
+-    useEffect(() => {
+-      unsubscribeFromGoalReminders(courseId);
+-    }, []);
+-  }
+-
+   let body = null;
+   if (mode === COURSE_EXIT_MODES.nonPassing) {
+     body = (<CourseNonPassing />);
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 1f3f647..0a1e2c2 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -3,7 +3,6 @@ import MockAdapter from 'axios-mock-adapter';
+ import { Factory } from 'rosie';
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+-import { waitFor } from '@testing-library/react';
+ 
+ import { fetchCourse } from '../../data';
+ import { buildSimpleCourseBlocks } from '../../../shared/data/__factories__/courseBlocks.factory';
+@@ -378,18 +377,4 @@ describe('Course Exit Pages', () => {
+       expect(screen.getByRole('link', { name: 'View course schedule' })).toBeInTheDocument();
+     });
+   });
+-
+-  it('unsubscribes the user when loading the course exit page', async () => {
+-    setMetadata({
+-      enrollment: {
+-        mode: 'audit',
+-      },
+-    });
+-    await fetchAndRender(<CourseExit />);
+-    const url = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
+-    await waitFor(() => {
+-      expect(axiosMock.history.post[0].url).toMatch(url);
+-      expect(axiosMock.history.post[0].data).toMatch(`{"course_id":"${defaultMetadata.id}","subscribed_to_reminders":false}`);
+-    });
+-  });
+ });
+diff --git a/src/courseware/course/course-exit/data/api.js b/src/courseware/course/course-exit/data/api.js
+index d819db7..000f968 100644
+--- a/src/courseware/course/course-exit/data/api.js
++++ b/src/courseware/course/course-exit/data/api.js
+@@ -23,7 +23,7 @@ function filterRecommendationsList(
+   ));
+ }
+ 
+-export async function getCourseRecommendations(courseKey) {
++export default async function getCourseRecommendations(courseKey) {
+   const discoveryApiUrl = getConfig().DISCOVERY_API_BASE_URL;
+   if (!discoveryApiUrl) {
+     return [];
+@@ -36,11 +36,3 @@ export async function getCourseRecommendations(courseKey) {
+   ]);
+   return filterRecommendationsList(camelCaseObject(recommendationsResponse), camelCaseObject(enrollmentsResponse));
+ }
+-
+-export async function postUnsubscribeFromGoalReminders(courseId) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`);
+-  return getAuthenticatedHttpClient().post(url.href, {
+-    course_id: courseId,
+-    subscribed_to_reminders: false,
+-  });
+-}
+diff --git a/src/courseware/course/course-exit/data/thunks.js b/src/courseware/course/course-exit/data/thunks.js
+index 56d6696..f355afb 100644
+--- a/src/courseware/course/course-exit/data/thunks.js
++++ b/src/courseware/course/course-exit/data/thunks.js
+@@ -5,10 +5,7 @@ import {
+   fetchCourseRecommendationsRequest,
+   fetchCourseRecommendationsSuccess,
+ } from './slice';
+-import {
+-  getCourseRecommendations,
+-  postUnsubscribeFromGoalReminders,
+-} from './api';
++import getCourseRecommendations from './api';
+ import { updateModel } from '../../../../generic/model-store';
+ 
+ export default function fetchCourseRecommendations(courseKey, courseId) {
+@@ -30,7 +27,3 @@ export default function fetchCourseRecommendations(courseKey, courseId) {
+     }
+   };
+ }
+-
+-export async function unsubscribeFromGoalReminders(courseId, daysPerWeek, subscribedToReminders) {
+-  return postUnsubscribeFromGoalReminders(courseId, daysPerWeek, subscribedToReminders);
+-}
+-- 
+2.34.1
+

@@ -1,0 +1,47 @@
+From c2f4ba3ad0fae822870936856d9f504d80392250 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 9 Jul 2020 16:10:49 -0400
+Subject: [PATCH 0161/1021] AA-195: Don't show schedule banner if no schedule
+ (#100)
+
+In some cases (user schedule is close to or past the course end),
+we don't actually have dates for a course, even if we would normally
+have them.
+
+When that happens, let's not show a banner saying we made a
+schedule for the learner.
+---
+ src/course-home/dates-banner/DatesBannerContainer.jsx | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index f22a21e..3c0d514 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -17,6 +17,7 @@ function DatesBannerContainer(props) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
++    courseDateBlocks,
+     datesBannerInfo,
+   } = useModel(model, courseId);
+ 
+@@ -32,13 +33,14 @@ function DatesBannerContainer(props) {
+   } = useModel('courses', courseId);
+ 
+   const dispatch = useDispatch();
++  const hasDeadlines = courseDateBlocks.some(x => x.dateType === 'assignment-due-date');
+   const upgradeToCompleteGraded = model === 'dates' && contentTypeGatingEnabled && !missedDeadlines;
+   const upgradeToReset = !upgradeToCompleteGraded && missedDeadlines && missedGatedContent;
+   const resetDates = !upgradeToCompleteGraded && missedDeadlines && !missedGatedContent;
+   const datesBanners = [
+     {
+       name: 'datesTabInfoBanner',
+-      shouldDisplay: model === 'dates' && !missedDeadlines && isSelfPaced,
++      shouldDisplay: model === 'dates' && hasDeadlines && !missedDeadlines && isSelfPaced,
+     },
+     {
+       name: 'upgradeToCompleteGradedBanner',
+-- 
+2.34.1
+

@@ -1,0 +1,54 @@
+From 65173e9f93f99caaa3e06252a2826e7803a04997 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Wed, 10 Jun 2020 17:08:07 -0400
+Subject: [PATCH 0137/1021] fix: remove conditions for an infinite React hooks
+ loop (#81)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The useAlert hook was being given a new payload object every time it was called, defeating any memoization happening inside.
+
+It was also re-calling it’s useEffect hook when alertId changed, which it was changing itself. That’s a no-no.
+---
+ src/alerts/access-expiration-alert/hooks.js | 5 ++++-
+ src/user-messages/hooks.js                  | 2 +-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+index 22fc418..987b65f 100644
+--- a/src/alerts/access-expiration-alert/hooks.js
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -1,4 +1,5 @@
+ /* eslint-disable import/prefer-default-export */
++import { useMemo } from 'react';
+ import { useModel } from '../../model-store';
+ import { useAlert } from '../../user-messages';
+ 
+@@ -7,9 +8,11 @@ export function useAccessExpirationAlert(courseId) {
+   const rawHtml = (course && course.courseExpiredMessage) || null;
+   const isVisible = !!rawHtml; // If it exists, show it.
+ 
++  const payload = useMemo(() => ({ rawHtml }), [rawHtml]);
++
+   useAlert(isVisible, {
+     code: 'clientAccessExpirationAlert',
+     topic: 'course',
+-    payload: { rawHtml },
++    payload,
+   });
+ }
+diff --git a/src/user-messages/hooks.js b/src/user-messages/hooks.js
+index 4e0aa40..1f01087 100644
+--- a/src/user-messages/hooks.js
++++ b/src/user-messages/hooks.js
+@@ -22,5 +22,5 @@ export function useAlert(isVisible, {
+         remove(alertId);
+       }
+     };
+-  }, [alertId, isVisible, code, text, topic, type, dismissible, payload]);
++  }, [isVisible, code, text, topic, type, dismissible, payload]);
+ }
+-- 
+2.34.1
+

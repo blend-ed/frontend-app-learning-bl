@@ -1,0 +1,585 @@
+From a4c978a303da92fe1da41dd7e00071cb38a08b48 Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Fri, 13 Mar 2020 12:57:08 -0400
+Subject: [PATCH 0077/1021] Mobile responsive sequence navigation (#28)
+
+[TNL-7072] When a sequence navigation would overflow, convert it to a dropdown.
+---
+ .../course/CourseTabsNavigation.jsx           |  2 +-
+ .../sequence/SequenceNavigation.jsx           | 21 ++--
+ .../sequence/SequenceNavigationDropdown.jsx   | 49 ++++++++++
+ .../sequence/SequenceNavigationTabs.jsx       | 53 +++++++++++
+ src/courseware/sequence/UnitButton.jsx        |  9 +-
+ src/index.scss                                | 84 ++++++++++++++--
+ src/tabs/Tabs.jsx                             | 95 +++++--------------
+ src/tabs/useIndexOfLastVisibleChild.js        | 77 +++++++++++++++
+ 8 files changed, 299 insertions(+), 91 deletions(-)
+ create mode 100644 src/courseware/sequence/SequenceNavigationDropdown.jsx
+ create mode 100644 src/courseware/sequence/SequenceNavigationTabs.jsx
+ create mode 100644 src/tabs/useIndexOfLastVisibleChild.js
+
+diff --git a/src/courseware/course/CourseTabsNavigation.jsx b/src/courseware/course/CourseTabsNavigation.jsx
+index a4ed69c..ce0da85 100644
+--- a/src/courseware/course/CourseTabsNavigation.jsx
++++ b/src/courseware/course/CourseTabsNavigation.jsx
+@@ -20,7 +20,7 @@ function CourseTabsNavigation({
+           {tabs.map(({ url, title, slug }) => (
+             <a
+               key={slug}
+-              className={classNames('nav-link', { active: slug === activeTabSlug })}
++              className={classNames('nav-item flex-shrink-0 nav-link', { active: slug === activeTabSlug })}
+               href={`${getConfig().LMS_BASE_URL}${url}`}
+             >
+               {title}
+diff --git a/src/courseware/sequence/SequenceNavigation.jsx b/src/courseware/sequence/SequenceNavigation.jsx
+index 19cb280..d3be70d 100644
+--- a/src/courseware/sequence/SequenceNavigation.jsx
++++ b/src/courseware/sequence/SequenceNavigation.jsx
+@@ -7,6 +7,7 @@ import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ 
+ import UnitButton from './UnitButton';
++import SequenceNavigationTabs from './SequenceNavigationTabs';
+ 
+ export default function SequenceNavigation({
+   activeUnitId,
+@@ -20,16 +21,6 @@ export default function SequenceNavigation({
+   showCompletion,
+   unitIds,
+ }) {
+-  const unitButtons = unitIds.map(unitId => (
+-    <UnitButton
+-      key={unitId}
+-      unitId={unitId}
+-      isActive={activeUnitId === unitId}
+-      showCompletion={showCompletion}
+-      onClick={onNavigate}
+-    />
+-  ));
+-
+   return (
+     <nav className={classNames('sequence-navigation', className)}>
+       <Button className="previous-btn" onClick={onPrevious} disabled={isFirstUnit}>
+@@ -41,7 +32,15 @@ export default function SequenceNavigation({
+         />
+       </Button>
+ 
+-      {isLocked ? <UnitButton type="lock" isActive /> : unitButtons}
++
++      {isLocked ? <UnitButton type="lock" isActive /> : (
++        <SequenceNavigationTabs
++          unitIds={unitIds}
++          activeUnitId={activeUnitId}
++          showCompletion={showCompletion}
++          onNavigate={onNavigate}
++        />
++      )}
+ 
+       <Button className="next-btn" onClick={onNext} disabled={isLastUnit}>
+         <FormattedMessage
+diff --git a/src/courseware/sequence/SequenceNavigationDropdown.jsx b/src/courseware/sequence/SequenceNavigationDropdown.jsx
+new file mode 100644
+index 0000000..71eacff
+--- /dev/null
++++ b/src/courseware/sequence/SequenceNavigationDropdown.jsx
+@@ -0,0 +1,49 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { Dropdown } from '@edx/paragon';
++import { FormattedMessage } from '@edx/frontend-platform/i18n';
++
++import UnitButton from './UnitButton';
++
++export default function SequenceNavigationDropdown({
++  activeUnitId,
++  onNavigate,
++  showCompletion,
++  unitIds,
++}) {
++  return (
++    <Dropdown className="sequence-navigation-dropdown">
++      <Dropdown.Button className="dropdown-button font-weight-normal w-100 border-right-0">
++        <FormattedMessage
++          defaultMessage="{current} of {total}"
++          description="The title of the mobile menu for sequence navigation of units"
++          id="learn.course.sequence.navigation.mobile.menu"
++          values={{
++            current: unitIds.indexOf(activeUnitId) + 1,
++            total: unitIds.length,
++          }}
++        />
++      </Dropdown.Button>
++      <Dropdown.Menu className="w-100">
++        {unitIds.map(unitId => (
++          <UnitButton
++            className="w-100"
++            isActive={activeUnitId === unitId}
++            key={unitId}
++            onClick={onNavigate}
++            showCompletion={showCompletion}
++            showTitle
++            unitId={unitId}
++          />
++        ))}
++      </Dropdown.Menu>
++    </Dropdown>
++  );
++}
++
++SequenceNavigationDropdown.propTypes = {
++  activeUnitId: PropTypes.string.isRequired,
++  onNavigate: PropTypes.func.isRequired,
++  showCompletion: PropTypes.bool.isRequired,
++  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++};
+diff --git a/src/courseware/sequence/SequenceNavigationTabs.jsx b/src/courseware/sequence/SequenceNavigationTabs.jsx
+new file mode 100644
+index 0000000..fde3845
+--- /dev/null
++++ b/src/courseware/sequence/SequenceNavigationTabs.jsx
+@@ -0,0 +1,53 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++
++import UnitButton from './UnitButton';
++import SequenceNavigationDropdown from './SequenceNavigationDropdown';
++import useIndexOfLastVisibleChild from '../../tabs/useIndexOfLastVisibleChild';
++
++export default function SequenceNavigationTabs({
++  unitIds, activeUnitId, showCompletion, onNavigate,
++}) {
++  const [
++    indexOfLastVisibleChild,
++    containerRef,
++    invisibleStyle,
++  ] = useIndexOfLastVisibleChild();
++  const shouldDisplayDropdown = indexOfLastVisibleChild === -1;
++
++  return (
++    <div style={{ flexBasis: '100%', minWidth: 0 }}>
++      <div className="sequence-navigation-tabs-container" ref={containerRef}>
++        <div
++          className="sequence-navigation-tabs d-flex flex-grow-1"
++          style={shouldDisplayDropdown ? invisibleStyle : null}
++        >
++          {unitIds.map(unitId => (
++            <UnitButton
++              key={unitId}
++              unitId={unitId}
++              isActive={activeUnitId === unitId}
++              showCompletion={showCompletion}
++              onClick={onNavigate}
++            />
++          ))}
++        </div>
++      </div>
++      {shouldDisplayDropdown && (
++        <SequenceNavigationDropdown
++          activeUnitId={activeUnitId}
++          onNavigate={onNavigate}
++          showCompletion={showCompletion}
++          unitIds={unitIds}
++        />
++      )}
++    </div>
++  );
++}
++
++SequenceNavigationTabs.propTypes = {
++  activeUnitId: PropTypes.string.isRequired,
++  onNavigate: PropTypes.func.isRequired,
++  showCompletion: PropTypes.bool.isRequired,
++  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++};
+diff --git a/src/courseware/sequence/UnitButton.jsx b/src/courseware/sequence/UnitButton.jsx
+index c31c18e..37d7424 100644
+--- a/src/courseware/sequence/UnitButton.jsx
++++ b/src/courseware/sequence/UnitButton.jsx
+@@ -17,6 +17,8 @@ function UnitButton({
+   complete,
+   showCompletion,
+   unitId,
++  className,
++  showTitle,
+ }) {
+   const handleClick = useCallback(() => {
+     onClick(unitId);
+@@ -27,11 +29,12 @@ function UnitButton({
+       className={classNames({
+         active: isActive,
+         complete: showCompletion && complete,
+-      })}
++      }, className)}
+       onClick={handleClick}
+       title={displayName}
+     >
+       <UnitIcon type={contentType} />
++      {showTitle && <span className="unit-title">{displayName}</span>}
+       {showCompletion && complete ? <CompleteIcon size="sm" className="text-success ml-2" /> : null}
+       {bookmarked ? (
+         <BookmarkFilledIcon
+@@ -52,12 +55,16 @@ UnitButton.propTypes = {
+   onClick: PropTypes.func.isRequired,
+   displayName: PropTypes.string.isRequired,
+   contentType: PropTypes.string.isRequired,
++  className: PropTypes.string,
++  showTitle: PropTypes.bool,
+ };
+ 
+ UnitButton.defaultProps = {
++  className: undefined,
+   isActive: false,
+   bookmarked: false,
+   complete: false,
++  showTitle: false,
+   showCompletion: true,
+ };
+ 
+diff --git a/src/index.scss b/src/index.scss
+index 3954a6e..dedb021 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -102,15 +102,18 @@ $primary: #1176B2;
+ 
+   .btn {
+     flex-grow: 1;
+-    display: block;
++    display: inline-flex;
+     border-radius: 0;
+     border: solid 1px #EAEAEA;
+-    margin-left: -1px;
++    border-left-width: 0;
+     position: relative;
+     font-weight: 400;
+-    flex-basis: 80%;
+-    padding: .625rem .375rem;
++    padding: 0 .375rem;
++    height: 3rem;
++    justify-content: center;
++    align-items: center;
+     color: theme-color('gray', 400);
++    white-space: nowrap;
+ 
+     &:hover,
+     &:focus,
+@@ -135,22 +138,88 @@ $primary: #1176B2;
+       background-color: #EEF7E5;
+       color: $success;
+     }
++
+     &:first-child {
+-      margin-left: 0;
++      border-left-width: 0;
++    }
++    &:last-child {
++      border-right-width: 0;
++    }
++  }
++
++  .sequence-navigation-tabs-container {
++    flex-grow: 1;
++    flex-shrink: 1;
++    flex-basis: 100%;
++    display: flex;
++    // min-width 0 prevents the flex item from overflowing the parent container
++    // https://dev.to/martyhimmel/quick-tip-to-stop-flexbox-from-overflowing-peb
++    min-width: 0;
++  }
++  .sequence-navigation-tabs {
++    .btn {
++      flex-basis: 100%;
++      min-width: 4rem;
++    }
++  }
++  .sequence-navigation-dropdown {
++    .dropdown-menu .btn {
++      flex-basis: 100%;
++      min-width: 4rem;
++      padding-left: 1rem;
++      padding-right: 1rem;
++      display: inline-flex;
++      align-items: center;
++      justify-content: flex-start;
++      border-right: 0;
++      & + .btn {
++        border-top: 0;
++      }
++      .unit-title {
++        flex-grow: 1;
++        text-align: left;
++        overflow: hidden;
++        min-width: 0;
++        margin: 0 1rem;
++        text-overflow: ellipsis;
++      }
++      &.active {
++        &:after {
++          content: '';
++          position: absolute;
++          bottom: 0px;
++          left: -1px;
++          top: 0;
++          right: auto;
++          width: 2px;
++          height: auto;
++          background: $primary;
++        }
++      }
+     }
+   }
+ 
+   .previous-btn, .next-btn {
+-    flex-basis: 10em;
+-    min-width: 9em;
++    min-width: 4rem;
+     color: theme-color('gray', 700);
+     display: inline-flex;
+     justify-content: center;
+     align-items: center;
++    @media (max-width: -1 + map-get($grid-breakpoints, 'sm')) {
++      padding-top: 1rem;
++      padding-bottom: 1rem;
++      span {
++        @include sr-only();
++      }
++    }
++    @media (min-width: map-get($grid-breakpoints, 'sm')) {
++      min-width: 10rem;
++    }
+   }
+ 
+   .previous-btn {
+     border-left-width: 0;
++    margin-left: 0;
+     @media (min-width: map-get($grid-breakpoints, 'sm')) {
+       border-left-width: 1px;
+       border-top-left-radius: 4px;
+@@ -158,6 +227,7 @@ $primary: #1176B2;
+   }
+ 
+   .next-btn {
++    border-left-width: 1px;
+     border-right-width: 0;
+     @media (min-width: map-get($grid-breakpoints, 'sm')) {
+       border-top-right-radius: 4px;
+diff --git a/src/tabs/Tabs.jsx b/src/tabs/Tabs.jsx
+index 5630888..a8f9f48 100644
+--- a/src/tabs/Tabs.jsx
++++ b/src/tabs/Tabs.jsx
+@@ -1,86 +1,39 @@
+-import React, {
+-  useLayoutEffect, useRef, useMemo, useState,
+-} from 'react';
++import React, { useMemo } from 'react';
+ import PropTypes from 'prop-types';
+ import { Dropdown } from '@edx/paragon';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import classNames from 'classnames';
+-import useWindowSize from './useWindowSize';
++import useIndexOfLastVisibleChild from './useIndexOfLastVisibleChild';
+ 
+-const invisibleStyle = {
+-  position: 'absolute',
+-  left: 0,
+-  pointerEvents: 'none',
+-  visibility: 'hidden',
+-};
+ export default function Tabs({ children, className, ...attrs }) {
+-  const [cutOffIndex, setCutOffIndex] = useState(React.Children.count(children));
+-  const windowSize = useWindowSize();
+-  const navElementRef = useRef(null);
+-  const tabsRectRef = useRef({});
+-  const overflowEl = useRef(null);
+-
+-  // eslint-disable-next-line prefer-arrow-callback
+-  useLayoutEffect(function findCutOffIndex() {
+-    const tabsRect = navElementRef.current.getBoundingClientRect();
+-
+-    // No-op if the width is unchanged.
+-    // (Assumes tabs themselves don't change count or width).
+-    if (!tabsRect.width === tabsRectRef.current.width) {
+-      return;
+-    }
+-    // Update for future comparison
+-    tabsRectRef.current = tabsRect;
+-
+-    // Get array of child nodes from NodeList form
+-    const childNodesArray = Array.prototype.slice.call(navElementRef.current.children);
+-    // Use reduce to sum the widths of child nodes and determine the new cutoff index
+-    const { lastFittingChildIndex } = childNodesArray.reduce((acc, childNode) => {
+-      const isOverflowElement = childNode === overflowEl.current;
+-      if (isOverflowElement) {
+-        return acc;
+-      }
+-
+-      acc.sumWidth += childNode.getBoundingClientRect().width;
+-
+-      if (acc.sumWidth <= tabsRect.width) {
+-        acc.lastFittingChildIndex += 1;
+-      }
+-
+-      return acc;
+-    }, {
+-      // Include the overflow element's width to begin with. Doing this means
+-      // sometimes we'll show a dropdown with one item in it when it would fit,
+-      // but allowing this case dramatically simplifies the calculations we need
+-      // to do above.
+-      sumWidth: overflowEl.current.getBoundingClientRect().width,
+-      lastFittingChildIndex: 0,
+-    });
+-
+-    setCutOffIndex(lastFittingChildIndex);
+-  }, [windowSize]);
++  const [
++    indexOfLastVisibleChild,
++    containerElementRef,
++    invisibleStyle,
++    overflowElementRef,
++  ] = useIndexOfLastVisibleChild();
+ 
+   const tabChildren = useMemo(() => {
+     const childrenArray = React.Children.toArray(children);
++    const indexOfOverflowStart = indexOfLastVisibleChild + 1;
+ 
+     // All tabs will be rendered. Those that would overflow are set to invisible.
+-    const wrappedChildren = childrenArray.map((child, index) => (
+-      <li className="nav-item flex-shrink-0" style={cutOffIndex <= index ? invisibleStyle : null}>
+-        {React.cloneElement(child)}
+-      </li>
+-    ));
++    const wrappedChildren = childrenArray.map((child, index) => React.cloneElement(child, {
++      style: index > indexOfLastVisibleChild ? invisibleStyle : null,
++    }));
+ 
+     // Build the list of items to put in the overflow menu
+-    const overflowChildren = childrenArray.slice(cutOffIndex)
+-      .map((overflowChild) => React.cloneElement(overflowChild, { className: 'dropdown-item' }));
++    const overflowChildren = childrenArray.slice(indexOfOverflowStart)
++      .map(overflowChild => React.cloneElement(overflowChild, { className: 'dropdown-item' }));
+ 
+     // Insert the overflow menu at the cut off index (even if it will be hidden
+     // it so it can be part of measurements)
+-    wrappedChildren.splice(cutOffIndex, 0, (
+-      <li
++    wrappedChildren.splice(indexOfOverflowStart, 0, (
++      <div
+         className="nav-item flex-shrink-0"
+-        style={cutOffIndex >= React.Children.count(children) ? invisibleStyle : null}
+-        ref={overflowEl}
++        style={indexOfOverflowStart >= React.Children.count(children) ? invisibleStyle : null}
++        ref={overflowElementRef}
++        key="overflow"
+       >
+         <Dropdown>
+           <Dropdown.Button className="nav-link font-weight-normal">
+@@ -92,19 +45,19 @@ export default function Tabs({ children, className, ...attrs }) {
+           </Dropdown.Button>
+           <Dropdown.Menu className="dropdown-menu-right">{overflowChildren}</Dropdown.Menu>
+         </Dropdown>
+-      </li>
++      </div>
+     ));
+     return wrappedChildren;
+-  }, [children, cutOffIndex]);
++  }, [children, indexOfLastVisibleChild]);
+ 
+   return (
+-    <ul
++    <nav
+       {...attrs}
+       className={classNames('nav flex-nowrap', className)}
+-      ref={navElementRef}
++      ref={containerElementRef}
+     >
+       {tabChildren}
+-    </ul>
++    </nav>
+   );
+ }
+ 
+diff --git a/src/tabs/useIndexOfLastVisibleChild.js b/src/tabs/useIndexOfLastVisibleChild.js
+new file mode 100644
+index 0000000..94dfcc0
+--- /dev/null
++++ b/src/tabs/useIndexOfLastVisibleChild.js
+@@ -0,0 +1,77 @@
++import { useLayoutEffect, useRef, useState } from 'react';
++import useWindowSize from './useWindowSize';
++
++const invisibleStyle = {
++  position: 'absolute',
++  left: 0,
++  pointerEvents: 'none',
++  visibility: 'hidden',
++};
++
++/**
++ * This hook will find the index of the last child of a containing element
++ * that fits within its bounding rectangle. This is done by summing the widths
++ * of the children until they exceed the width of the container.
++ *
++ * The hook returns an array containing:
++ * [indexOfLastVisibleChild, containerElementRef, invisibleStyle, overflowElementRef]
++ *
++ * indexOfLastVisibleChild - the index of the last visible child
++ * containerElementRef - a ref to be added to the containing html node
++ * invisibleStyle - a set of styles to be applied to child of the containing node
++ *    if it needs to be hidden. These styles remove the element visually, from
++ *    screen readers, and from normal layout flow. But, importantly, these styles
++ *    preserve the width of the element, so that future width calculations will
++ *    still be accurate.
++ * overflowElementRef - a ref to be added to an html node inside the container
++ *    that is likely to be used to contain a "More" type dropdown or other
++ *    mechanism to reveal hidden children. The width of this element is always
++ *    included when determining which children will fit or not. Usage of this ref
++ *    is optional.
++ */
++export default function useIndexOfLastVisibleChild() {
++  const containerElementRef = useRef(null);
++  const overflowElementRef = useRef(null);
++  const containingRectRef = useRef({});
++  const [indexOfLastVisibleChild, setIndexOfLastVisibleChild] = useState(-1);
++  const windowSize = useWindowSize();
++
++  useLayoutEffect(() => {
++    const containingRect = containerElementRef.current.getBoundingClientRect();
++
++    // No-op if the width is unchanged.
++    // (Assumes tabs themselves don't change count or width).
++    if (!containingRect.width === containingRectRef.current.width) {
++      return;
++    }
++    // Update for future comparison
++    containingRectRef.current = containingRect;
++
++    // Get array of child nodes from NodeList form
++    const childNodesArr = Array.prototype.slice.call(containerElementRef.current.children);
++    const { nextIndexOfLastVisibleChild } = childNodesArr
++      // filter out the overflow element
++      .filter(childNode => childNode !== overflowElementRef.current)
++      // sum the widths to find the last visible element's index
++      .reduce((acc, childNode, index) => {
++        // use floor to prevent rounding errors
++        acc.sumWidth += Math.floor(childNode.getBoundingClientRect().width);
++        if (acc.sumWidth <= containingRect.width) {
++          acc.nextIndexOfLastVisibleChild = index;
++        }
++        return acc;
++      }, {
++        // Include the overflow element's width to begin with. Doing this means
++        // sometimes we'll show a dropdown with one item in it when it would fit,
++        // but allowing this case dramatically simplifies the calculations we need
++        // to do above.
++        sumWidth: overflowElementRef.current ? overflowElementRef.current.getBoundingClientRect().width : 0,
++        nextIndexOfLastVisibleChild: -1,
++      });
++
++
++    setIndexOfLastVisibleChild(nextIndexOfLastVisibleChild);
++  }, [windowSize, containerElementRef.current]);
++
++  return [indexOfLastVisibleChild, containerElementRef, invisibleStyle, overflowElementRef];
++}
+-- 
+2.34.1
+

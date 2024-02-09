@@ -1,0 +1,29 @@
+From 3b33aacb3d3c8ba68be1c829d39da021023a2d1d Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 25 Jan 2022 14:42:15 -0500
+Subject: [PATCH 0792/1021] fix: [AA-1018] api cleanup
+
+Back off change to fetchCourse in courseware/thunks.js
+---
+ src/courseware/data/thunks.js | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 0e746c3..a3c8472 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -140,10 +140,7 @@ export function fetchCourse(courseId) {
+       if (courseMetadataResult.status === 'fulfilled') {
+         dispatch(addModel({
+           modelType: 'coursewareMeta',
+-          model: {
+-            id: courseId,
+-            ...courseMetadataResult.value,
+-          },
++          model: courseMetadataResult.value,
+         }));
+       }
+ 
+-- 
+2.34.1
+

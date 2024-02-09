@@ -1,0 +1,360 @@
+From 6003865840be2b20da3423c8b569d03abe65c8f8 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 27 Jul 2021 09:46:02 -0400
+Subject: [PATCH 0553/1021] fix: remove unused portions of effort estimate
+ experiment (#560)
+
+We are sticking with the sequence version, and abandoning the section
+version. This commit also marks the strings for translation, as it
+is a real feature now, not just an experiment.
+
+AA-659
+---
+ .../data/__snapshots__/redux.test.js.snap     |  8 +---
+ src/course-home/data/api.js                   |  4 --
+ src/course-home/outline-tab/Section.jsx       |  2 -
+ .../UnitNavigationEffortEstimate.jsx          | 40 +++++++++----------
+ .../sequence/sequence-navigation/messages.js  |  5 +++
+ .../__factories__/courseMetadata.factory.js   |  1 -
+ src/courseware/data/api.js                    |  4 --
+ .../__factories__/courseBlocks.factory.js     |  9 +++--
+ src/shared/effort-estimate/EffortEstimate.jsx | 32 ++++++++++-----
+ src/shared/effort-estimate/messages.js        | 20 ++++++++++
+ 10 files changed, 72 insertions(+), 53 deletions(-)
+ create mode 100644 src/shared/effort-estimate/messages.js
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index e1ff273..504c866 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -396,8 +396,6 @@ Object {
+         "courseBlocks": Object {
+           "courses": Object {
+             "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
+-              "effortActivities": undefined,
+-              "effortTime": undefined,
+               "hasScheduledContent": false,
+               "id": "course-v1:edX+DemoX+Demo_Course_1",
+               "sectionIds": Array [
+@@ -410,8 +408,6 @@ Object {
+             "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2": Object {
+               "complete": false,
+               "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+-              "effortActivities": 2,
+-              "effortTime": 15,
+               "id": "block-v1:edX+DemoX+Demo_Course+type@chapter+block@bcdabcdabcdabcdabcdabcdabcdabcd2",
+               "resumeBlock": false,
+               "sequenceIds": Array [
+@@ -425,8 +421,8 @@ Object {
+               "complete": false,
+               "description": null,
+               "due": null,
+-              "effortActivities": undefined,
+-              "effortTime": undefined,
++              "effortActivities": 2,
++              "effortTime": 15,
+               "icon": null,
+               "id": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1",
+               "legacyWebUrl": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+DemoX+Demo_Course+type@sequential+block@bcdabcdabcdabcdabcdabcdabcdabcd1?experience=legacy",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index ae0858d..e6fd22d 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -111,8 +111,6 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+     switch (block.type) {
+       case 'course':
+         models.courses[block.id] = {
+-          effortActivities: block.effort_activities,
+-          effortTime: block.effort_time,
+           id: courseId,
+           title: block.display_name,
+           sectionIds: block.children || [],
+@@ -123,8 +121,6 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+       case 'chapter':
+         models.sections[block.id] = {
+           complete: block.complete,
+-          effortActivities: block.effort_activities,
+-          effortTime: block.effort_time,
+           id: block.id,
+           title: block.display_name,
+           resumeBlock: block.resume_block,
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index ce69f76..b507812 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -6,7 +6,6 @@ import { faCheckCircle as fasCheckCircle, faMinus, faPlus } from '@fortawesome/f
+ import { faCheckCircle as farCheckCircle } from '@fortawesome/free-regular-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ 
+-import EffortEstimate from '../../shared/effort-estimate';
+ import SequenceLink from './SequenceLink';
+ import { useModel } from '../../generic/model-store';
+ 
+@@ -67,7 +66,6 @@ function Section({
+         <span className="sr-only">
+           , {intl.formatMessage(complete ? messages.completedSection : messages.incompleteSection)}
+         </span>
+-        <EffortEstimate className="ml-3 align-middle" block={section} />
+       </div>
+     </div>
+   );
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+index fda5330..7f79722 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigationEffortEstimate.jsx
+@@ -1,23 +1,28 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { useSelector } from 'react-redux';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import EffortEstimate from '../../../../shared/effort-estimate';
+ import { sequenceIdsSelector } from '../../../data';
+ import { useModel } from '../../../../generic/model-store';
+ 
+-// This component exists to peek ahead at the next subsection or section and grab its estimated effort.
+-// If we should be showing the next block's effort, we display the title and effort instead of "Next".
+-// This code currently tries to handle both section and subsection estimates. But once AA-659 happens, it can be
+-// simplified to one or the other code path.
++import messages from './messages';
+ 
+-function UnitNavigationEffortEstimate({ children, sequenceId, unitId }) {
++// This component exists to peek ahead at the next sequence and grab its estimated effort.
++// If we should be showing the next sequence's effort, we display the title and effort instead of "Next".
++
++function UnitNavigationEffortEstimate({
++  children,
++  intl,
++  sequenceId,
++  unitId,
++}) {
+   const sequenceIds = useSelector(sequenceIdsSelector);
+   const sequenceIndex = sequenceIds.indexOf(sequenceId);
+   const nextSequenceId = sequenceIndex < sequenceIds.length - 1 ? sequenceIds[sequenceIndex + 1] : null;
+   const sequence = useModel('sequences', sequenceId);
+   const nextSequence = useModel('sequences', nextSequenceId);
+-  const nextSection = useModel('sections', nextSequence ? nextSequence.sectionId : null);
+ 
+   if (!sequence || !nextSequence) {
+     return children;
+@@ -28,32 +33,23 @@ function UnitNavigationEffortEstimate({ children, sequenceId, unitId }) {
+     return children;
+   }
+ 
+-  let blockToShow = nextSequence;
+-  // The experimentation code currently only sets effort on either sequences, sections, or nothing. If we don't have
+-  // sequence info, we are either doing sections or nothing. Let's look into it.
++  // If we don't have info to show for the next sequence, just bail
+   if (!nextSequence.effortActivities && !nextSequence.effortTime) {
+-    if (!nextSection.effortActivities && !nextSection.effortTime) {
+-      return children; // control group - no effort estimates at all
+-    }
+-
+-    // Are we at a section border? If so, let's show the next section's effort estimates
+-    if (sequence.sectionId !== nextSequence.sectionId) {
+-      blockToShow = nextSection;
+-    }
++    return children;
+   }
+ 
+-  // Note: we don't use `children` here - we replace it with the next section name.
+-  // AA-659: remember to add a translation for Next Up
++  // Note: we don't use `children` here - we replace it with the next sequence's title.
+   return (
+     <div className="d-inline-block text-wrap">
+-      Next Up: {blockToShow.title}
+-      <EffortEstimate className="d-block mt-1" block={blockToShow} />
++      {intl.formatMessage(messages.nextUpButton, { title: nextSequence.title })}
++      <EffortEstimate className="d-block mt-1" block={nextSequence} />
+     </div>
+   );
+ }
+ 
+ UnitNavigationEffortEstimate.propTypes = {
+   children: PropTypes.node,
++  intl: intlShape.isRequired,
+   sequenceId: PropTypes.string.isRequired,
+   unitId: PropTypes.string,
+ };
+@@ -63,4 +59,4 @@ UnitNavigationEffortEstimate.defaultProps = {
+   unitId: null,
+ };
+ 
+-export default UnitNavigationEffortEstimate;
++export default injectIntl(UnitNavigationEffortEstimate);
+diff --git a/src/courseware/course/sequence/sequence-navigation/messages.js b/src/courseware/course/sequence/sequence-navigation/messages.js
+index fc947f9..9d99fdd 100644
+--- a/src/courseware/course/sequence/sequence-navigation/messages.js
++++ b/src/courseware/course/sequence/sequence-navigation/messages.js
+@@ -6,6 +6,11 @@ const messages = defineMessages({
+     defaultMessage: 'Next',
+     description: 'Button to advance to the next section',
+   },
++  nextUpButton: {
++    id: 'learn.sequence.navigation.next.up.button',
++    defaultMessage: 'Next Up: {title}',
++    description: 'Button to advance to the next section, with title',
++  },
+   previousButton: {
+     id: 'learn.sequence.navigation.previous.button',
+     defaultMessage: 'Previous',
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 7b84c58..49a0622 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -9,7 +9,6 @@ Factory.define('courseMetadata')
+     can_show_upgrade_sock: false,
+     content_type_gating_enabled: false,
+     course_expired_message: null,
+-    effort: null,
+     end: null,
+     enrollment_start: null,
+     enrollment_end: null,
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 792fb40..69998c2 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -16,8 +16,6 @@ export function normalizeBlocks(courseId, blocks) {
+     switch (block.type) {
+       case 'course':
+         models.courses[block.id] = {
+-          effortActivities: block.effort_activities,
+-          effortTime: block.effort_time,
+           id: courseId,
+           title: block.display_name,
+           sectionIds: block.children || [],
+@@ -26,8 +24,6 @@ export function normalizeBlocks(courseId, blocks) {
+         break;
+       case 'chapter':
+         models.sections[block.id] = {
+-          effortActivities: block.effort_activities,
+-          effortTime: block.effort_time,
+           id: block.id,
+           title: block.display_name,
+           sequenceIds: block.children || [],
+diff --git a/src/shared/data/__factories__/courseBlocks.factory.js b/src/shared/data/__factories__/courseBlocks.factory.js
+index 24d25a3..86eefd8 100644
+--- a/src/shared/data/__factories__/courseBlocks.factory.js
++++ b/src/shared/data/__factories__/courseBlocks.factory.js
+@@ -106,7 +106,12 @@ export function buildSimpleCourseBlocks(courseId, title, options = {}) {
+ export function buildMinimalCourseBlocks(courseId, title, options = {}) {
+   const sequenceBlocks = options.sequenceBlocks || [Factory.build(
+     'block',
+-    { display_name: 'Title of Sequence', type: 'sequential' },
++    {
++      display_name: 'Title of Sequence',
++      effort_activities: 2,
++      effort_time: 15,
++      type: 'sequential',
++    },
+     { courseId },
+   )];
+   const sectionBlocks = options.sectionBlocks || [Factory.build(
+@@ -115,8 +120,6 @@ export function buildMinimalCourseBlocks(courseId, title, options = {}) {
+       type: 'chapter',
+       display_name: 'Title of Section',
+       complete: options.complete || false,
+-      effort_time: 15,
+-      effort_activities: 2,
+       resume_block: options.resumeBlock || false,
+       children: sequenceBlocks.map(block => block.id),
+     },
+diff --git a/src/shared/effort-estimate/EffortEstimate.jsx b/src/shared/effort-estimate/EffortEstimate.jsx
+index 5568500..3a0fae4 100644
+--- a/src/shared/effort-estimate/EffortEstimate.jsx
++++ b/src/shared/effort-estimate/EffortEstimate.jsx
+@@ -1,9 +1,11 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ import classNames from 'classnames';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from './messages';
+ 
+ // This component shows an effort estimate provided by the backend block data. Either time, activities, or both.
+-// Right now it is an experiment, and AA-659 is its cleanup ticket.
+ 
+ function EffortEstimate(props) {
+   const {
+@@ -12,27 +14,34 @@ function EffortEstimate(props) {
+       effortTime,
+     },
+     className,
++    intl,
+   } = props;
+ 
+-  // FIXME: This is not properly internationalized. This is just an experiment right now, so I chose to not mark
+-  // FIXME: the strings for translation. That should be fixed if/when this is made real code. AA-659
+   const minuteCount = Math.ceil(effortTime / 60); // effortTime is in seconds
++  const minutesAbbreviated = intl.formatMessage(messages.minutesAbbreviated, { minuteCount });
++  const minutesFull = intl.formatMessage(messages.minutesFull, { minuteCount });
+   const minutes = (
+     <>
+-      {minuteCount}
+-      <span aria-hidden="true"> min</span>
+-      <span className="sr-only"> {minuteCount === 1 ? 'minute' : 'minutes'}</span>
++      <span aria-hidden="true">{minutesAbbreviated}</span>
++      <span className="sr-only">{minutesFull}</span>
+     </>
+   );
+-  const activities = <>{effortActivities} {effortActivities === 1 ? 'activity' : 'activities'}</>;
++  const activities = intl.formatMessage(messages.activities, { activityCount: effortActivities });
+   let content = null;
+ 
+   if (effortTime && effortActivities) {
+-    content = <>{minutes} + {activities}</>;
++    content = (
++      <FormattedMessage
++        id="learning.effortEstimation.combinedEstimate"
++        defaultMessage="{minutes} + {activities}"
++        description="You can likely leave this alone, unless you want to use a full width plus or similar change"
++        values={{ activities, minutes }}
++      />
++    );
+   } else if (effortTime) {
+-    content = <>{minutes}</>;
++    content = minutes;
+   } else if (effortActivities) {
+-    content = <>{activities}</>;
++    content = activities;
+   } else {
+     return null;
+   }
+@@ -57,6 +66,7 @@ EffortEstimate.propTypes = {
+     effortTime: PropTypes.number,
+   }).isRequired,
+   className: PropTypes.string,
++  intl: intlShape.isRequired,
+ };
+ 
+-export default EffortEstimate;
++export default injectIntl(EffortEstimate);
+diff --git a/src/shared/effort-estimate/messages.js b/src/shared/effort-estimate/messages.js
+new file mode 100644
+index 0000000..75b544d
+--- /dev/null
++++ b/src/shared/effort-estimate/messages.js
+@@ -0,0 +1,20 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  activities: {
++    id: 'learning.effortEstimation.activities',
++    defaultMessage: '{activityCount, plural, one {# activity} other {# activities}}',
++  },
++  minutesAbbreviated: {
++    id: 'learning.effortEstimation.minutesAbbreviated',
++    defaultMessage: '{minuteCount, plural, other {# min}}',
++    description: 'Number of minutes in a casual, shorthand manner: 5 min',
++  },
++  minutesFull: {
++    id: 'learning.effortEstimation.minutesFull',
++    defaultMessage: '{minuteCount, plural, one {# minute} other {# minutes}}',
++    description: 'Number of minutes spelled out: 5 minutes',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

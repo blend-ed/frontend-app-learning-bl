@@ -1,0 +1,739 @@
+From 8552329739873336719d22dbb43b18a0e08227e0 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 24 Aug 2021 16:10:04 -0400
+Subject: [PATCH 0624/1021] feat: add a new course goal unsubscribe landing
+ page (#612)
+
+URL format: /goal-unsubscribe/<uuid-token>
+
+This is designed to be used in the new course goals feature, where
+emails will be sent to learners and those emails will include a
+link to this landing page, as an unsubscribe link.
+
+Also, update calls to the LMS course home API to not include the
+/v1/ fragment anymore, as we're moving to an unversioned API.
+
+AA-907
+---
+ .env                                          |  1 +
+ .env.development                              |  1 +
+ .env.test                                     |  1 +
+ src/course-header/Header.jsx                  |  8 ++-
+ src/course-home/data/api.js                   | 18 ++++--
+ .../data/pact-tests/lmsPact.test.jsx          |  4 +-
+ src/course-home/data/redux.test.js            | 12 ++--
+ src/course-home/dates-tab/DatesTab.test.jsx   |  4 +-
+ .../goal-unsubscribe/GoalUnsubscribe.jsx      | 52 ++++++++++++++++
+ .../goal-unsubscribe/GoalUnsubscribe.test.jsx | 62 +++++++++++++++++++
+ .../goal-unsubscribe/ResultPage.jsx           | 58 +++++++++++++++++
+ src/course-home/goal-unsubscribe/index.jsx    |  3 +
+ src/course-home/goal-unsubscribe/messages.js  | 30 +++++++++
+ .../goal-unsubscribe/unsubscribe.svg          |  5 ++
+ .../outline-tab/OutlineTab.test.jsx           |  6 +-
+ .../progress-tab/ProgressTab.test.jsx         |  4 +-
+ src/generic/PageLoading.jsx                   |  6 +-
+ src/index.jsx                                 |  6 +-
+ src/setupTest.js                              |  1 +
+ src/tab-page/LoadedTabPage.jsx                |  9 +--
+ src/tab-page/TabPage.jsx                      | 12 ++++
+ 21 files changed, 267 insertions(+), 36 deletions(-)
+ create mode 100644 src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+ create mode 100644 src/course-home/goal-unsubscribe/GoalUnsubscribe.test.jsx
+ create mode 100644 src/course-home/goal-unsubscribe/ResultPage.jsx
+ create mode 100644 src/course-home/goal-unsubscribe/index.jsx
+ create mode 100644 src/course-home/goal-unsubscribe/messages.js
+ create mode 100644 src/course-home/goal-unsubscribe/unsubscribe.svg
+
+diff --git a/.env b/.env
+index 4386f3a..a8f64ec 100644
+--- a/.env
++++ b/.env
+@@ -4,6 +4,7 @@
+ NODE_ENV='production'
+ ACCESS_TOKEN_COOKIE_NAME=''
+ BASE_URL=''
++CONTACT_URL=''
+ CREDENTIALS_BASE_URL=''
+ CSRF_TOKEN_API_PATH=''
+ DISCOVERY_API_BASE_URL=''
+diff --git a/.env.development b/.env.development
+index 39f8cfa..3404a92 100644
+--- a/.env.development
++++ b/.env.development
+@@ -4,6 +4,7 @@
+ NODE_ENV='development'
+ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+ BASE_URL='http://localhost:2000'
++CONTACT_URL='http://localhost:18000/contact'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ DISCOVERY_API_BASE_URL='http://localhost:18381'
+diff --git a/.env.test b/.env.test
+index f7c5386..4a1445b 100644
+--- a/.env.test
++++ b/.env.test
+@@ -4,6 +4,7 @@
+ NODE_ENV='test'
+ ACCESS_TOKEN_COOKIE_NAME='edx-jwt-cookie-header-payload'
+ BASE_URL='http://localhost:2000'
++CONTACT_URL='http://localhost:18000/contact'
+ CREDENTIALS_BASE_URL='http://localhost:18150'
+ CSRF_TOKEN_API_PATH='/csrf/api/v1/token'
+ DISCOVERY_API_BASE_URL='http://localhost:18381'
+diff --git a/src/course-header/Header.jsx b/src/course-header/Header.jsx
+index 278b08b..b502399 100644
+--- a/src/course-header/Header.jsx
++++ b/src/course-header/Header.jsx
+@@ -29,7 +29,7 @@ LinkedLogo.propTypes = {
+ };
+ 
+ function Header({
+-  courseOrg, courseNumber, courseTitle, intl,
++  courseOrg, courseNumber, courseTitle, intl, showUserDropdown,
+ }) {
+   const { authenticatedUser } = useContext(AppContext);
+ 
+@@ -67,13 +67,13 @@ function Header({
+           <span className="d-block small m-0">{courseOrg} {courseNumber}</span>
+           <span className="d-block m-0 font-weight-bold course-title">{courseTitle}</span>
+         </div>
+-        {authenticatedUser && (
++        {showUserDropdown && authenticatedUser && (
+           <AuthenticatedUserDropdown
+             enterpriseLearnerPortalLink={enterpriseLearnerPortalLink}
+             username={authenticatedUser.username}
+           />
+         )}
+-        {!authenticatedUser && (
++        {showUserDropdown && !authenticatedUser && (
+           <AnonymousUserMenu />
+         )}
+       </div>
+@@ -86,12 +86,14 @@ Header.propTypes = {
+   courseNumber: PropTypes.string,
+   courseTitle: PropTypes.string,
+   intl: intlShape.isRequired,
++  showUserDropdown: PropTypes.bool,
+ };
+ 
+ Header.defaultProps = {
+   courseOrg: null,
+   courseNumber: null,
+   courseTitle: null,
++  showUserDropdown: true,
+ };
+ 
+ export default injectIntl(Header);
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index ef008ea..8c56df3 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -179,7 +179,7 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+ }
+ 
+ export async function getCourseHomeCourseMetadata(courseId) {
+-  let url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
++  let url = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   url = appendBrowserTimezoneToUrl(url);
+   const { data } = await getAuthenticatedHttpClient().get(url);
+   return normalizeCourseHomeCourseMetadata(data);
+@@ -191,7 +191,7 @@ export async function getCourseHomeCourseMetadata(courseId) {
+ // import './__factories__';
+ export async function getDatesTabData(courseId) {
+   // return camelCaseObject(Factory.build('datesTabData'));
+-  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`;
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/dates/${courseId}`;
+   try {
+     const { data } = await getAuthenticatedHttpClient().get(url);
+     return camelCaseObject(data);
+@@ -211,7 +211,7 @@ export async function getDatesTabData(courseId) {
+ }
+ 
+ export async function getProgressTabData(courseId, targetUserId) {
+-  let url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
++  let url = `${getConfig().LMS_BASE_URL}/api/course_home/progress/${courseId}`;
+ 
+   // If targetUserId is passed in, we will get the progress page data
+   // for the user with the provided id, rather than the requesting user.
+@@ -312,7 +312,7 @@ export function getTimeOffsetMillis(headerDate, requestTime, responseTime) {
+ }
+ 
+ export async function getOutlineTabData(courseId) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline/${courseId}`;
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+   let { tabData } = {};
+   let requestTime = Date.now();
+   let responseTime = requestTime;
+@@ -386,12 +386,12 @@ export async function postCourseDeadlines(courseId, model) {
+ }
+ 
+ export async function postCourseGoals(courseId, goalKey) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/v1/save_course_goal`);
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`);
+   return getAuthenticatedHttpClient().post(url.href, { course_id: courseId, goal_key: goalKey });
+ }
+ 
+ export async function postDismissWelcomeMessage(courseId) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/v1/dismiss_welcome_message`);
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/dismiss_welcome_message`);
+   await getAuthenticatedHttpClient().post(url.href, { course_id: courseId });
+ }
+ 
+@@ -407,3 +407,9 @@ export async function executePostFromPostEvent(postData, researchEventData) {
+     research_event_data: researchEventData,
+   });
+ }
++
++export async function unsubscribeFromCourseGoal(token) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_home/unsubscribe_from_course_goal/${token}`);
++  return getAuthenticatedHttpClient().post(url.href)
++    .then(res => camelCaseObject(res));
++}
+diff --git a/src/course-home/data/pact-tests/lmsPact.test.jsx b/src/course-home/data/pact-tests/lmsPact.test.jsx
+index 28a6efe..580ff4b 100644
+--- a/src/course-home/data/pact-tests/lmsPact.test.jsx
++++ b/src/course-home/data/pact-tests/lmsPact.test.jsx
+@@ -44,7 +44,7 @@ describe('Course Home Service', () => {
+         uponReceiving: 'a request to fetch tab',
+         withRequest: {
+           method: 'GET',
+-          path: `/api/course_home/v1/course_metadata/${courseId}`,
++          path: `/api/course_home/course_metadata/${courseId}`,
+         },
+         willRespondWith: {
+           status: 200,
+@@ -151,7 +151,7 @@ describe('Course Home Service', () => {
+         uponReceiving: 'a request to fetch dates tab',
+         withRequest: {
+           method: 'GET',
+-          path: `/api/course_home/v1/dates/${courseId}`,
++          path: `/api/course_home/dates/${courseId}`,
+         },
+         willRespondWith: {
+           status: 200,
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index c4ae61d..5ea0b85 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -18,7 +18,7 @@ const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
+ describe('Data layer integration tests', () => {
+   const courseHomeMetadata = Factory.build('courseHomeMetadata');
+   const { id: courseId } = courseHomeMetadata;
+-  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
+   let store;
+@@ -31,7 +31,7 @@ describe('Data layer integration tests', () => {
+   });
+ 
+   describe('Test fetchDatesTab', () => {
+-    const datesBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dates`;
++    const datesBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/dates`;
+ 
+     it('Should fail to fetch if error occurs', async () => {
+       axiosMock.onGet(courseMetadataUrl).networkError();
+@@ -60,7 +60,7 @@ describe('Data layer integration tests', () => {
+   });
+ 
+   describe('Test fetchOutlineTab', () => {
+-    const outlineBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline`;
++    const outlineBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline`;
+ 
+     it('Should result in fetch failure if error occurs', async () => {
+       axiosMock.onGet(courseMetadataUrl).networkError();
+@@ -89,7 +89,7 @@ describe('Data layer integration tests', () => {
+   });
+ 
+   describe('Test fetchProgressTab', () => {
+-    const progressBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress`;
++    const progressBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/progress`;
+ 
+     it('Should result in fetch failure if error occurs', async () => {
+       axiosMock.onGet(courseMetadataUrl).networkError();
+@@ -133,7 +133,7 @@ describe('Data layer integration tests', () => {
+ 
+   describe('Test saveCourseGoal', () => {
+     it('Should save course goal', async () => {
+-      const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/save_course_goal`;
++      const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
+       axiosMock.onPost(goalUrl).reply(200, {});
+ 
+       await thunks.saveCourseGoal(courseId, 'unsure');
+@@ -164,7 +164,7 @@ describe('Data layer integration tests', () => {
+ 
+   describe('Test dismissWelcomeMessage', () => {
+     it('Should dismiss welcome message', async () => {
+-      const dismissUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dismiss_welcome_message`;
++      const dismissUrl = `${getConfig().LMS_BASE_URL}/api/course_home/dismiss_welcome_message`;
+       axiosMock.onPost(dismissUrl).reply(201);
+ 
+       await executeThunk(thunks.dismissWelcomeMessage(courseId), store.dispatch);
+diff --git a/src/course-home/dates-tab/DatesTab.test.jsx b/src/course-home/dates-tab/DatesTab.test.jsx
+index 62c9e19..46dd49d 100644
+--- a/src/course-home/dates-tab/DatesTab.test.jsx
++++ b/src/course-home/dates-tab/DatesTab.test.jsx
+@@ -46,8 +46,8 @@ describe('DatesTab', () => {
+   let courseMetadata = Factory.build('courseHomeMetadata');
+   const { id: courseId } = courseMetadata;
+ 
+-  const datesUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/dates/${courseId}`;
+-  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
++  const datesUrl = `${getConfig().LMS_BASE_URL}/api/course_home/dates/${courseId}`;
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+ 
+   function setMetadata(attributes, options) {
+diff --git a/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx b/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+new file mode 100644
+index 0000000..f4b21e9
+--- /dev/null
++++ b/src/course-home/goal-unsubscribe/GoalUnsubscribe.jsx
+@@ -0,0 +1,52 @@
++import { useEffect, useState } from 'react';
++import { useParams } from 'react-router-dom';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import { Header } from '../../course-header';
++import PageLoading from '../../generic/PageLoading';
++import { unsubscribeFromCourseGoal } from '../data/api';
++
++import messages from './messages';
++import ResultPage from './ResultPage';
++
++function GoalUnsubscribe({ intl }) {
++  const { token } = useParams();
++  const [error, setError] = useState(false);
++  const [isLoading, setIsLoading] = useState(true);
++  const [data, setData] = useState({});
++
++  // We don't need to bother with redux for this simple page. We're not sharing state with other pages at all.
++  useEffect(() => {
++    unsubscribeFromCourseGoal(token)
++      .then(
++        (result) => {
++          setIsLoading(false);
++          setData(result.data);
++        },
++        () => {
++          setIsLoading(false);
++          setError(true);
++        },
++      );
++  }, []); // deps=[] to only run once
++
++  return (
++    <>
++      <Header showUserDropdown={false} />
++      <main id="main-content" className="container my-5 text-center">
++        {isLoading && (
++          <PageLoading srMessage={`${intl.formatMessage(messages.loading)}`} />
++        )}
++        {!isLoading && (
++          <ResultPage error={error} courseTitle={data.courseTitle} />
++        )}
++      </main>
++    </>
++  );
++}
++
++GoalUnsubscribe.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(GoalUnsubscribe);
+diff --git a/src/course-home/goal-unsubscribe/GoalUnsubscribe.test.jsx b/src/course-home/goal-unsubscribe/GoalUnsubscribe.test.jsx
+new file mode 100644
+index 0000000..dc85835
+--- /dev/null
++++ b/src/course-home/goal-unsubscribe/GoalUnsubscribe.test.jsx
+@@ -0,0 +1,62 @@
++import React from 'react';
++import { Route } from 'react-router';
++import MockAdapter from 'axios-mock-adapter';
++import { getConfig, history } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { AppProvider } from '@edx/frontend-platform/react';
++import { render, screen } from '@testing-library/react';
++
++import GoalUnsubscribe from './GoalUnsubscribe';
++import { act, initializeMockApp } from '../../setupTest';
++import initializeStore from '../../store';
++import { UserMessagesProvider } from '../../generic/user-messages';
++
++initializeMockApp();
++jest.mock('@edx/frontend-platform/analytics');
++
++describe('GoalUnsubscribe', () => {
++  let axiosMock;
++  let store;
++  let component;
++  const unsubscribeUrl = `${getConfig().LMS_BASE_URL}/api/course_home/unsubscribe_from_course_goal/TOKEN`;
++
++  beforeEach(() => {
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++    store = initializeStore();
++    component = (
++      <AppProvider store={store}>
++        <UserMessagesProvider>
++          <Route path="/goal-unsubscribe/:token" component={GoalUnsubscribe} />
++        </UserMessagesProvider>
++      </AppProvider>
++    );
++    history.push('/goal-unsubscribe/TOKEN'); // so we can pull token from url
++  });
++
++  it('starts with a spinner', () => {
++    render(component);
++    expect(screen.getByRole('status')).toBeInTheDocument();
++  });
++
++  it('loads a real token', async () => {
++    const response = { course_title: 'My Sample Course' };
++    axiosMock.onPost(unsubscribeUrl).reply(200, response);
++    await act(async () => render(component));
++
++    expect(screen.getByText('You’ve unsubscribed from goal reminders')).toBeInTheDocument();
++    expect(screen.getByText(/your goal for My Sample Course/)).toBeInTheDocument();
++    expect(screen.getByRole('link', { name: 'Go to dashboard' }))
++      .toHaveAttribute('href', 'http://localhost:18000/dashboard');
++  });
++
++  it('loads a bad token with an error page', async () => {
++    axiosMock.onPost(unsubscribeUrl).reply(404, {});
++    await act(async () => render(component));
++
++    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
++    expect(screen.getByRole('link', { name: 'Go to dashboard' }))
++      .toHaveAttribute('href', 'http://localhost:18000/dashboard');
++    expect(screen.getByRole('link', { name: 'contact support' }))
++      .toHaveAttribute('href', 'http://localhost:18000/contact');
++  });
++});
+diff --git a/src/course-home/goal-unsubscribe/ResultPage.jsx b/src/course-home/goal-unsubscribe/ResultPage.jsx
+new file mode 100644
+index 0000000..23852de
+--- /dev/null
++++ b/src/course-home/goal-unsubscribe/ResultPage.jsx
+@@ -0,0 +1,58 @@
++import PropTypes from 'prop-types';
++import { getConfig } from '@edx/frontend-platform';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Button, Hyperlink } from '@edx/paragon';
++
++import messages from './messages';
++import { ReactComponent as UnsubscribeIcon } from './unsubscribe.svg';
++
++function ResultPage({ courseTitle, error, intl }) {
++  const errorDescription = (
++    <FormattedMessage
++      id="learning.goals.unsubscribe.errorDescription"
++      defaultMessage="We were unable to unsubscribe you from goal reminder emails. Please try again later or {contactSupport} for help."
++      values={{
++        contactSupport: (
++          <Hyperlink
++            className="text-reset"
++            style={{ textDecoration: 'underline' }}
++            destination={`${getConfig().CONTACT_URL}`}
++          >
++            {intl.formatMessage(messages.contactSupport)}
++          </Hyperlink>
++        ),
++      }}
++    />
++  );
++
++  const header = error
++    ? intl.formatMessage(messages.errorHeader)
++    : intl.formatMessage(messages.header);
++  const description = error
++    ? errorDescription
++    : intl.formatMessage(messages.description, { courseTitle });
++
++  return (
++    <>
++      <UnsubscribeIcon className="text-primary" alt="" />
++      <div role="heading" aria-level="1" className="h2">{header}</div>
++      <div>{description}</div>
++      <Button variant="brand" href={`${getConfig().LMS_BASE_URL}/dashboard`} className="mt-4">
++        {intl.formatMessage(messages.goToDashboard)}
++      </Button>
++    </>
++  );
++}
++
++ResultPage.defaultProps = {
++  courseTitle: null,
++  error: false,
++};
++
++ResultPage.propTypes = {
++  courseTitle: PropTypes.string,
++  error: PropTypes.bool,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(ResultPage);
+diff --git a/src/course-home/goal-unsubscribe/index.jsx b/src/course-home/goal-unsubscribe/index.jsx
+new file mode 100644
+index 0000000..3c8b672
+--- /dev/null
++++ b/src/course-home/goal-unsubscribe/index.jsx
+@@ -0,0 +1,3 @@
++import GoalUnsubscribe from './GoalUnsubscribe';
++
++export default GoalUnsubscribe;
+diff --git a/src/course-home/goal-unsubscribe/messages.js b/src/course-home/goal-unsubscribe/messages.js
+new file mode 100644
+index 0000000..db789df
+--- /dev/null
++++ b/src/course-home/goal-unsubscribe/messages.js
+@@ -0,0 +1,30 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  contactSupport: {
++    id: 'learning.goals.unsubscribe.contact',
++    defaultMessage: 'contact support',
++  },
++  description: {
++    id: 'learning.goals.unsubscribe.description',
++    defaultMessage: 'You will no longer receive email reminders about your goal for {courseTitle}.',
++  },
++  errorHeader: {
++    id: 'learning.goals.unsubscribe.errorHeader',
++    defaultMessage: 'Something went wrong',
++  },
++  goToDashboard: {
++    id: 'learning.goals.unsubscribe.goToDashboard',
++    defaultMessage: 'Go to dashboard',
++  },
++  header: {
++    id: 'learning.goals.unsubscribe.header',
++    defaultMessage: 'You’ve unsubscribed from goal reminders',
++  },
++  loading: {
++    id: 'learning.goals.unsubscribe.loading',
++    defaultMessage: 'Unsubscribing…',
++  },
++});
++
++export default messages;
+diff --git a/src/course-home/goal-unsubscribe/unsubscribe.svg b/src/course-home/goal-unsubscribe/unsubscribe.svg
+new file mode 100644
+index 0000000..68e720e
+--- /dev/null
++++ b/src/course-home/goal-unsubscribe/unsubscribe.svg
+@@ -0,0 +1,5 @@
++<svg width="167" height="153" viewBox="0 0 167 153" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path d="M140.25 25.5H12.75V127.5H140.25V25.5ZM127.5 46L76.5 77.875L25.5 46V38.25L76.5 70.125L127.5 38.25V46Z" fill="currentColor"/>
++<circle cx="134" cy="39" r="33" transform="rotate(-90 134 39)" fill="white"/>
++<path d="M134 11C118.544 11 106 23.544 106 39C106 54.456 118.544 67 134 67C149.456 67 162 54.456 162 39C162 23.544 149.456 11 134 11ZM134 61.4C121.624 61.4 111.6 51.376 111.6 39C111.6 33.82 113.364 29.06 116.332 25.28L147.72 56.668C143.94 59.636 139.18 61.4 134 61.4ZM151.668 52.72L120.28 21.332C124.06 18.364 128.82 16.6 134 16.6C146.376 16.6 156.4 26.624 156.4 39C156.4 44.18 154.636 48.94 151.668 52.72Z" fill="#D23228"/>
++</svg>
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index bc0a3b8..1fb00eb 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -24,11 +24,11 @@ describe('Outline Tab', () => {
+   let axiosMock;
+ 
+   const courseId = 'course-v1:edX+Test+run';
+-  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+   const enrollmentUrl = `${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`;
+-  const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/save_course_goal`;
+-  const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/outline/${courseId}`;
++  const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/save_course_goal`;
++  const outlineUrl = `${getConfig().LMS_BASE_URL}/api/course_home/outline/${courseId}`;
+   const proctoringInfoUrl = `${getConfig().LMS_BASE_URL}/api/edx_proctoring/v1/user_onboarding/status?is_learning_mfe=true&course_id=${encodeURIComponent(courseId)}`;
+ 
+   const store = initializeStore();
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index 2558b00..bdcd8df 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -20,9 +20,9 @@ describe('Progress Tab', () => {
+   let axiosMock;
+ 
+   const courseId = 'course-v1:edX+Test+run';
+-  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/course_metadata/${courseId}`;
+   courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
+-  const progressUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/*`);
++  const progressUrl = new RegExp(`${getConfig().LMS_BASE_URL}/api/course_home/progress/*`);
+ 
+   const store = initializeStore();
+   const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
+diff --git a/src/generic/PageLoading.jsx b/src/generic/PageLoading.jsx
+index d7a8129..1ffc783 100644
+--- a/src/generic/PageLoading.jsx
++++ b/src/generic/PageLoading.jsx
+@@ -1,6 +1,8 @@
+ import React, { Component } from 'react';
+ import PropTypes from 'prop-types';
+ 
++import { Spinner } from '@edx/paragon';
++
+ export default class PageLoading extends Component {
+   renderSrMessage() {
+     if (!this.props.srMessage) {
+@@ -23,9 +25,9 @@ export default class PageLoading extends Component {
+             height: '50vh',
+           }}
+         >
+-          <div className="spinner-border text-primary" role="status">
++          <Spinner animation="border" variant="primary" role="status">
+             {this.renderSrMessage()}
+-          </div>
++          </Spinner>
+         </div>
+       </div>
+     );
+diff --git a/src/index.jsx b/src/index.jsx
+index ff42d84..f25efc0 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -10,7 +10,7 @@ import React from 'react';
+ import ReactDOM from 'react-dom';
+ import { Switch } from 'react-router-dom';
+ 
+-import Footer, { messages as footerMessages } from '@edx/frontend-component-footer';
++import { messages as footerMessages } from '@edx/frontend-component-footer';
+ 
+ import appMessages from './i18n';
+ import { UserMessagesProvider } from './generic/user-messages';
+@@ -21,6 +21,7 @@ import { CourseExit } from './courseware/course/course-exit';
+ import CoursewareContainer from './courseware';
+ import CoursewareRedirectLandingPage from './courseware/CoursewareRedirectLandingPage';
+ import DatesTab from './course-home/dates-tab';
++import GoalUnsubscribe from './course-home/goal-unsubscribe';
+ import ProgressTab from './course-home/progress-tab/ProgressTab';
+ import { TabContainer } from './tab-page';
+ 
+@@ -33,6 +34,7 @@ subscribe(APP_READY, () => {
+     <AppProvider store={initializeStore()}>
+       <UserMessagesProvider>
+         <Switch>
++          <PageRoute exact path="/goal-unsubscribe/:token" component={GoalUnsubscribe} />
+           <PageRoute path="/redirect" component={CoursewareRedirectLandingPage} />
+           <PageRoute path="/course/:courseId/home">
+             <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
+@@ -73,7 +75,6 @@ subscribe(APP_READY, () => {
+             component={CoursewareContainer}
+           />
+         </Switch>
+-        <Footer />
+       </UserMessagesProvider>
+     </AppProvider>,
+     document.getElementById('root'),
+@@ -88,6 +89,7 @@ initialize({
+   handlers: {
+     config: () => {
+       mergeConfig({
++        CONTACT_URL: process.env.CONTACT_URL || null,
+         CREDENTIALS_BASE_URL: process.env.CREDENTIALS_BASE_URL || null,
+         ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
+         INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
+diff --git a/src/setupTest.js b/src/setupTest.js
+index 4fb05c6..2fb761b 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -73,6 +73,7 @@ export const authenticatedUser = {
+ 
+ export function initializeMockApp() {
+   mergeConfig({
++    CONTACT_URL: process.env.CONTACT_URL || null,
+     INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
+     STUDIO_BASE_URL: process.env.STUDIO_BASE_URL || null,
+     TWITTER_URL: process.env.TWITTER_URL || null,
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 3459827..b901b4d 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -5,7 +5,7 @@ import { Helmet } from 'react-helmet';
+ import { getConfig } from '@edx/frontend-platform';
+ import { useToggle } from '@edx/paragon';
+ 
+-import { Header, CourseTabsNavigation } from '../course-header';
++import { CourseTabsNavigation } from '../course-header';
+ import { useModel } from '../generic/model-store';
+ import { AlertList } from '../generic/user-messages';
+ import StreakModal from '../shared/streak-celebration';
+@@ -22,8 +22,6 @@ function LoadedTabPage({
+ }) {
+   const {
+     originalUserIsStaff,
+-    number,
+-    org,
+     tabs,
+     title,
+     celebrations,
+@@ -47,11 +45,6 @@ function LoadedTabPage({
+       <Helmet>
+         <title>{`${activeTab ? `${activeTab.title} | ` : ''}${title} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+-      <Header
+-        courseOrg={org}
+-        courseNumber={number}
+-        courseTitle={title}
+-      />
+       {originalUserIsStaff && (
+         <InstructorToolbar
+           courseId={courseId}
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index a84ad3a..4d2c5c6 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -4,6 +4,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useDispatch, useSelector } from 'react-redux';
+ import { Redirect } from 'react-router';
+ 
++import Footer from '@edx/frontend-component-footer';
+ import { Toast } from '@edx/paragon';
+ import { Header } from '../course-header';
+ import { getAccessDeniedRedirectUrl } from '../shared/access';
+@@ -31,7 +32,10 @@ function TabPage({ intl, ...props }) {
+   const dispatch = useDispatch();
+   const {
+     courseAccess,
++    number,
++    org,
+     start,
++    title,
+   } = useModel(metadataModel, courseId);
+ 
+   if (courseStatus === 'loading') {
+@@ -41,6 +45,7 @@ function TabPage({ intl, ...props }) {
+         <PageLoading
+           srMessage={intl.formatMessage(messages.loading)}
+         />
++        <Footer />
+       </>
+     );
+   }
+@@ -68,7 +73,13 @@ function TabPage({ intl, ...props }) {
+         >
+           {toastHeader}
+         </Toast>
++        <Header
++          courseOrg={org}
++          courseNumber={number}
++          courseTitle={title}
++        />
+         <LoadedTabPage {...props} />
++        <Footer />
+       </>
+     );
+   }
+@@ -80,6 +91,7 @@ function TabPage({ intl, ...props }) {
+       <p className="text-center py-5 mx-auto" style={{ maxWidth: '30em' }}>
+         {intl.formatMessage(messages.failure)}
+       </p>
++      <Footer />
+     </>
+   );
+ }
+-- 
+2.34.1
+

@@ -1,0 +1,32 @@
+From 1892edaade3fc8920acedf7ec9ee1df2a273ac1d Mon Sep 17 00:00:00 2001
+From: Muhammad Abdullah Waheed
+ <42172960+abdullahwaheed@users.noreply.github.com>
+Date: Wed, 28 Sep 2022 19:47:31 +0500
+Subject: [PATCH 0931/1021] refactor: updated renovate config to auto update
+ minor and patch versions of edx dependencies (#963)
+
+---
+ renovate.json | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/renovate.json b/renovate.json
+index 1733af4..b332af8 100644
+--- a/renovate.json
++++ b/renovate.json
+@@ -5,5 +5,12 @@
+   "patch": {
+     "automerge": true
+   },
+-  "rebaseStalePrs": true
++  "rebaseStalePrs": true,
++  "packageRules": [
++    {
++      "matchPackagePatterns": ["@edx"],
++      "matchUpdateTypes": ["minor", "patch"],
++      "automerge": true
++    }
++  ]
+ }
+-- 
+2.34.1
+

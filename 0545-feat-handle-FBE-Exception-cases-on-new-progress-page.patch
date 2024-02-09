@@ -1,0 +1,1186 @@
+From 377f780e852d9eb211bf3134c735e8c81c83a6b3 Mon Sep 17 00:00:00 2001
+From: Matthew Piatetsky <mpiatetsky@edx.org>
+Date: Tue, 20 Jul 2021 12:20:53 -0400
+Subject: [PATCH 0545/1021] feat: handle FBE Exception cases on new progress
+ page (#539)
+
+---
+ package-lock.json                             | 138 +++++-------------
+ package.json                                  |   2 +-
+ .../__factories__/progressTabData.factory.js  |   1 +
+ .../data/__snapshots__/redux.test.js.snap     |   7 +-
+ src/course-home/data/api.js                   |  20 ++-
+ src/course-home/data/slice.js                 |   5 -
+ src/course-home/progress-tab/ProgressTab.jsx  |   6 +-
+ .../progress-tab/ProgressTab.test.jsx         | 125 +++++++++++++++-
+ .../grades/course-grade/CourseGrade.jsx       |   9 +-
+ .../grades/course-grade/CourseGradeHeader.jsx |  16 +-
+ .../grades/course-grade/GradeBar.jsx          |   4 +-
+ .../grades/course-grade/GradeRangeTooltip.jsx |   4 +-
+ .../grades/detailed-grades/DetailedGrades.jsx |  14 +-
+ .../detailed-grades/DetailedGradesTable.jsx   |   3 +-
+ .../detailed-grades/SubsectionTitleCell.jsx   |  25 ++--
+ .../grade-summary/AssignmentTypeCell.jsx      |  18 ++-
+ .../DroppableAssignmentFootnote.jsx           |   4 +-
+ .../grade-summary/GradeSummaryHeader.jsx      |  13 +-
+ .../grade-summary/GradeSummaryTable.jsx       |  40 ++++-
+ .../progress-tab/grades/messages.js           |  16 +-
+ 20 files changed, 309 insertions(+), 161 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index ad9dce2..da0379a 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1447,9 +1447,9 @@
+       }
+     },
+     "@edx/paragon": {
+-      "version": "15.2.2",
+-      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-15.2.2.tgz",
+-      "integrity": "sha512-C4YMd4zjRalS8pPglpAvDnribrA/3x8XXcbyTq0Xwwotp9HSld2yndASczZGdjNcqG0b1gpmPdxkzx2kaogCiw==",
++      "version": "16.2.0",
++      "resolved": "https://registry.npmjs.org/@edx/paragon/-/paragon-16.2.0.tgz",
++      "integrity": "sha512-13xGUU+BezQ27NvR1gtm7YxbcborgUxX78PlUXjamSM3bqMt4LfviyxZjewyxBuevAF+Tj4PlLzKMLe3SkuwFw==",
+       "requires": {
+         "@fortawesome/fontawesome-svg-core": "^1.2.30",
+         "@fortawesome/free-solid-svg-icons": "^5.14.0",
+@@ -1470,7 +1470,6 @@
+         "react-responsive": "^6.1.1",
+         "react-table": "^7.6.1",
+         "react-transition-group": "^4.0.0",
+-        "sanitize-html": "^1.27.5",
+         "tabbable": "^4.0.0",
+         "uncontrollable": "7.2.1"
+       },
+@@ -3081,9 +3080,9 @@
+       }
+     },
+     "@types/react-transition-group": {
+-      "version": "4.4.1",
+-      "resolved": "https://registry.npmjs.org/@types/react-transition-group/-/react-transition-group-4.4.1.tgz",
+-      "integrity": "sha512-vIo69qKKcYoJ8wKCJjwSgCTM+z3chw3g18dkrDfVX665tMH7tmbDxEAnPdey4gTlwZz5QuHGzd+hul0OVZDqqQ==",
++      "version": "4.4.2",
++      "resolved": "https://registry.npmjs.org/@types/react-transition-group/-/react-transition-group-4.4.2.tgz",
++      "integrity": "sha512-KibDWL6nshuOJ0fu8ll7QnV/LVTo3PzQ9aCPnRUYPfX7eZohHwLIdNHj7pftanREzHNP4/nJa8oeM73uSiavMQ==",
+       "requires": {
+         "@types/react": "*"
+       }
+@@ -3592,6 +3591,7 @@
+       "version": "3.2.1",
+       "resolved": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-3.2.1.tgz",
+       "integrity": "sha512-VT0ZI6kZRdTh8YyJw3SMbYm/u+NqfsAxEpWO0Pf9sq8/e94WxxOpPKx9FR1FlyCtOVDNOQ+8ntlqFxiRc+r5qA==",
++      "dev": true,
+       "requires": {
+         "color-convert": "^1.9.0"
+       }
+@@ -5420,6 +5420,7 @@
+       "version": "2.4.2",
+       "resolved": "https://registry.npmjs.org/chalk/-/chalk-2.4.2.tgz",
+       "integrity": "sha512-Mti+f9lpJNcwF4tWV8/OrTTtF1gZi+f8FqlyAdouralcFWFQWF2+NgCHShjkCb+IFBLq9buZwE1xckQU4peSuQ==",
++      "dev": true,
+       "requires": {
+         "ansi-styles": "^3.2.1",
+         "escape-string-regexp": "^1.0.5",
+@@ -5430,6 +5431,7 @@
+           "version": "5.5.0",
+           "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-5.5.0.tgz",
+           "integrity": "sha512-QjVjwdXIt408MIiAqCX4oUKsgU2EqAGzs2Ppkm4aQYbjm+ZEWEcW4SfFNTr4uMNZma0ey4f5lgLrkB0aX0QMow==",
++          "dev": true,
+           "requires": {
+             "has-flag": "^3.0.0"
+           }
+@@ -5809,6 +5811,7 @@
+       "version": "1.9.3",
+       "resolved": "https://registry.npmjs.org/color-convert/-/color-convert-1.9.3.tgz",
+       "integrity": "sha512-QfAUtd+vFdAtFQcC8CCyYt1fYWxSqAiK2cSD6zDB8N3cpsEBAvRxp9zOGg6G/SHHJYAT88/az/IuDGALsNVbGg==",
++      "dev": true,
+       "requires": {
+         "color-name": "1.1.3"
+       }
+@@ -5816,7 +5819,8 @@
+     "color-name": {
+       "version": "1.1.3",
+       "resolved": "https://registry.npmjs.org/color-name/-/color-name-1.1.3.tgz",
+-      "integrity": "sha1-p9BVi9icQveV3UIyj3QIMcpTvCU="
++      "integrity": "sha1-p9BVi9icQveV3UIyj3QIMcpTvCU=",
++      "dev": true
+     },
+     "color-string": {
+       "version": "1.5.5",
+@@ -7084,37 +7088,12 @@
+         "csstype": "^3.0.2"
+       }
+     },
+-    "dom-serializer": {
+-      "version": "1.3.2",
+-      "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-1.3.2.tgz",
+-      "integrity": "sha512-5c54Bk5Dw4qAxNOI1pFEizPSjVsx5+bpJKmL2kPn8JhBUq2q09tTCa3mjijun2NfK78NMouDYNMBkOrPZiS+ig==",
+-      "requires": {
+-        "domelementtype": "^2.0.1",
+-        "domhandler": "^4.2.0",
+-        "entities": "^2.0.0"
+-      },
+-      "dependencies": {
+-        "domhandler": {
+-          "version": "4.2.0",
+-          "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-4.2.0.tgz",
+-          "integrity": "sha512-zk7sgt970kzPks2Bf+dwT/PLzghLnsivb9CcxkvR8Mzr66Olr0Ofd8neSbglHJHaHa2MadfoSdNlKYAaafmWfA==",
+-          "requires": {
+-            "domelementtype": "^2.2.0"
+-          }
+-        }
+-      }
+-    },
+     "domain-browser": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/domain-browser/-/domain-browser-1.2.0.tgz",
+       "integrity": "sha512-jnjyiM6eRyZl2H+W8Q/zLMA481hzi0eszAaBUzIVnmYVDBbnLxVNnfu1HgEBvCbL+71FrxMl3E6lpKH7Ge3OXA==",
+       "dev": true
+     },
+-    "domelementtype": {
+-      "version": "2.2.0",
+-      "resolved": "https://registry.npmjs.org/domelementtype/-/domelementtype-2.2.0.tgz",
+-      "integrity": "sha512-DtBMo82pv1dFtUmHyr48beiuq792Sxohr+8Hm9zoxklYPfa6n0Z3Byjj2IV7bmr2IyqClnqEQhfgHJJ5QF0R5A=="
+-    },
+     "domexception": {
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/domexception/-/domexception-2.0.1.tgz",
+@@ -7132,34 +7111,6 @@
+         }
+       }
+     },
+-    "domhandler": {
+-      "version": "3.3.0",
+-      "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-3.3.0.tgz",
+-      "integrity": "sha512-J1C5rIANUbuYK+FuFL98650rihynUOEzRLxW+90bKZRWB6A1X1Tf82GxR1qAWLyfNPRvjqfip3Q5tdYlmAa9lA==",
+-      "requires": {
+-        "domelementtype": "^2.0.1"
+-      }
+-    },
+-    "domutils": {
+-      "version": "2.7.0",
+-      "resolved": "https://registry.npmjs.org/domutils/-/domutils-2.7.0.tgz",
+-      "integrity": "sha512-8eaHa17IwJUPAiB+SoTYBo5mCdeMgdcAoXJ59m6DT1vw+5iLS3gNoqYaRowaBKtGVrOF1Jz4yDTgYKLK2kvfJg==",
+-      "requires": {
+-        "dom-serializer": "^1.0.1",
+-        "domelementtype": "^2.2.0",
+-        "domhandler": "^4.2.0"
+-      },
+-      "dependencies": {
+-        "domhandler": {
+-          "version": "4.2.0",
+-          "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-4.2.0.tgz",
+-          "integrity": "sha512-zk7sgt970kzPks2Bf+dwT/PLzghLnsivb9CcxkvR8Mzr66Olr0Ofd8neSbglHJHaHa2MadfoSdNlKYAaafmWfA==",
+-          "requires": {
+-            "domelementtype": "^2.2.0"
+-          }
+-        }
+-      }
+-    },
+     "dot-case": {
+       "version": "3.0.4",
+       "resolved": "https://registry.npmjs.org/dot-case/-/dot-case-3.0.4.tgz",
+@@ -7605,7 +7556,8 @@
+     "escape-string-regexp": {
+       "version": "1.0.5",
+       "resolved": "https://registry.npmjs.org/escape-string-regexp/-/escape-string-regexp-1.0.5.tgz",
+-      "integrity": "sha1-G2HAViGQqN/2rjuyzwIAyhMLhtQ="
++      "integrity": "sha1-G2HAViGQqN/2rjuyzwIAyhMLhtQ=",
++      "dev": true
+     },
+     "escodegen": {
+       "version": "2.0.0",
+@@ -9417,7 +9369,8 @@
+     "has-flag": {
+       "version": "3.0.0",
+       "resolved": "https://registry.npmjs.org/has-flag/-/has-flag-3.0.0.tgz",
+-      "integrity": "sha1-tdRU3CGZriJWmfNGfloH87lVuv0="
++      "integrity": "sha1-tdRU3CGZriJWmfNGfloH87lVuv0=",
++      "dev": true
+     },
+     "has-symbol-support-x": {
+       "version": "1.4.2",
+@@ -9718,17 +9671,6 @@
+         }
+       }
+     },
+-    "htmlparser2": {
+-      "version": "4.1.0",
+-      "resolved": "https://registry.npmjs.org/htmlparser2/-/htmlparser2-4.1.0.tgz",
+-      "integrity": "sha512-4zDq1a1zhE4gQso/c5LP1OtrhYTncXNSpvJYtWJBtXAETPlMfi3IFNjGuQbYLuVY4ZR0QMqRVvo4Pdy9KLyP8Q==",
+-      "requires": {
+-        "domelementtype": "^2.0.1",
+-        "domhandler": "^3.0.0",
+-        "domutils": "^2.0.0",
+-        "entities": "^2.0.0"
+-      }
+-    },
+     "http-cache-semantics": {
+       "version": "3.8.1",
+       "resolved": "https://registry.npmjs.org/http-cache-semantics/-/http-cache-semantics-3.8.1.tgz",
+@@ -14184,7 +14126,8 @@
+     "lodash": {
+       "version": "4.17.21",
+       "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz",
+-      "integrity": "sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg=="
++      "integrity": "sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==",
++      "dev": true
+     },
+     "lodash.assignin": {
+       "version": "4.2.0",
+@@ -15915,11 +15858,6 @@
+       "integrity": "sha1-bVuTSkVpk7I9N/QKOC1vFmao5cY=",
+       "dev": true
+     },
+-    "parse-srcset": {
+-      "version": "1.0.2",
+-      "resolved": "https://registry.npmjs.org/parse-srcset/-/parse-srcset-1.0.2.tgz",
+-      "integrity": "sha1-8r0iH2zJcKk42IVWq8WJyqqiveE="
+-    },
+     "parse5": {
+       "version": "6.0.1",
+       "resolved": "https://registry.npmjs.org/parse5/-/parse5-6.0.1.tgz",
+@@ -16269,6 +16207,7 @@
+       "version": "7.0.35",
+       "resolved": "https://registry.npmjs.org/postcss/-/postcss-7.0.35.tgz",
+       "integrity": "sha512-3QT8bBJeX/S5zKTTjTCIjRF3If4avAT6kqxcASlTWEtAFCb9NH0OUxNDfgZSWdP5fJnBYCMEWkIFfWeugjzYMg==",
++      "dev": true,
+       "requires": {
+         "chalk": "^2.4.2",
+         "source-map": "^0.6.1",
+@@ -17621,16 +17560,16 @@
+       "integrity": "sha512-rtGImPZ0YyLrscKI9xTpV8psd6I8VAtjKCzQDlzyDvqJA8XOW78TXYQwNRNd8g8JZnDu8q9Fu/1v4HPAVwVdHA=="
+     },
+     "react-focus-lock": {
+-      "version": "2.5.1",
+-      "resolved": "https://registry.npmjs.org/react-focus-lock/-/react-focus-lock-2.5.1.tgz",
+-      "integrity": "sha512-gOToRZKVEymGEjFaTRUKgJsdYQrNosoiK7yZnXnnd8bYew4vMzk3Rxb0Q4nyrGwsFuUmgQiSAulQirA0J+v4hA==",
++      "version": "2.5.2",
++      "resolved": "https://registry.npmjs.org/react-focus-lock/-/react-focus-lock-2.5.2.tgz",
++      "integrity": "sha512-WzpdOnEqjf+/A3EH9opMZWauag7gV0BxFl+EY4ElA4qFqYsUsBLnmo2sELbN5OC30S16GAWMy16B9DLPpdJKAQ==",
+       "requires": {
+         "@babel/runtime": "^7.0.0",
+         "focus-lock": "^0.9.1",
+         "prop-types": "^15.6.2",
+-        "react-clientside-effect": "^1.2.2",
+-        "use-callback-ref": "^1.2.1",
+-        "use-sidecar": "^1.0.1"
++        "react-clientside-effect": "^1.2.5",
++        "use-callback-ref": "^1.2.5",
++        "use-sidecar": "^1.0.5"
+       }
+     },
+     "react-focus-on": {
+@@ -17687,9 +17626,9 @@
+       "integrity": "sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA=="
+     },
+     "react-overlays": {
+-      "version": "5.1.0",
+-      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-5.1.0.tgz",
+-      "integrity": "sha512-Qp8dqDIIYgQoHxOGVKHwvQUkDe70/Ja/6dn8iCQAXyPvvpks3+T8scLTZLK8MPBBu+X8ustas6y4U6M6zdmCjA==",
++      "version": "5.1.1",
++      "resolved": "https://registry.npmjs.org/react-overlays/-/react-overlays-5.1.1.tgz",
++      "integrity": "sha512-eCN2s2/+GVZzpnId4XVWtvDPYYBD2EtOGP74hE+8yDskPzFy9+pV1H3ZZihxuRdEbQzzacySaaDkR7xE0ydl4Q==",
+       "requires": {
+         "@babel/runtime": "^7.13.8",
+         "@popperjs/core": "^2.8.6",
+@@ -17729,9 +17668,9 @@
+       }
+     },
+     "react-remove-scroll": {
+-      "version": "2.4.2",
+-      "resolved": "https://registry.npmjs.org/react-remove-scroll/-/react-remove-scroll-2.4.2.tgz",
+-      "integrity": "sha512-mMSIZYQF3jS2uRJXeFDRaVGA+BGs/hIryV64YUKsHFtpgwZloOUcdu0oW8K6OU8uLHt/kM5d0lUZbdpIVwgXtQ==",
++      "version": "2.4.3",
++      "resolved": "https://registry.npmjs.org/react-remove-scroll/-/react-remove-scroll-2.4.3.tgz",
++      "integrity": "sha512-lGWYXfV6jykJwbFpsuPdexKKzp96f3RbvGapDSIdcyGvHb7/eqyn46C7/6h+rUzYar1j5mdU+XECITHXCKBk9Q==",
+       "requires": {
+         "react-remove-scroll-bar": "^2.1.0",
+         "react-style-singleton": "^2.1.0",
+@@ -18749,17 +18688,6 @@
+         "walker": "~1.0.5"
+       }
+     },
+-    "sanitize-html": {
+-      "version": "1.27.5",
+-      "resolved": "https://registry.npmjs.org/sanitize-html/-/sanitize-html-1.27.5.tgz",
+-      "integrity": "sha512-M4M5iXDAUEcZKLXkmk90zSYWEtk5NH3JmojQxKxV371fnMh+x9t1rqdmXaGoyEHw3z/X/8vnFhKjGL5xFGOJ3A==",
+-      "requires": {
+-        "htmlparser2": "^4.1.0",
+-        "lodash": "^4.17.15",
+-        "parse-srcset": "^1.0.2",
+-        "postcss": "^7.0.27"
+-      }
+-    },
+     "sass": {
+       "version": "1.26.11",
+       "resolved": "https://registry.npmjs.org/sass/-/sass-1.26.11.tgz",
+@@ -19352,7 +19280,8 @@
+     "source-map": {
+       "version": "0.6.1",
+       "resolved": "https://registry.npmjs.org/source-map/-/source-map-0.6.1.tgz",
+-      "integrity": "sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g=="
++      "integrity": "sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==",
++      "dev": true
+     },
+     "source-map-loader": {
+       "version": "0.2.4",
+@@ -20106,6 +20035,7 @@
+       "version": "6.1.0",
+       "resolved": "https://registry.npmjs.org/supports-color/-/supports-color-6.1.0.tgz",
+       "integrity": "sha512-qe1jfm1Mg7Nq/NSh6XE24gPXROEVsWHxC1LIx//XNlD9iw7YZQGjZNjYN7xGaEG6iKdA8EtNFW6R0gjnVXp+wQ==",
++      "dev": true,
+       "requires": {
+         "has-flag": "^3.0.0"
+       }
+diff --git a/package.json b/package.json
+index d437bd0..6e733bd 100644
+--- a/package.json
++++ b/package.json
+@@ -40,7 +40,7 @@
+     "@edx/frontend-enterprise": "4.2.3",
+     "@edx/frontend-lib-special-exams": "1.9.0",
+     "@edx/frontend-platform": "1.11.0",
+-    "@edx/paragon": "15.2.2",
++    "@edx/paragon": "16.2.0",
+     "@fortawesome/fontawesome-svg-core": "1.2.34",
+     "@fortawesome/free-brands-svg-icons": "5.13.1",
+     "@fortawesome/free-regular-svg-icons": "5.13.1",
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+index 0ed0056..ab21a13 100644
+--- a/src/course-home/data/__factories__/progressTabData.factory.js
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -24,6 +24,7 @@ Factory.define('progressTabData')
+             assignment_type: 'Homework',
+             block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
+             display_name: 'First subsection',
++            learner_has_access: true,
+             has_graded_assignment: true,
+             num_points_earned: 0,
+             num_points_possible: 3,
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 81038a9..467ae8e 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -5,7 +5,6 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+-    "gradesFeatureIsLocked": false,
+     "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+@@ -302,7 +301,6 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+-    "gradesFeatureIsLocked": false,
+     "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+@@ -482,7 +480,6 @@ Object {
+   "courseHome": Object {
+     "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+     "courseStatus": "loaded",
+-    "gradesFeatureIsLocked": false,
+     "targetUserId": undefined,
+     "toastBodyLink": null,
+     "toastBodyText": null,
+@@ -564,7 +561,8 @@ Object {
+         "courseId": "course-v1:edX+DemoX+Demo_Course_1",
+         "end": "3027-03-31T00:00:00Z",
+         "enrollmentMode": "audit",
+-        "gradesFeatureIsLocked": false,
++        "gradesFeatureIsFullyLocked": false,
++        "gradesFeatureIsPartiallyLocked": false,
+         "gradingPolicy": Object {
+           "assignmentPolicies": Array [
+             Object {
+@@ -591,6 +589,7 @@ Object {
+                 "blockKey": "block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345",
+                 "displayName": "First subsection",
+                 "hasGradedAssignment": true,
++                "learnerHasAccess": true,
+                 "numPointsEarned": 0,
+                 "numPointsPossible": 3,
+                 "percentGraded": 0,
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 128a859..ae0858d 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -245,7 +245,25 @@ export async function getProgressTabData(courseId, targetUserId) {
+     // in order to preserve a course team's desired grade formatting.
+     camelCasedData.gradingPolicy.gradeRange = data.grading_policy.grade_range;
+ 
+-    camelCasedData.gradesFeatureIsLocked = camelCasedData.completionSummary.lockedCount > 0;
++    camelCasedData.gradesFeatureIsFullyLocked = camelCasedData.completionSummary.lockedCount > 0;
++
++    camelCasedData.gradesFeatureIsPartiallyLocked = false;
++    if (camelCasedData.gradesFeatureIsFullyLocked) {
++      camelCasedData.sectionScores.forEach((chapter) => {
++        chapter.subsections.forEach((subsection) => {
++          // If something is eligible to be gated by content type gating and would show up on the progress page
++          if (subsection.assignmentType !== null && subsection.hasGradedAssignment && subsection.showGrades
++            && (subsection.numPointsPossible > 0 || subsection.numPointsEarned > 0)) {
++            // but the learner still has access to it, then we are in a partially locked, rather than fully locked state
++            // since the learner has access to some (but not all) content that would normally be locked
++            if (subsection.learnerHasAccess) {
++              camelCasedData.gradesFeatureIsPartiallyLocked = true;
++              camelCasedData.gradesFeatureIsFullyLocked = false;
++            }
++          }
++        });
++      });
++    }
+ 
+     return camelCasedData;
+   } catch (error) {
+diff --git a/src/course-home/data/slice.js b/src/course-home/data/slice.js
+index 4534887..adb2097 100644
+--- a/src/course-home/data/slice.js
++++ b/src/course-home/data/slice.js
+@@ -10,7 +10,6 @@ const slice = createSlice({
+   initialState: {
+     courseStatus: 'loading',
+     courseId: null,
+-    gradesFeatureIsLocked: false,
+     toastBodyText: null,
+     toastBodyLink: null,
+     toastHeader: '',
+@@ -39,9 +38,6 @@ const slice = createSlice({
+       state.toastBodyText = linkText;
+       state.toastHeader = header;
+     },
+-    setGradesFeatureStatus: (state, { payload }) => {
+-      state.gradesFeatureIsLocked = payload.gradesFeatureIsLocked;
+-    },
+   },
+ });
+ 
+@@ -50,7 +46,6 @@ export const {
+   fetchTabSuccess,
+   fetchTabFailure,
+   setCallToActionToast,
+-  setGradesFeatureStatus,
+ } = slice.actions;
+ 
+ export const {
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index db3935a..d9a22c4 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -18,10 +18,10 @@ function ProgressTab() {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+ 
+-  const applyLockedOverlay = gradesFeatureIsLocked ? 'locked-overlay' : '';
++  const applyLockedOverlay = gradesFeatureIsFullyLocked ? 'locked-overlay' : '';
+ 
+   const layout = layoutGenerator({
+     mobile: 0,
+@@ -41,7 +41,7 @@ function ProgressTab() {
+             <CertificateStatus />
+           </OnMobile>
+           <CourseGrade />
+-          <div className={`grades my-4 p-4 rounded shadow-sm ${applyLockedOverlay}`} aria-hidden={gradesFeatureIsLocked}>
++          <div className={`grades my-4 p-4 rounded shadow-sm ${applyLockedOverlay}`} aria-hidden={gradesFeatureIsFullyLocked}>
+             <GradeSummary />
+             <DetailedGrades />
+           </div>
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+index dbde50f..128e382 100644
+--- a/src/course-home/progress-tab/ProgressTab.test.jsx
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -111,6 +111,7 @@ describe('Progress Tab', () => {
+                 assignment_type: 'Homework',
+                 block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
+                 display_name: 'First subsection',
++                learner_has_access: true,
+                 has_graded_assignment: true,
+                 num_points_earned: 1,
+                 num_points_possible: 2,
+@@ -176,6 +177,7 @@ describe('Progress Tab', () => {
+                 assignment_type: 'Homework',
+                 block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
+                 display_name: 'First subsection',
++                learner_has_access: true,
+                 has_graded_assignment: true,
+                 num_points_earned: 8,
+                 num_points_possible: 10,
+@@ -252,6 +254,26 @@ describe('Progress Tab', () => {
+           sku: 'ABCD1234',
+           upgrade_url: 'edx.org/upgrade',
+         },
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++                display_name: 'First subsection',
++                learner_has_access: false,
++                has_graded_assignment: true,
++                num_points_earned: 8,
++                num_points_possible: 10,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++              },
++            ],
++          },
++        ],
+       });
+       await fetchAndRender();
+       expect(screen.getByText('locked feature')).toBeInTheDocument();
+@@ -275,6 +297,26 @@ describe('Progress Tab', () => {
+           sku: 'ABCD1234',
+           upgrade_url: 'edx.org/upgrade',
+         },
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++                display_name: 'First subsection',
++                learner_has_access: false,
++                has_graded_assignment: true,
++                num_points_earned: 8,
++                num_points_possible: 10,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++              },
++            ],
++          },
++        ],
+       });
+       await fetchAndRender();
+       expect(screen.getByText('locked feature')).toBeInTheDocument();
+@@ -298,6 +340,26 @@ describe('Progress Tab', () => {
+           incomplete_count: 1,
+           locked_count: 1,
+         },
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
++                display_name: 'First subsection',
++                learner_has_access: false,
++                has_graded_assignment: true,
++                num_points_earned: 1,
++                num_points_possible: 2,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++              },
++            ],
++          },
++        ],
+       });
+       await fetchAndRender();
+       expect(screen.getByText('locked feature')).toBeInTheDocument();
+@@ -309,6 +371,62 @@ describe('Progress Tab', () => {
+       expect(screen.queryByText('locked feature')).not.toBeInTheDocument();
+     });
+ 
++    it('renders limited feature preview with upgrade button when user has access to some content that would typically be locked', async () => {
++      setTabData({
++        completion_summary: {
++          complete_count: 1,
++          incomplete_count: 1,
++          locked_count: 1,
++        },
++        verified_mode: {
++          access_expiration_date: '2050-01-01T12:00:00',
++          currency: 'USD',
++          currency_symbol: '$',
++          price: 149,
++          sku: 'ABCD1234',
++          upgrade_url: 'edx.org/upgrade',
++        },
++        section_scores: [
++          {
++            display_name: 'First section',
++            subsections: [
++              {
++                assignment_type: 'Homework',
++                block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@123456',
++                display_name: 'First subsection',
++                learner_has_access: false,
++                has_graded_assignment: true,
++                num_points_earned: 8,
++                num_points_possible: 10,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++              },
++              {
++                assignment_type: 'Exam',
++                display_name: 'Second subsection',
++                learner_has_access: true,
++                has_graded_assignment: true,
++                num_points_earned: 1,
++                num_points_possible: 1,
++                percent_graded: 1.0,
++                show_correctness: 'always',
++                show_grades: true,
++                url: 'http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection',
++              },
++            ],
++          },
++        ],
++      });
++      await fetchAndRender();
++      expect(screen.getByText('limited feature')).toBeInTheDocument();
++      expect(screen.getByText('Unlock to work towards a certificate.')).toBeInTheDocument();
++      expect(screen.queryAllByText('You have limited access to graded assignments as part of the audit track in this course.')).toHaveLength(2);
++
++      expect(screen.queryAllByTestId('blocked-icon')).toHaveLength(4);
++    });
++
+     it('renders correct current grade tooltip when showGrades is false', async () => {
+       // The learner has a 50% on the first assignment and a 100% on the second, making their grade a 75%
+       // The second assignment has showGrades set to false, so the grade reflected to the learner should be 50%.
+@@ -321,6 +439,7 @@ describe('Progress Tab', () => {
+                 assignment_type: 'Homework',
+                 block_key: 'block-v1:edX+DemoX+Demo_Course+type@sequential+block@12345',
+                 display_name: 'First subsection',
++                learner_has_access: true,
+                 has_graded_assignment: true,
+                 num_points_earned: 1,
+                 num_points_possible: 2,
+@@ -337,6 +456,7 @@ describe('Progress Tab', () => {
+               {
+                 assignment_type: 'Homework',
+                 display_name: 'Second subsection',
++                learner_has_access: true,
+                 has_graded_assignment: true,
+                 num_points_earned: 1,
+                 num_points_possible: 1,
+@@ -531,6 +651,7 @@ describe('Progress Tab', () => {
+               {
+                 assignment_type: 'Homework',
+                 display_name: 'Second subsection',
++                learner_has_access: true,
+                 has_graded_assignment: true,
+                 num_points_earned: 1,
+                 num_points_possible: 1,
+@@ -554,8 +675,8 @@ describe('Progress Tab', () => {
+       await fetchAndRender();
+       expect(screen.getByText('Detailed grades')).toBeInTheDocument();
+ 
+-      expect(screen.getByRole('link', { name: 'First subsection' }));
+-      expect(screen.getByRole('link', { name: 'Second subsection' }));
++      expect(screen.getByText('First subsection'));
++      expect(screen.getByText('Second subsection'));
+     });
+ 
+     it('sends event on click of subsection link', async () => {
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+index 5b113dc..c350296 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGrade.jsx
+@@ -16,7 +16,8 @@ function CourseGrade({ intl }) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
++    gradesFeatureIsPartiallyLocked,
+     gradingPolicy: {
+       gradeRange,
+     },
+@@ -24,12 +25,12 @@ function CourseGrade({ intl }) {
+ 
+   const passingGrade = Number((Math.min(...Object.values(gradeRange)) * 100).toFixed(0));
+ 
+-  const applyLockedOverlay = gradesFeatureIsLocked ? 'locked-overlay' : '';
++  const applyLockedOverlay = gradesFeatureIsFullyLocked ? 'locked-overlay' : '';
+ 
+   return (
+     <section className="text-dark-700 my-4 rounded shadow-sm">
+-      {gradesFeatureIsLocked && <CourseGradeHeader />}
+-      <div className={applyLockedOverlay} aria-hidden={gradesFeatureIsLocked}>
++      {(gradesFeatureIsFullyLocked || gradesFeatureIsPartiallyLocked) && <CourseGradeHeader />}
++      <div className={applyLockedOverlay} aria-hidden={gradesFeatureIsFullyLocked}>
+         <div className="row w-100 m-0 p-4">
+           <div className="col-12 col-sm-6 p-0 pr-sm-2">
+             <h2>{intl.formatMessage(messages.grades)}</h2>
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+index 4512848..79b5b71 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeHeader.jsx
+@@ -19,6 +19,7 @@ function CourseGradeHeader({ intl }) {
+   } = useModel('courseHomeMeta', courseId);
+   const {
+     verifiedMode,
++    gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+ 
+   const { administrator } = getAuthenticatedUser();
+@@ -29,6 +30,14 @@ function CourseGradeHeader({ intl }) {
+       is_staff: administrator,
+     });
+   };
++  let previewText;
++  if (verifiedMode) {
++    previewText = gradesFeatureIsFullyLocked
++      ? intl.formatMessage(messages.courseGradePreviewUnlockCertificateBody)
++      : intl.formatMessage(messages.courseGradePartialPreviewUnlockCertificateBody);
++  } else {
++    previewText = intl.formatMessage(messages.courseGradePreviewUpgradeDeadlinePassedBody);
++  }
+   return (
+     <div className="row w-100 m-0 p-4 rounded-top bg-primary-500 text-white">
+       <div className={`col-12 ${verifiedMode ? 'col-md-9' : ''} p-0`}>
+@@ -40,13 +49,14 @@ function CourseGradeHeader({ intl }) {
+             <span aria-hidden="true">
+               {intl.formatMessage(messages.courseGradePreviewHeaderAriaHidden)}
+             </span>
+-            {intl.formatMessage(messages.courseGradePreviewHeader)}
++            {gradesFeatureIsFullyLocked
++              ? intl.formatMessage(messages.courseGradePreviewHeaderLocked)
++              : intl.formatMessage(messages.courseGradePreviewHeaderLimited)}
+           </div>
+         </div>
+         <div className="row w-100 m-0 p-0 justify-content-end">
+           <div className="col-11 px-2 p-sm-0 small">
+-            {verifiedMode ? intl.formatMessage(messages.courseGradePreviewUnlockCertificateBody)
+-              : intl.formatMessage(messages.courseGradePreviewUpgradeDeadlinePassedBody)}
++            {previewText}
+           </div>
+         </div>
+       </div>
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index 6f5f2d2..01e5c10 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -19,12 +19,12 @@ function GradeBar({ intl, passingGrade }) {
+       isPassing,
+       visiblePercent,
+     },
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+ 
+   const currentGrade = Number((visiblePercent * 100).toFixed(0));
+ 
+-  const lockedTooltipClassName = gradesFeatureIsLocked ? 'locked-overlay' : '';
++  const lockedTooltipClassName = gradesFeatureIsFullyLocked ? 'locked-overlay' : '';
+ 
+   return (
+     <div className="col-12 col-sm-6 align-self-center">
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+index e177857..e983d96 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeRangeTooltip.jsx
+@@ -17,7 +17,7 @@ function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+   } = useSelector(state => state.courseHome);
+ 
+   const {
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
+     gradingPolicy: {
+       gradeRange,
+     },
+@@ -68,7 +68,7 @@ function GradeRangeTooltip({ intl, iconButtonClassName, passingGrade }) {
+         src={InfoOutline}
+         iconAs={Icon}
+         size="inline"
+-        disabled={gradesFeatureIsLocked}
++        disabled={gradesFeatureIsFullyLocked}
+       />
+     </OverlayTrigger>
+   );
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 7550d13..9a5a0a5 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -5,7 +5,8 @@ import { getConfig } from '@edx/frontend-platform';
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import { Hyperlink } from '@edx/paragon';
++import { Blocked } from '@edx/paragon/icons';
++import { Icon, Hyperlink } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+ 
+ import DetailedGradesTable from './DetailedGradesTable';
+@@ -21,7 +22,8 @@ function DetailedGrades({ intl }) {
+     org,
+   } = useModel('courseHomeMeta', courseId);
+   const {
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
++    gradesFeatureIsPartiallyLocked,
+     sectionScores,
+   } = useModel('progress', courseId);
+ 
+@@ -40,7 +42,7 @@ function DetailedGrades({ intl }) {
+       className="muted-link inline-link"
+       destination={`${getConfig().LMS_BASE_URL}/courses/${courseId}/course`}
+       onClick={logOutlineLinkClick}
+-      tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
++      tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+     >
+       {intl.formatMessage(messages.courseOutline)}
+     </Hyperlink>
+@@ -49,6 +51,12 @@ function DetailedGrades({ intl }) {
+   return (
+     <section className="text-dark-700">
+       <h3 className="h4 mb-3">{intl.formatMessage(messages.detailedGrades)}</h3>
++      {gradesFeatureIsPartiallyLocked && (
++        <div className="mb-3 small row ml-0">
++          <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />
++          {intl.formatMessage(messages.gradeSummaryLimitedAccessExplanation)}
++        </div>
++      )}
+       {hasSectionScores && (
+         <DetailedGradesTable />
+       )}
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index f83c618..e9d5e36 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -12,6 +12,7 @@ function DetailedGradesTable({ intl }) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
++
+   const {
+     sectionScores,
+   } = useModel('progress', courseId);
+@@ -31,7 +32,7 @@ function DetailedGradesTable({ intl }) {
+ 
+       const detailedGradesData = subsectionScores.map((subsection) => ({
+         subsectionTitle: <SubsectionTitleCell subsection={subsection} />,
+-        score: `${subsection.numPointsEarned}/${subsection.numPointsPossible}`,
++        score: <span className={subsection.learnerHasAccess ? '' : 'locked-overlay'}>{subsection.numPointsEarned}/{subsection.numPointsPossible}</span>,
+       }));
+ 
+       return (
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+index 4cf780e..e4cab4e 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+@@ -6,7 +6,7 @@ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { Collapsible, Icon, Row } from '@edx/paragon';
+-import { ArrowDropDown, ArrowDropUp } from '@edx/paragon/icons';
++import { ArrowDropDown, ArrowDropUp, Blocked } from '@edx/paragon/icons';
+ 
+ import messages from '../messages';
+ import { useModel } from '../../../../generic/model-store';
+@@ -20,7 +20,7 @@ function SubsectionTitleCell({ intl, subsection }) {
+     org,
+   } = useModel('courseHomeMeta', courseId);
+   const {
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+ 
+   const {
+@@ -46,19 +46,22 @@ function SubsectionTitleCell({ intl, subsection }) {
+         <Collapsible.Trigger
+           className="mr-1"
+           aria-label={intl.formatMessage(messages.problemScoreToggleAltText, { subsectionTitle: displayName })}
+-          tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
++          tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+         >
+           <Collapsible.Visible whenClosed><Icon src={ArrowDropDown} /></Collapsible.Visible>
+           <Collapsible.Visible whenOpen><Icon src={ArrowDropUp} /></Collapsible.Visible>
+         </Collapsible.Trigger>
+-        <a
+-          href={url}
+-          className="muted-link small"
+-          onClick={logSubsectionClicked}
+-          tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
+-        >
+-          {displayName}
+-        </a>
++        <span className="small row ml-0">
++          {gradesFeatureIsFullyLocked || subsection.learnerHasAccess ? '' : <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />}
++          <a
++            href={url}
++            className="muted-link small"
++            onClick={logSubsectionClicked}
++            tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
++          >
++            {displayName}
++          </a>
++        </span>
+       </Row>
+       <Collapsible.Body>
+         <ProblemScoreDrawer problemScores={problemScores} />
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+index 064248e..6a16638 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -1,18 +1,26 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import PropTypes from 'prop-types';
++import { Blocked } from '@edx/paragon/icons';
++import { Icon } from '@edx/paragon';
+ import { useModel } from '../../../../generic/model-store';
+ 
+-function AssignmentTypeCell({ assignmentType, footnoteMarker, footnoteId }) {
++function AssignmentTypeCell({
++  assignmentType, footnoteMarker, footnoteId, locked,
++}) {
+   const {
+     courseId,
+   } = useSelector(state => state.courseHome);
++
+   const {
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
++
++  const lockedIcon = locked ? <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" /> : '';
++
+   return (
+     <div className="small">
+-      {assignmentType}
++      <span className="d-inline-flex">{lockedIcon}{assignmentType}</span>
+       {footnoteId && footnoteMarker && (
+         <sup>
+           <a
+@@ -20,7 +28,7 @@ function AssignmentTypeCell({ assignmentType, footnoteMarker, footnoteId }) {
+             className="muted-link"
+             href={`#${footnoteId}-footnote`}
+             aria-describedby="grade-summary-footnote-label"
+-            tabIndex={gradesFeatureIsLocked ? '-1' : '0'}
++            tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+           >
+             {footnoteMarker}
+           </a>
+@@ -34,11 +42,13 @@ AssignmentTypeCell.propTypes = {
+   assignmentType: PropTypes.string.isRequired,
+   footnoteId: PropTypes.string,
+   footnoteMarker: PropTypes.number,
++  locked: PropTypes.bool,
+ };
+ 
+ AssignmentTypeCell.defaultProps = {
+   footnoteId: '',
+   footnoteMarker: null,
++  locked: false,
+ };
+ 
+ export default AssignmentTypeCell;
+diff --git a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+index 660d548..56d1a73 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/DroppableAssignmentFootnote.jsx
+@@ -12,7 +12,7 @@ function DroppableAssignmentFootnote({ footnotes, intl }) {
+     courseId,
+   } = useSelector(state => state.courseHome);
+   const {
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+   return (
+     <>
+@@ -29,7 +29,7 @@ function DroppableAssignmentFootnote({ footnotes, intl }) {
+                 assignmentType: footnote.assignmentType,
+               }}
+             />
+-            <a className="sr-only" href={`#${footnote.id}-ref`} tabIndex={gradesFeatureIsLocked ? '-1' : '0'}>
++            <a className="sr-only" href={`#${footnote.id}-ref`} tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}>
+               {intl.formatMessage(messages.backToContent)}
+             </a>
+           </li>
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+index 4c021a1..e2b355c 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+@@ -5,7 +5,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import {
+   Icon, IconButton, OverlayTrigger, Popover,
+ } from '@edx/paragon';
+-import { InfoOutline } from '@edx/paragon/icons';
++import { Blocked, InfoOutline } from '@edx/paragon/icons';
+ 
+ import messages from '../messages';
+ import { useModel } from '../../../../generic/model-store';
+@@ -15,7 +15,8 @@ function GradeSummaryHeader({ intl }) {
+     courseId,
+   } = useSelector(state => state.courseHome);
+   const {
+-    gradesFeatureIsLocked,
++    gradesFeatureIsFullyLocked,
++    gradesFeatureIsPartiallyLocked,
+   } = useModel('progress', courseId);
+   const [showTooltip, setShowTooltip] = useState(false);
+   return (
+@@ -41,9 +42,15 @@ function GradeSummaryHeader({ intl }) {
+           iconAs={Icon}
+           className="mb-3"
+           size="sm"
+-          disabled={gradesFeatureIsLocked}
++          disabled={gradesFeatureIsFullyLocked}
+         />
+       </OverlayTrigger>
++      {gradesFeatureIsPartiallyLocked && (
++        <div className="mb-3 small row ml-0">
++          <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />
++          {intl.formatMessage(messages.gradeSummaryLimitedAccessExplanation)}
++        </div>
++      )}
+     </div>
+   );
+ }
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index 09a0edb..670e447 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -20,6 +20,8 @@ function GradeSummaryTable({ intl }) {
+     gradingPolicy: {
+       assignmentPolicies,
+     },
++    gradesFeatureIsFullyLocked,
++    sectionScores,
+   } = useModel('progress', courseId);
+ 
+   const footnotes = [];
+@@ -29,6 +31,19 @@ function GradeSummaryTable({ intl }) {
+     return footnoteId.replace(/[^A-Za-z0-9.-_]+/g, '-');
+   };
+ 
++  const hasNoAccessToAssignmentsOfType = (assignmentType) => {
++    const subsectionAssignmentsOfType = sectionScores.map((chapter) => chapter.subsections.filter((subsection) => (
++      subsection.assignmentType === assignmentType && subsection.hasGradedAssignment
++      && (subsection.numPointsPossible > 0 || subsection.numPointsEarned > 0)
++    ))).flat();
++    if (subsectionAssignmentsOfType.length) {
++      return !subsectionAssignmentsOfType.some((subsection) => (
++        subsection.learnerHasAccess === true
++      ));
++    }
++    return false;
++  };
++
+   const gradeSummaryData = assignmentPolicies.map((assignment) => {
+     let footnoteId = '';
+     let footnoteMarker;
+@@ -44,11 +59,15 @@ function GradeSummaryTable({ intl }) {
+       footnoteMarker = footnotes.length;
+     }
+ 
++    const locked = !gradesFeatureIsFullyLocked && hasNoAccessToAssignmentsOfType(assignment.type) ? 'locked-overlay' : '';
++
+     return {
+-      type: { footnoteId, footnoteMarker, type: assignment.type },
+-      weight: `${(assignment.weight * 100).toFixed(0)}%`,
+-      grade: `${(assignment.averageGrade * 100).toFixed(0)}%`,
+-      weightedGrade: `${(assignment.weightedGrade * 100).toFixed(0)}%`,
++      type: {
++        footnoteId, footnoteMarker, type: assignment.type, locked,
++      },
++      weight: { weight: `${(assignment.weight * 100).toFixed(0)}%`, locked },
++      grade: { grade: `${(assignment.averageGrade * 100).toFixed(0)}%`, locked },
++      weightedGrade: { weightedGrade: `${(assignment.weightedGrade * 100).toFixed(0)}%`, locked },
+     };
+   });
+ 
+@@ -67,6 +86,7 @@ function GradeSummaryTable({ intl }) {
+                 assignmentType={value.type} // eslint-disable-line react/prop-types
+                 footnoteId={value.footnoteId} // eslint-disable-line react/prop-types
+                 footnoteMarker={value.footnoteMarker} // eslint-disable-line react/prop-types
++                locked={value.locked} // eslint-disable-line react/prop-types
+               />
+             ),
+             headerClassName: 'h5 mb-0',
+@@ -75,18 +95,30 @@ function GradeSummaryTable({ intl }) {
+             Header: `${intl.formatMessage(messages.weight)}`,
+             accessor: 'weight',
+             headerClassName: 'justify-content-end h5 mb-0',
++            // eslint-disable-next-line react/prop-types
++            Cell: ({ value }) => (
++              <span className={value.locked ? 'locked-overlay' : ''}>{value.weight}</span> // eslint-disable-line react/prop-types
++            ),
+             cellClassName: 'float-right small',
+           },
+           {
+             Header: `${intl.formatMessage(messages.grade)}`,
+             accessor: 'grade',
+             headerClassName: 'justify-content-end h5 mb-0',
++            // eslint-disable-next-line react/prop-types
++            Cell: ({ value }) => (
++              <span className={value.locked ? 'locked-overlay' : ''}>{value.grade}</span> // eslint-disable-line react/prop-types
++            ),
+             cellClassName: 'float-right small',
+           },
+           {
+             Header: `${intl.formatMessage(messages.weightedGrade)}`,
+             accessor: 'weightedGrade',
+             headerClassName: 'justify-content-end h5 mb-0 text-right',
++            // eslint-disable-next-line react/prop-types
++            Cell: ({ value }) => (
++              <span className={value.locked ? 'locked-overlay' : ''}>{value.weightedGrade}</span> // eslint-disable-line react/prop-types
++            ),
+             cellClassName: 'float-right font-weight-bold small',
+           },
+         ]}
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 37b581a..652684c 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -29,10 +29,14 @@ const messages = defineMessages({
+     id: 'progress.courseGrade.footer.passing',
+     defaultMessage: 'You’re currently passing this course with a grade of {letterGrade} ({minGrade}-{maxGrade}%)',
+   },
+-  courseGradePreviewHeader: {
+-    id: 'progress.courseGrade.preview.header',
++  courseGradePreviewHeaderLocked: {
++    id: 'progress.courseGrade.preview.headerLocked',
+     defaultMessage: 'locked feature',
+   },
++  courseGradePreviewHeaderLimited: {
++    id: 'progress.courseGrade.preview.headerLimited',
++    defaultMessage: 'limited feature',
++  },
+   courseGradePreviewHeaderAriaHidden: {
+     id: 'progress.courseGrade.preview.header.ariaHidden',
+     defaultMessage: 'Preview of a ',
+@@ -41,6 +45,10 @@ const messages = defineMessages({
+     id: 'progress.courseGrade.preview.body.unlockCertificate',
+     defaultMessage: 'Unlock to view grades and work towards a certificate.',
+   },
++  courseGradePartialPreviewUnlockCertificateBody: {
++    id: 'progress.courseGrade.partialpreview.body.unlockCertificate',
++    defaultMessage: 'Unlock to work towards a certificate.',
++  },
+   courseGradePreviewUpgradeDeadlinePassedBody: {
+     id: 'progress.courseGrade.preview.body.upgradeDeadlinePassed',
+     defaultMessage: 'The deadline to upgrade in this course has passed.',
+@@ -89,6 +97,10 @@ const messages = defineMessages({
+     id: 'progress.gradeSummary',
+     defaultMessage: 'Grade summary',
+   },
++  gradeSummaryLimitedAccessExplanation: {
++    id: 'progress.gradeSummary.limitedAccessExplanation',
++    defaultMessage: 'You have limited access to graded assignments as part of the audit track in this course.',
++  },
+   gradeSummaryTooltipAlt: {
+     id: 'progress.gradeSummary.tooltip.alt',
+     defaultMessage: 'Grade summary tooltip',
+-- 
+2.34.1
+

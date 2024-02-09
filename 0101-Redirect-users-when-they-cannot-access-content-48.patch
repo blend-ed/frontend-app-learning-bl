@@ -1,0 +1,100 @@
+From 1cc7dc266b2056ff5eaacf89dfdf55d92a3067ca Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Wed, 15 Apr 2020 12:56:51 -0400
+Subject: [PATCH 0101/1021] Redirect users when they cannot access content
+ (#48)
+
+TNL-7171, TNL-7172, TNL-7173, TNL-7174: When a user is denied access to load courseware, redirect them to the appropriate location based upon the error code returned. If the error code is unknown they will be redirected to course home.
+---
+ src/CoursewareRedirect.jsx             |  6 ++++++
+ src/courseware/CoursewareContainer.jsx | 20 ++++++++++++++++++--
+ src/data/api.js                        |  3 +--
+ src/data/thunks.js                     |  2 +-
+ 4 files changed, 26 insertions(+), 5 deletions(-)
+
+diff --git a/src/CoursewareRedirect.jsx b/src/CoursewareRedirect.jsx
+index f1647be..d6bba65 100644
+--- a/src/CoursewareRedirect.jsx
++++ b/src/CoursewareRedirect.jsx
+@@ -24,6 +24,12 @@ export default () => {
+             global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${match.params.courseId}/course/`);
+           }}
+         />
++        <Route
++          path={`${path}/dashboard`}
++          render={({ location }) => {
++            global.location.assign(`${getConfig().LMS_BASE_URL}/dashboard${location.search}`);
++          }}
++        />
+       </Switch>
+     </div>
+   );
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 19b8636..8486903 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -2,7 +2,7 @@ import React, { useEffect, useCallback } from 'react';
+ import PropTypes from 'prop-types';
+ import { useSelector, useDispatch } from 'react-redux';
+ import { history } from '@edx/frontend-platform';
+-
++import { getLocale } from '@edx/frontend-platform/i18n';
+ import { useRouteMatch, Redirect } from 'react-router';
+ import {
+   fetchCourse,
+@@ -162,8 +162,24 @@ export default function CoursewareContainer() {
+   useExamRedirect(sequenceId);
+   useSavedSequencePosition(courseId, sequenceId, routeUnitId);
+ 
++  const course = useModel('courses', courseId);
++
+   if (courseStatus === 'denied') {
+-    return <Redirect to={`/redirect/course-home/${courseId}`} />;
++    switch (course.canLoadCourseware.errorCode) {
++      case 'audit_expired':
++        return <Redirect to={`/redirect/dashboard?access_response_error=${course.canLoadCourseware.additionalContextUserMessage}`} />;
++      case 'course_not_started':
++        // eslint-disable-next-line no-case-declarations
++        const startDate = (new Intl.DateTimeFormat(getLocale())).format(new Date(course.start));
++        return <Redirect to={`/redirect/dashboard?notlive=${startDate}`} />;
++      case 'survey_required': // TODO: Redirect to the course survey
++      case 'unfulfilled_milestones':
++        return <Redirect to="/redirect/dashboard" />;
++      case 'authentication_required':
++      case 'enrollment_required':
++      default:
++        return <Redirect to={`/redirect/course-home/${courseId}`} />;
++    }
+   }
+ 
+   return (
+diff --git a/src/data/api.js b/src/data/api.js
+index 4ebe3ad..5b3e948 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -15,8 +15,7 @@ function normalizeMetadata(metadata) {
+     start: metadata.start,
+     enrollmentMode: metadata.enrollment.mode,
+     isEnrolled: metadata.enrollment.is_active,
+-    canLoadCourseware: typeof metadata.can_load_courseware === 'boolean'
+-      ? metadata.can_load_courseware : metadata.can_load_courseware.has_access,
++    canLoadCourseware: camelCaseObject(metadata.can_load_courseware),
+     isStaff: metadata.is_staff,
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+     tabs: camelCaseObject(metadata.tabs),
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index 365d548..134ebc5 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -68,7 +68,7 @@ export function fetchCourse(courseId) {
+       }
+ 
+       if (fetchedMetadata) {
+-        if (courseMetadataResult.value.canLoadCourseware && fetchedBlocks) {
++        if (courseMetadataResult.value.canLoadCourseware.hasAccess && fetchedBlocks) {
+           // User has access
+           dispatch(fetchCourseSuccess({ courseId }));
+           return;
+-- 
+2.34.1
+

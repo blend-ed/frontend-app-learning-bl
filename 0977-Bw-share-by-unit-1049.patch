@@ -1,0 +1,48 @@
+From 4cea9e582b146d78949ecb7fae4c5623f796a8ef Mon Sep 17 00:00:00 2001
+From: Ben Warzeski <bwarzeski@edx.org>
+Date: Fri, 20 Jan 2023 11:02:37 -0500
+Subject: [PATCH 0977/1021] Bw/share by unit (#1049)
+
+* fix: disable share feature on component unmount
+
+* fix: share only on set units
+
+* fix: share only on set units
+---
+ src/courseware/course/sequence/Unit.jsx     | 4 +++-
+ src/courseware/course/share/ShareButton.jsx | 4 ----
+ 2 files changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 75fb7ee..4e927cc 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -150,7 +150,9 @@ function Unit({
+         isProcessing={unit.bookmarkedUpdateState === 'loading'}
+       />
+       {/* TODO: social share exp. Need to remove later */}
+-      {window.expSocialShareEnabled && <ShareButton url={window.expSocialShareAboutUrl} />}
++      {(window.expSocialShareAboutUrls && window.expSocialShareUrls[unit.id] !== undefined) && (
++        <ShareButton url={window.expSocialShareAboutUrls[unit.id]} />
++      )}
+       {contentTypeGatingEnabled && unit.containsContentTypeGatedContent && (
+         <Suspense
+           fallback={(
+diff --git a/src/courseware/course/share/ShareButton.jsx b/src/courseware/course/share/ShareButton.jsx
+index 3cd9eb4..73473f3 100644
+--- a/src/courseware/course/share/ShareButton.jsx
++++ b/src/courseware/course/share/ShareButton.jsx
+@@ -20,10 +20,6 @@ const ShareTwitterIcon = () => (
+ function ShareButton({ url }) {
+   const { formatMessage } = useIntl();
+ 
+-  React.useEffect(() => () => {
+-    window.expSocialShareEnabled = false;
+-  }, []);
+-
+   const twitterUrl = stringifyUrl({
+     url,
+     query: {
+-- 
+2.34.1
+

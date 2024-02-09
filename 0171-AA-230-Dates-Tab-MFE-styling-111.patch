@@ -1,0 +1,221 @@
+From 81c6b401fd8c0596952f01af028ed2a79a8cd94e Mon Sep 17 00:00:00 2001
+From: Carla Duarte <ciduarte@wpi.edu>
+Date: Mon, 20 Jul 2020 13:39:56 -0400
+Subject: [PATCH 0171/1021] AA-230: Dates Tab MFE styling (#111)
+
+Co-authored-by: Carla Duarte <cduarte@edx.org>
+---
+ src/course-home/dates-banner/DatesBanner.jsx | 14 +++++++------
+ src/course-home/dates-tab/Badge.jsx          |  2 +-
+ src/course-home/dates-tab/Badge.scss         |  2 +-
+ src/course-home/dates-tab/DatesTab.jsx       |  4 ++--
+ src/course-home/dates-tab/Day.jsx            | 20 +++++++++----------
+ src/course-home/dates-tab/Day.scss           | 21 ++++++++++----------
+ src/course-home/dates-tab/Timeline.jsx       |  4 ++--
+ 7 files changed, 34 insertions(+), 33 deletions(-)
+
+diff --git a/src/course-home/dates-banner/DatesBanner.jsx b/src/course-home/dates-banner/DatesBanner.jsx
+index 7dd0f0f..1417903 100644
+--- a/src/course-home/dates-banner/DatesBanner.jsx
++++ b/src/course-home/dates-banner/DatesBanner.jsx
+@@ -12,18 +12,20 @@ function DatesBanner(props) {
+   } = props;
+ 
+   return (
+-    <div className="banner rounded my-2 p-3 container-fluid border border-primary-200 bg-info-100">
+-      <div className="row justify-content-between">
+-        <div className={name === 'datesTabInfoBanner' ? 'col-12' : 'col-9'}>
++    <div className="banner rounded my-4 p-4 container-fluid border border-primary-200 bg-info-100">
++      <div className="row w-100 m-0 justify-content-start justify-content-sm-between">
++        <div className={name === 'datesTabInfoBanner' ? 'col-12' : 'col-12 col-md-9'}>
+           <strong>
+             {intl.formatMessage(messages[`datesBanner.${name}.header`])}
+           </strong>
+           {intl.formatMessage(messages[`datesBanner.${name}.body`])}
+         </div>
+         {bannerClickHandler && (
+-          <button type="button" className="btn rounded align-self-center border border-primary bg-white mr-3 font-weight-bold" onClick={bannerClickHandler}>
+-            {intl.formatMessage(messages[`datesBanner.${name}.button`])}
+-          </button>
++          <div className="col-auto col-md-3 p-md-0 d-inline-flex align-items-center justify-content-start justify-content-md-center">
++            <button type="button" className="btn rounded align-self-center border border-primary bg-white mt-3 mt-md-0 font-weight-bold" onClick={bannerClickHandler}>
++              {intl.formatMessage(messages[`datesBanner.${name}.button`])}
++            </button>
++          </div>
+         )}
+       </div>
+     </div>
+diff --git a/src/course-home/dates-tab/Badge.jsx b/src/course-home/dates-tab/Badge.jsx
+index f1e5938..a945366 100644
+--- a/src/course-home/dates-tab/Badge.jsx
++++ b/src/course-home/dates-tab/Badge.jsx
+@@ -4,7 +4,7 @@ import classNames from 'classnames';
+ 
+ export default function Badge({ children, className }) {
+   return (
+-    <span className={classNames('dates-badge badge align-text-bottom font-italic ml-2 px-2', className)}>
++    <span className={classNames('dates-badge badge align-text-bottom font-italic ml-2 px-2 py-1', className)}>
+       {children}
+     </span>
+   );
+diff --git a/src/course-home/dates-tab/Badge.scss b/src/course-home/dates-tab/Badge.scss
+index d3c81e5..c5e52b8 100644
+--- a/src/course-home/dates-tab/Badge.scss
++++ b/src/course-home/dates-tab/Badge.scss
+@@ -1,3 +1,3 @@
+ .dates-badge {
+-  font-size: 0.9rem;
++  font-size: 0.75rem;
+ }
+diff --git a/src/course-home/dates-tab/DatesTab.jsx b/src/course-home/dates-tab/DatesTab.jsx
+index aa5d6b1..32d72f1 100644
+--- a/src/course-home/dates-tab/DatesTab.jsx
++++ b/src/course-home/dates-tab/DatesTab.jsx
+@@ -8,9 +8,9 @@ import DatesBannerContainer from '../dates-banner/DatesBannerContainer';
+ function DatesTab({ intl }) {
+   return (
+     <>
+-      <h2 className="mb-4">
++      <div role="heading" aria-level="1" className="h4 my-3">
+         {intl.formatMessage(messages.title)}
+-      </h2>
++      </div>
+       <DatesBannerContainer model="dates" />
+       <Timeline />
+     </>
+diff --git a/src/course-home/dates-tab/Day.jsx b/src/course-home/dates-tab/Day.jsx
+index ea8e90b..09e9abe 100644
+--- a/src/course-home/dates-tab/Day.jsx
++++ b/src/course-home/dates-tab/Day.jsx
+@@ -24,20 +24,20 @@ function Day({
+   const { color, badges } = getBadgeListAndColor(date, intl, null, items);
+ 
+   return (
+-    <div className="dates-day pb-4">
++    <li className="dates-day pb-4">
+       {/* Top Line */}
+-      {!first && <div className="dates-line-top border border-left border-gray-900 bg-gray-900" />}
++      {!first && <div className="dates-line-top border-1 border-left border-gray-900 bg-gray-900" />}
+ 
+       {/* Dot */}
+       <div className={classNames(color, 'dates-dot border border-gray-900')} />
+ 
+       {/* Bottom Line */}
+-      {!last && <div className="dates-line-bottom border border-left border-gray-900 bg-gray-900" />}
++      {!last && <div className="dates-line-bottom border-1 border-left border-gray-900 bg-gray-900" />}
+ 
+       {/* Content */}
+-      <div className="d-inline-block ml-3 pl-3">
+-        <div>
+-          <h5 className="d-inline text-dark-500">
++      <div className="d-inline-block ml-3 pl-2">
++        <div className="mb-1">
++          <p className="d-inline text-dark-500 font-weight-bold">
+             <FormattedDate
+               value={date}
+               day="numeric"
+@@ -46,7 +46,7 @@ function Day({
+               year="numeric"
+               {...timezoneFormatArgs}
+             />
+-          </h5>
++          </p>
+           {badges}
+         </div>
+         {items.map((item) => {
+@@ -57,13 +57,13 @@ function Day({
+           const textColor = available ? 'text-dark-500' : 'text-dark-200';
+           return (
+             <div key={item.title + item.date} className={textColor}>
+-              <div><span className="font-weight-bold">{title}</span>{itemBadges}</div>
+-              <div>{item.description}</div>
++              <div><span className="font-weight-bold small mt-1">{title}</span>{itemBadges}</div>
++              {item.description && <div className="small mb-2">{item.description}</div>}
+             </div>
+           );
+         })}
+       </div>
+-    </div>
++    </li>
+   );
+ }
+ 
+diff --git a/src/course-home/dates-tab/Day.scss b/src/course-home/dates-tab/Day.scss
+index 0578cc5..c098f42 100644
+--- a/src/course-home/dates-tab/Day.scss
++++ b/src/course-home/dates-tab/Day.scss
+@@ -1,7 +1,6 @@
+ $dot-radius: 0.3rem;
+ $dot-size: $dot-radius * 2;
+-$top-offset: 0.45rem;
+-$left-offset: 0.225rem + $dot-radius;
++$offset: $dot-radius * 1.5;
+ 
+ .dates-day {
+   position: relative;
+@@ -10,9 +9,9 @@ $left-offset: 0.225rem + $dot-radius;
+ .dates-line-top {
+   display: inline-block;
+   position: absolute;
+-  left: $left-offset;
++  left: $offset;
+   top: 0;
+-  height: $top-offset;
++  height: $offset;
+   z-index: 0;
+ }
+ 
+@@ -20,26 +19,26 @@ $left-offset: 0.225rem + $dot-radius;
+   display: inline-block;
+   position: absolute;
+   border-radius: 50%;
+-  left: $dot-radius; // save room for today's larger size
+-  top: $top-offset;
++  left: $dot-radius * 0.5; // save room for today's larger size
++  top: $offset;
+   height: $dot-size;
+   width: $dot-size;
+   z-index: 1;
+ 
+   &.dates-bg-today {
+     left: 0;
+-    top: $top-offset - $dot-radius;
+-    height: $dot-size * 2;
+-    width: $dot-size * 2;
++    top: $offset - $dot-radius;
++    height: $dot-size * 1.5;
++    width: $dot-size * 1.5;
+   }
+ }
+ 
+ .dates-line-bottom {
+   display: inline-block;
+   position: absolute;
+-  top: $top-offset + $dot-size;
++  top: $offset + $dot-size;
+   bottom: 0;
+-  left: $left-offset;
++  left: $offset;
+   z-index: 0;
+ }
+ 
+diff --git a/src/course-home/dates-tab/Timeline.jsx b/src/course-home/dates-tab/Timeline.jsx
+index 8c08af4..44bfc2c 100644
+--- a/src/course-home/dates-tab/Timeline.jsx
++++ b/src/course-home/dates-tab/Timeline.jsx
+@@ -61,10 +61,10 @@ export default function Timeline() {
+   }
+ 
+   return (
+-    <>
++    <ul className="list-unstyled m-0">
+       {groupedDates.map((groupedDate) => (
+         <Day key={groupedDate.date} {...groupedDate} />
+       ))}
+-    </>
++    </ul>
+   );
+ }
+-- 
+2.34.1
+

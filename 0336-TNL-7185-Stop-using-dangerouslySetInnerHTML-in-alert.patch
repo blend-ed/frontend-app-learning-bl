@@ -1,0 +1,672 @@
+From e89aef78b5eea856dd19bc38990840077560e14d Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 14 Dec 2020 16:09:49 -0500
+Subject: [PATCH 0336/1021] TNL-7185: Stop using dangerouslySetInnerHTML in
+ alerts (#306)
+
+Render offer and access-expiration alerts ourselves from newly
+passed in backend data, rather than from provided HTML blobs.
+---
+ .../AccessExpirationAlert.jsx                 | 130 +++++++++++++++++-
+ src/alerts/access-expiration-alert/hooks.js   |   7 +-
+ .../access-expiration-alert/messages.js       |  10 ++
+ src/alerts/offer-alert/OfferAlert.jsx         |  88 +++++++++++-
+ src/alerts/offer-alert/hooks.js               |   7 +-
+ src/alerts/offer-alert/messages.js            |  14 ++
+ .../__factories__/outlineTabData.factory.js   |   4 +-
+ .../data/__snapshots__/redux.test.js.snap     |   4 +-
+ src/course-home/data/api.js                   |   8 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |   9 +-
+ .../outline-tab/OutlineTab.test.jsx           |  40 +++++-
+ src/courseware/course/Course.jsx              |   9 +-
+ src/courseware/course/Course.test.jsx         |  28 ++--
+ .../course/course-exit/CourseCelebration.jsx  |   2 +
+ src/courseware/data/api.js                    |   6 +-
+ 15 files changed, 309 insertions(+), 57 deletions(-)
+ create mode 100644 src/alerts/access-expiration-alert/messages.js
+ create mode 100644 src/alerts/offer-alert/messages.js
+
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index 35aecec..f5d0307 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -1,24 +1,140 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import {
++  FormattedMessage, FormattedDate, injectIntl, intlShape,
++} from '@edx/frontend-platform/i18n';
++import { Hyperlink } from '@edx/paragon';
+ 
+ import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++import messages from './messages';
+ 
+-function AccessExpirationAlert({ payload }) {
++function AccessExpirationAlert({ intl, payload }) {
+   const {
+-    rawHtml,
++    accessExpiration,
++    userTimezone,
+   } = payload;
+-  return rawHtml && (
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  if (!accessExpiration) {
++    return null;
++  }
++
++  const {
++    expirationDate,
++    masqueradingExpiredCourse,
++    upgradeDeadline,
++    upgradeUrl,
++  } = accessExpiration;
++
++  if (masqueradingExpiredCourse) {
++    return (
++      <Alert type={ALERT_TYPES.INFO}>
++        <FormattedMessage
++          id="learning.accessExpiration.expired"
++          defaultMessage="This learner does not have access to this course. Their access expired on {date}."
++          values={{
++            date: (
++              <FormattedDate
++                key="accessExpirationExpiredDate"
++                day="numeric"
++                month="short"
++                year="numeric"
++                value={expirationDate}
++                {...timezoneFormatArgs}
++              />
++            ),
++          }}
++        />
++      </Alert>
++    );
++  }
++
++  let deadlineMessage = null;
++  if (upgradeDeadline && upgradeUrl) {
++    deadlineMessage = (
++      <>
++        <br />
++        <FormattedMessage
++          id="learning.accessExpiration.deadline"
++          defaultMessage="Upgrade by {date} to get unlimited access to the course as long as it exists on the site."
++          values={{
++            date: (
++              <FormattedDate
++                key="accessExpirationUpgradeDeadline"
++                day="numeric"
++                month="short"
++                year="numeric"
++                value={upgradeDeadline}
++                {...timezoneFormatArgs}
++              />
++            ),
++          }}
++        />
++        &nbsp;
++        <Hyperlink
++          className="font-weight-bold"
++          style={{ textDecoration: 'underline' }}
++          destination={upgradeUrl}
++        >
++          {intl.formatMessage(messages.upgradeNow)}
++        </Hyperlink>
++      </>
++    );
++  }
++
++  return (
+     <Alert type={ALERT_TYPES.INFO}>
+-      {/* eslint-disable-next-line react/no-danger */}
+-      <div dangerouslySetInnerHTML={{ __html: rawHtml }} />
++      <span className="font-weight-bold">
++        <FormattedMessage
++          id="learning.accessExpiration.header"
++          defaultMessage="Audit Access Expires {date}"
++          values={{
++            date: (
++              <FormattedDate
++                key="accessExpirationHeaderDate"
++                day="numeric"
++                month="short"
++                year="numeric"
++                value={expirationDate}
++                {...timezoneFormatArgs}
++              />
++            ),
++          }}
++        />
++      </span>
++      <br />
++      <FormattedMessage
++        id="learning.accessExpiration.body"
++        defaultMessage="You lose all access to this course, including your progress, on {date}."
++        values={{
++          date: (
++            <FormattedDate
++              key="accessExpirationBodyDate"
++              day="numeric"
++              month="short"
++              year="numeric"
++              value={expirationDate}
++              {...timezoneFormatArgs}
++            />
++          ),
++        }}
++      />
++      {deadlineMessage}
+     </Alert>
+   );
+ }
+ 
+ AccessExpirationAlert.propTypes = {
++  intl: intlShape.isRequired,
+   payload: PropTypes.shape({
+-    rawHtml: PropTypes.string.isRequired,
++    accessExpiration: PropTypes.shape({
++      expirationDate: PropTypes.string.isRequired,
++      masqueradingExpiredCourse: PropTypes.bool.isRequired,
++      upgradeDeadline: PropTypes.string,
++      upgradeUrl: PropTypes.string,
++    }).isRequired,
++    userTimezone: PropTypes.string.isRequired,
+   }).isRequired,
+ };
+ 
+-export default AccessExpirationAlert;
++export default injectIntl(AccessExpirationAlert);
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+index 0aaa12a..757ed00 100644
+--- a/src/alerts/access-expiration-alert/hooks.js
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -3,13 +3,12 @@ import { useAlert } from '../../generic/user-messages';
+ 
+ const AccessExpirationAlert = React.lazy(() => import('./AccessExpirationAlert'));
+ 
+-function useAccessExpirationAlert(courseExpiredMessage, topic) {
+-  const rawHtml = courseExpiredMessage || null;
+-  const isVisible = !!rawHtml; // If it exists, show it.
++function useAccessExpirationAlert(accessExpiration, userTimezone, topic) {
++  const isVisible = !!accessExpiration; // If it exists, show it.
+ 
+   useAlert(isVisible, {
+     code: 'clientAccessExpirationAlert',
+-    payload: useMemo(() => ({ rawHtml }), [rawHtml]),
++    payload: useMemo(() => ({ accessExpiration, userTimezone }), [accessExpiration, userTimezone]),
+     topic,
+   });
+ 
+diff --git a/src/alerts/access-expiration-alert/messages.js b/src/alerts/access-expiration-alert/messages.js
+new file mode 100644
+index 0000000..32d3f9a
+--- /dev/null
++++ b/src/alerts/access-expiration-alert/messages.js
+@@ -0,0 +1,10 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  upgradeNow: {
++    id: 'learning.accessExpiration.upgradeNow',
++    defaultMessage: 'Upgrade now',
++  },
++});
++
++export default messages;
+diff --git a/src/alerts/offer-alert/OfferAlert.jsx b/src/alerts/offer-alert/OfferAlert.jsx
+index 1685795..376ae29 100644
+--- a/src/alerts/offer-alert/OfferAlert.jsx
++++ b/src/alerts/offer-alert/OfferAlert.jsx
+@@ -1,24 +1,98 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import {
++  FormattedMessage, FormattedDate, injectIntl, intlShape,
++} from '@edx/frontend-platform/i18n';
++import { Hyperlink } from '@edx/paragon';
+ 
+ import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++import messages from './messages';
+ 
+-function OfferAlert({ payload }) {
++function OfferAlert({ intl, payload }) {
+   const {
+-    rawHtml,
++    offer,
++    userTimezone,
+   } = payload;
+-  return rawHtml && (
++
++  if (!offer) {
++    return null;
++  }
++
++  const {
++    code,
++    discountedPrice,
++    expirationDate,
++    originalPrice,
++    percentage,
++    upgradeUrl,
++  } = offer;
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  const fullPricing = (
++    <>
++      <span className="sr-only">
++        {intl.formatMessage(messages.srPrices, { discountedPrice, originalPrice })}
++      </span>
++      <span aria-hidden="true">
++        {discountedPrice} <del>{originalPrice}</del>
++      </span>
++    </>
++  );
++
++  return (
+     <Alert type={ALERT_TYPES.INFO}>
+-      {/* eslint-disable-next-line react/no-danger */}
+-      <div dangerouslySetInnerHTML={{ __html: rawHtml }} />
++      <span className="font-weight-bold">
++        <FormattedMessage
++          id="learning.offer.header"
++          defaultMessage="Upgrade by {date} and save {percentage}% [{fullPricing}]"
++          values={{
++            date: (
++              <FormattedDate
++                key="offerDate"
++                day="numeric"
++                month="long"
++                value={expirationDate}
++                {...timezoneFormatArgs}
++              />
++            ),
++            fullPricing,
++            percentage,
++          }}
++        />
++      </span>
++      <br />
++      <FormattedMessage
++        id="learning.offer.code"
++        defaultMessage="Use code {code} at checkout!"
++        values={{
++          code: (<b>{code}</b>),
++        }}
++      />
++      &nbsp;
++      <Hyperlink
++        className="font-weight-bold"
++        style={{ textDecoration: 'underline' }}
++        destination={upgradeUrl}
++      >
++        {intl.formatMessage(messages.upgradeNow)}
++      </Hyperlink>
+     </Alert>
+   );
+ }
+ 
+ OfferAlert.propTypes = {
++  intl: intlShape.isRequired,
+   payload: PropTypes.shape({
+-    rawHtml: PropTypes.string.isRequired,
++    offer: PropTypes.shape({
++      code: PropTypes.string.isRequired,
++      discountedPrice: PropTypes.string.isRequired,
++      expirationDate: PropTypes.string.isRequired,
++      originalPrice: PropTypes.string.isRequired,
++      percentage: PropTypes.number.isRequired,
++      upgradeUrl: PropTypes.string.isRequired,
++    }).isRequired,
++    userTimezone: PropTypes.string.isRequired,
+   }).isRequired,
+ };
+ 
+-export default OfferAlert;
++export default injectIntl(OfferAlert);
+diff --git a/src/alerts/offer-alert/hooks.js b/src/alerts/offer-alert/hooks.js
+index 97f3950..5f4454a 100644
+--- a/src/alerts/offer-alert/hooks.js
++++ b/src/alerts/offer-alert/hooks.js
+@@ -3,14 +3,13 @@ import { useAlert } from '../../generic/user-messages';
+ 
+ const OfferAlert = React.lazy(() => import('./OfferAlert'));
+ 
+-export function useOfferAlert(offerHtml, topic) {
+-  const rawHtml = offerHtml || null;
+-  const isVisible = !!rawHtml; // if it exists, show it.
++export function useOfferAlert(offer, userTimezone, topic) {
++  const isVisible = !!offer; // if it exists, show it.
+ 
+   useAlert(isVisible, {
+     code: 'clientOfferAlert',
+     topic,
+-    payload: useMemo(() => ({ rawHtml }), [rawHtml]),
++    payload: useMemo(() => ({ offer, userTimezone }), [offer, userTimezone]),
+   });
+ 
+   return { clientOfferAlert: OfferAlert };
+diff --git a/src/alerts/offer-alert/messages.js b/src/alerts/offer-alert/messages.js
+new file mode 100644
+index 0000000..f3e4612
+--- /dev/null
++++ b/src/alerts/offer-alert/messages.js
+@@ -0,0 +1,14 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  srPrices: {
++    id: 'learning.offer.screenReaderPrices',
++    defaultMessage: 'Original price: {originalPrice}, discount price: {discountedPrice}',
++  },
++  upgradeNow: {
++    id: 'learning.offer.upgradeNow',
++    defaultMessage: 'Upgrade now',
++  },
++});
++
++export default messages;
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index b3faf6d..cf19b16 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -34,8 +34,8 @@ Factory.define('outlineTabData')
+     upgrade_url: `${host}/dashboard`,
+   }))
+   .attrs({
++    access_expiration: null,
+     can_show_upgrade_sock: true,
+-    course_expired_html: null,
+     course_goals: {
+       goal_options: [],
+       selected_goal: null,
+@@ -50,6 +50,6 @@ Factory.define('outlineTabData')
+       extra_text: 'Contact the administrator.',
+     },
+     handouts_html: '<ul><li>Handout 1</li></ul>',
+-    offer_html: null,
++    offer: null,
+     welcome_message_html: '<p>Welcome to this course!</p>',
+   });
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 5ea68ed..d34fecb 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -339,6 +339,7 @@ Object {
+     },
+     "outline": Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "accessExpiration": null,
+         "canShowUpgradeSock": true,
+         "courseBlocks": Object {
+           "courses": Object {
+@@ -375,7 +376,6 @@ Object {
+             },
+           },
+         },
+-        "courseExpiredHtml": null,
+         "courseGoals": Object {
+           "goalOptions": Array [],
+           "selectedGoal": null,
+@@ -403,7 +403,7 @@ Object {
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "hasEnded": undefined,
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+-        "offerHtml": null,
++        "offer": null,
+         "resumeCourse": Object {
+           "hasVisitedCourse": false,
+           "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+Test+Block@12345abcde",
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index c22bce0..184b849 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -141,33 +141,33 @@ export async function getOutlineTabData(courseId) {
+   const {
+     data,
+   } = tabData;
++  const accessExpiration = camelCaseObject(data.access_expiration);
+   const canShowUpgradeSock = data.can_show_upgrade_sock;
+   const courseBlocks = data.course_blocks ? normalizeOutlineBlocks(courseId, data.course_blocks.blocks) : {};
+   const courseGoals = camelCaseObject(data.course_goals);
+-  const courseExpiredHtml = data.course_expired_html;
+   const courseTools = camelCaseObject(data.course_tools);
+   const datesBannerInfo = camelCaseObject(data.dates_banner_info);
+   const datesWidget = camelCaseObject(data.dates_widget);
+   const enrollAlert = camelCaseObject(data.enroll_alert);
+   const handoutsHtml = data.handouts_html;
+   const hasEnded = data.has_ended;
+-  const offerHtml = data.offer_html;
++  const offer = camelCaseObject(data.offer);
+   const resumeCourse = camelCaseObject(data.resume_course);
+   const verifiedMode = camelCaseObject(data.verified_mode);
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+   return {
++    accessExpiration,
+     canShowUpgradeSock,
+     courseBlocks,
+     courseGoals,
+-    courseExpiredHtml,
+     courseTools,
+     datesBannerInfo,
+     datesWidget,
+     enrollAlert,
+     handoutsHtml,
+     hasEnded,
+-    offerHtml,
++    offer,
+     resumeCourse,
+     verifiedMode,
+     welcomeMessageHtml,
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 5fc4a95..90aefe0 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -43,6 +43,7 @@ function OutlineTab({ intl }) {
+   } = useModel('courses', courseId);
+ 
+   const {
++    accessExpiration,
+     canShowUpgradeSock,
+     courseBlocks: {
+       courses,
+@@ -52,17 +53,17 @@ function OutlineTab({ intl }) {
+       goalOptions,
+       selectedGoal,
+     },
+-    courseExpiredHtml,
+     datesBannerInfo,
+     datesWidget: {
+       courseDateBlocks,
++      userTimezone,
+     },
+     hasEnded,
+     resumeCourse: {
+       hasVisitedCourse,
+       url: resumeCourseUrl,
+     },
+-    offerHtml,
++    offer,
+     verifiedMode,
+   } = useModel('outline', courseId);
+ 
+@@ -75,8 +76,8 @@ function OutlineTab({ intl }) {
+   const enrollmentAlert = useEnrollmentAlert(courseId);
+ 
+   // Below the course title alerts (appearing in the order listed here)
+-  const offerAlert = useOfferAlert(offerHtml, 'outline-course-alerts');
+-  const accessExpirationAlert = useAccessExpirationAlert(courseExpiredHtml, 'outline-course-alerts');
++  const offerAlert = useOfferAlert(offer, userTimezone, 'outline-course-alerts');
++  const accessExpirationAlert = useAccessExpirationAlert(accessExpiration, userTimezone, 'outline-course-alerts');
+   const courseStartAlert = useCourseStartAlert(courseId);
+   const courseEndAlert = useCourseEndAlert(courseId);
+   const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index c3d6998..437e125 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -342,11 +342,43 @@ describe('Outline Tab', () => {
+     });
+ 
+     describe('Access Expiration Alert', () => {
+-      // Appears if course_expired_html is provided
+-      it('appears', async () => {
+-        setTabData({ course_expired_html: '<p>Course Will Expire, Uh Oh</p>' });
++      it('has special masquerade text', async () => {
++        setTabData({
++          access_expiration: {
++            expiration_date: '2020-01-01T12:00:00Z',
++            masquerading_expired_course: true,
++            upgrade_deadline: null,
++            upgrade_url: null,
++          },
++        });
++        await fetchAndRender();
++        await screen.findByText('This learner does not have access to this course.', { exact: false });
++      });
++
++      it('shows expiration', async () => {
++        setTabData({
++          access_expiration: {
++            expiration_date: '2080-01-01T12:00:00Z',
++            masquerading_expired_course: false,
++            upgrade_deadline: null,
++            upgrade_url: null,
++          },
++        });
++        await fetchAndRender();
++        await screen.findByText('Audit Access Expires');
++      });
++
++      it('shows upgrade prompt', async () => {
++        setTabData({
++          access_expiration: {
++            expiration_date: '2080-01-01T12:00:00Z',
++            masquerading_expired_course: false,
++            upgrade_deadline: '2070-01-01T12:00:00Z',
++            upgrade_url: 'https://example.com/upgrade',
++          },
++        });
+         await fetchAndRender();
+-        await screen.findByText('Course Will Expire, Uh Oh');
++        await screen.findByText('to get unlimited access to the course as long as it exists on the site.', { exact: false });
+       });
+     });
+ 
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 63cf2f8..03ccc0d 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -35,16 +35,17 @@ function Course({
+   ].filter(element => element != null).map(element => element.title);
+ 
+   const {
++    accessExpiration,
+     canShowUpgradeSock,
+     celebrations,
+-    courseExpiredMessage,
+-    offerHtml,
++    offer,
++    userTimezone,
+     verifiedMode,
+   } = course;
+ 
+   // Below the tabs, above the breadcrumbs alerts (appearing in the order listed here)
+-  const offerAlert = useOfferAlert(offerHtml, 'course');
+-  const accessExpirationAlert = useAccessExpirationAlert(courseExpiredMessage, 'course');
++  const offerAlert = useOfferAlert(offer, userTimezone, 'course');
++  const accessExpirationAlert = useAccessExpirationAlert(accessExpiration, userTimezone, 'course');
+ 
+   const dispatch = useDispatch();
+   const celebrateFirstSection = celebrations && celebrations.firstSection;
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index 2b0faca..dd9af22 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -85,23 +85,27 @@ describe('Course', () => {
+   });
+ 
+   it('displays offer and expiration alert', async () => {
+-    const offerText = 'test-offer';
+-    const offerId = `${offerText}-id`;
+-    const offerHtml = `<div data-testid="${offerId}">${offerText}</div>`;
+-
+-    const expirationText = 'test-expiration';
+-    const expirationId = `${expirationText}-id`;
+-    const expirationHtml = `<div data-testid="${expirationId}">${expirationText}</div>`;
+-
+     const courseMetadata = Factory.build('courseMetadata', {
+-      offer_html: offerHtml,
+-      course_expired_message: expirationHtml,
++      access_expiration: {
++        expiration_date: '2080-01-01T12:00:00Z',
++        masquerading_expired_course: false,
++        upgrade_deadline: null,
++        upgrade_url: null,
++      },
++      offer: {
++        code: 'EDXWELCOME',
++        expiration_date: '2070-01-01T12:00:00Z',
++        original_price: '$100',
++        discounted_price: '$85',
++        percentage: 15,
++        upgrade_url: 'https://example.com/upgrade',
++      },
+     });
+     const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
+     render(<Course {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+ 
+-    expect(await screen.findByTestId(offerId)).toHaveTextContent(offerText);
+-    expect(screen.getByTestId(expirationId)).toHaveTextContent(expirationText);
++    await screen.findByText('EDXWELCOME');
++    await screen.findByText('Audit Access Expires');
+   });
+ 
+   it('passes handlers to the sequence', async () => {
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index f846fb0..9206127 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -218,6 +218,8 @@ function CourseCelebration({ intl }) {
+         } else {
+           footnote = <DashboardFootnote variant={visitEvent} />;
+         }
++      } else {
++        visitEvent = 'celebration_audit_no_upgrade';
+       }
+       break;
+     default:
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index ca5505f..70345a0 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -110,14 +110,13 @@ function normalizeTabUrls(id, tabs) {
+ 
+ function normalizeMetadata(metadata) {
+   return {
++    accessExpiration: camelCaseObject(metadata.access_expiration),
+     canShowUpgradeSock: metadata.can_show_upgrade_sock,
+     contentTypeGatingEnabled: metadata.content_type_gating_enabled,
+-    // TODO: TNL-7185: return course expired _date_, instead of _message_
+-    courseExpiredMessage: metadata.course_expired_message,
+     id: metadata.id,
+     title: metadata.name,
+     number: metadata.number,
+-    offerHtml: metadata.offer_html,
++    offer: camelCaseObject(metadata.offer),
+     org: metadata.org,
+     enrollmentStart: metadata.enrollment_start,
+     enrollmentEnd: metadata.enrollment_end,
+@@ -131,6 +130,7 @@ function normalizeMetadata(metadata) {
+     license: metadata.license,
+     verifiedMode: camelCaseObject(metadata.verified_mode),
+     tabs: normalizeTabUrls(metadata.id, camelCaseObject(metadata.tabs)),
++    userTimezone: metadata.user_timezone,
+     showCalculator: metadata.show_calculator,
+     notes: camelCaseObject(metadata.notes),
+     marketingUrl: metadata.marketing_url,
+-- 
+2.34.1
+

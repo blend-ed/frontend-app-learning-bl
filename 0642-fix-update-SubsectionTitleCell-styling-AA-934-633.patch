@@ -1,0 +1,129 @@
+From 597ecb7b4e683bdd469e5da4fe0fccfa71f5605b Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 8 Sep 2021 10:48:55 -0400
+Subject: [PATCH 0642/1021] fix: update SubsectionTitleCell styling (AA-934)
+ (#633)
+
+---
+ .../detailed-grades/DetailedGradesTable.jsx   |  2 +-
+ .../detailed-grades/SubsectionTitleCell.jsx   | 14 ++++++-
+ .../grade-summary/AssignmentTypeCell.jsx      | 37 ++++++++++---------
+ .../progress-tab/grades/messages.js           |  4 +-
+ 4 files changed, 35 insertions(+), 22 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+index 0f5e561..22c3fd6 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGradesTable.jsx
+@@ -51,7 +51,7 @@ function DetailedGradesTable({ intl }) {
+                 Header: `${intl.formatMessage(messages.score)}`,
+                 accessor: 'score',
+                 headerClassName: 'justify-content-end h5 mb-0',
+-                cellClassName: 'float-right text-right small',
++                cellClassName: 'float-right small',
+               },
+             ]}
+           >
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+index c26efae..5f5e705 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+@@ -52,7 +52,17 @@ function SubsectionTitleCell({ intl, subsection }) {
+           <Collapsible.Visible whenOpen><Icon src={ArrowDropUp} /></Collapsible.Visible>
+         </Collapsible.Trigger>
+         <span className="small d-inline ml-4 pl-1">
+-          {gradesFeatureIsFullyLocked || subsection.learnerHasAccess ? '' : <Icon id={`detailedGradesBlockedIcon${subsection.blockKey}`} aria-label={intl.formatMessage(messages.noAcessToSubsection, { displayName })} className="mr-1 mt-1 d-inline-flex" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />}
++          {gradesFeatureIsFullyLocked || subsection.learnerHasAccess ? ''
++            : (
++              <Icon
++                id={`detailedGradesBlockedIcon${subsection.blockKey}`}
++                aria-label={intl.formatMessage(messages.noAccessToSubsection, { displayName })}
++                className="mr-1 mt-1 d-inline-flex"
++                style={{ height: '1rem', width: '1rem' }}
++                src={Blocked}
++                data-testid="blocked-icon"
++              />
++            )}
+           {url ? (
+             <a
+               href={url}
+@@ -68,7 +78,7 @@ function SubsectionTitleCell({ intl, subsection }) {
+           )}
+         </span>
+       </Row>
+-      <Collapsible.Body>
++      <Collapsible.Body className="d-flex w-100">
+         <ProblemScoreDrawer problemScores={problemScores} subsection={subsection} />
+       </Collapsible.Body>
+     </Collapsible.Advanced>
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+index 015e39c..11633e2 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -18,25 +18,28 @@ function AssignmentTypeCell({
+     gradesFeatureIsFullyLocked,
+   } = useModel('progress', courseId);
+ 
+-  const lockedIcon = locked ? <Icon id={`assignmentTypeBlockedIcon${assignmentType}`} aria-label={intl.formatMessage(messages.noAcessToAssignmentType, { assignmentType })} className="mr-1 mt-1 d-inline-flex" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" /> : '';
++  const lockedIcon = locked ? <Icon id={`assignmentTypeBlockedIcon${assignmentType}`} aria-label={intl.formatMessage(messages.noAccessToAssignmentType, { assignmentType })} className="mr-1 mt-1 d-inline-flex" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" /> : '';
+ 
+   return (
+-    <div className="small">
+-      <span className="d-inline-flex">{lockedIcon}{assignmentType}</span>
+-      {footnoteId && footnoteMarker && (
+-        <sup>
+-          <a
+-            id={`${footnoteId}-ref`}
+-            className="muted-link"
+-            href={`#${footnoteId}-footnote`}
+-            aria-describedby="grade-summary-footnote-label"
+-            tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+-            aria-labelledby={`assignmentTypeBlockedIcon${assignmentType}`}
+-          >
+-            {footnoteMarker}
+-          </a>
+-        </sup>
+-      )}
++    <div className="d-flex small">
++      <div className="d-flex">{lockedIcon}</div>
++      <div>
++        {assignmentType}&nbsp;
++        {footnoteId && footnoteMarker && (
++          <sup>
++            <a
++              id={`${footnoteId}-ref`}
++              className="muted-link"
++              href={`#${footnoteId}-footnote`}
++              aria-describedby="grade-summary-footnote-label"
++              tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
++              aria-labelledby={`assignmentTypeBlockedIcon${assignmentType}`}
++            >
++              {footnoteMarker}
++            </a>
++          </sup>
++        )}
++      </div>
+     </div>
+   );
+ }
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 1d6efda..53a849b 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -139,11 +139,11 @@ const messages = defineMessages({
+     id: 'progress.weightedGradeSummary',
+     defaultMessage: 'Your current weighted grade summary',
+   },
+-  noAcessToAssignmentType: {
++  noAccessToAssignmentType: {
+     id: 'progress.noAcessToAssignmentType',
+     defaultMessage: 'You do not have access to assignments of type {assignmentType}',
+   },
+-  noAcessToSubsection: {
++  noAccessToSubsection: {
+     id: 'progress.noAcessToSubsection',
+     defaultMessage: 'You do not have access to subsection {displayName}',
+   },
+-- 
+2.34.1
+

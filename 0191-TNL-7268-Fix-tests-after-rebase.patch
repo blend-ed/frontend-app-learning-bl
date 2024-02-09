@@ -1,0 +1,74 @@
+From c1bf77efa47c45c0e189b9a2d0fb3aaec12544c8 Mon Sep 17 00:00:00 2001
+From: Agrendalath <piotr@surowiec.it>
+Date: Tue, 7 Jul 2020 18:06:32 +0200
+Subject: [PATCH 0191/1021] [TNL-7268] Fix tests after rebase
+
+---
+ .../sequence-navigation/SequenceNavigation.test.jsx       | 4 ++--
+ .../sequence-navigation/SequenceNavigationTabs.test.jsx   | 4 ++--
+ src/setupTest.js                                          | 8 +++++---
+ 3 files changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+index 23f9ea2..94c5726 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.test.jsx
+@@ -6,10 +6,10 @@ import {
+   initialState, render, screen, testUnits,
+ } from '../../../../setupTest';
+ import SequenceNavigation from './SequenceNavigation';
+-import useIndexOfLastVisibleChild from '../../../../tabs/useIndexOfLastVisibleChild';
++import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastVisibleChild';
+ 
+ // Mock the hook to avoid relying on its implementation and mocking `getBoundingClientRect`.
+-jest.mock('../../../../tabs/useIndexOfLastVisibleChild');
++jest.mock('../../../../generic/tabs/useIndexOfLastVisibleChild');
+ useIndexOfLastVisibleChild.mockReturnValue([0, null, null]);
+ 
+ describe('Sequence Navigation', () => {
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+index 4d45699..32cfb5c 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.test.jsx
+@@ -3,10 +3,10 @@ import {
+   initialState, render, screen, testUnits,
+ } from '../../../../setupTest';
+ import SequenceNavigationTabs from './SequenceNavigationTabs';
+-import useIndexOfLastVisibleChild from '../../../../tabs/useIndexOfLastVisibleChild';
++import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastVisibleChild';
+ 
+ // Mock the hook to avoid relying on its implementation and mocking `getBoundingClientRect`.
+-jest.mock('../../../../tabs/useIndexOfLastVisibleChild');
++jest.mock('../../../../generic/tabs/useIndexOfLastVisibleChild');
+ 
+ describe('Sequence Navigation Tabs', () => {
+   const mockData = {
+diff --git a/src/setupTest.js b/src/setupTest.js
+index ab9e880..0349bd2 100755
+--- a/src/setupTest.js
++++ b/src/setupTest.js
+@@ -52,9 +52,10 @@ import { Provider } from 'react-redux';
+ import { configureStore } from '@reduxjs/toolkit';
+ // eslint-disable-next-line import/no-extraneous-dependencies
+ import { IntlProvider } from 'react-intl';
+-import { reducer as modelsReducer } from './model-store';
+-import { reducer as coursewareReducer } from './data';
+-import { UserMessagesProvider } from './user-messages';
++import { reducer as courseHomeReducer } from './course-home/data';
++import { reducer as coursewareReducer } from './courseware/data/slice';
++import { reducer as modelsReducer } from './generic/model-store';
++import { UserMessagesProvider } from './generic/user-messages';
+ 
+ /**
+  * HACK: Mock the MutationObserver as it's breaking async testing.
+@@ -153,6 +154,7 @@ function render(
+       reducer: {
+         models: modelsReducer,
+         courseware: coursewareReducer,
++        courseHome: courseHomeReducer,
+       },
+       preloadedState: initialState,
+     }),
+-- 
+2.34.1
+

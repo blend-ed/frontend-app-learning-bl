@@ -1,0 +1,26 @@
+From 41b97ba638f57f2dfad70d059d828b75d7d259c8 Mon Sep 17 00:00:00 2001
+From: Saad Yousaf <saad.yousaf@arbisoft.com>
+Date: Sat, 24 Apr 2021 02:36:47 +0500
+Subject: [PATCH 0432/1021] fix: center content by fixing the container-fluid
+ class (#419)
+
+Co-authored-by: SaadYousaf <saadyousaf@A006-00314.local>
+---
+ src/index.scss | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/index.scss b/src/index.scss
+index 8e8f03f..8bfcfc3 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -7,6 +7,7 @@
+ 
+ // TODO: Fix .container-fluid for mobile in paragon
+ .container-fluid {
++  max-width: 1140px + 2 * $grid-gutter-width;
+   @media (max-width: -1 + map-get($grid-breakpoints, 'sm')) {
+     padding-left: $grid-gutter-width/2;
+     padding-right: $grid-gutter-width/2;
+-- 
+2.34.1
+

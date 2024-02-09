@@ -1,0 +1,380 @@
+From b1fdbcccf3b73a794971074c50280eb7f2370fe6 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Thu, 13 May 2021 15:07:19 -0400
+Subject: [PATCH 0462/1021] AA-790: progress tab handle
+ unenrolled/unauthenticated users (#445)
+
+---
+ .../data/__snapshots__/redux.test.js.snap     | 148 ++++++++++++++++++
+ src/course-home/data/api.js                   |   6 +-
+ src/course-home/data/redux.test.js            |  29 ++++
+ .../certificate-status/CertificateStatus.jsx  |  23 +--
+ .../CompletionDonutChart.jsx                  |   4 +-
+ .../grade-summary/AssignmentTypeCell.jsx      |   2 +-
+ .../grade-summary/GradeSummaryTable.jsx       |   2 +-
+ .../StreakCelebrationModal.jsx                |  12 +-
+ src/tab-page/LoadedTabPage.jsx                |   2 +-
+ 9 files changed, 206 insertions(+), 22 deletions(-)
+
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 62fd74d..eb3ff44 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -460,3 +460,151 @@ Object {
+   },
+ }
+ `;
++
++exports[`Data layer integration tests Test fetchProgressTab Should fetch, normalize, and save metadata 1`] = `
++Object {
++  "courseHome": Object {
++    "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++    "courseStatus": "loaded",
++    "toastBodyLink": null,
++    "toastBodyText": null,
++    "toastHeader": "",
++  },
++  "courseware": Object {
++    "courseId": null,
++    "courseStatus": "loading",
++    "sequenceId": null,
++    "sequenceStatus": "loading",
++  },
++  "models": Object {
++    "courseHomeMeta": Object {
++      "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "canLoadCourseware": false,
++        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "isEnrolled": false,
++        "isSelfPaced": false,
++        "isStaff": false,
++        "number": "DemoX",
++        "org": "edX",
++        "originalUserIsStaff": false,
++        "tabs": Array [
++          Object {
++            "slug": "outline",
++            "title": "Course",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course/",
++          },
++          Object {
++            "slug": "discussion",
++            "title": "Discussion",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/discussion/forum/",
++          },
++          Object {
++            "slug": "wiki",
++            "title": "Wiki",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/course_wiki",
++          },
++          Object {
++            "slug": "progress",
++            "title": "Progress",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/progress",
++          },
++          Object {
++            "slug": "instructor",
++            "title": "Instructor",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/instructor",
++          },
++          Object {
++            "slug": "dates",
++            "title": "Dates",
++            "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course_1/dates",
++          },
++        ],
++        "title": "Demonstration Course",
++        "verifiedMode": Object {
++          "currencySymbol": "$",
++          "price": 10,
++          "upgradeUrl": "test",
++        },
++      },
++    },
++    "progress": Object {
++      "course-v1:edX+DemoX+Demo_Course_1": Object {
++        "certificateData": Object {},
++        "completionSummary": Object {
++          "completeCount": 1,
++          "incompleteCount": 1,
++          "lockedCount": 0,
++        },
++        "courseGrade": Object {
++          "isPassing": false,
++          "letterGrade": null,
++          "percent": 0,
++        },
++        "courseId": "course-v1:edX+DemoX+Demo_Course_1",
++        "end": "3027-03-31T00:00:00Z",
++        "enrollmentMode": "audit",
++        "gradingPolicy": Object {
++          "assignmentPolicies": Array [
++            Object {
++              "numDroppable": 1,
++              "shortLabel": "HW",
++              "type": "Homework",
++              "weight": 1,
++            },
++          ],
++          "gradeRange": Object {
++            "pass": 0.75,
++          },
++        },
++        "hasScheduledContent": false,
++        "id": "course-v1:edX+DemoX+Demo_Course_1",
++        "sectionScores": Array [
++          Object {
++            "displayName": "First section",
++            "subsections": Array [
++              Object {
++                "assignmentType": "Homework",
++                "displayName": "First subsection",
++                "hasGradedAssignment": true,
++                "numPointsEarned": 0,
++                "numPointsPossible": 1,
++                "percentGraded": 0,
++                "showCorrectness": "always",
++                "showGrades": true,
++                "url": "http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection",
++              },
++            ],
++          },
++          Object {
++            "displayName": "Second section",
++            "subsections": Array [
++              Object {
++                "assignmentType": "Homework",
++                "displayName": "Second subsection",
++                "hasGradedAssignment": true,
++                "numPointsEarned": 1,
++                "numPointsPossible": 1,
++                "percentGraded": 1,
++                "showCorrectness": "always",
++                "showGrades": true,
++                "url": "http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection",
++              },
++            ],
++          },
++        ],
++        "studioUrl": "http://studio.edx.org/settings/grading/course-v1:edX+Test+run",
++        "userHasPassingGrade": false,
++        "verificationData": Object {
++          "link": null,
++          "status": "none",
++          "statusDate": null,
++        },
++        "verifiedMode": null,
++      },
++    },
++  },
++  "recommendations": Object {
++    "recommendationsStatus": "loading",
++  },
++}
++`;
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 96501be..245343e 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -118,8 +118,8 @@ export async function getDatesTabData(courseId) {
+     const { httpErrorStatus } = error && error.customAttributes;
+     if (httpErrorStatus === 404) {
+       global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/dates`);
+-      return {};
+     }
++    // 401 can be returned for unauthenticated users or users who are not enrolled
+     if (httpErrorStatus === 401) {
+       global.location.replace(`${getConfig().BASE_URL}/course/${courseId}/home`);
+     }
+@@ -139,6 +139,10 @@ export async function getProgressTabData(courseId) {
+     if (httpErrorStatus === 404) {
+       global.location.replace(`${getConfig().LMS_BASE_URL}/courses/${courseId}/progress`);
+     }
++    // 401 can be returned for unauthenticated users or users who are not enrolled
++    if (httpErrorStatus === 401) {
++      global.location.replace(`${getConfig().BASE_URL}/course/${courseId}/home`);
++    }
+     throw error;
+   }
+ }
+diff --git a/src/course-home/data/redux.test.js b/src/course-home/data/redux.test.js
+index 1b9760c..62bd0d6 100644
+--- a/src/course-home/data/redux.test.js
++++ b/src/course-home/data/redux.test.js
+@@ -88,6 +88,35 @@ describe('Data layer integration tests', () => {
+     });
+   });
+ 
++  describe('Test fetchProgressTab', () => {
++    const progressBaseUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress`;
++
++    it('Should result in fetch failure if error occurs', async () => {
++      axiosMock.onGet(courseMetadataUrl).networkError();
++      axiosMock.onGet(`${progressBaseUrl}/${courseId}`).networkError();
++
++      await executeThunk(thunks.fetchProgressTab(courseId), store.dispatch);
++
++      expect(loggingService.logError).toHaveBeenCalled();
++      expect(store.getState().courseHome.courseStatus).toEqual('failed');
++    });
++
++    it('Should fetch, normalize, and save metadata', async () => {
++      const progressTabData = Factory.build('progressTabData', { courseId });
++
++      const progressUrl = `${progressBaseUrl}/${courseId}`;
++
++      axiosMock.onGet(courseMetadataUrl).reply(200, courseHomeMetadata);
++      axiosMock.onGet(progressUrl).reply(200, progressTabData);
++
++      await executeThunk(thunks.fetchProgressTab(courseId), store.dispatch);
++
++      const state = store.getState();
++      expect(state.courseHome.courseStatus).toEqual('loaded');
++      expect(state).toMatchSnapshot();
++    });
++  });
++
+   describe('Test saveCourseGoal', () => {
+     it('Should save course goal', async () => {
+       const goalUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/save_course_goal`;
+diff --git a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+index c84b38f..23555e2 100644
+--- a/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
++++ b/src/course-home/progress-tab/certificate-status/CertificateStatus.jsx
+@@ -23,8 +23,11 @@ function CertificateStatus({ intl }) {
+ 
+   const {
+     certificateData,
++    end,
+     hasScheduledContent,
+     userHasPassingGrade,
++    verificationData,
++    verifiedMode,
+   } = useModel('progress', courseId);
+ 
+   const mode = getCourseExitMode(
+@@ -35,16 +38,15 @@ function CertificateStatus({ intl }) {
+   );
+   const dispatch = useDispatch();
+ 
+-  const {
+-    end,
+-    verificationData,
+-    certificateData: {
+-      certStatus,
+-      certWebViewUrl,
+-      downloadUrl,
+-    },
+-    verifiedMode,
+-  } = useModel('progress', courseId);
++  let certStatus;
++  let certWebViewUrl;
++  let downloadUrl;
++
++  if (certificateData) {
++    certStatus = certificateData.certStatus;
++    certWebViewUrl = certificateData.certWebViewUrl;
++    downloadUrl = certificateData.downloadUrl;
++  }
+ 
+   let certCase;
+   let body;
+@@ -66,7 +68,6 @@ function CertificateStatus({ intl }) {
+   } else if (mode === COURSE_EXIT_MODES.celebration) {
+     switch (certStatus) {
+       case 'requesting':
+-        // Requestable
+         certCase = 'requestable';
+         buttonAction = () => { dispatch(requestCert(courseId)); };
+         body = intl.formatMessage(messages[`${certCase}Body`]);
+diff --git a/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx b/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+index ddeb67e..95f0848 100644
+--- a/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
++++ b/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+@@ -22,8 +22,8 @@ function CompletionDonutChart({ intl }) {
+   } = useModel('progress', courseId);
+ 
+   const numTotalUnits = completeCount + incompleteCount + lockedCount;
+-  const completePercentage = Number(((completeCount / numTotalUnits) * 100).toFixed(0));
+-  const lockedPercentage = Number(((lockedCount / numTotalUnits) * 100).toFixed(0));
++  const completePercentage = completeCount ? Number(((completeCount / numTotalUnits) * 100).toFixed(0)) : 0;
++  const lockedPercentage = lockedCount ? Number(((lockedCount / numTotalUnits) * 100).toFixed(0)) : 0;
+   const incompletePercentage = 100 - completePercentage - lockedPercentage;
+ 
+   return (
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+index 97a627e..bdb7917 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -24,7 +24,7 @@ AssignmentTypeCell.propTypes = {
+ 
+ AssignmentTypeCell.defaultProps = {
+   footnoteId: '',
+-  footnoteMarker: '',
++  footnoteMarker: null,
+ };
+ 
+ export default AssignmentTypeCell;
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+index 4d407ff..6f81f0d 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryTable.jsx
+@@ -38,7 +38,7 @@ function GradeSummaryTable({
+ 
+   const gradeSummaryData = assignmentPolicies.map((assignment) => {
+     let footnoteId = '';
+-    let footnoteMarker = '';
++    let footnoteMarker;
+ 
+     if (assignment.numDroppable > 0) {
+       footnoteId = getFootnoteId(assignment);
+diff --git a/src/shared/streak-celebration/StreakCelebrationModal.jsx b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+index c9fe09d..a559bdd 100644
+--- a/src/shared/streak-celebration/StreakCelebrationModal.jsx
++++ b/src/shared/streak-celebration/StreakCelebrationModal.jsx
+@@ -188,22 +188,24 @@ function StreakModal({
+ 
+ StreakModal.defaultProps = {
+   isStreakCelebrationOpen: false,
++  streakLengthToCelebrate: -1,
++  verifiedMode: {},
+   AA759ExperimentEnabled: false,
+ };
+ 
+ StreakModal.propTypes = {
+   courseId: PropTypes.string.isRequired,
+   metadataModel: PropTypes.string.isRequired,
+-  streakLengthToCelebrate: PropTypes.number.isRequired,
++  streakLengthToCelebrate: PropTypes.number,
+   intl: intlShape.isRequired,
+   isStreakCelebrationOpen: PropTypes.bool,
+   closeStreakCelebration: PropTypes.func.isRequired,
+   AA759ExperimentEnabled: PropTypes.bool,
+   verifiedMode: PropTypes.shape({
+-    currencySymbol: PropTypes.string.isRequired,
+-    price: PropTypes.number.isRequired,
+-    upgradeUrl: PropTypes.string.isRequired,
+-  }).isRequired,
++    currencySymbol: PropTypes.string,
++    price: PropTypes.number,
++    upgradeUrl: PropTypes.string,
++  }),
+ };
+ 
+ export default injectIntl(StreakModal);
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 8450fee..5360b12 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -45,7 +45,7 @@ function LoadedTabPage({
+   return (
+     <>
+       <Helmet>
+-        <title>{`${activeTab.title} | ${title} | ${getConfig().SITE_NAME}`}</title>
++        <title>{`${activeTab ? `${activeTab.title} | ` : ''}${title} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+       <Header
+         courseOrg={org}
+-- 
+2.34.1
+

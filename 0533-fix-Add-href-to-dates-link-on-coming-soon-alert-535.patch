@@ -1,0 +1,32 @@
+From e423dddb03d58e6a71b948dd0159e849f723affb Mon Sep 17 00:00:00 2001
+From: Thomas Tracy <contact@tjtracy.com>
+Date: Mon, 12 Jul 2021 13:33:34 -0400
+Subject: [PATCH 0533/1021] [fix] Add href to dates link on coming soon alert
+ (#535)
+
+---
+ .../alerts/scheduled-content-alert/ScheduledCotentAlert.jsx  | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx b/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
+index 5087ac0..4f0dddb 100644
+--- a/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
++++ b/src/course-home/outline-tab/alerts/scheduled-content-alert/ScheduledCotentAlert.jsx
+@@ -25,11 +25,12 @@ function ScheduledContentAlert({ payload }) {
+         </div>
+         <div className="flex-grow-0 pt-3 pt-lg-0">
+           {datesTabLink && (
+-            <Button>
++            <Button
++              href={datesTabLink}
++            >
+               <FormattedMessage
+                 id="learning.outline.alert.scheduled-content.button"
+                 defaultMessage="View Course Schedule"
+-                href={datesTabLink}
+               />
+             </Button>
+           )}
+-- 
+2.34.1
+

@@ -1,0 +1,446 @@
+From 5c204ad0f984e95521127605c089abdceb90a094 Mon Sep 17 00:00:00 2001
+From: Bianca Severino <bseverino@edx.org>
+Date: Fri, 4 Jun 2021 09:06:32 -0400
+Subject: [PATCH 0484/1021] feat: add honor code component (#465)
+
+This component blocks access to graded units when
+the user is required to sign the integrity agreement for
+the course. Once signed, it will not appear for the course
+again.
+---
+ .env                                          |  1 +
+ .env.development                              |  1 +
+ .env.test                                     |  1 +
+ src/courseware/course/sequence/Unit.jsx       | 17 +++++-
+ src/courseware/course/sequence/Unit.test.jsx  | 27 ++++++++-
+ .../course/sequence/honor-code/HonorCode.jsx  | 58 +++++++++++++++++++
+ .../sequence/honor-code/HonorCode.test.jsx    | 33 +++++++++++
+ .../course/sequence/honor-code/index.js       |  1 +
+ .../course/sequence/honor-code/messages.js    | 21 +++++++
+ src/courseware/course/sequence/messages.js    |  5 ++
+ .../__factories__/courseMetadata.factory.js   |  1 +
+ src/courseware/data/api.js                    |  9 +++
+ src/courseware/data/index.js                  |  1 +
+ src/courseware/data/redux.test.js             | 29 ++++++++++
+ src/courseware/data/thunks.js                 | 18 ++++++
+ 15 files changed, 219 insertions(+), 4 deletions(-)
+ create mode 100644 src/courseware/course/sequence/honor-code/HonorCode.jsx
+ create mode 100644 src/courseware/course/sequence/honor-code/HonorCode.test.jsx
+ create mode 100644 src/courseware/course/sequence/honor-code/index.js
+ create mode 100644 src/courseware/course/sequence/honor-code/messages.js
+
+diff --git a/.env b/.env
+index ebb0a7e..2b2bf47 100644
+--- a/.env
++++ b/.env
+@@ -28,6 +28,7 @@ SUPPORT_URL=''
+ SUPPORT_URL_CALCULATOR_MATH=''
+ SUPPORT_URL_ID_VERIFICATION=''
+ SUPPORT_URL_VERIFIED_CERTIFICATE=''
++TERMS_OF_SERVICE_URL=''
+ TWITTER_HASHTAG=''
+ TWITTER_URL=''
+ USER_INFO_COOKIE_NAME=''
+diff --git a/.env.development b/.env.development
+index 2610c8b..f0b2b65 100644
+--- a/.env.development
++++ b/.env.development
+@@ -28,6 +28,7 @@ SUPPORT_URL='https://support.edx.org'
+ SUPPORT_URL_CALCULATOR_MATH='https://support.edx.org/hc/en-us/articles/360000038428-Entering-math-expressions-in-assignments-or-the-calculator'
+ SUPPORT_URL_ID_VERIFICATION='https://support.edx.org/hc/en-us/articles/206503858-How-do-I-verify-my-identity'
+ SUPPORT_URL_VERIFIED_CERTIFICATE='https://support.edx.org/hc/en-us/articles/206502008-What-is-a-verified-certificate'
++TERMS_OF_SERVICE_URL='https://www.edx.org/edx-terms-service'
+ TWITTER_HASHTAG='myedxjourney'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+diff --git a/.env.test b/.env.test
+index a9297d8..45fd13f 100644
+--- a/.env.test
++++ b/.env.test
+@@ -28,6 +28,7 @@ SUPPORT_URL='https://support.edx.org'
+ SUPPORT_URL_CALCULATOR_MATH='https://support.edx.org/hc/en-us/articles/360000038428-Entering-math-expressions-in-assignments-or-the-calculator'
+ SUPPORT_URL_ID_VERIFICATION='https://support.edx.org/hc/en-us/articles/206503858-How-do-I-verify-my-identity'
+ SUPPORT_URL_VERIFIED_CERTIFICATE='https://support.edx.org/hc/en-us/articles/206502008-What-is-a-verified-certificate'
++TERMS_OF_SERVICE_URL='https://www.edx.org/edx-terms-service'
+ TWITTER_HASHTAG='myedxjourney'
+ TWITTER_URL='https://twitter.com/edXOnline'
+ USER_INFO_COOKIE_NAME='edx-user-info'
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 0c3dbe9..6e7d6b3 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -21,6 +21,7 @@ import { fetchCourse } from '../../data/thunks';
+ /** [MM-P2P] Experiment */
+ import { MMP2PLockPaywall } from '../../../experiments/mm-p2p';
+ 
++const HonorCode = React.lazy(() => import('./honor-code'));
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
+ 
+ /**
+@@ -93,6 +94,7 @@ function Unit({
+   const course = useModel('coursewareMeta', courseId);
+   const {
+     contentTypeGatingEnabled,
++    userNeedsIntegritySignature,
+   } = course;
+ 
+   const dispatch = useDispatch();
+@@ -154,8 +156,19 @@ function Unit({
+       { mmp2p.meta.showLock && (
+         <MMP2PLockPaywall options={mmp2p} />
+       )}
++      {!mmp2p.meta.blockContent && unit.graded && userNeedsIntegritySignature && (
++        <Suspense
++          fallback={(
++            <PageLoading
++              srMessage={intl.formatMessage(messages['learn.loading.honor.code'])}
++            />
++          )}
++        >
++          <HonorCode courseId={courseId} />
++        </Suspense>
++      )}
+       { /** [MM-P2P] Experiment (conditional) */ }
+-      {!mmp2p.meta.blockContent && !hasLoaded && (
++      {!mmp2p.meta.blockContent && !userNeedsIntegritySignature && !hasLoaded && (
+         <PageLoading
+           srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+         />
+@@ -186,7 +199,7 @@ function Unit({
+         />
+       )}
+       { /** [MM-P2P] Experiment (conditional) */ }
+-      { !mmp2p.meta.blockContent && (
++      { !mmp2p.meta.blockContent && !userNeedsIntegritySignature && (
+         <div className="unit-iframe-wrapper">
+           <iframe
+             id="unit-iframe"
+diff --git a/src/courseware/course/sequence/Unit.test.jsx b/src/courseware/course/sequence/Unit.test.jsx
+index dfddc2a..c92b393 100644
+--- a/src/courseware/course/sequence/Unit.test.jsx
++++ b/src/courseware/course/sequence/Unit.test.jsx
+@@ -13,11 +13,16 @@ describe('Unit', () => {
+   );
+   const unitBlocks = [Factory.build(
+     'block',
+-    { type: 'problem' },
++    { type: 'problem', graded: 'true' },
+     { courseId: courseMetadata.id },
+   ), Factory.build(
+     'block',
+-    { type: 'vertical', contains_content_type_gated_content: true, bookmarked: true },
++    {
++      type: 'vertical',
++      contains_content_type_gated_content: true,
++      bookmarked: true,
++      graded: true,
++    },
+     { courseId: courseMetadata.id },
+   )];
+   const [unit, unitThatContainsGatedContent] = unitBlocks;
+@@ -49,6 +54,24 @@ describe('Unit', () => {
+     expect(screen.getByText('Loading locked content messaging...')).toBeInTheDocument();
+   });
+ 
++  it('displays HonorCode when userNeedsIntegritySignature is true', async () => {
++    const signatureMetadata = Factory.build(
++      'courseMetadata',
++      { user_needs_integrity_signature: true },
++    );
++    const signatureStore = await initializeTestStore(
++      { courseMetadata: signatureMetadata, unitBlocks },
++      false,
++    );
++    const signatureData = {
++      id: unit.id,
++      courseId: signatureMetadata.id,
++      format: 'Homework',
++    };
++    render(<Unit {...signatureData} />, { store: signatureStore });
++    expect(screen.getByText('Loading honor code messaging...')).toBeInTheDocument();
++  });
++
+   it('handles receiving MessageEvent', async () => {
+     render(<Unit {...mockData} />);
+     loadUnit();
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.jsx b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+new file mode 100644
+index 0000000..1d9f399
+--- /dev/null
++++ b/src/courseware/course/sequence/honor-code/HonorCode.jsx
+@@ -0,0 +1,58 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { useDispatch } from 'react-redux';
++import { getConfig, history } from '@edx/frontend-platform';
++import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { ActionRow, Alert, Button } from '@edx/paragon';
++
++import { saveIntegritySignature } from '../../../data';
++import messages from './messages';
++
++function HonorCode({ intl, courseId }) {
++  const dispatch = useDispatch();
++  const siteName = getConfig().SITE_NAME;
++  const honorCodeUrl = `${process.env.TERMS_OF_SERVICE_URL}#honor-code`;
++
++  const handleCancel = () => history.push(`/course/${courseId}/home`);
++
++  const handleAgree = () => {
++    dispatch(saveIntegritySignature(courseId));
++  };
++
++  return (
++    <Alert variant="light" aria-live="off">
++      <h4 aria-level="3">
++        {siteName}{' '}
++        {intl.formatMessage(messages['learn.honorCode.name'])}
++      </h4>
++
++      <p>
++        <FormattedMessage
++          id="learn.honorCode.content"
++          defaultMessage="Honesty and academic integrity are important to {siteName} and the institutions providing courses and programs on the {siteName} site. By clicking “I agree” below, I confirm that I have read, understand, and will abide by the {link} for the {siteName} Site."
++          values={{
++            siteName,
++            link: <a href={honorCodeUrl}>{intl.formatMessage(messages['learn.honorCode.name'])}</a>,
++          }}
++        />
++      </p>
++
++      <ActionRow>
++        <ActionRow.Spacer />
++        <Button variant="tertiary" onClick={handleCancel}>
++          {intl.formatMessage(messages['learn.honorCode.cancel'])}
++        </Button>
++        <Button variant="primary" onClick={handleAgree}>
++          {intl.formatMessage(messages['learn.honorCode.agree'])}
++        </Button>
++      </ActionRow>
++    </Alert>
++  );
++}
++
++HonorCode.propTypes = {
++  intl: intlShape.isRequired,
++  courseId: PropTypes.string.isRequired,
++};
++
++export default injectIntl(HonorCode);
+diff --git a/src/courseware/course/sequence/honor-code/HonorCode.test.jsx b/src/courseware/course/sequence/honor-code/HonorCode.test.jsx
+new file mode 100644
+index 0000000..2708dcb
+--- /dev/null
++++ b/src/courseware/course/sequence/honor-code/HonorCode.test.jsx
+@@ -0,0 +1,33 @@
++import React from 'react';
++import { history } from '@edx/frontend-platform';
++
++import {
++  fireEvent, initializeTestStore, render, screen,
++} from '../../../../setupTest';
++import HonorCode from './HonorCode';
++
++jest.mock('@edx/frontend-platform', () => ({
++  ...jest.requireActual('@edx/frontend-platform'),
++  history: {
++    push: jest.fn(),
++  },
++}));
++
++describe('Honor Code', () => {
++  let store;
++  const mockData = {};
++
++  beforeAll(async () => {
++    store = await initializeTestStore();
++    const { courseware } = store.getState();
++    mockData.courseId = courseware.courseId;
++  });
++
++  it('cancel button links to course home ', () => {
++    render(<HonorCode {...mockData} />);
++
++    const cancelButton = screen.getByText('Cancel');
++    fireEvent.click(cancelButton);
++    expect(history.push).toHaveBeenCalledWith(`/course/${mockData.courseId}/home`);
++  });
++});
+diff --git a/src/courseware/course/sequence/honor-code/index.js b/src/courseware/course/sequence/honor-code/index.js
+new file mode 100644
+index 0000000..1522036
+--- /dev/null
++++ b/src/courseware/course/sequence/honor-code/index.js
+@@ -0,0 +1 @@
++export { default } from './HonorCode';
+diff --git a/src/courseware/course/sequence/honor-code/messages.js b/src/courseware/course/sequence/honor-code/messages.js
+new file mode 100644
+index 0000000..b988426
+--- /dev/null
++++ b/src/courseware/course/sequence/honor-code/messages.js
+@@ -0,0 +1,21 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  'learn.honorCode.name': {
++    id: 'learn.honorCode.name',
++    defaultMessage: 'Honor Code',
++    description: 'Honor code name.',
++  },
++  'learn.honorCode.cancel': {
++    id: 'learn.honorCode.cancel',
++    defaultMessage: 'Cancel',
++    description: '"Cancel" button.',
++  },
++  'learn.honorCode.agree': {
++    id: 'learn.honorCode.agree',
++    defaultMessage: 'I agree',
++    description: '"I agree" button.',
++  },
++});
++
++export default messages;
+diff --git a/src/courseware/course/sequence/messages.js b/src/courseware/course/sequence/messages.js
+index 0cd447f..0f3e43f 100644
+--- a/src/courseware/course/sequence/messages.js
++++ b/src/courseware/course/sequence/messages.js
+@@ -6,6 +6,11 @@ const messages = defineMessages({
+     defaultMessage: 'Loading locked content messaging...',
+     description: 'Message shown when an interface about locked content is being loaded',
+   },
++  'learn.loading.honor.code': {
++    id: 'learn.loading.honor.codk',
++    defaultMessage: 'Loading honor code messaging...',
++    description: 'Message shown when an interface about the honor code is being loaded',
++  },
+   'learn.loading.learning.sequence': {
+     id: 'learn.loading.learning.sequence',
+     defaultMessage: 'Loading learning sequence...',
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 1455be5..72bc62e 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -56,5 +56,6 @@ Factory.define('courseMetadata')
+     verification_status: 'none',
+     linkedin_add_to_profile_url: null,
+     related_programs: null,
++    user_needs_integrity_signature: false,
+     is_mfe_special_exams_enabled: false,
+   });
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 6e2cf65..c067062 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -151,6 +151,7 @@ function normalizeMetadata(metadata) {
+     verificationStatus: metadata.verification_status,
+     linkedinAddToProfileUrl: metadata.linkedin_add_to_profile_url,
+     relatedPrograms: camelCaseObject(metadata.related_programs),
++    userNeedsIntegritySignature: metadata.user_needs_integrity_signature,
+     specialExamsEnabledWaffleFlag: metadata.is_mfe_special_exams_enabled,
+   };
+ }
+@@ -194,6 +195,7 @@ function normalizeSequenceMetadata(sequence) {
+       complete: unit.complete,
+       title: unit.page_title,
+       contentType: unit.type,
++      graded: unit.graded,
+       containsContentTypeGatedContent: unit.contains_content_type_gated_content,
+     })),
+   };
+@@ -230,3 +232,10 @@ export async function getResumeBlock(courseId) {
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+   return camelCaseObject(data);
+ }
++
++export async function postIntegritySignature(courseId) {
++  const { data } = await getAuthenticatedHttpClient().post(
++    `${getConfig().LMS_BASE_URL}/api/agreements/v1/integrity_signature/${courseId}`, {},
++  );
++  return camelCaseObject(data);
++}
+diff --git a/src/courseware/data/index.js b/src/courseware/data/index.js
+index d5974bf..5961756 100644
+--- a/src/courseware/data/index.js
++++ b/src/courseware/data/index.js
+@@ -2,6 +2,7 @@ export {
+   fetchCourse,
+   fetchSequence,
+   checkBlockCompletion,
++  saveIntegritySignature,
+   saveSequencePosition,
+ } from './thunks';
+ export {
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index dc04f63..40ef4eb 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -262,4 +262,33 @@ describe('Data layer integration tests', () => {
+       });
+     });
+   });
++
++  describe('test saveIntegritySignature', () => {
++    it('Should update userNeedsIntegritySignature upon success', async () => {
++      const courseMetadataNeedSignature = Factory.build('courseMetadata', {
++        user_needs_integrity_signature: true,
++      });
++
++      let courseUrlNeedSignature = `${courseBaseUrl}/${courseMetadataNeedSignature.id}`;
++      courseUrlNeedSignature = appendBrowserTimezoneToUrl(courseUrlNeedSignature);
++
++      axiosMock.onGet(courseUrlNeedSignature).reply(200, courseMetadataNeedSignature);
++
++      await executeThunk(thunks.fetchCourse(courseMetadataNeedSignature.id), store.dispatch);
++      expect(
++        store.getState().models.coursewareMeta[courseMetadataNeedSignature.id].userNeedsIntegritySignature,
++      ).toEqual(true);
++
++      const integritySignatureUrl = `${getConfig().LMS_BASE_URL}/api/agreements/v1/integrity_signature/${courseMetadataNeedSignature.id}`;
++      axiosMock.onPost(integritySignatureUrl).reply(200, {});
++      await executeThunk(
++        thunks.saveIntegritySignature(courseMetadataNeedSignature.id),
++        store.dispatch,
++        store.getState,
++      );
++      expect(
++        store.getState().models.coursewareMeta[courseMetadataNeedSignature.id].userNeedsIntegritySignature,
++      ).toEqual(false);
++    });
++  });
+ });
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 1d3521c..bea60c8 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -5,6 +5,7 @@ import {
+   getCourseMetadata,
+   getCourseBlocks,
+   getSequenceMetadata,
++  postIntegritySignature,
+ } from './api';
+ import {
+   updateModel, addModel, updateModelsMap, addModelsMap, updateModels,
+@@ -181,3 +182,20 @@ export function saveSequencePosition(courseId, sequenceId, activeUnitIndex) {
+     }
+   };
+ }
++
++export function saveIntegritySignature(courseId) {
++  return async (dispatch) => {
++    try {
++      await postIntegritySignature(courseId);
++      dispatch(updateModel({
++        modelType: 'coursewareMeta',
++        model: {
++          id: courseId,
++          userNeedsIntegritySignature: false,
++        },
++      }));
++    } catch (error) {
++      logError(error);
++    }
++  };
++}
+-- 
+2.34.1
+

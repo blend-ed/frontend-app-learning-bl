@@ -1,0 +1,37 @@
+From cf61c7a7474192d8462a8cb439351230b71091ee Mon Sep 17 00:00:00 2001
+From: David Ormsbee <dave@edx.org>
+Date: Mon, 7 Jun 2021 12:30:42 -0400
+Subject: [PATCH 0488/1021] fix: display Unit titles as <h1> (TNL-8387)
+
+Unit titles were being written to the page as <h2> because the old
+courseware experience reserved <h1> for wrapping the header logo link.
+We've since determined that this is not a best practice, and the new
+courseware MFE in this repo no longer uses a <h1> for that purpose, but
+the Unit title was never promoted from <h2> to <h1> until this commit.
+
+Course teams have traditionally been permitted to use <h3>-<h6> in their
+content. Making this change does mean that there will now be a gap with
+some content, where we skip from <h1> to <h3>. For the short term, we
+are NOT recommending course teams use <h2>, until we have a better
+chance to evaluate whether that heading should remain reserved for
+platform-level use.
+---
+ src/courseware/course/sequence/Unit.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 6e7d6b3..4cc96fc 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -135,7 +135,7 @@ function Unit({
+ 
+   return (
+     <div className="unit">
+-      <h2 className="mb-0 h3">{unit.title}</h2>
++      <h1 className="mb-0 h3">{unit.title}</h1>
+       <BookmarkButton
+         unitId={unit.id}
+         isBookmarked={unit.bookmarked}
+-- 
+2.34.1
+

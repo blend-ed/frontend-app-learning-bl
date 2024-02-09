@@ -1,0 +1,620 @@
+From d3b22bc879b64d98db787faca572a56626365303 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Thu, 30 Apr 2020 10:22:44 -0400
+Subject: [PATCH 0108/1021] TNL-7164, Enroll Now button fix, flash messages,
+ and custom message props (#53)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Adding an index.js file for user-messages.
+
+Importing from the module, not its contents.
+
+* Allowing customProps to be passed though AlertList to Alerts.
+
+* UserMessagesProvider can create flash messages.
+
+A flash message is one that will be displayed on the next reload of the page.  UserMessagesProvider now provides a “addFlash” function.  These messages are stored in localStorage and displayed the next time UserMessagesProvider is mounted, which is generally going to be on the next page refresh.
+
+Once displayed, flash messages are cleared out of localStorage.
+
+* Hooking up Enroll Now button and adding “success” alert.
+
+Success alert is shown as a flash message on next page reload.
+
+* Using ALERT_TYPES constants.
+---
+ .../AccessExpirationAlert.jsx                 |  2 +-
+ src/access-expiration-alert/hooks.js          |  2 +-
+ src/course-home/CourseHome.jsx                |  2 +-
+ src/courseware/course/Course.jsx              |  6 +-
+ src/courseware/course/sequence/Sequence.jsx   |  4 +-
+ src/enrollment-alert/EnrollmentAlert.jsx      | 23 ++++-
+ src/enrollment-alert/StaffEnrollmentAlert.jsx | 23 ++++-
+ src/enrollment-alert/data/api.js              |  9 ++
+ src/enrollment-alert/hooks.js                 | 44 ++++++---
+ src/enrollment-alert/messages.js              |  5 +
+ src/index.jsx                                 |  2 +-
+ src/logistration-alert/LogistrationAlert.jsx  |  2 +-
+ src/logistration-alert/hooks.js               |  4 +-
+ src/offer-alert/OfferAlert.jsx                |  2 +-
+ src/offer-alert/hooks.js                      |  2 +-
+ src/user-messages/Alert.jsx                   | 16 ++--
+ src/user-messages/AlertList.jsx               |  8 +-
+ src/user-messages/UserMessagesProvider.jsx    | 92 +++++++++++++++++--
+ src/user-messages/index.js                    |  4 +
+ 19 files changed, 199 insertions(+), 53 deletions(-)
+ create mode 100644 src/enrollment-alert/data/api.js
+ create mode 100644 src/user-messages/index.js
+
+diff --git a/src/access-expiration-alert/AccessExpirationAlert.jsx b/src/access-expiration-alert/AccessExpirationAlert.jsx
+index 0c9c038..adbd3e6 100644
+--- a/src/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import Alert from '../user-messages/Alert';
++import { Alert } from '../user-messages';
+ 
+ function AccessExpirationAlert(props) {
+   const {
+diff --git a/src/access-expiration-alert/hooks.js b/src/access-expiration-alert/hooks.js
+index 7bbe325..877d408 100644
+--- a/src/access-expiration-alert/hooks.js
++++ b/src/access-expiration-alert/hooks.js
+@@ -1,6 +1,6 @@
+ /* eslint-disable import/prefer-default-export */
+ import { useContext, useState, useEffect } from 'react';
+-import UserMessagesContext from '../user-messages/UserMessagesContext';
++import { UserMessagesContext } from '../user-messages';
+ import { useModel } from '../model-store';
+ 
+ export function useAccessExpirationAlert(courseId) {
+diff --git a/src/course-home/CourseHome.jsx b/src/course-home/CourseHome.jsx
+index 1deda22..577b101 100644
+--- a/src/course-home/CourseHome.jsx
++++ b/src/course-home/CourseHome.jsx
+@@ -2,7 +2,7 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { Button } from '@edx/paragon';
+ 
+-import AlertList from '../user-messages/AlertList';
++import { AlertList } from '../user-messages';
+ import { Header, CourseTabsNavigation } from '../course-header';
+ import { useLogistrationAlert } from '../logistration-alert';
+ import { useEnrollmentAlert } from '../enrollment-alert';
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 5083677..e5b175b 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { useSelector } from 'react-redux';
+-import AlertList from '../../user-messages/AlertList';
++import { AlertList } from '../../user-messages';
+ import { useAccessExpirationAlert } from '../../access-expiration-alert';
+ import { useLogistrationAlert } from '../../logistration-alert';
+ import { useEnrollmentAlert } from '../../enrollment-alert';
+@@ -86,6 +86,10 @@ function Course({
+               clientAccessExpirationAlert: AccessExpirationAlert,
+               clientOfferAlert: OfferAlert,
+             }}
++            // courseId is provided because EnrollmentAlert and StaffEnrollmentAlert require it.
++            customProps={{
++              courseId,
++            }}
+           />
+           <CourseBreadcrumbs
+             courseId={courseId}
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 8befcbb..5809d3e 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -11,7 +11,7 @@ import Unit from './Unit';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+ import PageLoading from '../../../PageLoading';
+ import messages from './messages';
+-import UserMessagesContext from '../../../user-messages/UserMessagesContext';
++import { UserMessagesContext, ALERT_TYPES } from '../../../user-messages';
+ import { useModel } from '../../../model-store';
+ 
+ const ContentLock = React.lazy(() => import('./content-lock'));
+@@ -78,7 +78,7 @@ function Sequence({
+           code: null,
+           dismissible: false,
+           text: sequence.bannerText,
+-          type: 'info',
++          type: ALERT_TYPES.INFO,
+           topic: 'sequence',
+         });
+       }
+diff --git a/src/enrollment-alert/EnrollmentAlert.jsx b/src/enrollment-alert/EnrollmentAlert.jsx
+index fc15e53..a684ca4 100644
+--- a/src/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/enrollment-alert/EnrollmentAlert.jsx
+@@ -1,24 +1,37 @@
+ import React from 'react';
+-import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import PropTypes from 'prop-types';
++import { Button } from '@edx/paragon';
++
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faSpinner } from '@fortawesome/free-solid-svg-icons';
++import { Alert } from '../user-messages';
+ 
+-import Alert from '../user-messages/Alert';
+ import messages from './messages';
++import { useEnrollClickHandler } from './hooks';
++
++function EnrollmentAlert({ intl, courseId }) {
++  const { enrollClickHandler, loading } = useEnrollClickHandler(
++    courseId,
++    intl.formatMessage(messages['learning.enrollment.success']),
++  );
+ 
+-function EnrollmentAlert({ intl }) {
+   return (
+     <Alert type="error">
+       {intl.formatMessage(messages['learning.enrollment.alert'])}
+       {' '}
+-      <a href={`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`}>
++      <Button disabled={loading} className="btn-link p-0 border-0 align-top" onClick={enrollClickHandler}>
+         {intl.formatMessage(messages['learning.enrollment.enroll.now'])}
+-      </a>
++      </Button>
++      {' '}
++      {loading && <FontAwesomeIcon icon={faSpinner} spin />}
+     </Alert>
+   );
+ }
+ 
+ EnrollmentAlert.propTypes = {
+   intl: intlShape.isRequired,
++  courseId: PropTypes.string.isRequired,
+ };
+ 
+ export default injectIntl(EnrollmentAlert);
+diff --git a/src/enrollment-alert/StaffEnrollmentAlert.jsx b/src/enrollment-alert/StaffEnrollmentAlert.jsx
+index 0e297a3..c5fd849 100644
+--- a/src/enrollment-alert/StaffEnrollmentAlert.jsx
++++ b/src/enrollment-alert/StaffEnrollmentAlert.jsx
+@@ -1,24 +1,37 @@
+ import React from 'react';
+-import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import PropTypes from 'prop-types';
++import { Button } from '@edx/paragon';
++
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faSpinner } from '@fortawesome/free-solid-svg-icons';
++import { Alert } from '../user-messages';
+ 
+-import Alert from '../user-messages/Alert';
+ import messages from './messages';
++import { useEnrollClickHandler } from './hooks';
++
++function StaffEnrollmentAlert({ intl, courseId }) {
++  const { enrollClickHandler, loading } = useEnrollClickHandler(
++    courseId,
++    intl.formatMessage(messages['learning.enrollment.success']),
++  );
+ 
+-function StaffEnrollmentAlert({ intl }) {
+   return (
+     <Alert type="info" dismissible>
+       {intl.formatMessage(messages['learning.staff.enrollment.alert'])}
+       {' '}
+-      <a href={`${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`}>
++      <Button disabled={loading} className="btn-link p-0 border-0 align-top" onClick={enrollClickHandler}>
+         {intl.formatMessage(messages['learning.enrollment.enroll.now'])}
+-      </a>
++      </Button>
++      {' '}
++      {loading && <FontAwesomeIcon icon={faSpinner} spin />}
+     </Alert>
+   );
+ }
+ 
+ StaffEnrollmentAlert.propTypes = {
+   intl: intlShape.isRequired,
++  courseId: PropTypes.string.isRequired,
+ };
+ 
+ export default injectIntl(StaffEnrollmentAlert);
+diff --git a/src/enrollment-alert/data/api.js b/src/enrollment-alert/data/api.js
+new file mode 100644
+index 0000000..2989bfb
+--- /dev/null
++++ b/src/enrollment-alert/data/api.js
+@@ -0,0 +1,9 @@
++/* eslint-disable import/prefer-default-export */
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { getConfig } from '@edx/frontend-platform';
++
++export async function postCourseEnrollment(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/enrollment/v1/enrollment`;
++  const { data } = await getAuthenticatedHttpClient().post(url, { course_details: { course_id: courseId } });
++  return data;
++}
+diff --git a/src/enrollment-alert/hooks.js b/src/enrollment-alert/hooks.js
+index b2bdfc5..a6be779 100644
+--- a/src/enrollment-alert/hooks.js
++++ b/src/enrollment-alert/hooks.js
+@@ -1,7 +1,10 @@
+ /* eslint-disable import/prefer-default-export */
+-import { useContext, useState, useEffect } from 'react';
+-import UserMessagesContext from '../user-messages/UserMessagesContext';
++import {
++  useContext, useState, useEffect, useCallback,
++} from 'react';
++import { UserMessagesContext, ALERT_TYPES } from '../user-messages';
+ import { useModel } from '../model-store';
++import { postCourseEnrollment } from './data/api';
+ 
+ export function useEnrollmentAlert(courseId) {
+   const course = useModel('courses', courseId);
+@@ -11,17 +14,11 @@ export function useEnrollmentAlert(courseId) {
+   useEffect(() => {
+     if (course && course.isEnrolled !== undefined) {
+       if (!course.isEnrolled && alertId === null) {
+-        if (course.isStaff) {
+-          setAlertId(add({
+-            code: 'clientStaffEnrollmentAlert',
+-            topic: 'course',
+-          }));
+-        } else {
+-          setAlertId(add({
+-            code: 'clientEnrollmentAlert',
+-            topic: 'course',
+-          }));
+-        }
++        const code = course.isStaff ? 'clientStaffEnrollmentAlert' : 'clientEnrollmentAlert';
++        setAlertId(add({
++          code,
++          topic: 'course',
++        }));
+       } else if (course.isEnrolled && alertId !== null) {
+         remove(alertId);
+         setAlertId(null);
+@@ -34,3 +31,24 @@ export function useEnrollmentAlert(courseId) {
+     };
+   }, [course, isEnrolled]);
+ }
++
++export function useEnrollClickHandler(courseId, successText) {
++  const [loading, setLoading] = useState(false);
++  const { addFlash } = useContext(UserMessagesContext);
++  const enrollClickHandler = useCallback(() => {
++    setLoading(true);
++    postCourseEnrollment(courseId).then(() => {
++      addFlash({
++        dismissible: true,
++        flash: true,
++        text: successText,
++        type: ALERT_TYPES.SUCCESS,
++        topic: 'course',
++      });
++      setLoading(false);
++      global.location.reload();
++    });
++  }, [courseId]);
++
++  return { enrollClickHandler, loading };
++}
+diff --git a/src/enrollment-alert/messages.js b/src/enrollment-alert/messages.js
+index 4546ff2..659d684 100644
+--- a/src/enrollment-alert/messages.js
++++ b/src/enrollment-alert/messages.js
+@@ -16,6 +16,11 @@ const messages = defineMessages({
+     defaultMessage: 'Enroll Now',
+     description: 'A link prompting the user to click on it to enroll in the currently viewed course.',
+   },
++  'learning.enrollment.success': {
++    id: 'learning.enrollment.success',
++    defaultMessage: "You've successfully enrolled in this course!",
++    description: 'A message telling the user that their course enrollment was successful.',
++  },
+ });
+ 
+ export default messages;
+diff --git a/src/index.jsx b/src/index.jsx
+index 78e0c77..21f3461 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -13,7 +13,7 @@ import { messages as headerMessages } from '@edx/frontend-component-header';
+ import Footer, { messages as footerMessages } from '@edx/frontend-component-footer';
+ 
+ import appMessages from './i18n';
+-import UserMessagesProvider from './user-messages/UserMessagesProvider';
++import { UserMessagesProvider } from './user-messages';
+ 
+ import './index.scss';
+ import './assets/favicon.ico';
+diff --git a/src/logistration-alert/LogistrationAlert.jsx b/src/logistration-alert/LogistrationAlert.jsx
+index 0848e99..e1efaf9 100644
+--- a/src/logistration-alert/LogistrationAlert.jsx
++++ b/src/logistration-alert/LogistrationAlert.jsx
+@@ -3,7 +3,7 @@ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
+ 
+-import Alert from '../user-messages/Alert';
++import { Alert } from '../user-messages';
+ import messages from './messages';
+ 
+ function LogistrationAlert({ intl }) {
+diff --git a/src/logistration-alert/hooks.js b/src/logistration-alert/hooks.js
+index bd21a0c..f0f4adc 100644
+--- a/src/logistration-alert/hooks.js
++++ b/src/logistration-alert/hooks.js
+@@ -1,7 +1,7 @@
+ /* eslint-disable import/prefer-default-export */
+ import { useContext, useState, useEffect } from 'react';
+ import { AppContext } from '@edx/frontend-platform/react';
+-import UserMessagesContext from '../user-messages/UserMessagesContext';
++import { UserMessagesContext, ALERT_TYPES } from '../user-messages';
+ 
+ export function useLogistrationAlert() {
+   const { authenticatedUser } = useContext(AppContext);
+@@ -12,7 +12,7 @@ export function useLogistrationAlert() {
+       setAlertId(add({
+         code: 'clientLogistrationAlert',
+         dismissible: false,
+-        type: 'error',
++        type: ALERT_TYPES.ERROR,
+         topic: 'course',
+       }));
+     } else if (authenticatedUser !== null && alertId !== null) {
+diff --git a/src/offer-alert/OfferAlert.jsx b/src/offer-alert/OfferAlert.jsx
+index 2df0b70..719b3f6 100644
+--- a/src/offer-alert/OfferAlert.jsx
++++ b/src/offer-alert/OfferAlert.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import Alert from '../user-messages/Alert';
++import { Alert } from '../user-messages';
+ 
+ function OfferAlert(props) {
+   const {
+diff --git a/src/offer-alert/hooks.js b/src/offer-alert/hooks.js
+index 4518c0b..0bcbad3 100644
+--- a/src/offer-alert/hooks.js
++++ b/src/offer-alert/hooks.js
+@@ -1,6 +1,6 @@
+ /* eslint-disable import/prefer-default-export */
+ import { useContext, useState, useEffect } from 'react';
+-import UserMessagesContext from '../user-messages/UserMessagesContext';
++import { UserMessagesContext } from '../user-messages';
+ import { useModel } from '../model-store';
+ 
+ export function useOfferAlert(courseId) {
+diff --git a/src/user-messages/Alert.jsx b/src/user-messages/Alert.jsx
+index 9fb2281..8b62d0a 100644
+--- a/src/user-messages/Alert.jsx
++++ b/src/user-messages/Alert.jsx
+@@ -7,27 +7,29 @@ import {
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { Button } from '@edx/paragon';
+ 
++import { ALERT_TYPES } from './UserMessagesProvider';
++
+ function getAlertClass(type) {
+-  if (type === 'error') {
++  if (type === ALERT_TYPES.ERROR) {
+     return 'alert-warning';
+   }
+-  if (type === 'danger') {
++  if (type === ALERT_TYPES.DANGER) {
+     return 'alert-danger';
+   }
+-  if (type === 'success') {
++  if (type === ALERT_TYPES.SUCCESS) {
+     return 'alert-success';
+   }
+   return 'alert-info';
+ }
+ 
+ function getAlertIcon(type) {
+-  if (type === 'error') {
++  if (type === ALERT_TYPES.ERROR) {
+     return faExclamationTriangle;
+   }
+-  if (type === 'danger') {
++  if (type === ALERT_TYPES.DANGER) {
+     return faMinusCircle;
+   }
+-  if (type === 'success') {
++  if (type === ALERT_TYPES.SUCCESS) {
+     return faCheckCircle;
+   }
+   return faInfoCircle;
+@@ -53,7 +55,7 @@ function Alert({
+ 
+ 
+ Alert.propTypes = {
+-  type: PropTypes.oneOf(['error', 'danger', 'info', 'success']).isRequired,
++  type: PropTypes.oneOf([ALERT_TYPES.ERROR, ALERT_TYPES.DANGER, ALERT_TYPES.INFO, ALERT_TYPES.SUCCESS]).isRequired,
+   dismissible: PropTypes.bool,
+   children: PropTypes.node,
+   onDismiss: PropTypes.func,
+diff --git a/src/user-messages/AlertList.jsx b/src/user-messages/AlertList.jsx
+index cae5c36..0db4ece 100644
+--- a/src/user-messages/AlertList.jsx
++++ b/src/user-messages/AlertList.jsx
+@@ -4,7 +4,9 @@ import PropTypes from 'prop-types';
+ import UserMessagesContext from './UserMessagesContext';
+ import Alert from './Alert';
+ 
+-export default function AlertList({ topic, className, customAlerts }) {
++export default function AlertList({
++  topic, className, customAlerts, customProps,
++}) {
+   const { remove, messages } = useContext(UserMessagesContext);
+   const getAlertComponent = useCallback(
+     (code) => (customAlerts[code] !== undefined ? customAlerts[code] : Alert),
+@@ -27,6 +29,7 @@ export default function AlertList({ topic, className, customAlerts }) {
+               dismissible={message.dismissible}
+               onDismiss={() => remove(message.id)}
+               rawHtml={message.rawHtml}
++              {...customProps}
+             >
+               {message.text}
+             </AlertComponent>
+@@ -47,10 +50,13 @@ AlertList.propTypes = {
+       PropTypes.node,
+     ]),
+   ),
++  // eslint-disable-next-line react/forbid-prop-types
++  customProps: PropTypes.object,
+ };
+ 
+ AlertList.defaultProps = {
+   topic: null,
+   className: null,
+   customAlerts: {},
++  customProps: {},
+ };
+diff --git a/src/user-messages/UserMessagesProvider.jsx b/src/user-messages/UserMessagesProvider.jsx
+index e7191c7..f227170 100644
+--- a/src/user-messages/UserMessagesProvider.jsx
++++ b/src/user-messages/UserMessagesProvider.jsx
+@@ -1,8 +1,61 @@
+-import React, { useState, useRef } from 'react';
++import React, { useState, useRef, useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import UserMessagesContext from './UserMessagesContext';
+ 
++export const ALERT_TYPES = {
++  ERROR: 'error',
++  DANGER: 'danger',
++  SUCCESS: 'success',
++  INFO: 'info',
++};
++
++// NOTE: This storage key is not namespaced.  That means that it's shared for the current fully
++// qualified domain.  Namespacing could be added by adding an optional prop to UserMessagesProvider
++// to set a namespace, but we'll cross that bridge when we need it.
++const FLASH_MESSAGES_LOCAL_STORAGE_KEY = 'UserMessagesProvider.flashMessages';
++
++function getFlashMessages() {
++  let flashMessages = [];
++  try {
++    if (global.localStorage) {
++      const rawItem = global.localStorage.getItem(FLASH_MESSAGES_LOCAL_STORAGE_KEY);
++      if (rawItem) {
++        // Only try to parse and set flashMessages from the raw item if it exists.
++        const parsed = JSON.parse(rawItem);
++        if (Array.isArray(parsed)) {
++          flashMessages = parsed;
++        }
++      }
++    }
++  } catch (e) {
++    // If this fails for some reason, just return the empty array.
++  }
++  return flashMessages;
++}
++
++function addFlashMessage(message) {
++  try {
++    if (global.localStorage) {
++      const flashMessages = getFlashMessages();
++      flashMessages.push(message);
++      global.localStorage.setItem(FLASH_MESSAGES_LOCAL_STORAGE_KEY, JSON.stringify(flashMessages));
++    }
++  } catch (e) {
++    // If this fails, just bail.
++  }
++}
++
++function clearFlashMessages() {
++  try {
++    if (global.localStorage) {
++      global.localStorage.removeItem(FLASH_MESSAGES_LOCAL_STORAGE_KEY);
++    }
++  } catch (e) {
++    // If this fails, just bail.
++  }
++}
++
+ export default function UserMessagesProvider({ children }) {
+   // Note: The callbacks (add, remove, clear) below interact with useState in very subtle ways.
+   // When we call setMessages, we always do so with the function-based form of the handler, making
+@@ -20,28 +73,47 @@ export default function UserMessagesProvider({ children }) {
+   // its very nature.
+   const refId = useRef(nextId);
+ 
+-  const add = ({
+-    code, dismissible, text, type, topic, ...others
+-  }) => {
++  /**
++   * Flash messages are a special kind of message that appears once on page refresh.
++   */
++  function addFlash(message) {
++    addFlashMessage(message);
++  }
++
++  function add(message) {
++    const {
++      code, dismissible, text, type, topic, ...others
++    } = message;
+     const id = refId.current;
+     setMessages(currentMessages => [...currentMessages, {
+       code, dismissible, text, type, topic, ...others, id,
+     }]);
+     refId.current += 1;
+     setNextId(refId.current);
+-    return refId.current;
+-  };
+ 
+-  const remove = id => {
++    return id;
++  }
++
++  function remove(id) {
+     setMessages(currentMessages => currentMessages.filter(message => message.id !== id));
+-  };
++  }
+ 
+-  const clear = (topic = null) => {
++  function clear(topic = null) {
+     setMessages(currentMessages => (topic === null ? [] : currentMessages.filter(message => message.topic !== topic)));
+-  };
++  }
++
++  useEffect(() => {
++    const flashMessages = getFlashMessages();
++    flashMessages.forEach(flashMessage => add(flashMessage));
++    // We only allow flash messages to persist through one refresh, then we clear them out.
++    // If we want persistent messages, then add a 'persist' key to the messages and handle that
++    // as a separate local storage item.
++    clearFlashMessages();
++  }, []);
+ 
+   const value = {
+     add,
++    addFlash,
+     remove,
+     clear,
+     messages,
+diff --git a/src/user-messages/index.js b/src/user-messages/index.js
+new file mode 100644
+index 0000000..b7d8dfd
+--- /dev/null
++++ b/src/user-messages/index.js
+@@ -0,0 +1,4 @@
++export { default as UserMessagesProvider, ALERT_TYPES } from './UserMessagesProvider';
++export { default as UserMessagesContext } from './UserMessagesContext';
++export { default as AlertList } from './AlertList';
++export { default as Alert } from './Alert';
+-- 
+2.34.1
+

@@ -1,0 +1,51 @@
+From 57d880de70cc350f36662fb15a4f6de8c0d46930 Mon Sep 17 00:00:00 2001
+From: Abderraouf Mehdi Bouhali <armbouhali@gmail.com>
+Date: Mon, 24 Oct 2022 09:49:42 +0100
+Subject: [PATCH 0942/1021] fix(rtl): mirror new user tour modal background
+
+Mirrors the background image used in the new user tour modal
+as it obstructs the readability of the modal title when in RTL
+---
+ src/index.scss                                                 | 1 +
+ .../newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx       | 1 +
+ .../newUserCourseHomeTour/NewUserCourseHomeTourModal.scss      | 3 +++
+ 3 files changed, 5 insertions(+)
+ create mode 100644 src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.scss
+
+diff --git a/src/index.scss b/src/index.scss
+index 9c16a12..9f1079d 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -376,6 +376,7 @@
+ @import "course-home/progress-tab/course-completion/CompletionDonutChart.scss";
+ @import "course-home/progress-tab/grades/course-grade/GradeBar.scss";
+ @import "courseware/course/course-exit/CourseRecommendations";
++@import "product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.scss";
+ 
+ /** [MM-P2P] Experiment */
+ @import "experiments/mm-p2p/index.scss";
+diff --git a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+index 66eb3a6..6a3df70 100644
+--- a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
++++ b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.jsx
+@@ -19,6 +19,7 @@ function NewUserCourseHomeTourModal({
+     <MarketingModal
+       isOpen={isOpen}
+       title="New user course home prompt"
++      className="new-user-tour-dialog"
+       heroIsDark
+       hasCloseButton={false}
+       heroNode={(
+diff --git a/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.scss b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.scss
+new file mode 100644
+index 0000000..073eaf8
+--- /dev/null
++++ b/src/product-tours/newUserCourseHomeTour/NewUserCourseHomeTourModal.scss
+@@ -0,0 +1,3 @@
++[dir="rtl"] .new-user-tour-dialog .pgn__modal-hero .pgn__modal-hero-bg {
++    transform: scaleX(-1);
++}
+\ No newline at end of file
+-- 
+2.34.1
+

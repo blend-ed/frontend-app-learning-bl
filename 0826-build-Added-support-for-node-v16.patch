@@ -1,0 +1,31 @@
+From 8114750796ca284816ffc39ec1ca0dda89dfa784 Mon Sep 17 00:00:00 2001
+From: edX requirements bot <testeng+edx-requirements-bot@edx.org>
+Date: Fri, 4 Feb 2022 10:11:08 -0500
+Subject: [PATCH 0826/1021] build: Added support for node v16
+
+---
+ .github/workflows/validate.yml | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/.github/workflows/validate.yml b/.github/workflows/validate.yml
+index 2044d0f..2eb9844 100644
+--- a/.github/workflows/validate.yml
++++ b/.github/workflows/validate.yml
+@@ -3,12 +3,13 @@ on:
+ - push
+ - pull_request
+ jobs:
+-  build:
++  tests:
+     runs-on: ubuntu-latest
+     strategy:
+       matrix:
+         node-version:
+         - 12
++        node: [12, 14, 16]
+     steps:
+     - uses: actions/checkout@v2
+     - uses: actions/setup-node@v2
+-- 
+2.34.1
+

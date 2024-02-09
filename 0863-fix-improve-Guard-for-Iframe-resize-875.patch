@@ -1,0 +1,26 @@
+From 94367706206f44a7f7f23bd1ce11db981c7c547d Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Thu, 17 Mar 2022 14:47:19 -0400
+Subject: [PATCH 0863/1021] fix: improve Guard for Iframe resize (#875)
+
+Fix line that was causing JS errors when it was called in a context without a valid document.
+---
+ src/course-home/outline-tab/LmsHtmlFragment.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.jsx b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+index d2db407..5385d38 100644
+--- a/src/course-home/outline-tab/LmsHtmlFragment.jsx
++++ b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+@@ -28,7 +28,7 @@ export default function LmsHtmlFragment({
+ 
+   const iframe = useRef(null);
+   function resetIframeHeight() {
+-    if (iframe.current) {
++    if (iframe?.current?.contentWindow?.document?.body) {
+       iframe.current.height = iframe.current.contentWindow.document.body.scrollHeight;
+     }
+   }
+-- 
+2.34.1
+

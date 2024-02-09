@@ -1,0 +1,768 @@
+From aca45fb26e328f40cf46a49b5b00267cc612d030 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Tue, 13 Apr 2021 10:08:13 -0400
+Subject: [PATCH 0425/1021] AA-720: Progress Tab Course Completion chart (#407)
+
+---
+ src/course-home/data/__factories__/index.js   |  1 +
+ .../__factories__/progressTabData.factory.js  | 71 ++++++++++++++++
+ .../progress-tab/ProgressTab.test.jsx         | 85 +++++++++++++++++++
+ .../CompleteDonutSegment.jsx                  | 77 +++++++++++++++++
+ .../CompletionDonutChart.jsx                  | 65 ++++++++++++++
+ .../CompletionDonutChart.scss                 | 74 ++++++++++++++++
+ .../course-completion/CourseCompletion.jsx    | 46 +++++-----
+ .../IncompleteDonutSegment.jsx                | 55 ++++++++++++
+ .../course-completion/LockedDonutSegment.jsx  | 72 ++++++++++++++++
+ .../course-completion/messages.js             | 42 +++++++++
+ .../grades/detailed-grades/DetailedGrades.jsx |  6 +-
+ .../grade-summary/AssignmentTypeCell.jsx      |  2 +-
+ .../grade-summary/GradeSummaryHeader.jsx      |  2 +-
+ .../progress-tab/grades/messages.js           |  4 +
+ src/index.scss                                |  1 +
+ 15 files changed, 572 insertions(+), 31 deletions(-)
+ create mode 100644 src/course-home/data/__factories__/progressTabData.factory.js
+ create mode 100644 src/course-home/progress-tab/ProgressTab.test.jsx
+ create mode 100644 src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
+ create mode 100644 src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+ create mode 100644 src/course-home/progress-tab/course-completion/CompletionDonutChart.scss
+ create mode 100644 src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
+ create mode 100644 src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
+ create mode 100644 src/course-home/progress-tab/course-completion/messages.js
+
+diff --git a/src/course-home/data/__factories__/index.js b/src/course-home/data/__factories__/index.js
+index a268057..a620ad5 100644
+--- a/src/course-home/data/__factories__/index.js
++++ b/src/course-home/data/__factories__/index.js
+@@ -1,3 +1,4 @@
+ import './courseHomeMetadata.factory';
+ import './datesTabData.factory';
+ import './outlineTabData.factory';
++import './progressTabData.factory';
+diff --git a/src/course-home/data/__factories__/progressTabData.factory.js b/src/course-home/data/__factories__/progressTabData.factory.js
+new file mode 100644
+index 0000000..5a508d7
+--- /dev/null
++++ b/src/course-home/data/__factories__/progressTabData.factory.js
+@@ -0,0 +1,71 @@
++import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
++
++// Sample data helpful when developing & testing, to see a variety of configurations.
++// This set of data may not be realistic, but it is intended to demonstrate many UI results.
++Factory.define('progressTabData')
++  .attrs({
++    certificate_data: null,
++    completion_summary: {
++      complete_count: 1,
++      incomplete_count: 1,
++      locked_count: 0,
++    },
++    course_grade: {
++      percent: 0,
++      is_passing: false,
++    },
++    section_scores: [
++      {
++        display_name: 'First section',
++        subsections: [
++          {
++            assignment_type: 'Homework',
++            display_name: 'First subsection',
++            has_graded_assignment: true,
++            num_points_earned: 0,
++            num_points_possible: 1,
++            percent_graded: 0.0,
++            show_correctness: 'always',
++            show_grades: true,
++            url: 'http://learning.edx.org/course/course-v1:edX+Test+run/first_subsection',
++          },
++        ],
++      },
++      {
++        display_name: 'Second section',
++        subsections: [
++          {
++            assignment_type: 'Homework',
++            display_name: 'Second subsection',
++            has_graded_assignment: true,
++            num_points_earned: 1,
++            num_points_possible: 1,
++            percent_graded: 1.0,
++            show_correctness: 'always',
++            show_grades: true,
++            url: 'http://learning.edx.org/course/course-v1:edX+Test+run/second_subsection',
++          },
++        ],
++      },
++    ],
++    enrollment_mode: 'audit',
++    grading_policy: {
++      assignment_policies: [
++        {
++          num_droppable: 1,
++          short_label: 'HW',
++          type: 'Homework',
++          weight: 1,
++        },
++      ],
++      grade_range: {
++        pass: 0.75,
++      },
++    },
++    studio_url: 'http://studio.edx.org/settings/grading/course-v1:edX+Test+run',
++    verification_data: {
++      link: null,
++      status: 'none',
++      status_date: null,
++    },
++  });
+diff --git a/src/course-home/progress-tab/ProgressTab.test.jsx b/src/course-home/progress-tab/ProgressTab.test.jsx
+new file mode 100644
+index 0000000..416423c
+--- /dev/null
++++ b/src/course-home/progress-tab/ProgressTab.test.jsx
+@@ -0,0 +1,85 @@
++import React from 'react';
++import { Factory } from 'rosie';
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import MockAdapter from 'axios-mock-adapter';
++
++import {
++  initializeMockApp, logUnhandledRequests, render, screen, act,
++} from '../../setupTest';
++import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
++import * as thunks from '../data/thunks';
++import initializeStore from '../../store';
++import ProgressTab from './ProgressTab';
++
++initializeMockApp();
++jest.mock('@edx/frontend-platform/analytics');
++
++describe('Progress Tab', () => {
++  let axiosMock;
++
++  const courseId = 'course-v1:edX+Test+run';
++  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/course_metadata/${courseId}`;
++  courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
++  const progressUrl = `${getConfig().LMS_BASE_URL}/api/course_home/v1/progress/${courseId}`;
++
++  const store = initializeStore();
++  const defaultMetadata = Factory.build('courseHomeMetadata', { id: courseId });
++  const defaultTabData = Factory.build('progressTabData');
++
++  function setTabData(attributes, options) {
++    const progressTabData = Factory.build('progressTabData', attributes, options);
++    axiosMock.onGet(progressUrl).reply(200, progressTabData);
++  }
++
++  async function fetchAndRender() {
++    await executeThunk(thunks.fetchProgressTab(courseId), store.dispatch);
++    await act(async () => render(<ProgressTab />, { store }));
++  }
++
++  beforeEach(async () => {
++    axiosMock = new MockAdapter(getAuthenticatedHttpClient());
++
++    // Set defaults for network requests
++    axiosMock.onGet(courseMetadataUrl).reply(200, defaultMetadata);
++    axiosMock.onGet(progressUrl).reply(200, defaultTabData);
++
++    logUnhandledRequests(axiosMock);
++  });
++
++  describe('Grade Summary', () => {
++    it('renders Grade Summary table when assignment policies are populated', async () => {
++      await fetchAndRender();
++      expect(screen.getByText('Grade summary')).toBeInTheDocument();
++    });
++
++    it('does not render Grade Summary when assignment policies are not populated', async () => {
++      setTabData({
++        grading_policy: {
++          assignment_policies: [],
++        },
++      });
++      await fetchAndRender();
++      expect(screen.queryByText('Grade summary')).not.toBeInTheDocument();
++    });
++  });
++
++  describe('Detailed Grades', () => {
++    it('renders Detailed Grades table when section scores are populated', async () => {
++      await fetchAndRender();
++      expect(screen.getByText('Detailed grades')).toBeInTheDocument();
++
++      expect(screen.getByRole('link', { name: 'First subsection' }));
++      expect(screen.getByRole('link', { name: 'Second subsection' }));
++    });
++
++    it('render message when section scores are not populated', async () => {
++      setTabData({
++        section_scores: [],
++      });
++      await fetchAndRender();
++      expect(screen.getByText('Detailed grades')).toBeInTheDocument();
++      expect(screen.getByText('You currently have no graded problem scores.')).toBeInTheDocument();
++    });
++  });
++});
+diff --git a/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx b/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
+new file mode 100644
+index 0000000..03d17e4
+--- /dev/null
++++ b/src/course-home/progress-tab/course-completion/CompleteDonutSegment.jsx
+@@ -0,0 +1,77 @@
++import React, { useState } from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { OverlayTrigger, Popover } from '@edx/paragon';
++
++import messages from './messages';
++
++function CompleteDonutSegment({ completePercentage, intl, lockedPercentage }) {
++  const [showCompletePopover, setShowCompletePopover] = useState(false);
++
++  const completeSegmentOffset = (3.6 * completePercentage) / 8;
++  let completeTooltipDegree = completePercentage < 100 ? -completeSegmentOffset : 0;
++
++  const lockedSegmentOffset = lockedPercentage - 75;
++  if (lockedPercentage > 0) {
++    completeTooltipDegree = (lockedSegmentOffset + completePercentage) * -3.6 + 90 + completeSegmentOffset;
++  }
++
++  return (
++    <g
++      className="donut-segment-group"
++      onBlur={() => setShowCompletePopover(false)}
++      onFocus={() => setShowCompletePopover(true)}
++      tabIndex="-1"
++    >
++      <circle
++        className="donut-segment complete-stroke"
++        cx="21"
++        cy="21"
++        r="15.91549430918954"
++        strokeDasharray={`${completePercentage} ${100 - completePercentage}`}
++        strokeDashoffset={lockedSegmentOffset + completePercentage}
++      />
++
++      {/* Tooltip */}
++      <OverlayTrigger
++        show={showCompletePopover}
++        placement="top"
++        overlay={(
++          <Popover aria-hidden="true">
++            <Popover.Content>
++              {intl.formatMessage(messages.completeContentTooltip)}
++            </Popover.Content>
++          </Popover>
++        )}
++      >
++        {/* Used to anchor the tooltip within the complete segment's stroke */}
++        <rect x="19" y="3" style={{ transform: `rotate(${completeTooltipDegree}deg)` }} />
++      </OverlayTrigger>
++
++      {/* Segment dividers */}
++      {lockedPercentage > 0 && lockedPercentage < 100 && (
++        <circle
++          className="donut-segment divider-stroke"
++          strokeDasharray="0.3 99.7"
++          strokeDashoffset={0.15 + lockedSegmentOffset}
++        />
++      )}
++      {completePercentage < 100 && lockedPercentage < 100 && lockedPercentage + completePercentage === 100 && (
++        <circle
++          className="donut-segment divider-stroke"
++          strokeDasharray="0.3 99.7"
++          strokeDashoffset="25.15"
++        />
++      )}
++    </g>
++  );
++}
++
++CompleteDonutSegment.propTypes = {
++  completePercentage: PropTypes.number.isRequired,
++  intl: intlShape.isRequired,
++  lockedPercentage: PropTypes.number.isRequired,
++};
++
++export default injectIntl(CompleteDonutSegment);
+diff --git a/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx b/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+new file mode 100644
+index 0000000..ddeb67e
+--- /dev/null
++++ b/src/course-home/progress-tab/course-completion/CompletionDonutChart.jsx
+@@ -0,0 +1,65 @@
++import React from 'react';
++import { useSelector } from 'react-redux';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { useModel } from '../../../generic/model-store';
++
++import CompleteDonutSegment from './CompleteDonutSegment';
++import IncompleteDonutSegment from './IncompleteDonutSegment';
++import LockedDonutSegment from './LockedDonutSegment';
++import messages from './messages';
++
++function CompletionDonutChart({ intl }) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseHome);
++
++  const {
++    completionSummary: {
++      completeCount,
++      incompleteCount,
++      lockedCount,
++    },
++  } = useModel('progress', courseId);
++
++  const numTotalUnits = completeCount + incompleteCount + lockedCount;
++  const completePercentage = Number(((completeCount / numTotalUnits) * 100).toFixed(0));
++  const lockedPercentage = Number(((lockedCount / numTotalUnits) * 100).toFixed(0));
++  const incompletePercentage = 100 - completePercentage - lockedPercentage;
++
++  return (
++    <>
++      <svg role="img" width="50%" height="100%" viewBox="0 0 42 42" className="donut" style={{ maxWidth: '178px' }} aria-hidden="true">
++        {/* The radius (or "r" attribute) is based off of a circumference of 100 in order to simplify percentage
++            calculations. The subsequent stroke-dasharray values found in each segment should add up to equal 100
++            in order to wrap around the circle once. */}
++        <circle className="donut-hole" fill="#fff" cx="21" cy="21" r="15.91549430918954" />
++        <g className="donut-chart-text">
++          <text x="50%" y="50%" className="donut-chart-number">
++            {completePercentage}%
++          </text>
++          <text x="50%" y="50%" className="donut-chart-label">
++            {intl.formatMessage(messages.donutLabel)}
++          </text>
++        </g>
++        <IncompleteDonutSegment incompletePercentage={incompletePercentage} />
++        <LockedDonutSegment lockedPercentage={lockedPercentage} />
++        <CompleteDonutSegment completePercentage={completePercentage} lockedPercentage={lockedPercentage} />
++      </svg>
++      <div className="sr-only">
++        {intl.formatMessage(messages.percentComplete, { percent: completePercentage })}
++        {intl.formatMessage(messages.percentIncomplete, { percent: incompletePercentage })}
++        {lockedPercentage > 0 && (
++          <>
++            {intl.formatMessage(messages.percentLocked, { percent: lockedPercentage })}
++          </>
++        )}
++      </div>
++    </>
++  );
++}
++
++CompletionDonutChart.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CompletionDonutChart);
+diff --git a/src/course-home/progress-tab/course-completion/CompletionDonutChart.scss b/src/course-home/progress-tab/course-completion/CompletionDonutChart.scss
+new file mode 100644
+index 0000000..e8abfc0
+--- /dev/null
++++ b/src/course-home/progress-tab/course-completion/CompletionDonutChart.scss
+@@ -0,0 +1,74 @@
++.donut rect {
++  fill: transparent;
++  width: 4px;
++  height: 4px;
++  transform-origin: center;
++}
++
++.donut-chart-label {
++  font: {
++    family: $font-family-sans-serif;
++    size: .2rem;
++    weight: $font-weight-normal;
++  }
++  text-anchor: middle;
++}
++
++.donut-chart-number {
++  font: {
++    family: $font-family-monospace;
++    size: .5rem;
++    weight: $font-weight-bold;
++  }
++  line-height: 1rem;
++  text-anchor: middle;
++  -moz-transform: translateY(-0.6em);
++  -ms-transform: translateY(-0.6em);
++  -webkit-transform: translateY(-0.6em);
++  transform: translateY(-0.6em);
++}
++
++.donut-chart-text {
++  fill: $primary-500;
++  -moz-transform: translateY(0.25em);
++  -ms-transform: translateY(0.25em);
++  -webkit-transform: translateY(0.25em);
++  transform: translateY(0.25em);
++}
++
++.donut-ring, .donut-segment {
++  stroke-width: 6px;
++  fill: transparent;
++}
++
++.donut-segment-group {
++  cursor: pointer;
++  pointer-events: visibleStroke;
++
++  &:focus {
++    outline: none;
++
++    circle {
++      stroke-width: 7px;
++    }
++  }
++}
++
++.donut-ring, .donut-segment, .donut-hole {
++  &.complete-stroke {
++    stroke: $info-500;
++  }
++
++  &.divider-stroke {
++    stroke-width: 7px;
++    stroke: white;
++  }
++
++  &.incomplete-stroke {
++    stroke: $light-300;
++  }
++
++  &.locked-stroke {
++    stroke: $primary-500;
++  }
++}
+diff --git a/src/course-home/progress-tab/course-completion/CourseCompletion.jsx b/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+index 2e19a78..c481435 100644
+--- a/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
++++ b/src/course-home/progress-tab/course-completion/CourseCompletion.jsx
+@@ -1,35 +1,29 @@
+ import React from 'react';
+-import { useSelector } from 'react-redux';
+-import { useModel } from '../../../generic/model-store';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+-function CourseCompletion() {
+-  // TODO: AA-720
+-  const {
+-    courseId,
+-  } = useSelector(state => state.courseHome);
+-
+-  const {
+-    completionSummary: {
+-      completeCount,
+-      incompleteCount,
+-      lockedCount,
+-    },
+-  } = useModel('progress', courseId);
+-
+-  const total = completeCount + incompleteCount + lockedCount;
+-  const completePercentage = ((completeCount / total) * 100).toFixed(0);
+-  const incompletePercentage = ((incompleteCount / total) * 100).toFixed(0);
+-  const lockedPercentage = ((lockedCount / total) * 100).toFixed(0);
++import CompletionDonutChart from './CompletionDonutChart';
++import messages from './messages';
+ 
++function CourseCompletion({ intl }) {
+   return (
+     <section className="text-dark-700 mb-4 rounded shadow-sm p-4">
+-      <h2>Course completion</h2>
+-      <p className="small">This represents how much course content you have completed.</p>
+-      Complete: {completePercentage}%
+-      Incomplete: {incompletePercentage}%
+-      Locked: {lockedPercentage}%
++      <div className="row w-100 m-0">
++        <div className="col-12 col-sm-6 col-md-7 p-0">
++          <h2>{intl.formatMessage(messages.courseCompletion)}</h2>
++          <p className="small">
++            {intl.formatMessage(messages.completionBody)}
++          </p>
++        </div>
++        <div className="col-12 col-sm-6 col-md-5 mt-sm-n3 p-0 text-center">
++          <CompletionDonutChart />
++        </div>
++      </div>
+     </section>
+   );
+ }
+ 
+-export default CourseCompletion;
++CourseCompletion.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CourseCompletion);
+diff --git a/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx b/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
+new file mode 100644
+index 0000000..33ebec9
+--- /dev/null
++++ b/src/course-home/progress-tab/course-completion/IncompleteDonutSegment.jsx
+@@ -0,0 +1,55 @@
++import React, { useState } from 'react';
++import PropTypes from 'prop-types';
++
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { OverlayTrigger, Popover } from '@edx/paragon';
++
++import messages from './messages';
++
++function IncompleteDonutSegment({ incompletePercentage, intl }) {
++  const [showIncompletePopover, setShowIncompletePopover] = useState(false);
++
++  const incompleteSegmentOffset = (3.6 * incompletePercentage) / 16;
++  const incompleteTooltipDegree = incompletePercentage < 100 ? incompleteSegmentOffset : 0;
++
++  return (
++    <g
++      className="donut-segment-group"
++      onBlur={() => setShowIncompletePopover(false)}
++      onFocus={() => setShowIncompletePopover(true)}
++      tabIndex="-1"
++    >
++      <circle
++        className="donut-ring incomplete-stroke"
++        cx="21"
++        cy="21"
++        r="15.91549430918954"
++        strokeDasharray={`${incompletePercentage} ${100 - incompletePercentage}`}
++        strokeDashoffset="25"
++      />
++
++      {/* Tooltip */}
++      <OverlayTrigger
++        show={showIncompletePopover}
++        placement="top"
++        overlay={(
++          <Popover aria-hidden="true">
++            <Popover.Content>
++              {intl.formatMessage(messages.incompleteContentTooltip)}
++            </Popover.Content>
++          </Popover>
++        )}
++      >
++        {/* Used to anchor the tooltip within the incomplete segment's stroke */}
++        <rect x="19" y="3" style={{ transform: `rotate(${incompleteTooltipDegree}deg)` }} />
++      </OverlayTrigger>
++    </g>
++  );
++}
++
++IncompleteDonutSegment.propTypes = {
++  incompletePercentage: PropTypes.number.isRequired,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(IncompleteDonutSegment);
+diff --git a/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx b/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
+new file mode 100644
+index 0000000..80f03db
+--- /dev/null
++++ b/src/course-home/progress-tab/course-completion/LockedDonutSegment.jsx
+@@ -0,0 +1,72 @@
++import React, { useState } from 'react';
++import PropTypes from 'prop-types';
++
++import { OverlayTrigger, Popover } from '@edx/paragon';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import messages from './messages';
++
++function LockedDonutSegment({ intl, lockedPercentage }) {
++  const [showLockedPopover, setShowLockedPopover] = useState(false);
++
++  if (!lockedPercentage > 0) {
++    return null;
++  }
++
++  const iconDegree = lockedPercentage > 8 ? (3.6 * lockedPercentage) / 8 : ((3.6 * lockedPercentage) / 5) * 2;
++
++  return (
++    <g
++      className="donut-segment-group"
++      onBlur={() => setShowLockedPopover(false)}
++      onFocus={() => setShowLockedPopover(true)}
++      tabIndex="-1"
++    >
++      <circle
++        className="donut-segment locked-stroke"
++        cx="21"
++        cy="21"
++        r="15.91549430918954"
++        strokeDasharray={`${lockedPercentage} ${100 - lockedPercentage}`}
++        strokeDashoffset={lockedPercentage - 75}
++      />
++
++      {/* Tooltip */}
++      <OverlayTrigger
++        show={showLockedPopover}
++        placement="top"
++        overlay={(
++          <Popover aria-hidden="true">
++            <Popover.Content>
++              {intl.formatMessage(messages.lockedContentTooltip)}
++            </Popover.Content>
++          </Popover>
++        )}
++      >
++        <g
++          width="6"
++          height="21"
++          viewBox="0 0 21 6"
++          style={{
++            transformOrigin: 'center',
++            transform: `rotate(-${iconDegree}deg)`,
++          }}
++        >
++          {/* Locked icon */}
++          <path
++            d="M20 8.00002H17V6.21002C17 3.60002 15.09 1.27002 12.49 1.02002C9.51 0.740018 7 3.08002 7 6.00002V8.00002H4V22H20V8.00002ZM12 17C10.9 17 10 16.1 10 15C10 13.9 10.9 13 12 13C13.1 13 14 13.9 14 15C14 16.1 13.1 17 12 17ZM9 8.00002V6.00002C9 4.34002 10.34 3.00002 12 3.00002C13.66 3.00002 15 4.34002 15 6.00002V8.00002H9Z"
++            fill={lockedPercentage > 5 ? 'white' : 'transparent'}
++            style={{ transform: `scale(0.18) translate(5.8em, .7em) rotate(${iconDegree}deg)` }}
++          />
++        </g>
++      </OverlayTrigger>
++    </g>
++  );
++}
++
++LockedDonutSegment.propTypes = {
++  intl: intlShape.isRequired,
++  lockedPercentage: PropTypes.number.isRequired,
++};
++
++export default injectIntl(LockedDonutSegment);
+diff --git a/src/course-home/progress-tab/course-completion/messages.js b/src/course-home/progress-tab/course-completion/messages.js
+new file mode 100644
+index 0000000..8d66f4f
+--- /dev/null
++++ b/src/course-home/progress-tab/course-completion/messages.js
+@@ -0,0 +1,42 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  donutLabel: {
++    id: 'progress.completion.donut.label',
++    defaultMessage: 'completed',
++  },
++  completionBody: {
++    id: 'progress.completion.body',
++    defaultMessage: 'This represents how much of the course content you have completed. Note that some content may not yet be released.',
++  },
++  completeContentTooltip: {
++    id: 'progress.completion.tooltip.locked',
++    defaultMessage: 'Content that you have completed.',
++  },
++  courseCompletion: {
++    id: 'progress.completion.header',
++    defaultMessage: 'Course completion',
++  },
++  incompleteContentTooltip: {
++    id: 'progress.completion.tooltip',
++    defaultMessage: 'Content that you have access to and have not completed.',
++  },
++  lockedContentTooltip: {
++    id: 'progress.completion.tooltip.complete',
++    defaultMessage: 'Content that is locked and available only to those who upgrade.',
++  },
++  percentComplete: {
++    id: 'progress.completion.donut.percentComplete',
++    defaultMessage: 'You have completed {percent}% of content in this course.',
++  },
++  percentIncomplete: {
++    id: 'progress.completion.donut.percentIncomplete',
++    defaultMessage: 'You have not completed {percent}% of content in this course that you have access to.',
++  },
++  percentLocked: {
++    id: 'progress.completion.donut.percentLocked',
++    defaultMessage: '{percent}% of content in this course is locked and available only for those who upgrade.',
++  },
++});
++
++export default messages;
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+index 8ed819b..621ac48 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/DetailedGrades.jsx
+@@ -31,15 +31,15 @@ function DetailedGrades({ intl }) {
+   );
+ 
+   return (
+-    <section className="text-dark-700 mb-4">
++    <section className="text-dark-700">
+       <h3 className="h4 mb-3">{intl.formatMessage(messages.detailedGrades)}</h3>
+       {hasSectionScores && (
+         <DetailedGradesTable sectionScores={sectionScores} />
+       )}
+       {!hasSectionScores && (
+-        <p className="small">You currently have no graded problem scores.</p>
++        <p className="small">{intl.formatMessage(messages.detailedGradesEmpty)}</p>
+       )}
+-      <p className="x-small">
++      <p className="x-small m-0">
+         <FormattedMessage
+           id="progress.ungradedAlert"
+           defaultMessage="For progress on ungraded aspects of the course, view your {outlineLink}."
+diff --git a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+index 585bf0e..97a627e 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/AssignmentTypeCell.jsx
+@@ -19,7 +19,7 @@ function AssignmentTypeCell({ assignmentType, footnoteMarker, footnoteId }) {
+ AssignmentTypeCell.propTypes = {
+   assignmentType: PropTypes.string.isRequired,
+   footnoteId: PropTypes.string,
+-  footnoteMarker: PropTypes.string,
++  footnoteMarker: PropTypes.number,
+ };
+ 
+ AssignmentTypeCell.defaultProps = {
+diff --git a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+index dea5108..d5416b9 100644
+--- a/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
++++ b/src/course-home/progress-tab/grades/grade-summary/GradeSummaryHeader.jsx
+@@ -11,7 +11,7 @@ function GradeSummaryHeader({ intl }) {
+     <div className="row w-100 m-0 align-items-center">
+       <h3 className="h4 mb-3 mr-2">{intl.formatMessage(messages.gradeSummary)}</h3>
+       <OverlayTrigger
+-        trigger={['hover', 'click']}
++        trigger="click"
+         placement="top"
+         overlay={(
+           <Popover>
+diff --git a/src/course-home/progress-tab/grades/messages.js b/src/course-home/progress-tab/grades/messages.js
+index 9881cca..ddaca03 100644
+--- a/src/course-home/progress-tab/grades/messages.js
++++ b/src/course-home/progress-tab/grades/messages.js
+@@ -17,6 +17,10 @@ const messages = defineMessages({
+     id: 'progress.detailedGrades',
+     defaultMessage: 'Detailed grades',
+   },
++  detailedGradesEmpty: {
++    id: 'progress.detailedGrades.emptyTable',
++    defaultMessage: 'You currently have no graded problem scores.',
++  },
+   footnotesTitle: {
+     id: 'progress.footnotes.title',
+     defaultMessage: 'Grade summary footnotes',
+diff --git a/src/index.scss b/src/index.scss
+index b330fff..8e8f03f 100755
+--- a/src/index.scss
++++ b/src/index.scss
+@@ -368,6 +368,7 @@
+ @import 'course-home/dates-tab/Day.scss';
+ @import 'course-home/outline-tab/widgets/UpgradeCard.scss';
+ @import 'course-home/outline-tab/widgets/ProctoringInfoPanel.scss';
++@import 'course-home/progress-tab/course-completion/CompletionDonutChart.scss';
+ @import 'courseware/course/course-exit/CourseRecommendationsExp/course_recommendations.exp';
+ 
+ /** [MM-P2P] Experiment */
+-- 
+2.34.1
+

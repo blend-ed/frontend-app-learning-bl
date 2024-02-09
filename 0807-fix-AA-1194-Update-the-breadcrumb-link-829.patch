@@ -1,0 +1,41 @@
+From 8285d42b7e61c2319ba3f48090423715cfd2bb54 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Thu, 17 Feb 2022 12:45:13 -0800
+Subject: [PATCH 0807/1021] fix: AA-1194: Update the breadcrumb link (#829)
+
+Before, for sections, it would link you to the chapter which would
+cause a JS error since the sequence endpoint expects sequentials.
+This updates to now link to the first subsection within a section when
+you hit the section breadcrumb
+---
+ src/courseware/course/CourseBreadcrumbs.jsx | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 4621f5c..3e30be1 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -15,8 +15,7 @@ import JumpNavMenuItem from './JumpNavMenuItem';
+ function CourseBreadcrumb({
+   content, withSeparator, courseId, sequenceId, unitId, isStaff,
+ }) {
+-  const defaultContent = content.filter(destination => destination.default)[0] || { id: courseId, label: '' };
+-
++  const defaultContent = content.filter(destination => destination.default)[0] || { id: courseId, label: '', sequences: [] };
+   return (
+     <>
+       {withSeparator && (
+@@ -33,7 +32,9 @@ function CourseBreadcrumb({
+           ? (
+             <Link
+               className="text-primary-500"
+-              to={`/course/${courseId}/${defaultContent.id}`}
++              to={defaultContent.sequences.length
++                ? `/course/${courseId}/${defaultContent.sequences[0].id}`
++                : `/course/${courseId}/${defaultContent.id}`}
+             >
+               {defaultContent.label}
+             </Link>
+-- 
+2.34.1
+

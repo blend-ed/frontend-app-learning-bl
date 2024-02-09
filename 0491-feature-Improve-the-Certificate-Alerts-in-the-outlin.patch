@@ -1,0 +1,503 @@
+From fab2da458638d5d94da7e3635968c6551850d533 Mon Sep 17 00:00:00 2001
+From: "Albert (AJ) St. Aubin" <astaubin@edx.org>
+Date: Wed, 2 Jun 2021 10:28:57 -0400
+Subject: [PATCH 0491/1021] feature: Improve the Certificate Alerts in the
+ outline to support new statuses
+
+[MICROBA-678]
+
+These changes refactor the CertificateAvailableAlert and add new
+features to it to support more status alerts for certificates. It
+attempts to do so in an iterative manner so that new/updated alerts can
+be included over time.
+---
+ .../__factories__/outlineTabData.factory.js   |  6 ++
+ .../data/__snapshots__/redux.test.js.snap     |  6 ++
+ src/course-home/data/api.js                   |  2 +
+ src/course-home/outline-tab/OutlineTab.jsx    |  2 +-
+ .../outline-tab/OutlineTab.test.jsx           | 64 +++++++++++-
+ .../CertificateAvailableAlert.jsx             | 49 ----------
+ .../certificate-available-alert/hooks.js      | 44 ---------
+ .../CertificateStatusAlert.jsx                | 97 +++++++++++++++++++
+ .../alerts/certificate-status-alert/hooks.js  | 71 ++++++++++++++
+ .../index.js                                  |  0
+ .../certificate-status-alert/messages.js      | 16 +++
+ 11 files changed, 261 insertions(+), 96 deletions(-)
+ delete mode 100644 src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
+ delete mode 100644 src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+ create mode 100644 src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+ create mode 100644 src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+ rename src/course-home/outline-tab/alerts/{certificate-available-alert => certificate-status-alert}/index.js (100%)
+ create mode 100644 src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 0126a4e..21a9ecd 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -31,6 +31,12 @@ Factory.define('outlineTabData')
+   .attrs({
+     access_expiration: null,
+     can_show_upgrade_sock: false,
++    cert_data: {
++      cert_status: null,
++      cert_web_view_url: null,
++      certificate_available_date: null,
++      download_url: null,
++    },
+     course_goals: {
+       goal_options: [],
+       selected_goal: null,
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 208b309..c80fb93 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -365,6 +365,12 @@ Object {
+       "course-v1:edX+DemoX+Demo_Course_1": Object {
+         "accessExpiration": null,
+         "canShowUpgradeSock": false,
++        "certData": Object {
++          "certStatus": null,
++          "certWebViewUrl": null,
++          "certificateAvailableDate": null,
++          "downloadUrl": null,
++        },
+         "courseBlocks": Object {
+           "courses": Object {
+             "block-v1:edX+DemoX+Demo_Course+type@course+block@bcdabcdabcdabcdabcdabcdabcdabcd3": Object {
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 245343e..2321637 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -204,6 +204,7 @@ export async function getOutlineTabData(courseId) {
+ 
+   const accessExpiration = camelCaseObject(data.access_expiration);
+   const canShowUpgradeSock = data.can_show_upgrade_sock;
++  const certData = camelCaseObject(data.cert_data);
+   const courseBlocks = data.course_blocks ? normalizeOutlineBlocks(courseId, data.course_blocks.blocks) : {};
+   const courseGoals = camelCaseObject(data.course_goals);
+   const courseTools = camelCaseObject(data.course_tools);
+@@ -221,6 +222,7 @@ export async function getOutlineTabData(courseId) {
+   return {
+     accessExpiration,
+     canShowUpgradeSock,
++    certData,
+     courseBlocks,
+     courseGoals,
+     courseTools,
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 15da293..d2a86cf 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -19,7 +19,7 @@ import Section from './Section';
+ import UpdateGoalSelector from './widgets/UpdateGoalSelector';
+ import UpgradeCard from './widgets/UpgradeCard';
+ import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
+-import useCertificateAvailableAlert from './alerts/certificate-available-alert';
++import useCertificateAvailableAlert from './alerts/certificate-status-alert';
+ import useCourseEndAlert from './alerts/course-end-alert';
+ import useCourseStartAlert from './alerts/course-start-alert';
+ import usePrivateCourseAlert from './alerts/private-course-alert';
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index 89a2b43..f948542 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -14,6 +14,7 @@ import {
+ import { appendBrowserTimezoneToUrl, executeThunk } from '../../utils';
+ import * as thunks from '../data/thunks';
+ import initializeStore from '../../store';
++import { CERT_STATUS_TYPE } from './alerts/certificate-status-alert/CertificateStatusAlert';
+ import OutlineTab from './OutlineTab';
+ 
+ initializeMockApp();
+@@ -672,7 +673,14 @@ describe('Outline Tab', () => {
+         const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+         const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+         setMetadata({ is_enrolled: true });
+-        setTabData({}, {
++        setTabData({
++          cert_data: {
++            cert_status: CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE,
++            cert_web_view_url: null,
++            certificate_available_date: tomorrow.toISOString(),
++            download_url: null,
++          },
++        }, {
+           date_blocks: [
+             {
+               date_type: 'course-end-date',
+@@ -687,8 +695,60 @@ describe('Outline Tab', () => {
+           ],
+         });
+         await fetchAndRender();
+-        await screen.findByText('Your grade and certificate will be ready soon!');
++        expect(screen.queryByText('Your grade and certificate will be ready soon!')).toBeInTheDocument();
++      });
++    });
++  });
++
++  describe('Certificate (web) Complete Alert', () => {
++    it('appears', async () => {
++      const now = new Date();
++      const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
++      setMetadata({ is_enrolled: true });
++      setTabData({
++        cert_data: {
++          cert_status: CERT_STATUS_TYPE.DOWNLOADABLE,
++          cert_web_view_url: 'certificate/testuuid',
++          certificate_available_date: null,
++          download_url: null,
++        },
++      }, {
++        date_blocks: [
++          {
++            date_type: 'course-end-date',
++            date: yesterday.toISOString(),
++            title: 'End',
++          },
++        ],
+       });
++      await fetchAndRender();
++      expect(screen.queryByText('Congratulations! Your certificate is ready.')).toBeInTheDocument();
++    });
++  });
++
++  describe('Certificate (pdf) Complete Alert', () => {
++    it('appears', async () => {
++      const now = new Date();
++      const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
++      setMetadata({ is_enrolled: true });
++      setTabData({
++        cert_data: {
++          cert_status: CERT_STATUS_TYPE.DOWNLOADABLE,
++          cert_web_view_url: null,
++          certificate_available_date: null,
++          download_url: 'download/url',
++        },
++      }, {
++        date_blocks: [
++          {
++            date_type: 'course-end-date',
++            date: yesterday.toISOString(),
++            title: 'End',
++          },
++        ],
++      });
++      await fetchAndRender();
++      expect(screen.queryByText('Congratulations! Your certificate is ready.')).not.toBeInTheDocument();
+     });
+   });
+ 
+diff --git a/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx b/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
+deleted file mode 100644
+index 9cbe405..0000000
+--- a/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
++++ /dev/null
+@@ -1,49 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { FormattedDate, FormattedMessage } from '@edx/frontend-platform/i18n';
+-
+-import { Alert, ALERT_TYPES } from '../../../../generic/user-messages';
+-
+-function CertificateAvailableAlert({ payload }) {
+-  const {
+-    certDate,
+-    userTimezone,
+-    courseEndDate,
+-  } = payload;
+-
+-  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+-  const certificateAvailableDateFormatted = <FormattedDate value={certDate} day="numeric" month="long" year="numeric" />;
+-  const courseEndDateFormatted = <FormattedDate value={courseEndDate} day="numeric" month="long" year="numeric" />;
+-
+-  return (
+-    <Alert type={ALERT_TYPES.SUCCESS}>
+-      <strong>
+-        <FormattedMessage
+-          id="learning.outline.alert.cert.title"
+-          defaultMessage="Your grade and certificate will be ready soon!"
+-        />
+-      </strong>
+-      <br />
+-      <FormattedMessage
+-        id="learning.outline.alert.cert.when"
+-        defaultMessage="This course ended on {courseEndDateFormatted}. Final grades and certificates are
+-        scheduled to be available after {certificateAvailableDate}."
+-        values={{
+-          courseEndDateFormatted,
+-          certificateAvailableDate: certificateAvailableDateFormatted,
+-        }}
+-        {...timezoneFormatArgs}
+-      />
+-    </Alert>
+-  );
+-}
+-
+-CertificateAvailableAlert.propTypes = {
+-  payload: PropTypes.shape({
+-    certDate: PropTypes.string,
+-    courseEndDate: PropTypes.string,
+-    userTimezone: PropTypes.string,
+-  }).isRequired,
+-};
+-
+-export default CertificateAvailableAlert;
+diff --git a/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+deleted file mode 100644
+index a176572..0000000
+--- a/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
++++ /dev/null
+@@ -1,44 +0,0 @@
+-import React, { useMemo } from 'react';
+-import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-
+-import { useAlert } from '../../../../generic/user-messages';
+-import { useModel } from '../../../../generic/model-store';
+-
+-const CertificateAvailableAlert = React.lazy(() => import('./CertificateAvailableAlert'));
+-
+-function useCertificateAvailableAlert(courseId) {
+-  const {
+-    isEnrolled,
+-  } = useModel('courseHomeMeta', courseId);
+-  const {
+-    datesWidget: {
+-      courseDateBlocks,
+-      userTimezone,
+-    },
+-  } = useModel('outline', courseId);
+-  const authenticatedUser = getAuthenticatedUser();
+-  const username = authenticatedUser ? authenticatedUser.username : '';
+-  const certBlock = courseDateBlocks.find(b => b.dateType === 'certificate-available-date');
+-  const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+-  const endDate = endBlock ? new Date(endBlock.date) : null;
+-  const hasEnded = endBlock ? endDate < new Date() : false;
+-  const isVisible = isEnrolled && certBlock && hasEnded; // only show if we're between end and cert dates
+-  const payload = {
+-    certDate: certBlock && certBlock.date,
+-    courseEndDate: endBlock && endBlock.date,
+-    username,
+-    userTimezone,
+-  };
+-
+-  useAlert(isVisible, {
+-    code: 'clientCertificateAvailableAlert',
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
+-    topic: 'outline-course-alerts',
+-  });
+-
+-  return {
+-    clientCertificateAvailableAlert: CertificateAvailableAlert,
+-  };
+-}
+-
+-export default useCertificateAvailableAlert;
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+new file mode 100644
+index 0000000..8063eaa
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+@@ -0,0 +1,97 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import {
++  FormattedDate,
++  FormattedMessage,
++  injectIntl,
++  intlShape,
++} from '@edx/frontend-platform/i18n';
++import { Alert, Button } from '@edx/paragon';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
++import certMessages from './messages';
++import certStatusMessages from '../../../progress-tab/certificate-status/messages';
++
++export const CERT_STATUS_TYPE = {
++  EARNED_NOT_AVAILABLE: 'earned_but_not_available',
++  DOWNLOADABLE: 'downloadable',
++};
++
++function CertificateStatusAlert({ intl, payload }) {
++  const {
++    certificateAvailableDate,
++    certStatusType,
++    courseEndDate,
++    certURL,
++    userTimezone,
++  } = payload;
++
++  let variant = '';
++  if (certStatusType === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE || certStatusType === CERT_STATUS_TYPE.DOWNLOADABLE) {
++    variant = 'success';
++  }
++
++  let header = '';
++  let body = '';
++  let buttonVisible = false;
++  let buttonMessage = '';
++  if (certStatusType === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
++    const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++    const certificateAvailableDateFormatted = <FormattedDate value={certificateAvailableDate} day="numeric" month="long" year="numeric" />;
++    const courseEndDateFormatted = <FormattedDate value={courseEndDate} day="numeric" month="long" year="numeric" />;
++
++    header = intl.formatMessage(certMessages.certStatusEarnedNotAvailableHeader);
++    body = (
++      <p>
++        <FormattedMessage
++          id="learning.outline.alert.cert.when"
++          defaultMessage="This course ended on {courseEndDateFormatted}. Final grades and certificates are
++          scheduled to be available after {certificateAvailableDate}."
++          values={{
++            courseEndDateFormatted,
++            certificateAvailableDate: certificateAvailableDateFormatted,
++          }}
++          {...timezoneFormatArgs}
++        />
++      </p>
++    );
++  } else if (certStatusType === CERT_STATUS_TYPE.DOWNLOADABLE) {
++    header = intl.formatMessage(certMessages.certStatusDownloadableHeader);
++    buttonMessage = intl.formatMessage(certStatusMessages.viewableButton);
++    buttonVisible = true;
++  }
++  return (
++    <Alert variant={variant}>
++      <div className="row justify-content-between align-items-center">
++        <div className={buttonVisible ? 'col-lg-8' : 'col-auto'}>
++          <FontAwesomeIcon icon={faCheckCircle} className="alert-icon text-success-500" />
++          <Alert.Heading>{header}</Alert.Heading>
++          {body}
++        </div>
++        {buttonVisible && (
++          <div className="m-auto m-lg-0 pr-lg-3">
++            <Button
++              variant="primary"
++              href={certURL}
++            >
++              {buttonMessage}
++            </Button>
++          </div>
++        )}
++      </div>
++    </Alert>
++  );
++}
++
++CertificateStatusAlert.propTypes = {
++  intl: intlShape.isRequired,
++  payload: PropTypes.shape({
++    certificateAvailableDate: PropTypes.string,
++    certStatusType: PropTypes.string,
++    courseEndDate: PropTypes.string,
++    certURL: PropTypes.string,
++    userTimezone: PropTypes.string,
++  }).isRequired,
++};
++
++export default injectIntl(CertificateStatusAlert);
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+new file mode 100644
+index 0000000..7764fc7
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+@@ -0,0 +1,71 @@
++import React, { useMemo } from 'react';
++
++import { getConfig } from '@edx/frontend-platform';
++import { useAlert } from '../../../../generic/user-messages';
++import { useModel } from '../../../../generic/model-store';
++import { CERT_STATUS_TYPE } from './CertificateStatusAlert';
++
++const CertificateStatusAlert = React.lazy(() => import('./CertificateStatusAlert'));
++
++function verifyCertStatusType(status) {
++  // This method will only return cert statuses when we want to alert on them.
++  // It should be modified when we want to alert on a new status type.
++  if (status === CERT_STATUS_TYPE.DOWNLOADABLE) {
++    return CERT_STATUS_TYPE.DOWNLOADABLE;
++  }
++  if (status === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
++    return CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE;
++  }
++  return '';
++}
++
++function useCertificateStatusAlert(courseId) {
++  const {
++    isEnrolled,
++  } = useModel('courseHomeMeta', courseId);
++  const {
++    datesWidget: {
++      courseDateBlocks,
++      userTimezone,
++    },
++    certData,
++  } = useModel('outline', courseId);
++
++  const {
++    certStatus,
++    certWebViewUrl,
++    certificateAvailableDate,
++    downloadUrl,
++  } = certData || {};
++
++  const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
++
++  const certStatusType = verifyCertStatusType(certStatus);
++  const certURL = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
++  const hasCertStatus = certStatusType !== '';
++  const isWebCert = downloadUrl === null;
++
++  // only show if there is a known cert status that we want to alert on.
++  // TODO Temporarily only show this for WebCertificates while we update the messaging
++  // in follow on work MICROBA-678
++  const isVisible = isEnrolled && hasCertStatus && isWebCert;
++  const payload = {
++    certificateAvailableDate,
++    certURL,
++    certStatusType,
++    courseEndDate: endBlock && endBlock.date,
++    userTimezone,
++  };
++
++  useAlert(isVisible, {
++    code: 'clientCertificateStatusAlert',
++    payload: useMemo(() => payload, Object.values(payload).sort()),
++    topic: 'outline-course-alerts',
++  });
++
++  return {
++    clientCertificateStatusAlert: CertificateStatusAlert,
++  };
++}
++
++export default useCertificateStatusAlert;
+diff --git a/src/course-home/outline-tab/alerts/certificate-available-alert/index.js b/src/course-home/outline-tab/alerts/certificate-status-alert/index.js
+similarity index 100%
+rename from src/course-home/outline-tab/alerts/certificate-available-alert/index.js
+rename to src/course-home/outline-tab/alerts/certificate-status-alert/index.js
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js b/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+new file mode 100644
+index 0000000..8dfce5f
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/messages.js
+@@ -0,0 +1,16 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  certStatusEarnedNotAvailableHeader: {
++    id: 'cert.alert.earned.unavailable.header',
++    defaultMessage: 'Your grade and certificate will be ready soon!',
++    description: 'Header alerting the user that their certificate will be available soon.',
++  },
++  certStatusDownloadableHeader: {
++    id: 'cert.alert.earned.ready.header',
++    defaultMessage: 'Congratulations! Your certificate is ready.',
++    description: 'Header alerting the user that their certificate is ready.',
++  },
++});
++
++export default messages;
+-- 
+2.34.1
+

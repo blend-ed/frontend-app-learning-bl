@@ -1,0 +1,56 @@
+From 0b171ac9f92c172f4b7aa7c9936be6aa02884e22 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Tue, 14 Jan 2020 17:18:03 -0500
+Subject: [PATCH 0033/1021] Adding the exam redirect back in.
+
+---
+ src/learning-sequence/course/Course.jsx            |  1 +
+ src/learning-sequence/course/SequenceContainer.jsx | 12 ++++++++++--
+ 2 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/src/learning-sequence/course/Course.jsx b/src/learning-sequence/course/Course.jsx
+index 4246ebc..79b3b47 100644
+--- a/src/learning-sequence/course/Course.jsx
++++ b/src/learning-sequence/course/Course.jsx
+@@ -53,6 +53,7 @@ export default function Course({
+         courseId={courseId}
+         sequenceId={sequenceId}
+         unitId={unitId}
++        models={models}
+         onNext={nextSequenceHandler}
+         onPrevious={previousSequenceHandler}
+       />
+diff --git a/src/learning-sequence/course/SequenceContainer.jsx b/src/learning-sequence/course/SequenceContainer.jsx
+index 0aa956b..7fece09 100644
+--- a/src/learning-sequence/course/SequenceContainer.jsx
++++ b/src/learning-sequence/course/SequenceContainer.jsx
+@@ -40,7 +40,7 @@ prevUrl: null
+ */
+ 
+ function SequenceContainer({
+-  courseUsageKey, courseId, sequenceId, unitId, intl, onNext, onPrevious,
++  courseUsageKey, courseId, sequenceId, unitId, models, intl, onNext, onPrevious,
+ }) {
+   const { metadata, loaded, units } = useLoadSequenceMetadata(courseUsageKey, sequenceId);
+   console.log(units);
+@@ -52,8 +52,16 @@ function SequenceContainer({
+     }
+   }, [loaded, metadata, unitId]);
+ 
++  useEffect(() => {
++    if (metadata && models) {
++      if (metadata.isTimeLimited) {
++        global.location.href = models[sequenceId].lmsWebUrl;
++      }
++    }
++  }, [metadata, models]);
++
+   console.log(metadata);
+-  if (!loaded || !unitId) {
++  if (!loaded || !unitId || (metadata && metadata.isTimeLimited)) {
+     return (
+       <PageLoading
+         srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-- 
+2.34.1
+

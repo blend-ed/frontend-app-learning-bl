@@ -1,0 +1,225 @@
+From f1d43b18d62dbfcadf120bea2d50f570538343f7 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 31 Jul 2020 13:40:58 -0400
+Subject: [PATCH 0199/1021] Tweak CoursewareContainer tests to get them working
+ again.
+
+This is effectively fixing merge conflicts between:
+
+https://github.com/edx/frontend-app-learning/pull/128
+
+and:
+
+https://github.com/edx/frontend-app-learning/pull/97
+---
+ .../__factories__/outlineTabData.factory.js   |  2 +-
+ src/courseware/CoursewareContainer.test.jsx   | 27 +++++-
+ .../__factories__/courseBlocks.factory.js     | 84 ++++++++++++-------
+ src/courseware/data/redux.test.js             | 11 +--
+ 4 files changed, 82 insertions(+), 42 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index 92033ea..0fe0fe3 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -11,7 +11,7 @@ Factory.define('outlineTabData')
+     url: `${host}/courses/${courseId}/bookmarks/`,
+   }))
+   .attr('course_blocks', ['courseId'], courseId => {
+-    const { courseBlocks } = buildSimpleCourseBlocks(courseId, null);
++    const { courseBlocks } = buildSimpleCourseBlocks(courseId);
+     return {
+       blocks: courseBlocks.blocks,
+     };
+diff --git a/src/courseware/CoursewareContainer.test.jsx b/src/courseware/CoursewareContainer.test.jsx
+index 81c480f..a9df0d8 100644
+--- a/src/courseware/CoursewareContainer.test.jsx
++++ b/src/courseware/CoursewareContainer.test.jsx
+@@ -98,8 +98,8 @@ describe('CoursewareContainer', () => {
+       expect(sequenceNavButtons).toHaveLength(5);
+ 
+       expect(sequenceNavButtons[0]).toHaveTextContent('Previous');
+-      // Prove this button is rendering an SVG book icon, meaning it's a unit.
+-      expect(sequenceNavButtons[1].querySelector('svg')).toHaveClass('fa-book');
++      // Prove this button is rendering an SVG tasks icon, meaning it's a unit/vertical.
++      expect(sequenceNavButtons[1].querySelector('svg')).toHaveClass('fa-tasks');
+       expect(sequenceNavButtons[4]).toHaveTextContent('Next');
+     }
+ 
+@@ -116,10 +116,29 @@ describe('CoursewareContainer', () => {
+       courseMetadata = Factory.build('courseMetadata');
+       courseId = courseMetadata.id;
+ 
+-      const result = buildSimpleCourseBlocks(courseId, courseMetadata.name, 3); // 3 is for 3 units
++      const customUnitBlocks = [
++        Factory.build(
++          'block',
++          { type: 'vertical' },
++          { courseId },
++        ),
++        Factory.build(
++          'block',
++          { type: 'vertical' },
++          { courseId },
++        ),
++        Factory.build(
++          'block',
++          { type: 'vertical' },
++          { courseId },
++        ),
++      ];
++
++      const result = buildSimpleCourseBlocks(courseId, courseMetadata.name, { unitBlocks: customUnitBlocks });
+       courseBlocks = result.courseBlocks;
+       unitBlocks = result.unitBlocks;
+-      sequenceBlock = result.sequenceBlock;
++      // eslint-disable-next-line prefer-destructuring
++      sequenceBlock = result.sequenceBlock[0];
+ 
+       sequenceMetadata = Factory.build(
+         'sequenceMetadata',
+diff --git a/src/courseware/data/__factories__/courseBlocks.factory.js b/src/courseware/data/__factories__/courseBlocks.factory.js
+index 3334d9d..a04d7f3 100644
+--- a/src/courseware/data/__factories__/courseBlocks.factory.js
++++ b/src/courseware/data/__factories__/courseBlocks.factory.js
+@@ -1,52 +1,72 @@
+ import { Factory } from 'rosie'; // eslint-disable-line import/no-extraneous-dependencies
+-
+ import './block.factory';
+ 
++// Generates an Array of block IDs, either from a single block or an array of blocks.
++const getIds = (attr) => {
++  const blocks = Array.isArray(attr) ? attr : [attr];
++  return blocks.map(block => block.id);
++};
++
++// Generates an Object in { [block.id]: block } format, either from a single block or an array of blocks.
++const getBlocks = (attr) => {
++  const blocks = Array.isArray(attr) ? attr : [attr];
++  // eslint-disable-next-line no-return-assign,no-sequences
++  return blocks.reduce((acc, block) => (acc[block.id] = block, acc), {});
++};
++
+ Factory.define('courseBlocks')
+   .option('courseId', 'course-v1:edX+DemoX+Demo_Course')
+-  .option('units')
+-  .option('sequence')
+-  .option('section')
+-  .option('course')
++  .option('units', ['courseId'], courseId => ([
++    Factory.build(
++      'block',
++      { type: 'vertical' },
++      { courseId },
++    ),
++  ]))
++  .option('sequence', ['courseId', 'units'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'sequential', children: getIds(child) },
++    { courseId },
++  ))
++  .option('section', ['courseId', 'sequence'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'chapter', children: getIds(child) },
++    { courseId },
++  ))
++  .option('course', ['courseId', 'section'], (courseId, child) => Factory.build(
++    'block',
++    { type: 'course', children: getIds(child) },
++    { courseId },
++  ))
+   .attr(
+     'blocks',
+     ['course', 'section', 'sequence', 'units'],
+-    (course, section, sequence, units) => {
+-      const unitsObj = {};
+-      units.forEach(unit => {
+-        unitsObj[unit.id] = unit;
+-      });
+-      return {
+-        [course.id]: course,
+-        [section.id]: section,
+-        [sequence.id]: sequence,
+-        ...unitsObj,
+-      };
+-    },
++    (course, section, sequence, units) => ({
++      [course.id]: course,
++      ...getBlocks(section),
++      ...getBlocks(sequence),
++      ...getBlocks(units),
++    }),
+   )
+   .attr('root', ['course'], course => course.id);
+ 
+ /**
+  * Builds a course with a single chapter, sequence, and unit.
+  */
+-export default function buildSimpleCourseBlocks(courseId, title, numUnits = 1) {
+-  const unitBlocks = [];
+-  for (let i = 0; i < numUnits; i++) {
+-    const unitBlock = Factory.build(
+-      'block',
+-      { type: 'vertical' },
+-      { courseId },
+-    );
+-    unitBlocks.push(unitBlock);
+-  }
+-  const sequenceBlock = Factory.build(
++export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
++  const unitBlocks = options.unitBlocks || [Factory.build(
+     'block',
+-    { type: 'sequential', children: unitBlocks.map(unitBlock => unitBlock.id) },
++    { type: 'vertical' },
+     { courseId },
+-  );
+-  const sectionBlock = Factory.build(
++  )];
++  const sequenceBlock = options.sequenceBlock || [Factory.build(
++    'block',
++    { type: 'sequential', children: unitBlocks.map(block => block.id) },
++    { courseId },
++  )];
++  const sectionBlock = options.sectionBlock || Factory.build(
+     'block',
+-    { type: 'chapter', children: [sequenceBlock.id] },
++    { type: 'chapter', children: sequenceBlock.map(block => block.id) },
+     { courseId },
+   );
+   const courseBlock = options.courseBlocks || Factory.build(
+diff --git a/src/courseware/data/redux.test.js b/src/courseware/data/redux.test.js
+index c1dcd4f..10ec8e5 100644
+--- a/src/courseware/data/redux.test.js
++++ b/src/courseware/data/redux.test.js
+@@ -28,14 +28,13 @@ describe('Data layer integration tests', () => {
+   const sequenceMetadata = Factory.build(
+     'sequenceMetadata',
+     {},
+-    { courseId, unitBlocks: [unitBlock], sequenceBlock },
++    { courseId, unitBlocks, sequenceBlock: sequenceBlock[0] },
+   );
+ 
+   const courseUrl = `${courseBaseUrl}/${courseId}`;
+   const sequenceUrl = `${sequenceBaseUrl}/${sequenceMetadata.item_id}`;
+-  const sequenceId = sequenceBlock.id;
+-  const unitBlock = unitBlocks[0];
+-  const unitId = unitBlock.id;
++  const sequenceId = sequenceBlock[0].id;
++  const unitId = unitBlocks[0].id;
+ 
+   let store;
+ 
+@@ -66,7 +65,9 @@ describe('Data layer integration tests', () => {
+           has_access: false,
+         },
+       });
+-      const { courseBlocks: forbiddenCourseBlocks } = buildSimpleCourseBlocks(forbiddenCourseMetadata.id, null);
++      const forbiddenCourseBlocks = Factory.build('courseBlocks', {
++        courseId: forbiddenCourseMetadata.id,
++      });
+ 
+       const forbiddenCourseUrl = `${courseBaseUrl}/${forbiddenCourseMetadata.id}`;
+ 
+-- 
+2.34.1
+

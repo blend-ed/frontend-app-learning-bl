@@ -1,0 +1,26 @@
+From 2fba819c34f38151d4131fe3559c4f231d9c5835 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Wed, 15 Jan 2020 12:44:30 -0500
+Subject: [PATCH 0038/1021] Assume a position of 0 if position is null.
+
+---
+ src/learning-sequence/course/SequenceContainer.jsx | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/learning-sequence/course/SequenceContainer.jsx b/src/learning-sequence/course/SequenceContainer.jsx
+index 1a4e0ea..b3b8853 100644
+--- a/src/learning-sequence/course/SequenceContainer.jsx
++++ b/src/learning-sequence/course/SequenceContainer.jsx
+@@ -51,7 +51,8 @@ function SequenceContainer({
+ 
+   useEffect(() => {
+     if (loaded && !unitId) {
+-      const position = metadata.position - 1;
++      // The position may be null, in which case we'll just assume 0.
++      const position = metadata.position !== null ? metadata.position - 1 : 0;
+       const nextUnitId = metadata.items[position].id;
+       history.push(`/course/${courseUsageKey}/${sequenceId}/${nextUnitId}`);
+     }
+-- 
+2.34.1
+

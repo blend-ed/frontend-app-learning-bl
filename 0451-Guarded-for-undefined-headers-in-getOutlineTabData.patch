@@ -1,0 +1,33 @@
+From 0175c4cf273240db452eb1db588322e650c6fa05 Mon Sep 17 00:00:00 2001
+From: Ben Holt <bholt+github@edx.org>
+Date: Wed, 5 May 2021 12:29:13 -0400
+Subject: [PATCH 0451/1021] Guarded for undefined headers in getOutlineTabData
+
+---
+ src/course-home/data/api.js | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index b39379d..96501be 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -197,6 +197,7 @@ export async function getOutlineTabData(courseId) {
+     data,
+     headers,
+   } = tabData;
++
+   const accessExpiration = camelCaseObject(data.access_expiration);
+   const canShowUpgradeSock = data.can_show_upgrade_sock;
+   const courseBlocks = data.course_blocks ? normalizeOutlineBlocks(courseId, data.course_blocks.blocks) : {};
+@@ -209,7 +210,7 @@ export async function getOutlineTabData(courseId) {
+   const hasEnded = data.has_ended;
+   const offer = camelCaseObject(data.offer);
+   const resumeCourse = camelCaseObject(data.resume_course);
+-  const timeOffsetMillis = getTimeOffsetMillis(headers.date, requestTime, responseTime);
++  const timeOffsetMillis = getTimeOffsetMillis(headers && headers.date, requestTime, responseTime);
+   const verifiedMode = camelCaseObject(data.verified_mode);
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+-- 
+2.34.1
+

@@ -1,0 +1,62 @@
+From 684be8c0cf34f86ff1f1fc86f517ac784bcb5ed9 Mon Sep 17 00:00:00 2001
+From: stvn <stvn@mit.edu>
+Date: Wed, 30 Sep 2020 13:31:29 -0700
+Subject: [PATCH 0266/1021] Log "Unexpected course block type" as info, not
+ error
+
+---
+ src/course-home/data/api.js | 7 +++++--
+ src/courseware/data/api.js  | 7 +++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index a9fc76b..2063638 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -1,6 +1,9 @@
+ import { camelCaseObject, getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+-import { logError } from '@edx/frontend-platform/logging';
++import {
++  logError,
++  logInfo,
++} from '@edx/frontend-platform/logging';
+ 
+ function normalizeCourseHomeCourseMetadata(metadata) {
+   const data = camelCaseObject(metadata);
+@@ -53,7 +56,7 @@ export function normalizeOutlineBlocks(courseId, blocks) {
+         break;
+ 
+       default:
+-        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, and sequential.`);
++        logInfo(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, and sequential.`);
+     }
+   });
+ 
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index f65171a..f343c1a 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -1,6 +1,9 @@
+ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-import { logError } from '@edx/frontend-platform/logging';
++import {
++  logError,
++  logInfo,
++} from '@edx/frontend-platform/logging';
+ 
+ export function normalizeBlocks(courseId, blocks) {
+   const models = {
+@@ -43,7 +46,7 @@ export function normalizeBlocks(courseId, blocks) {
+         };
+         break;
+       default:
+-        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, and vertical.`);
++        logInfo(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, and vertical.`);
+     }
+   });
+ 
+-- 
+2.34.1
+

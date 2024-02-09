@@ -1,0 +1,27 @@
+From d55c8b134c21b0cec179d7ec650ea1211e741b06 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 22 Jun 2020 14:37:03 -0400
+Subject: [PATCH 0150/1021] Don't show verified-only badge on Today (#92)
+
+If the Today date entry on the dates tab doesn't have any items,
+we were showing the Verified Only badge. This fixes that mistake.
+---
+ src/dates-tab/badgelist.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/dates-tab/badgelist.jsx b/src/dates-tab/badgelist.jsx
+index 2a0108c..fb94b62 100644
+--- a/src/dates-tab/badgelist.jsx
++++ b/src/dates-tab/badgelist.jsx
+@@ -66,7 +66,7 @@ function getBadgeListAndColor(date, intl, item, items) {
+     },
+     {
+       message: messages.verifiedOnly,
+-      shownForDay: items.every(x => !hasAccess(x)),
++      shownForDay: items.length && items.every(x => !hasAccess(x)),
+       shownForItem: x => !hasAccess(x),
+       icon: faLock,
+       bg: 'bg-dark-500',
+-- 
+2.34.1
+

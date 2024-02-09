@@ -1,0 +1,157 @@
+From 0f69ed55025a7fc9fefce9c6fa0a0b428226d1cc Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Mon, 10 May 2021 16:43:38 -0400
+Subject: [PATCH 0457/1021] AA-792: Progress tab UI fixes (#443)
+
+---
+ src/course-home/outline-tab/OutlineTab.jsx    |  2 +-
+ .../progress-tab/ProgressHeader.jsx           |  2 +-
+ src/course-home/progress-tab/ProgressTab.jsx  |  4 +--
+ .../grades/course-grade/CourseGradeFooter.jsx | 30 +++++++++++--------
+ .../course-grade/CurrentGradeTooltip.jsx      |  2 +-
+ .../grades/course-grade/GradeBar.jsx          |  2 +-
+ .../course-grade/PassingGradeTooltip.jsx      |  2 +-
+ 7 files changed, 24 insertions(+), 20 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 71fdd8b..b84ea5f 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -119,7 +119,7 @@ function OutlineTab({ intl }) {
+       >
+         {goalToastHeader}
+       </Toast>
+-      <div className="row w-100 m-0 mb-3 justify-content-between">
++      <div className="row w-100 mx-0 my-3 justify-content-between">
+         <div className="col-12 col-sm-auto p-0">
+           <div role="heading" aria-level="1" className="h2">{title}</div>
+         </div>
+diff --git a/src/course-home/progress-tab/ProgressHeader.jsx b/src/course-home/progress-tab/ProgressHeader.jsx
+index 62c99a7..2ff8bc3 100644
+--- a/src/course-home/progress-tab/ProgressHeader.jsx
++++ b/src/course-home/progress-tab/ProgressHeader.jsx
+@@ -20,7 +20,7 @@ function ProgressHeader({ intl }) {
+ 
+   return (
+     <>
+-      <div className="row w-100 m-0 mb-4 justify-content-between">
++      <div className="row w-100 m-0 mt-3 mb-4 justify-content-between">
+         <h1>{intl.formatMessage(messages.progressHeader)}</h1>
+         {administrator && studioUrl && (
+           <Button variant="outline-primary" size="sm" className="align-self-center" href={studioUrl}>
+diff --git a/src/course-home/progress-tab/ProgressTab.jsx b/src/course-home/progress-tab/ProgressTab.jsx
+index 55adf13..9dbb657 100644
+--- a/src/course-home/progress-tab/ProgressTab.jsx
++++ b/src/course-home/progress-tab/ProgressTab.jsx
+@@ -37,7 +37,7 @@ function ProgressTab() {
+       <ProgressHeader />
+       <div className="row w-100 m-0">
+         {/* Main body */}
+-        <div className="col-12 col-lg-8 p-0">
++        <div className="col-12 col-md-8 p-0">
+           <CourseCompletion />
+           <OnMobile>
+             <CertificateStatus />
+@@ -50,7 +50,7 @@ function ProgressTab() {
+         </div>
+ 
+         {/* Side panel */}
+-        <div className="col-12 col-lg-4 p-0 px-lg-4">
++        <div className="col-12 col-md-4 p-0 px-md-4">
+           <OnDesktop>
+             <CertificateStatus />
+           </OnDesktop>
+diff --git a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+index cb01116..3cadd5f 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CourseGradeFooter.jsx
+@@ -55,30 +55,34 @@ function CourseGradeFooter({ intl, passingGrade }) {
+     }
+   }
+ 
++  const icon = isPassing ? <Icon src={CheckCircle} className="text-success-300 d-inline-flex align-bottom" />
++    : <Icon src={WarningFilled} className="d-inline-flex align-bottom" />;
++
+   return (
+-    <div className={`row w-100 m-0 px-4 py-3 py-md-4 align-items-baseline rounded-bottom ${isPassing ? 'bg-success-100' : 'bg-warning-100'}`}>
+-      <div className="col-auto p-0 align-self-md-center">
+-        {isPassing && (
+-          <Icon src={CheckCircle} className="text-success-300 mt-n1 mr-2" />
+-        )}
+-        {!isPassing && (
+-          <Icon src={WarningFilled} className="mt-n1 mr-2" />
+-        )}
++    <div className={`row w-100 m-0 px-4 py-3 py-md-4 rounded-bottom ${isPassing ? 'bg-success-100' : 'bg-warning-100'}`}>
++      <div className="col-auto p-0">
++        {icon}
+       </div>
+-      <div className="col-11 col-md-auto p-0">
++      <div className="col-11 pl-2 px-0">
+         <OnMobile>
+-          <span className="h5" style={{ verticalAlign: 'super' }}>
++          <span className="h5 align-bottom">
+             {footerText}
+             {hasLetterGrades && (
+-              <GradeRangeTooltip iconButtonClassName="h4 ml-1" passingGrade={passingGrade} />
++              <span style={{ whiteSpace: 'nowrap' }}>
++                &nbsp;
++                <GradeRangeTooltip iconButtonClassName="h4" passingGrade={passingGrade} />
++              </span>
+             )}
+           </span>
+         </OnMobile>
+         <OnAtLeastTablet>
+-          <span className="h4 m-0">
++          <span className="h4 m-0 align-bottom">
+             {footerText}
+             {hasLetterGrades && (
+-              <GradeRangeTooltip iconButtonClassName="h3 ml-1" passingGrade={passingGrade} />
++              <span style={{ whiteSpace: 'nowrap' }}>
++                &nbsp;
++                <GradeRangeTooltip iconButtonClassName="h3" passingGrade={passingGrade} />
++              </span>
+             )}
+           </span>
+         </OnAtLeastTablet>
+diff --git a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+index b177d3c..f6e4662 100644
+--- a/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/CurrentGradeTooltip.jsx
+@@ -46,7 +46,7 @@ function CurrentGradeTooltip({ intl, tooltipClassName }) {
+         textAnchor={currentGrade < 50 ? 'start' : 'end'}
+         x={`${currentGrade}%`}
+         y="20px"
+-        style={{ transform: `translateX(${currentGrade < 50 ? '' : '-'}3em)` }}
++        style={{ transform: `translateX(${currentGrade < 50 ? '' : '-'}3.4em)` }}
+       >
+         {intl.formatMessage(messages.currentGradeLabel)}
+       </text>
+diff --git a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+index 4b5ddd4..ac1ebec 100644
+--- a/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/GradeBar.jsx
+@@ -30,7 +30,7 @@ function GradeBar({ intl, passingGrade }) {
+   const lockedTooltipClassName = isLocked ? 'locked-overlay' : '';
+ 
+   return (
+-    <div className="col-12 col-sm-6 pr-sm-0 align-self-center">
++    <div className="col-12 col-sm-6 align-self-center">
+       <div className="sr-only">{intl.formatMessage(messages.courseGradeBarAltText, { currentGrade, passingGrade })}</div>
+       <svg width="100%" height="100px" className="grade-bar" aria-hidden="true">
+         <g style={{ transform: 'translateY(2.61em)' }}>
+diff --git a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+index 545f923..4a7afdf 100644
+--- a/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
++++ b/src/course-home/progress-tab/grades/course-grade/PassingGradeTooltip.jsx
+@@ -31,7 +31,7 @@ function PassingGradeTooltip({ intl, passingGrade, tooltipClassName }) {
+         textAnchor={passingGrade < 50 ? 'start' : 'end'}
+         x={`${passingGrade}%`}
+         y="90px"
+-        style={{ transform: `translateX(${passingGrade < 50 ? '' : '-'}3em)` }}
++        style={{ transform: `translateX(${passingGrade < 50 ? '' : '-'}3.4em)` }}
+       >
+         {intl.formatMessage(messages.passingGradeLabel)}
+       </text>
+-- 
+2.34.1
+

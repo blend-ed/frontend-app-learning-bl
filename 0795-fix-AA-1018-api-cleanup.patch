@@ -1,0 +1,26 @@
+From 5706adde4d26b94d4cb49c100d80c288e7d846da Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Mon, 7 Feb 2022 11:40:35 -0500
+Subject: [PATCH 0795/1021] fix: [AA-1018] api cleanup
+
+revert missing slice from Tabpage call
+---
+ src/index.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/index.jsx b/src/index.jsx
+index 1705408..f625e20 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -66,7 +66,7 @@ subscribe(APP_READY, () => {
+                 )}
+               />
+               <PageRoute path="/course/:courseId/course-end">
+-                <TabContainer tab="courseware" fetch={fetchCourse}>
++                <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
+                   <CourseExit />
+                 </TabContainer>
+               </PageRoute>
+-- 
+2.34.1
+

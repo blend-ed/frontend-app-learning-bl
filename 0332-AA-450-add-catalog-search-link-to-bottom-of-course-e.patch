@@ -1,0 +1,308 @@
+From 38700499d4253401888d78048ee8fad3f5160ed4 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Thu, 10 Dec 2020 11:16:35 -0500
+Subject: [PATCH 0332/1021] AA-450: add catalog search link to bottom of course
+ exit (#299)
+
+---
+ .env                                          |  1 +
+ .env.development                              |  1 +
+ .env.test                                     |  1 +
+ .../course/course-exit/CatalogSuggestion.jsx  | 54 +++++++++++++++++++
+ .../course/course-exit/CourseCelebration.jsx  | 12 +++--
+ .../course/course-exit/CourseNonPassing.jsx   |  4 +-
+ .../course/course-exit/DashboardFootnote.jsx  | 14 ++++-
+ src/courseware/course/course-exit/messages.js |  5 ++
+ src/courseware/course/course-exit/utils.js    |  3 +-
+ src/index.jsx                                 |  3 +-
+ 10 files changed, 89 insertions(+), 9 deletions(-)
+ create mode 100644 src/courseware/course/course-exit/CatalogSuggestion.jsx
+
+diff --git a/.env b/.env
+index a8774b8..83803d0 100644
+--- a/.env
++++ b/.env
+@@ -17,6 +17,7 @@ FAVICON_URL=null
+ MARKETING_SITE_BASE_URL=null
+ ORDER_HISTORY_URL=null
+ REFRESH_ACCESS_TOKEN_ENDPOINT=null
++SEARCH_CATALOG_URL=null
+ SEGMENT_KEY=null
+ SITE_NAME=null
+ SOCIAL_UTM_MILESTONE_CAMPAIGN=null
+diff --git a/.env.development b/.env.development
+index 3475c06..bbfa8af 100644
+--- a/.env.development
++++ b/.env.development
+@@ -17,6 +17,7 @@ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
++SEARCH_CATALOG_URL='http://localhost:18000/courses'
+ SEGMENT_KEY=null
+ SITE_NAME='edX'
+ SOCIAL_UTM_MILESTONE_CAMPAIGN='edxmilestone'
+diff --git a/.env.test b/.env.test
+index 09d05b4..09318fa 100644
+--- a/.env.test
++++ b/.env.test
+@@ -17,6 +17,7 @@ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
+ REFRESH_ACCESS_TOKEN_ENDPOINT='http://localhost:18000/login_refresh'
++SEARCH_CATALOG_URL='http://localhost:18000/courses'
+ SEGMENT_KEY=null
+ SITE_NAME='edX'
+ SOCIAL_UTM_MILESTONE_CAMPAIGN='edxmilestone'
+diff --git a/src/courseware/course/course-exit/CatalogSuggestion.jsx b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+new file mode 100644
+index 0000000..1ee21d8
+--- /dev/null
++++ b/src/courseware/course/course-exit/CatalogSuggestion.jsx
+@@ -0,0 +1,54 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { useSelector } from 'react-redux';
++
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import {
++  FormattedMessage, injectIntl, intlShape,
++} from '@edx/frontend-platform/i18n';
++import { Hyperlink } from '@edx/paragon';
++import { faSearch } from '@fortawesome/free-solid-svg-icons';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++
++import { useModel } from '../../../generic/model-store';
++
++import messages from './messages';
++import { logClick } from './utils';
++
++function CatalogSuggestion({ intl, variant }) {
++  const { courseId } = useSelector(state => state.courseware);
++  const { org } = useModel('courses', courseId);
++  const { administrator } = getAuthenticatedUser();
++
++  const searchOurCatalogLink = (
++    <Hyperlink
++      style={{ textDecoration: 'underline' }}
++      destination={getConfig().SEARCH_CATALOG_URL}
++      className="text-reset"
++      onClick={() => logClick(org, courseId, administrator, 'catalog_search', { variant })}
++    >
++      {intl.formatMessage(messages.searchOurCatalogLink)}
++    </Hyperlink>
++  );
++
++  return (
++    <div className="row w-100 mx-0 my-2 justify-content-center">
++      <div className="col col-md-8 p-4 bg-info-100 text-center">
++        <FontAwesomeIcon icon={faSearch} style={{ width: '20px' }} />&nbsp;
++        <FormattedMessage
++          id="courseExit.catalogSearchSuggestion"
++          defaultMessage="Looking to learn more? {searchOurCatalogLink} to find more courses and programs to explore."
++          values={{ searchOurCatalogLink }}
++        />
++      </div>
++    </div>
++  );
++}
++
++CatalogSuggestion.propTypes = {
++  intl: intlShape.isRequired,
++  variant: PropTypes.string.isRequired,
++};
++
++export default injectIntl(CatalogSuggestion);
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index db2f2ce..f846fb0 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -12,6 +12,7 @@ import { Alert, Button, Hyperlink } from '@edx/paragon';
+ import { getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
++import CatalogSuggestion from './CatalogSuggestion';
+ import CelebrationMobile from './assets/celebration_456x328.gif';
+ import CelebrationDesktop from './assets/celebration_750x540.gif';
+ import certificate from '../../../generic/assets/edX_verified_certificate.png';
+@@ -119,7 +120,7 @@ function CourseCelebration({ intl }) {
+       }
+       buttonEvent = 'view_cert';
+       visitEvent = 'celebration_with_cert';
+-      footnote = <DashboardFootnote />;
++      footnote = <DashboardFootnote variant={visitEvent} />;
+       break;
+     case 'earned_but_not_available': {
+       const endDate = <FormattedDate value={end} day="numeric" month="long" year="numeric" />;
+@@ -146,7 +147,7 @@ function CourseCelebration({ intl }) {
+         </>
+       );
+       visitEvent = 'celebration_with_unavailable_cert';
+-      footnote = <DashboardFootnote />;
++      footnote = <DashboardFootnote variant={visitEvent} />;
+       break;
+     }
+     case 'requesting':
+@@ -155,12 +156,12 @@ function CourseCelebration({ intl }) {
+       certHeader = intl.formatMessage(messages.certificateHeaderRequestable);
+       message = (<p>{intl.formatMessage(messages.requestCertificateBodyText)}</p>);
+       visitEvent = 'celebration_with_requestable_cert';
+-      footnote = <DashboardFootnote />;
++      footnote = <DashboardFootnote variant={visitEvent} />;
+       break;
+     case 'unverified':
+       certHeader = intl.formatMessage(messages.certificateHeaderUnverified);
+       visitEvent = 'celebration_unverified';
+-      footnote = <DashboardFootnote />;
++      footnote = <DashboardFootnote variant={visitEvent} />;
+       if (verificationStatus === 'pending') {
+         message = (<p>{intl.formatMessage(messages.verificationPending)}</p>);
+       } else {
+@@ -215,7 +216,7 @@ function CourseCelebration({ intl }) {
+         if (verifiedMode.accessExpirationDate) {
+           footnote = <UpgradeFootnote deadline={verifiedMode.accessExpirationDate} href={verifiedMode.upgradeUrl} />;
+         } else {
+-          footnote = <DashboardFootnote />;
++          footnote = <DashboardFootnote variant={visitEvent} />;
+         }
+       }
+       break;
+@@ -323,6 +324,7 @@ function CourseCelebration({ intl }) {
+             />
+           ))}
+           {footnote}
++          <CatalogSuggestion variant={visitEvent} />
+         </div>
+       </div>
+     </>
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index bb09061..bb15a4b 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -9,6 +9,7 @@ import { getConfig } from '@edx/frontend-platform';
+ 
+ import { useModel } from '../../../generic/model-store';
+ 
++import CatalogSuggestion from './CatalogSuggestion';
+ import DashboardFootnote from './DashboardFootnote';
+ import messages from './messages';
+ import { logClick, logVisit } from './utils';
+@@ -48,7 +49,8 @@ function CourseNonPassing({ intl }) {
+             )}
+           </div>
+         </Alert>
+-        <DashboardFootnote />
++        <DashboardFootnote variant="nonpassing" />
++        <CatalogSuggestion variant="nonpassing" />
+       </div>
+     </>
+   );
+diff --git a/src/courseware/course/course-exit/DashboardFootnote.jsx b/src/courseware/course/course-exit/DashboardFootnote.jsx
+index ab10c22..512a816 100644
+--- a/src/courseware/course/course-exit/DashboardFootnote.jsx
++++ b/src/courseware/course/course-exit/DashboardFootnote.jsx
+@@ -1,5 +1,8 @@
+ import React from 'react';
++import PropTypes from 'prop-types';
++import { useSelector } from 'react-redux';
+ 
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import {
+   FormattedMessage, injectIntl, intlShape,
+ } from '@edx/frontend-platform/i18n';
+@@ -7,15 +10,23 @@ import { Hyperlink } from '@edx/paragon';
+ import { faCalendarAlt } from '@fortawesome/free-regular-svg-icons';
+ import { getConfig } from '@edx/frontend-platform';
+ 
++import { useModel } from '../../../generic/model-store';
++
+ import Footnote from './Footnote';
+ import messages from './messages';
++import { logClick } from './utils';
++
++function DashboardFootnote({ intl, variant }) {
++  const { courseId } = useSelector(state => state.courseware);
++  const { org } = useModel('courses', courseId);
++  const { administrator } = getAuthenticatedUser();
+ 
+-function DashboardFootnote({ intl }) {
+   const dashboardLink = (
+     <Hyperlink
+       style={{ textDecoration: 'underline' }}
+       destination={`${getConfig().LMS_BASE_URL}/dashboard`}
+       className="text-reset"
++      onClick={() => logClick(org, courseId, administrator, 'dashboard_footnote', { variant })}
+     >
+       {intl.formatMessage(messages.dashboardLink)}
+     </Hyperlink>
+@@ -37,6 +48,7 @@ function DashboardFootnote({ intl }) {
+ 
+ DashboardFootnote.propTypes = {
+   intl: intlShape.isRequired,
++  variant: PropTypes.string.isRequired,
+ };
+ 
+ export default injectIntl(DashboardFootnote);
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index 9d449d0..01dcbc8 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -114,6 +114,11 @@ const messages = defineMessages({
+     defaultMessage: 'Request certificate',
+     description: 'Button to request the course certificate',
+   },
++  searchOurCatalogLink: {
++    id: 'courseExit.searchOurCatalogLink',
++    defaultMessage: 'Search our catalog',
++    description: 'First part of a sentence that continues afterward',
++  },
+   shareHeader: {
+     id: 'courseCelebration.shareHeader',
+     defaultMessage: 'You have completed your course. Share your success on social media or email.',
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index d76b05b..a89e2dc 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -72,7 +72,7 @@ function getCourseExitText(courseId, intl) {
+ 
+ // Meant to be used as part of a button's onClick handler.
+ // For convenience, you can pass a falsy event and it will be ignored.
+-const logClick = (org, courseId, administrator, event) => {
++const logClick = (org, courseId, administrator, event, extraProperties) => {
+   if (!event) {
+     return;
+   }
+@@ -81,6 +81,7 @@ const logClick = (org, courseId, administrator, event) => {
+     org_key: org,
+     courserun_key: courseId,
+     is_staff: administrator,
++    ...extraProperties,
+   });
+ };
+ 
+diff --git a/src/index.jsx b/src/index.jsx
+index 99100bf..b9cd193 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -79,7 +79,9 @@ initialize({
+     config: () => {
+       mergeConfig({
+         CREDENTIALS_BASE_URL: process.env.CREDENTIALS_BASE_URL || null,
++        ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
+         INSIGHTS_BASE_URL: process.env.INSIGHTS_BASE_URL || null,
++        SEARCH_CATALOG_URL: process.env.SEARCH_CATALOG_URL || null,
+         SOCIAL_UTM_MILESTONE_CAMPAIGN: process.env.SOCIAL_UTM_MILESTONE_CAMPAIGN || null,
+         STUDIO_BASE_URL: process.env.STUDIO_BASE_URL || null,
+         SUPPORT_URL: process.env.SUPPORT_URL || null,
+@@ -88,7 +90,6 @@ initialize({
+         SUPPORT_URL_VERIFIED_CERTIFICATE: process.env.SUPPORT_URL_VERIFIED_CERTIFICATE || null,
+         TWITTER_HASHTAG: process.env.TWITTER_HASHTAG || null,
+         TWITTER_URL: process.env.TWITTER_URL || null,
+-        ENTERPRISE_LEARNER_PORTAL_HOSTNAME: process.env.ENTERPRISE_LEARNER_PORTAL_HOSTNAME || null,
+       }, 'LearnerAppConfig');
+     },
+   },
+-- 
+2.34.1
+

@@ -1,0 +1,79 @@
+From eedaa9f2e95179c922d2780daea24d70f7810955 Mon Sep 17 00:00:00 2001
+From: Ihor Romaniuk <ihor.romaniuk@raccoongang.com>
+Date: Fri, 14 Jan 2022 18:11:05 +0200
+Subject: [PATCH 0780/1021] fix: add support for legacy theme static for the
+ LmsHtmlFragment (#785)
+
+Enables an alternative configuration to match the legacy styles. No-op by default.
+---
+ .env                                            | 1 +
+ .env.development                                | 1 +
+ .env.test                                       | 1 +
+ src/course-home/outline-tab/LmsHtmlFragment.jsx | 2 +-
+ src/index.jsx                                   | 1 +
+ 5 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/.env b/.env
+index 0dc298d..b29e73e 100644
+--- a/.env
++++ b/.env
+@@ -24,6 +24,7 @@ LOGOUT_URL=''
+ LOGO_URL=''
+ LOGO_TRADEMARK_URL=''
+ LOGO_WHITE_URL=''
++LEGACY_THEME_NAME=''
+ MARKETING_SITE_BASE_URL=''
+ ORDER_HISTORY_URL=''
+ REFRESH_ACCESS_TOKEN_ENDPOINT=''
+diff --git a/.env.development b/.env.development
+index ec78360..cb04320 100644
+--- a/.env.development
++++ b/.env.development
+@@ -23,6 +23,7 @@ LOGOUT_URL='http://localhost:18000/logout'
+ LOGO_URL=https://edx-cdn.org/v3/default/logo.svg
+ LOGO_TRADEMARK_URL=https://edx-cdn.org/v3/default/logo-trademark.svg
+ LOGO_WHITE_URL=https://edx-cdn.org/v3/default/logo-white.svg
++LEGACY_THEME_NAME=''
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
+diff --git a/.env.test b/.env.test
+index 699950a..9860963 100644
+--- a/.env.test
++++ b/.env.test
+@@ -23,6 +23,7 @@ LOGOUT_URL='http://localhost:18000/logout'
+ LOGO_URL=https://edx-cdn.org/v3/default/logo.svg
+ LOGO_TRADEMARK_URL=https://edx-cdn.org/v3/default/logo-trademark.svg
+ LOGO_WHITE_URL=https://edx-cdn.org/v3/default/logo-white.svg
++LEGACY_THEME_NAME=''
+ MARKETING_SITE_BASE_URL='http://localhost:18000'
+ ORDER_HISTORY_URL='http://localhost:1996/orders'
+ PORT=2000
+diff --git a/src/course-home/outline-tab/LmsHtmlFragment.jsx b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+index 77625f3..aa5c87c 100644
+--- a/src/course-home/outline-tab/LmsHtmlFragment.jsx
++++ b/src/course-home/outline-tab/LmsHtmlFragment.jsx
+@@ -13,7 +13,7 @@ export default function LmsHtmlFragment({
+     <html>
+       <head>
+         <base href="${getConfig().LMS_BASE_URL}" target="_parent">
+-        <link rel="stylesheet" href="/static/css/bootstrap/lms-main.css">
++        <link rel="stylesheet" href="/static/${getConfig().LEGACY_THEME_NAME ? `${getConfig().LEGACY_THEME_NAME}/` : ''}css/bootstrap/lms-main.css">
+         <link rel="stylesheet" type="text/css" href="${getConfig().BASE_URL}/src/course-home/outline-tab/LmsHtmlFragment.css">
+       </head>
+       <body class="${className}">${html}</body>
+diff --git a/src/index.jsx b/src/index.jsx
+index f103765..f625e20 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -112,6 +112,7 @@ initialize({
+         TERMS_OF_SERVICE_URL: process.env.TERMS_OF_SERVICE_URL || null,
+         TWITTER_HASHTAG: process.env.TWITTER_HASHTAG || null,
+         TWITTER_URL: process.env.TWITTER_URL || null,
++        LEGACY_THEME_NAME: process.env.LEGACY_THEME_NAME || null,
+       }, 'LearnerAppConfig');
+     },
+   },
+-- 
+2.34.1
+

@@ -1,0 +1,379 @@
+From 26de2cebeb2f1525f4962a621a9b40c292e27c1a Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Wed, 6 Jan 2021 15:10:29 -0500
+Subject: [PATCH 0363/1021] AA-545: Add course in progress CourseExit variant
+ (#334)
+
+---
+ .../course/course-exit/CourseExit.jsx         |  3 +
+ .../course/course-exit/CourseExit.test.jsx    | 14 +++++
+ .../course/course-exit/CourseInProgress.jsx   | 63 +++++++++++++++++++
+ .../course/course-exit/CourseNonPassing.jsx   |  2 +-
+ src/courseware/course/course-exit/index.js    |  4 +-
+ src/courseware/course/course-exit/messages.js | 13 ++++
+ src/courseware/course/course-exit/utils.js    | 26 +++++---
+ .../SequenceNavigation.jsx                    |  6 +-
+ .../sequence-navigation/UnitNavigation.jsx    |  6 +-
+ .../__factories__/courseBlocks.factory.js     |  5 +-
+ .../__factories__/courseMetadata.factory.js   | 10 +++
+ src/courseware/data/api.js                    |  3 +-
+ 12 files changed, 137 insertions(+), 18 deletions(-)
+ create mode 100644 src/courseware/course/course-exit/CourseInProgress.jsx
+
+diff --git a/src/courseware/course/course-exit/CourseExit.jsx b/src/courseware/course/course-exit/CourseExit.jsx
+index c008590..a45d426 100644
+--- a/src/courseware/course/course-exit/CourseExit.jsx
++++ b/src/courseware/course/course-exit/CourseExit.jsx
+@@ -7,6 +7,7 @@ import { useSelector } from 'react-redux';
+ import { Redirect } from 'react-router-dom';
+ 
+ import CourseCelebration from './CourseCelebration';
++import CourseInProgress from './CourseInProgress';
+ import CourseNonPassing from './CourseNonPassing';
+ import { COURSE_EXIT_MODES, getCourseExitMode } from './utils';
+ import messages from './messages';
+@@ -18,6 +19,8 @@ function CourseExit({ intl }) {
+   let body = null;
+   if (mode === COURSE_EXIT_MODES.nonPassing) {
+     body = (<CourseNonPassing />);
++  } else if (mode === COURSE_EXIT_MODES.inProgress) {
++    body = (<CourseInProgress />);
+   } else if (mode === COURSE_EXIT_MODES.celebration) {
+     body = (<CourseCelebration />);
+   } else {
+diff --git a/src/courseware/course/course-exit/CourseExit.test.jsx b/src/courseware/course/course-exit/CourseExit.test.jsx
+index 105962a..817c7f7 100644
+--- a/src/courseware/course/course-exit/CourseExit.test.jsx
++++ b/src/courseware/course/course-exit/CourseExit.test.jsx
+@@ -13,6 +13,7 @@ import initializeStore from '../../../store';
+ import executeThunk from '../../../utils';
+ import CourseCelebration from './CourseCelebration';
+ import CourseExit from './CourseExit';
++import CourseInProgress from './CourseInProgress';
+ import CourseNonPassing from './CourseNonPassing';
+ 
+ initializeMockApp();
+@@ -293,4 +294,17 @@ describe('Course Exit Pages', () => {
+       expect(screen.getByRole('link', { name: 'View grades' })).toBeInTheDocument();
+     });
+   });
++
++  describe('Course in progress experience', () => {
++    it('Displays link to dates tab', async () => {
++      setMetadata({ user_has_passing_grade: false });
++      const courseBlocks = buildSimpleCourseBlocks(defaultMetadata.id, defaultMetadata.name,
++        { hasScheduledContent: true });
++      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
++
++      await fetchAndRender(<CourseInProgress />);
++      expect(screen.getByText('More content is coming soon!')).toBeInTheDocument();
++      expect(screen.getByRole('link', { name: 'View course schedule' })).toBeInTheDocument();
++    });
++  });
+ });
+diff --git a/src/courseware/course/course-exit/CourseInProgress.jsx b/src/courseware/course/course-exit/CourseInProgress.jsx
+new file mode 100644
+index 0000000..4106bc1
+--- /dev/null
++++ b/src/courseware/course/course-exit/CourseInProgress.jsx
+@@ -0,0 +1,63 @@
++import React, { useEffect } from 'react';
++
++import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { Helmet } from 'react-helmet';
++import { useSelector } from 'react-redux';
++import { Alert, Button } from '@edx/paragon';
++import { getConfig } from '@edx/frontend-platform';
++
++import { useModel } from '../../../generic/model-store';
++
++import CatalogSuggestion from './CatalogSuggestion';
++import DashboardFootnote from './DashboardFootnote';
++import messages from './messages';
++import { logClick, logVisit } from './utils';
++
++function CourseInProgress({ intl }) {
++  const { courseId } = useSelector(state => state.courseware);
++  const { org, tabs } = useModel('courses', courseId);
++  const { administrator } = getAuthenticatedUser();
++
++  // Get dates tab link for 'view course schedule' button
++  const datesTab = tabs.find(tab => tab.slug === 'dates');
++  const datesTabLink = datesTab && datesTab.url;
++
++  useEffect(() => logVisit(org, courseId, administrator, 'in_progress'), [org, courseId, administrator]);
++
++  return (
++    <>
++      <Helmet>
++        <title>{`${intl.formatMessage(messages.endOfCourseTitle)} | ${getConfig().SITE_NAME}`}</title>
++      </Helmet>
++      <div className="row w-100 mx-0 mb-4 px-5 py-4 border border-light justify-content-center">
++        <div className="col-12 p-0 h2 text-center">
++          { intl.formatMessage(messages.courseInProgressHeader) }
++        </div>
++        <Alert variant="primary" className="col col-lg-10 mt-4 d-flex">
++          <div className="row w-100 m-0 align-items-start">
++            <div className="flex-grow-1 col-md p-0">{ intl.formatMessage(messages.courseInProgressDescription) }</div>
++            {datesTabLink && (
++              <Button
++                variant="primary"
++                className="flex-shrink-0 mt-3 mt-md-0 mb-1 mb-md-0 ml-md-5"
++                href={datesTabLink}
++                onClick={() => logClick(org, courseId, administrator, 'view_dates_tab')}
++              >
++                {intl.formatMessage(messages.viewCourseScheduleButton)}
++              </Button>
++            )}
++          </div>
++        </Alert>
++        <DashboardFootnote variant="in_progress" />
++        <CatalogSuggestion variant="in_progress" />
++      </div>
++    </>
++  );
++}
++
++CourseInProgress.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CourseInProgress);
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index bb15a4b..63b2332 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -40,7 +40,7 @@ function CourseNonPassing({ intl }) {
+             {progressLink && (
+               <Button
+                 variant="primary"
+-                className="flex-shrink-0 mt-3 mt-sm-0 mb-1 mb-sm-0 ml-2 ml-sm-5"
++                className="flex-shrink-0 mt-3 mt-sm-0 mb-1 mb-sm-0 ml-sm-5"
+                 href={progressLink}
+                 onClick={() => logClick(org, courseId, administrator, 'view_grades')}
+               >
+diff --git a/src/courseware/course/course-exit/index.js b/src/courseware/course/course-exit/index.js
+index d87cec6..2252238 100644
+--- a/src/courseware/course/course-exit/index.js
++++ b/src/courseware/course/course-exit/index.js
+@@ -1,4 +1,4 @@
+ import CourseExit from './CourseExit';
+-import { getCourseExitText } from './utils';
++import { getCourseExitNavigation } from './utils';
+ 
+-export { CourseExit, getCourseExitText };
++export { CourseExit, getCourseExitNavigation };
+diff --git a/src/courseware/course/course-exit/messages.js b/src/courseware/course/course-exit/messages.js
+index 01dcbc8..04dbc14 100644
+--- a/src/courseware/course/course-exit/messages.js
++++ b/src/courseware/course/course-exit/messages.js
+@@ -44,6 +44,14 @@ const messages = defineMessages({
+     defaultMessage: 'Four people raising their hands in celebration',
+     description: 'Alt text used to describe celebratory image',
+   },
++  courseInProgressDescription: {
++    id: 'courseExit.courseInProgressDescription',
++    defaultMessage: 'It looks like there is more content in this course that will be released in the future. Look out for email updates or check back on your course for when this content will be available.',
++  },
++  courseInProgressHeader: {
++    id: 'courseExit.courseInProgressHeader',
++    defaultMessage: 'More content is coming soon!',
++  },
+   dashboardLink: {
+     id: 'courseExit.dashboardLink',
+     defaultMessage: 'Dashboard',
+@@ -154,6 +162,11 @@ const messages = defineMessages({
+     defaultMessage: 'View my certificate',
+     description: 'Button to view the course certificate',
+   },
++  viewCourseScheduleButton: {
++    id: 'courseExit.viewCourseScheduleButton',
++    defaultMessage: 'View course schedule',
++    description: 'Button to view the course schedule',
++  },
+   viewCoursesButton: {
+     id: 'courseExit.viewCoursesButton',
+     defaultMessage: 'View my courses',
+diff --git a/src/courseware/course/course-exit/utils.js b/src/courseware/course/course-exit/utils.js
+index 3dac4e1..8975654 100644
+--- a/src/courseware/course/course-exit/utils.js
++++ b/src/courseware/course/course-exit/utils.js
+@@ -9,6 +9,7 @@ const COURSE_EXIT_MODES = {
+   disabled: 0,
+   celebration: 1,
+   nonPassing: 2,
++  inProgress: 3,
+ };
+ 
+ // These are taken from the edx-platform `get_cert_data` function found in lms/courseware/views/views.py
+@@ -29,6 +30,7 @@ function getCourseExitMode(courseId) {
+   const {
+     certificateData,
+     courseExitPageIsActive,
++    hasScheduledContent,
+     isEnrolled,
+     userHasPassingGrade,
+   } = useModel('courses', courseId);
+@@ -53,6 +55,9 @@ function getCourseExitMode(courseId) {
+     isEligibleForCertificate = NON_CERTIFICATE_STATUSES.indexOf(certStatus) === -1;
+   }
+ 
++  if (hasScheduledContent && !userHasPassingGrade) {
++    return COURSE_EXIT_MODES.inProgress;
++  }
+   if (isEligibleForCertificate && !userHasPassingGrade) {
+     return COURSE_EXIT_MODES.nonPassing;
+   }
+@@ -62,16 +67,23 @@ function getCourseExitMode(courseId) {
+   return COURSE_EXIT_MODES.disabled;
+ }
+ 
+-// Returns null if course exit is either not active or not handling the current case
+-function getCourseExitText(courseId, intl) {
+-  switch (getCourseExitMode(courseId)) {
++// Returns null in order to render the default navigation text
++function getCourseExitNavigation(courseId, intl) {
++  const exitMode = getCourseExitMode(courseId);
++  const exitActive = exitMode !== COURSE_EXIT_MODES.disabled;
++
++  let exitText;
++  switch (exitMode) {
+     case COURSE_EXIT_MODES.celebration:
+-      return intl.formatMessage(messages.nextButtonComplete);
++      exitText = intl.formatMessage(messages.nextButtonComplete);
++      break;
+     case COURSE_EXIT_MODES.nonPassing:
+-      return intl.formatMessage(messages.nextButtonEnd);
++      exitText = intl.formatMessage(messages.nextButtonEnd);
++      break;
+     default:
+-      return null;
++      exitText = null;
+   }
++  return { exitActive, exitText };
+ }
+ 
+ // Meant to be used as part of a button's onClick handler.
+@@ -108,7 +120,7 @@ const logVisit = (org, courseId, administrator, variant) => {
+ export {
+   COURSE_EXIT_MODES,
+   getCourseExitMode,
+-  getCourseExitText,
++  getCourseExitNavigation,
+   logClick,
+   logVisit,
+ };
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index 30147b8..467737c 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -7,7 +7,7 @@ import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { useSelector } from 'react-redux';
+-import { getCourseExitText } from '../../course-exit';
++import { getCourseExitNavigation } from '../../course-exit';
+ import UnitButton from './UnitButton';
+ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import { useSequenceNavigationMetadata } from './hooks';
+@@ -61,10 +61,10 @@ function SequenceNavigation({
+   };
+ 
+   const renderNextButton = () => {
+-    const exitText = getCourseExitText(courseId, intl);
++    const { exitActive, exitText } = getCourseExitNavigation(courseId, intl);
+     const buttonOnClick = isLastUnit ? goToCourseExitPage : nextSequenceHandler;
+     const buttonText = (isLastUnit && exitText) ? exitText : intl.formatMessage(messages.nextButton);
+-    const disabled = isLastUnit && !exitText;
++    const disabled = isLastUnit && !exitActive;
+     return (
+       <Button variant="link" className="next-btn" onClick={buttonOnClick} disabled={disabled}>
+         {buttonText}
+diff --git a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+index d8ba27b..d86350f 100644
+--- a/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/UnitNavigation.jsx
+@@ -6,7 +6,7 @@ import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useSelector } from 'react-redux';
+ 
+-import { getCourseExitText } from '../../course-exit';
++import { getCourseExitNavigation } from '../../course-exit';
+ 
+ import { useSequenceNavigationMetadata } from './hooks';
+ import messages from './messages';
+@@ -23,10 +23,10 @@ function UnitNavigation({
+   const { courseId } = useSelector(state => state.courseware);
+ 
+   const renderNextButton = () => {
+-    const exitText = getCourseExitText(courseId, intl);
++    const { exitActive, exitText } = getCourseExitNavigation(courseId, intl);
+     const buttonOnClick = isLastUnit ? goToCourseExitPage : onClickNext;
+     const buttonText = (isLastUnit && exitText) ? exitText : intl.formatMessage(messages.nextButton);
+-    const disabled = isLastUnit && !exitText;
++    const disabled = isLastUnit && !exitActive;
+     return (
+       <Button variant="outline-primary" className="next-button" onClick={buttonOnClick} disabled={disabled}>
+         {buttonText}
+diff --git a/src/courseware/data/__factories__/courseBlocks.factory.js b/src/courseware/data/__factories__/courseBlocks.factory.js
+index a04d7f3..cc9876c 100644
+--- a/src/courseware/data/__factories__/courseBlocks.factory.js
++++ b/src/courseware/data/__factories__/courseBlocks.factory.js
+@@ -77,7 +77,10 @@ export default function buildSimpleCourseBlocks(courseId, title, options = {}) {
+   return {
+     courseBlocks: options.courseBlocks || Factory.build(
+       'courseBlocks',
+-      { courseId },
++      {
++        courseId,
++        hasScheduledContent: options.hasScheduledContent || false,
++      },
+       {
+         units: unitBlocks,
+         sequence: sequenceBlock,
+diff --git a/src/courseware/data/__factories__/courseMetadata.factory.js b/src/courseware/data/__factories__/courseMetadata.factory.js
+index 58d06a2..bf7a1af 100644
+--- a/src/courseware/data/__factories__/courseMetadata.factory.js
++++ b/src/courseware/data/__factories__/courseMetadata.factory.js
+@@ -116,6 +116,16 @@ Factory.define('courseMetadata')
+           },
+           { courseId: id, path: 'instructor' },
+         ),
++        Factory.build(
++          'tab',
++          {
++            title: 'Dates',
++            priority: 5,
++            slug: 'dates',
++            type: 'dates',
++          },
++          { courseId: id, path: 'dates' },
++        ),
+       ];
+ 
+       return tabs;
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index ec41481..a51d52a 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -16,6 +16,7 @@ export function normalizeBlocks(courseId, blocks) {
+           id: courseId,
+           title: block.display_name,
+           sectionIds: block.children || [],
++          hasScheduledContent: block.has_scheduled_content || false,
+         };
+         break;
+       case 'chapter':
+@@ -91,7 +92,7 @@ export async function getCourseBlocks(courseId) {
+   url.searchParams.append('course_id', courseId);
+   url.searchParams.append('username', authenticatedUser ? authenticatedUser.username : '');
+   url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children,show_gated_sections,graded,special_exam_info');
++  url.searchParams.append('requested_fields', 'children,show_gated_sections,graded,special_exam_info,has_scheduled_content');
+ 
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+   return normalizeBlocks(courseId, data.blocks);
+-- 
+2.34.1
+

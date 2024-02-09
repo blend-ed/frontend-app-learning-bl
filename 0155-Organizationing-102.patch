@@ -1,0 +1,1720 @@
+From 73c74119f095fc743c199101320981c7950d0d40 Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Thu, 2 Jul 2020 13:11:50 -0400
+Subject: [PATCH 0155/1021] Organizationing (#102)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Moving model-store into “generic” sub-directory.
+
+Also adding a README.md to explain what belongs in “generic”
+
+* Moving user-messages into “generic” sub-directory.
+
+* Moving PageLoading into “generic” sub-directory.
+
+* Moving “tabs” module into “generic” sub-directory.
+
+* Moving InstructorToolbar and MasqueradeWidget up to instructor-toolbar.
+
+The masquerade widget is a sub-module of instructor-toolbar.
+
+* Co-locating celebration APIs with celebration utils.
+
+Also adding an ADR about thunk/API naming conventions and making some other areas of the code adhere to it.
+
+* Moving courseware data (thunks, api) into the courseware module.
+
+Note that cousre-home/data/api still uses normalizeBlocks - this should be fixed so it’s not reaching across.  Maybe we pull that particular API up top.
+
+This PR includes a few TODOs for things I saw, as well as a tiny bit of whitespace cleanup.
+---
+ docs/decisions/0006-thunk-and-api-naming.md   |  24 +++
+ src/CoursewareRedirect.jsx                    |   2 +-
+ .../AccessExpirationAlert.jsx                 |   2 +-
+ src/alerts/access-expiration-alert/hooks.js   |   4 +-
+ .../enrollment-alert/EnrollmentAlert.jsx      |   2 +-
+ .../enrollment-alert/StaffEnrollmentAlert.jsx |   2 +-
+ src/alerts/enrollment-alert/hooks.js          |   5 +-
+ .../logistration-alert/LogistrationAlert.jsx  |   2 +-
+ src/alerts/logistration-alert/hooks.js        |   3 +-
+ src/alerts/offer-alert/OfferAlert.jsx         |   2 +-
+ src/alerts/offer-alert/hooks.js               |   4 +-
+ src/course-header/CourseTabsNavigation.jsx    |   2 +-
+ src/course-home/data/api.js                   |   5 +-
+ src/course-home/data/thunks.js                |   6 +-
+ .../dates-banner/DatesBannerContainer.jsx     |   2 +-
+ src/course-home/dates-tab/Day.jsx             |   2 +-
+ src/course-home/dates-tab/Timeline.jsx        |   2 +-
+ src/course-home/outline-tab/OutlineTab.jsx    |   4 +-
+ src/course-home/outline-tab/Section.jsx       |   2 +-
+ .../outline-tab/widgets/CourseDates.jsx       |   2 +-
+ .../outline-tab/widgets/CourseTools.jsx       |   3 +-
+ src/courseware/CoursewareContainer.jsx        |  19 +-
+ src/courseware/course/Course.jsx              |   4 +-
+ src/courseware/course/CourseBreadcrumbs.jsx   |   2 +-
+ src/courseware/course/bookmark/data/thunks.js |   3 +-
+ .../course/celebration/SocialIcons.jsx        |   2 +-
+ src/courseware/course/celebration/data/api.js |  12 ++
+ src/courseware/course/celebration/utils.jsx   |   4 +-
+ .../course/content-tools/ContentTools.jsx     |   1 -
+ .../content-tools/calculator/Calculator.jsx   |   1 -
+ src/courseware/course/sequence/Sequence.jsx   |   6 +-
+ .../course/sequence/SequenceContent.jsx       |   4 +-
+ src/courseware/course/sequence/Unit.jsx       |   4 +-
+ .../sequence/lock-paywall/LockPaywall.jsx     |   2 +-
+ .../SequenceNavigation.jsx                    |   2 +-
+ .../SequenceNavigationTabs.jsx                |   2 +-
+ .../sequence/sequence-navigation/hooks.js     |   2 +-
+ src/courseware/data/api.js                    | 177 +++++++++++++++-
+ src/courseware/data/index.js                  |  14 ++
+ src/{ => courseware}/data/slice.js            |   0
+ src/courseware/data/thunks.js                 | 110 +++++++++-
+ src/data/api.js                               | 194 ------------------
+ src/data/index.js                             |   7 -
+ src/data/thunks.js                            | 108 ----------
+ src/{ => generic}/PageLoading.jsx             |   0
+ src/generic/README.md                         |   5 +
+ src/{ => generic}/model-store/hooks.js        |   0
+ src/{ => generic}/model-store/index.js        |   0
+ src/{ => generic}/model-store/slice.js        |   0
+ src/{ => generic}/tabs/Tabs.jsx               |   1 +
+ .../tabs/useIndexOfLastVisibleChild.js        |   2 +-
+ src/{ => generic}/tabs/useWindowSize.js       |   0
+ src/{ => generic}/user-messages/Alert.jsx     |   2 -
+ src/{ => generic}/user-messages/AlertList.jsx |   0
+ .../user-messages/UserMessagesContext.js      |   0
+ .../user-messages/UserMessagesProvider.jsx    |   2 +-
+ src/{ => generic}/user-messages/hooks.js      |   0
+ src/{ => generic}/user-messages/index.js      |   0
+ src/index.jsx                                 |   2 +-
+ .../InstructorToolbar.jsx                     |  29 +--
+ src/instructor-toolbar/index.js               |   1 +
+ .../masquerade-widget/MasqueradeWidget.jsx    |   3 +-
+ .../MasqueradeWidgetOption.jsx                |   2 +-
+ .../masquerade-widget/data/api.js             |  14 ++
+ .../masquerade-widget/index.js                |   0
+ src/store.js                                  |   4 +-
+ src/tab-page/LoadedTabPage.jsx                |   4 +-
+ src/tab-page/TabPage.jsx                      |   2 +-
+ 68 files changed, 427 insertions(+), 408 deletions(-)
+ create mode 100644 docs/decisions/0006-thunk-and-api-naming.md
+ create mode 100644 src/courseware/course/celebration/data/api.js
+ create mode 100644 src/courseware/data/index.js
+ rename src/{ => courseware}/data/slice.js (100%)
+ delete mode 100644 src/data/api.js
+ delete mode 100644 src/data/index.js
+ delete mode 100644 src/data/thunks.js
+ rename src/{ => generic}/PageLoading.jsx (100%)
+ create mode 100644 src/generic/README.md
+ rename src/{ => generic}/model-store/hooks.js (100%)
+ rename src/{ => generic}/model-store/index.js (100%)
+ rename src/{ => generic}/model-store/slice.js (100%)
+ rename src/{ => generic}/tabs/Tabs.jsx (99%)
+ rename src/{ => generic}/tabs/useIndexOfLastVisibleChild.js (100%)
+ rename src/{ => generic}/tabs/useWindowSize.js (100%)
+ rename src/{ => generic}/user-messages/Alert.jsx (99%)
+ rename src/{ => generic}/user-messages/AlertList.jsx (100%)
+ rename src/{ => generic}/user-messages/UserMessagesContext.js (100%)
+ rename src/{ => generic}/user-messages/UserMessagesProvider.jsx (99%)
+ rename src/{ => generic}/user-messages/hooks.js (100%)
+ rename src/{ => generic}/user-messages/index.js (100%)
+ rename src/{courseware/course => instructor-toolbar}/InstructorToolbar.jsx (80%)
+ create mode 100644 src/instructor-toolbar/index.js
+ rename src/{courseware/course => instructor-toolbar}/masquerade-widget/MasqueradeWidget.jsx (96%)
+ rename src/{courseware/course => instructor-toolbar}/masquerade-widget/MasqueradeWidgetOption.jsx (97%)
+ create mode 100644 src/instructor-toolbar/masquerade-widget/data/api.js
+ rename src/{courseware/course => instructor-toolbar}/masquerade-widget/index.js (100%)
+
+diff --git a/docs/decisions/0006-thunk-and-api-naming.md b/docs/decisions/0006-thunk-and-api-naming.md
+new file mode 100644
+index 0000000..ac2a4e7
+--- /dev/null
++++ b/docs/decisions/0006-thunk-and-api-naming.md
+@@ -0,0 +1,24 @@
++# Naming API functions and redux thunks
++
++Because API functions and redux thunks are two parts of a larger process, we've informally settled on some naming conventions for them to help differentiate the type of code we're looking at.
++
++## API Functions
++
++This micro-frontend follows a pattern of naming API functions with a prefix for their HTTP verb.
++
++Examples:
++
++`getCourseBlocks` - The GET request we make to load course blocks data.
++`postSequencePosition` - The POST request for saving sequence position.
++
++## Redux Thunks
++
++Meanwhile, we use a different set of verbs for redux thunks to differentiate them from the API functions.  For instance, we use the `fetch` prefix for loading data (primarily via GET requests), and `save` for sending data back to the server (primarily via POST or PATCH requests)
++
++Examples:
++
++`fetchCourse` - The thunk for getting course data across several APIs.
++`fetchSequence` - The thunk for the process of retrieving sequence data.
++`saveSequencePosition` - Wraps the POST request for sending sequence position back to the server.
++
++The verb prefixes for thunks aren't perfect - but they're a little more 'friendly' and semantically meaningful than the HTTP verbs used for APIs.  So far we have `fetch`, `save`, `check`, `reset`, etc.
+diff --git a/src/CoursewareRedirect.jsx b/src/CoursewareRedirect.jsx
+index d6bba65..b40c986 100644
+--- a/src/CoursewareRedirect.jsx
++++ b/src/CoursewareRedirect.jsx
+@@ -2,7 +2,7 @@ import React from 'react';
+ import { Switch, Route, useRouteMatch } from 'react-router';
+ import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+-import PageLoading from './PageLoading';
++import PageLoading from './generic/PageLoading';
+ 
+ export default () => {
+   const { path } = useRouteMatch();
+diff --git a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+index bac2859..bab938d 100644
+--- a/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
++++ b/src/alerts/access-expiration-alert/AccessExpirationAlert.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { Alert } from '../../user-messages';
++import { Alert } from '../../generic/user-messages';
+ 
+ function AccessExpirationAlert({ payload }) {
+   const {
+diff --git a/src/alerts/access-expiration-alert/hooks.js b/src/alerts/access-expiration-alert/hooks.js
+index 987b65f..58d0541 100644
+--- a/src/alerts/access-expiration-alert/hooks.js
++++ b/src/alerts/access-expiration-alert/hooks.js
+@@ -1,7 +1,7 @@
+ /* eslint-disable import/prefer-default-export */
+ import { useMemo } from 'react';
+-import { useModel } from '../../model-store';
+-import { useAlert } from '../../user-messages';
++import { useModel } from '../../generic/model-store';
++import { useAlert } from '../../generic/user-messages';
+ 
+ export function useAccessExpirationAlert(courseId) {
+   const course = useModel('courses', courseId);
+diff --git a/src/alerts/enrollment-alert/EnrollmentAlert.jsx b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+index 67e0fe7..b51dc6f 100644
+--- a/src/alerts/enrollment-alert/EnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/EnrollmentAlert.jsx
+@@ -5,7 +5,7 @@ import { Button } from '@edx/paragon';
+ 
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+-import { Alert } from '../../user-messages';
++import { Alert } from '../../generic/user-messages';
+ 
+ import messages from './messages';
+ import { useEnrollClickHandler } from './hooks';
+diff --git a/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx b/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
+index c9e9db9..229224b 100644
+--- a/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
++++ b/src/alerts/enrollment-alert/StaffEnrollmentAlert.jsx
+@@ -5,7 +5,7 @@ import { Button } from '@edx/paragon';
+ 
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+-import { Alert } from '../../user-messages';
++import { Alert } from '../../generic/user-messages';
+ 
+ import messages from './messages';
+ import { useEnrollClickHandler } from './hooks';
+diff --git a/src/alerts/enrollment-alert/hooks.js b/src/alerts/enrollment-alert/hooks.js
+index d0b5b51..58db7c3 100644
+--- a/src/alerts/enrollment-alert/hooks.js
++++ b/src/alerts/enrollment-alert/hooks.js
+@@ -2,11 +2,10 @@
+ import {
+   useContext, useState, useCallback,
+ } from 'react';
+-import { UserMessagesContext, ALERT_TYPES, useAlert } from '../../user-messages';
+-import { useModel } from '../../model-store';
++import { UserMessagesContext, ALERT_TYPES, useAlert } from '../../generic/user-messages';
++import { useModel } from '../../generic/model-store';
+ import { postCourseEnrollment } from './data/api';
+ 
+-
+ export function useEnrollmentAlert(courseId) {
+   const course = useModel('courses', courseId);
+   const code = course.isStaff ? 'clientStaffEnrollmentAlert' : 'clientEnrollmentAlert';
+diff --git a/src/alerts/logistration-alert/LogistrationAlert.jsx b/src/alerts/logistration-alert/LogistrationAlert.jsx
+index 72825c0..579d7d0 100644
+--- a/src/alerts/logistration-alert/LogistrationAlert.jsx
++++ b/src/alerts/logistration-alert/LogistrationAlert.jsx
+@@ -3,7 +3,7 @@ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape, FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { getLoginRedirectUrl } from '@edx/frontend-platform/auth';
+ 
+-import { Alert } from '../../user-messages';
++import { Alert } from '../../generic/user-messages';
+ import messages from './messages';
+ 
+ function LogistrationAlert({ intl }) {
+diff --git a/src/alerts/logistration-alert/hooks.js b/src/alerts/logistration-alert/hooks.js
+index 5557ab2..3d7981f 100644
+--- a/src/alerts/logistration-alert/hooks.js
++++ b/src/alerts/logistration-alert/hooks.js
+@@ -1,8 +1,7 @@
+ /* eslint-disable import/prefer-default-export */
+ import { useContext } from 'react';
+ import { AppContext } from '@edx/frontend-platform/react';
+-import { ALERT_TYPES, useAlert } from '../../user-messages';
+-
++import { ALERT_TYPES, useAlert } from '../../generic/user-messages';
+ 
+ export function useLogistrationAlert() {
+   const { authenticatedUser } = useContext(AppContext);
+diff --git a/src/alerts/offer-alert/OfferAlert.jsx b/src/alerts/offer-alert/OfferAlert.jsx
+index 714035b..ba62661 100644
+--- a/src/alerts/offer-alert/OfferAlert.jsx
++++ b/src/alerts/offer-alert/OfferAlert.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+-import { Alert } from '../../user-messages';
++import { Alert } from '../../generic/user-messages';
+ 
+ function OfferAlert({ payload }) {
+   const {
+diff --git a/src/alerts/offer-alert/hooks.js b/src/alerts/offer-alert/hooks.js
+index 4866ee6..64a1d9c 100644
+--- a/src/alerts/offer-alert/hooks.js
++++ b/src/alerts/offer-alert/hooks.js
+@@ -1,6 +1,6 @@
+ /* eslint-disable import/prefer-default-export */
+-import { useModel } from '../../model-store';
+-import { useAlert } from '../../user-messages';
++import { useModel } from '../../generic/model-store';
++import { useAlert } from '../../generic/user-messages';
+ 
+ export function useOfferAlert(courseId) {
+   const course = useModel('courses', courseId);
+diff --git a/src/course-header/CourseTabsNavigation.jsx b/src/course-header/CourseTabsNavigation.jsx
+index 3efdb39..e4148bc 100644
+--- a/src/course-header/CourseTabsNavigation.jsx
++++ b/src/course-header/CourseTabsNavigation.jsx
+@@ -4,7 +4,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import classNames from 'classnames';
+ 
+ import messages from './messages';
+-import Tabs from '../tabs/Tabs';
++import Tabs from '../generic/tabs/Tabs';
+ 
+ function CourseTabsNavigation({
+   activeTabSlug, className, tabs, intl,
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 5e2784f..b257de6 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -1,6 +1,7 @@
+ import { camelCaseObject, getConfig } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+-import { normalizeBlocks } from '../../data';
++// TODO: Pull this normalization function up so we're not reaching into courseware
++import { normalizeBlocks } from '../../courseware/data/api';
+ 
+ function normalizeCourseHomeCourseMetadata(metadata) {
+   const data = camelCaseObject(metadata);
+@@ -59,7 +60,7 @@ export async function getOutlineTabData(courseId) {
+   return { courseTools, courseBlocks, datesWidget };
+ }
+ 
+-export async function updateCourseDeadlines(courseId) {
++export async function postCourseDeadlines(courseId) {
+   const url = new URL(`${getConfig().LMS_BASE_URL}/api/course_experience/v1/reset_course_deadlines`);
+   await getAuthenticatedHttpClient().post(url.href, { course_key: courseId });
+ }
+diff --git a/src/course-home/data/thunks.js b/src/course-home/data/thunks.js
+index a7dd7d7..cd8c6a9 100644
+--- a/src/course-home/data/thunks.js
++++ b/src/course-home/data/thunks.js
+@@ -3,12 +3,12 @@ import {
+   getCourseHomeCourseMetadata,
+   getDatesTabData,
+   getOutlineTabData,
+-  updateCourseDeadlines,
++  postCourseDeadlines,
+ } from './api';
+ 
+ import {
+   addModel,
+-} from '../../model-store';
++} from '../../generic/model-store';
+ 
+ import {
+   fetchTabFailure,
+@@ -69,7 +69,7 @@ export function fetchOutlineTab(courseId) {
+ 
+ export function resetDeadlines(courseId, getTabData) {
+   return async (dispatch) => {
+-    updateCourseDeadlines(courseId).then(() => {
++    postCourseDeadlines(courseId).then(() => {
+       dispatch(getTabData(courseId));
+     });
+   };
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index f901b05..f22a21e 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -2,7 +2,7 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ import { useDispatch, useSelector } from 'react-redux';
+ 
+-import { useModel } from '../../model-store';
++import { useModel } from '../../generic/model-store';
+ 
+ import DatesBanner from './DatesBanner';
+ import { fetchDatesTab, resetDeadlines } from '../data/thunks';
+diff --git a/src/course-home/dates-tab/Day.jsx b/src/course-home/dates-tab/Day.jsx
+index 3d1ff70..ea8e90b 100644
+--- a/src/course-home/dates-tab/Day.jsx
++++ b/src/course-home/dates-tab/Day.jsx
+@@ -4,7 +4,7 @@ import classNames from 'classnames';
+ import { useSelector } from 'react-redux';
+ import { FormattedDate, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+-import { useModel } from '../../model-store';
++import { useModel } from '../../generic/model-store';
+ 
+ import { getBadgeListAndColor } from './badgelist';
+ import { isLearnerAssignment } from './utils';
+diff --git a/src/course-home/dates-tab/Timeline.jsx b/src/course-home/dates-tab/Timeline.jsx
+index 4e82dde..8c08af4 100644
+--- a/src/course-home/dates-tab/Timeline.jsx
++++ b/src/course-home/dates-tab/Timeline.jsx
+@@ -1,7 +1,7 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+ 
+-import { useModel } from '../../model-store';
++import { useModel } from '../../generic/model-store';
+ 
+ import Day from './Day';
+ import { daycmp, isLearnerAssignment } from './utils';
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index ac27847..9b8c8b1 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -2,12 +2,12 @@ import React from 'react';
+ import { useSelector } from 'react-redux';
+ import { Button } from '@edx/paragon';
+ 
+-import { AlertList } from '../../user-messages';
++import { AlertList } from '../../generic/user-messages';
+ 
+ import CourseDates from './widgets/CourseDates';
+ import CourseTools from './widgets/CourseTools';
+ import Section from './Section';
+-import { useModel } from '../../model-store';
++import { useModel } from '../../generic/model-store';
+ 
+ // Note that we import from the component files themselves in the enrollment-alert package.
+ // This is because React.lazy() requires that we import() from a file with a Component as its
+diff --git a/src/course-home/outline-tab/Section.jsx b/src/course-home/outline-tab/Section.jsx
+index 2da936c..2131835 100644
+--- a/src/course-home/outline-tab/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -4,7 +4,7 @@ import { Collapsible } from '@edx/paragon';
+ import { faChevronRight, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import SequenceLink from './SequenceLink';
+-import { useModel } from '../../model-store';
++import { useModel } from '../../generic/model-store';
+ 
+ export default function Section({ courseId, title, sequenceIds }) {
+   const {
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index 62904dd..8014221 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -1,6 +1,6 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import { useModel } from '../../../model-store';
++import { useModel } from '../../../generic/model-store';
+ import DateSummary from '../DateSummary';
+ 
+ export default function CourseDates({ courseId }) {
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 4c9c880..45da59b 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -5,8 +5,7 @@ import {
+   faBookmark, faCertificate, faInfo, faCalendar, faStar,
+ } from '@fortawesome/free-solid-svg-icons';
+ import { faNewspaper } from '@fortawesome/free-regular-svg-icons';
+-import { useModel } from '../../../model-store';
+-
++import { useModel } from '../../../generic/model-store';
+ 
+ export default function CourseTools(
+   { courseId },
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index c3850de..665bb60 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -5,20 +5,19 @@ import { history } from '@edx/frontend-platform';
+ import { getLocale } from '@edx/frontend-platform/i18n';
+ import { useRouteMatch, Redirect } from 'react-router';
+ 
++import { useModel } from '../generic/model-store';
++import { TabPage } from '../tab-page';
++
+ import {
+   fetchCourse,
+   fetchSequence,
+-  getResumeBlock,
+-} from '../data';
+-import {
+   checkBlockCompletion,
+   saveSequencePosition,
+-} from './data/thunks';
+-import { useModel } from '../model-store';
+-import { TabPage } from '../tab-page';
+-
++  getResumeBlock,
++  sequenceIdsSelector,
++  firstSequenceIdSelector,
++} from './data';
+ import Course from './course';
+-import { sequenceIdsSelector, firstSequenceIdSelector } from './data/selectors';
+ import { handleNextSectionCelebration } from './course/celebration';
+ 
+ function useUnitNavigationHandler(courseId, sequenceId, unitId) {
+@@ -51,7 +50,6 @@ function useNextSequence(sequenceId) {
+   return nextSequenceId !== null ? sequences[nextSequenceId] : null;
+ }
+ 
+-
+ function useNextSequenceHandler(courseId, sequenceId) {
+   const course = useModel('courses', courseId);
+   const sequence = useModel('sequences', sequenceId);
+@@ -69,6 +67,9 @@ function useNextSequenceHandler(courseId, sequenceId) {
+         history.push(`/course/${courseId}/${nextSequence.id}`);
+       }
+ 
++      // TODO: Consider publishing an event on sequence navigation which the celebration modal can
++      // subscribe to.  That'd prevent us from having celebration-specific code here in this
++      // handler.
+       const celebrateFirstSection = course && course.celebrations && course.celebrations.firstSection;
+       if (celebrateFirstSection && sequence.sectionId !== nextSequence.sectionId) {
+         handleNextSectionCelebration(sequenceId, nextSequence.id, nextUnitId);
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 6fbc250..c6dc221 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
+ import { Helmet } from 'react-helmet';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+-import { AlertList } from '../../user-messages';
++import { AlertList } from '../../generic/user-messages';
+ import { useAccessExpirationAlert } from '../../alerts/access-expiration-alert';
+ import { useOfferAlert } from '../../alerts/offer-alert';
+ 
+@@ -13,7 +13,7 @@ import { CelebrationModal, shouldCelebrateOnSectionLoad } from './celebration';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import CourseSock from './course-sock';
+ import ContentTools from './content-tools';
+-import { useModel } from '../../model-store';
++import { useModel } from '../../generic/model-store';
+ 
+ // Note that we import from the component files themselves in the enrollment-alert package.
+ // This is because Reacy.lazy() requires that we import() from a file with a Component as it's
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 7118c2b..b75c43a 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -5,7 +5,7 @@ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faHome } from '@fortawesome/free-solid-svg-icons';
+ import { useSelector } from 'react-redux';
+-import { useModel } from '../../model-store';
++import { useModel } from '../../generic/model-store';
+ 
+ function CourseBreadcrumb({
+   url, children, withSeparator, ...attrs
+diff --git a/src/courseware/course/bookmark/data/thunks.js b/src/courseware/course/bookmark/data/thunks.js
+index cbaa151..5bcd514 100644
+--- a/src/courseware/course/bookmark/data/thunks.js
++++ b/src/courseware/course/bookmark/data/thunks.js
+@@ -1,10 +1,9 @@
+-
+ import { logError } from '@edx/frontend-platform/logging';
+ import {
+   createBookmark,
+   deleteBookmark,
+ } from './api';
+-import { updateModel } from '../../../../model-store';
++import { updateModel } from '../../../../generic/model-store';
+ 
+ export function addBookmark(unitId) {
+   return async (dispatch) => {
+diff --git a/src/courseware/course/celebration/SocialIcons.jsx b/src/courseware/course/celebration/SocialIcons.jsx
+index 575d244..0c5aff2 100644
+--- a/src/courseware/course/celebration/SocialIcons.jsx
++++ b/src/courseware/course/celebration/SocialIcons.jsx
+@@ -13,7 +13,7 @@ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from './messages';
+-import { useModel } from '../../../model-store';
++import { useModel } from '../../../generic/model-store';
+ 
+ function SocialIcons({ courseId, intl }) {
+   const {
+diff --git a/src/courseware/course/celebration/data/api.js b/src/courseware/course/celebration/data/api.js
+new file mode 100644
+index 0000000..609ab5e
+--- /dev/null
++++ b/src/courseware/course/celebration/data/api.js
+@@ -0,0 +1,12 @@
++/* eslint-disable import/prefer-default-export */
++
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++
++// Does not block on answer
++export function postFirstSectionCelebrationComplete(courseId) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courseware/celebration/${courseId}`);
++  getAuthenticatedHttpClient().post(url.href, {
++    first_section: false,
++  });
++}
+diff --git a/src/courseware/course/celebration/utils.jsx b/src/courseware/course/celebration/utils.jsx
+index bd55e94..e8bf911 100644
+--- a/src/courseware/course/celebration/utils.jsx
++++ b/src/courseware/course/celebration/utils.jsx
+@@ -1,7 +1,7 @@
+ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+-import { setFirstSectionCelebrationComplete } from '../../../data/api';
++import { postFirstSectionCelebrationComplete } from './data/api';
+ import { clearLocalStorage, getLocalStorage, setLocalStorage } from '../../../data/localStorage';
+ 
+ const CELEBRATION_LOCAL_STORAGE_KEY = 'CelebrationModal.showOnSectionLoad';
+@@ -17,7 +17,7 @@ function handleNextSectionCelebration(sequenceId, nextSequenceId, nextUnitId) {
+ 
+ function recordFirstSectionCelebration(courseId) {
+   // Tell the LMS
+-  setFirstSectionCelebrationComplete(courseId);
++  postFirstSectionCelebrationComplete(courseId);
+ 
+   // Tell our analytics
+   const { administrator } = getAuthenticatedUser();
+diff --git a/src/courseware/course/content-tools/ContentTools.jsx b/src/courseware/course/content-tools/ContentTools.jsx
+index 25f57af..095dc2e 100644
+--- a/src/courseware/course/content-tools/ContentTools.jsx
++++ b/src/courseware/course/content-tools/ContentTools.jsx
+@@ -21,7 +21,6 @@ export default function ContentTools({
+   );
+ }
+ 
+-
+ ContentTools.propTypes = {
+   course: PropTypes.shape({
+     notes: PropTypes.shape({
+diff --git a/src/courseware/course/content-tools/calculator/Calculator.jsx b/src/courseware/course/content-tools/calculator/Calculator.jsx
+index 08c7e4f..cac2651 100644
+--- a/src/courseware/course/content-tools/calculator/Calculator.jsx
++++ b/src/courseware/course/content-tools/calculator/Calculator.jsx
+@@ -388,5 +388,4 @@ Calculator.propTypes = {
+   intl: intlShape.isRequired,
+ };
+ 
+-
+ export default injectIntl(Calculator);
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 8ee537d..fd99ea8 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -7,9 +7,9 @@ import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { useSelector } from 'react-redux';
+ 
+-import PageLoading from '../../../PageLoading';
+-import { UserMessagesContext, ALERT_TYPES } from '../../../user-messages';
+-import { useModel } from '../../../model-store';
++import PageLoading from '../../../generic/PageLoading';
++import { UserMessagesContext, ALERT_TYPES } from '../../../generic/user-messages';
++import { useModel } from '../../../generic/model-store';
+ 
+ import messages from './messages';
+ import { SequenceNavigation, UnitNavigation } from './sequence-navigation';
+diff --git a/src/courseware/course/sequence/SequenceContent.jsx b/src/courseware/course/sequence/SequenceContent.jsx
+index 6f72db2..523d1da 100644
+--- a/src/courseware/course/sequence/SequenceContent.jsx
++++ b/src/courseware/course/sequence/SequenceContent.jsx
+@@ -1,8 +1,8 @@
+ import React, { Suspense, useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+-import PageLoading from '../../../PageLoading';
+-import { useModel } from '../../../model-store';
++import PageLoading from '../../../generic/PageLoading';
++import { useModel } from '../../../generic/model-store';
+ 
+ import messages from './messages';
+ import Unit from './Unit';
+diff --git a/src/courseware/course/sequence/Unit.jsx b/src/courseware/course/sequence/Unit.jsx
+index 6068ca2..5709e4d 100644
+--- a/src/courseware/course/sequence/Unit.jsx
++++ b/src/courseware/course/sequence/Unit.jsx
+@@ -10,8 +10,8 @@ import { getConfig } from '@edx/frontend-platform';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import messages from './messages';
+ import BookmarkButton from '../bookmark/BookmarkButton';
+-import { useModel } from '../../../model-store';
+-import PageLoading from '../../../PageLoading';
++import { useModel } from '../../../generic/model-store';
++import PageLoading from '../../../generic/PageLoading';
+ 
+ const LockPaywall = React.lazy(() => import('./lock-paywall'));
+ 
+diff --git a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+index 8a320b5..c7cc179 100644
+--- a/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
++++ b/src/courseware/course/sequence/lock-paywall/LockPaywall.jsx
+@@ -6,7 +6,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import messages from './messages';
+ import VerifiedCert from './assets/edx-verified-mini-cert.png';
+-import { useModel } from '../../../../model-store';
++import { useModel } from '../../../../generic/model-store';
+ 
+ function LockPaywall({
+   intl,
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+index a8ca9f3..44ab4f7 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigation.jsx
+@@ -10,7 +10,7 @@ import { useSelector } from 'react-redux';
+ import UnitButton from './UnitButton';
+ import SequenceNavigationTabs from './SequenceNavigationTabs';
+ import { useSequenceNavigationMetadata } from './hooks';
+-import { useModel } from '../../../../model-store';
++import { useModel } from '../../../../generic/model-store';
+ 
+ export default function SequenceNavigation({
+   unitId,
+diff --git a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.jsx b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.jsx
+index ff93f2b..6275548 100644
+--- a/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.jsx
++++ b/src/courseware/course/sequence/sequence-navigation/SequenceNavigationTabs.jsx
+@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
+ 
+ import UnitButton from './UnitButton';
+ import SequenceNavigationDropdown from './SequenceNavigationDropdown';
+-import useIndexOfLastVisibleChild from '../../../../tabs/useIndexOfLastVisibleChild';
++import useIndexOfLastVisibleChild from '../../../../generic/tabs/useIndexOfLastVisibleChild';
+ 
+ export default function SequenceNavigationTabs({
+   unitIds, unitId, showCompletion, onNavigate,
+diff --git a/src/courseware/course/sequence/sequence-navigation/hooks.js b/src/courseware/course/sequence/sequence-navigation/hooks.js
+index 82918b6..404f414 100644
+--- a/src/courseware/course/sequence/sequence-navigation/hooks.js
++++ b/src/courseware/course/sequence/sequence-navigation/hooks.js
+@@ -1,7 +1,7 @@
+ /* eslint-disable import/prefer-default-export */
+ 
+ import { useSelector } from 'react-redux';
+-import { useModel } from '../../../../model-store';
++import { useModel } from '../../../../generic/model-store';
+ import { sequenceIdsSelector } from '../../../data/selectors';
+ 
+ export function useSequenceNavigationMetadata(currentSequenceId, currentUnitId) {
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index a2940f8..60b97af 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -1,5 +1,170 @@
+-import { getConfig } from '@edx/frontend-platform';
+-import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++import { getConfig, camelCaseObject } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
++import { logError } from '@edx/frontend-platform/logging';
++
++export function normalizeBlocks(courseId, blocks) {
++  const models = {
++    courses: {},
++    sections: {},
++    sequences: {},
++    units: {},
++  };
++  Object.values(blocks).forEach(block => {
++    switch (block.type) {
++      case 'course':
++        models.courses[block.id] = {
++          id: courseId,
++          title: block.display_name,
++          sectionIds: block.children || [],
++        };
++        break;
++      case 'chapter':
++        models.sections[block.id] = {
++          id: block.id,
++          title: block.display_name,
++          sequenceIds: block.children || [],
++        };
++        break;
++
++      case 'sequential':
++        models.sequences[block.id] = {
++          id: block.id,
++          title: block.display_name,
++          lmsWebUrl: block.lms_web_url,
++          unitIds: block.children || [],
++        };
++        break;
++      case 'vertical':
++        models.units[block.id] = {
++          graded: block.graded,
++          id: block.id,
++          title: block.display_name,
++          lmsWebUrl: block.lms_web_url,
++        };
++        break;
++      default:
++        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, and vertical.`);
++    }
++  });
++
++  // Next go through each list and use their child lists to decorate those children with a
++  // reference back to their parent.
++  Object.values(models.courses).forEach(course => {
++    if (Array.isArray(course.sectionIds)) {
++      course.sectionIds.forEach(sectionId => {
++        const section = models.sections[sectionId];
++        section.courseId = course.id;
++      });
++    }
++  });
++
++  Object.values(models.sections).forEach(section => {
++    if (Array.isArray(section.sequenceIds)) {
++      section.sequenceIds.forEach(sequenceId => {
++        models.sequences[sequenceId].sectionId = section.id;
++      });
++    }
++  });
++
++  Object.values(models.sequences).forEach(sequence => {
++    if (Array.isArray(sequence.unitIds)) {
++      sequence.unitIds.forEach(unitId => {
++        models.units[unitId].sequenceId = sequence.id;
++      });
++    }
++  });
++
++  return models;
++}
++
++export async function getCourseBlocks(courseId) {
++  const { username } = getAuthenticatedUser();
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
++  url.searchParams.append('course_id', courseId);
++  url.searchParams.append('username', username);
++  url.searchParams.append('depth', 3);
++  url.searchParams.append('requested_fields', 'children,show_gated_sections,graded');
++
++  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
++  return normalizeBlocks(courseId, data.blocks);
++}
++
++function normalizeTabUrls(id, tabs) {
++  // If api doesn't return the mfe base url, change tab url to point back to LMS
++  return tabs.map((tab) => {
++    let { url } = tab;
++    if (url[0] === '/') {
++      url = `${getConfig().LMS_BASE_URL}${tab.url}`;
++    }
++    return { ...tab, url };
++  });
++}
++
++function normalizeMetadata(metadata) {
++  return {
++    canShowUpgradeSock: metadata.can_show_upgrade_sock,
++    contentTypeGatingEnabled: metadata.content_type_gating_enabled,
++    // TODO: TNL-7185: return course expired _date_, instead of _message_
++    courseExpiredMessage: metadata.course_expired_message,
++    id: metadata.id,
++    title: metadata.name,
++    number: metadata.number,
++    offerHtml: metadata.offer_html,
++    org: metadata.org,
++    enrollmentStart: metadata.enrollment_start,
++    enrollmentEnd: metadata.enrollment_end,
++    end: metadata.end,
++    start: metadata.start,
++    enrollmentMode: metadata.enrollment.mode,
++    isEnrolled: metadata.enrollment.is_active,
++    canLoadCourseware: camelCaseObject(metadata.can_load_courseware),
++    isStaff: metadata.is_staff,
++    verifiedMode: camelCaseObject(metadata.verified_mode),
++    tabs: normalizeTabUrls(metadata.id, camelCaseObject(metadata.tabs)),
++    showCalculator: metadata.show_calculator,
++    notes: camelCaseObject(metadata.notes),
++    marketingUrl: metadata.marketing_url,
++    celebrations: camelCaseObject(metadata.celebrations),
++  };
++}
++
++export async function getCourseMetadata(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
++  const { data } = await getAuthenticatedHttpClient().get(url);
++  return normalizeMetadata(data);
++}
++
++function normalizeSequenceMetadata(sequence) {
++  return {
++    sequence: {
++      id: sequence.item_id,
++      unitIds: sequence.items.map(unit => unit.id),
++      bannerText: sequence.banner_text,
++      title: sequence.display_name,
++      gatedContent: camelCaseObject(sequence.gated_content),
++      isTimeLimited: sequence.is_time_limited,
++      // Position comes back from the server 1-indexed. Adjust here.
++      activeUnitIndex: sequence.position ? sequence.position - 1 : 0,
++      saveUnitPosition: sequence.save_position,
++      showCompletion: sequence.show_completion,
++    },
++    units: sequence.items.map(unit => ({
++      id: unit.id,
++      sequenceId: sequence.item_id,
++      bookmarked: unit.bookmarked,
++      complete: unit.complete,
++      title: unit.page_title,
++      contentType: unit.type,
++    })),
++  };
++}
++
++export async function getSequenceMetadata(sequenceId) {
++  const { data } = await getAuthenticatedHttpClient()
++    .get(`${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceId}`, {});
++
++  return normalizeSequenceMetadata(data);
++}
+ 
+ const getSequenceXModuleHandlerUrl = (courseId, sequenceId) => `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${sequenceId}/handler/xmodule_handler`;
+ 
+@@ -26,7 +191,7 @@ export async function getBlockCompletion(courseId, sequenceId, usageKey) {
+   return false;
+ }
+ 
+-export async function updateSequencePosition(courseId, sequenceId, position) {
++export async function postSequencePosition(courseId, sequenceId, position) {
+   // Post data sent to this endpoint must be url encoded
+   // TODO: Remove the need for this to be the case.
+   // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+@@ -45,3 +210,9 @@ export async function updateSequencePosition(courseId, sequenceId, position) {
+ 
+   return data;
+ }
++
++export async function getResumeBlock(courseId) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courseware/resume/${courseId}`);
++  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
++  return camelCaseObject(data);
++}
+diff --git a/src/courseware/data/index.js b/src/courseware/data/index.js
+new file mode 100644
+index 0000000..9dbada1
+--- /dev/null
++++ b/src/courseware/data/index.js
+@@ -0,0 +1,14 @@
++export {
++  fetchCourse,
++  fetchSequence,
++  checkBlockCompletion,
++  saveSequencePosition,
++} from './thunks';
++export {
++  getResumeBlock,
++} from './api';
++export {
++  sequenceIdsSelector,
++  firstSequenceIdSelector,
++} from './selectors';
++export { reducer } from './slice';
+diff --git a/src/data/slice.js b/src/courseware/data/slice.js
+similarity index 100%
+rename from src/data/slice.js
+rename to src/courseware/data/slice.js
+diff --git a/src/courseware/data/thunks.js b/src/courseware/data/thunks.js
+index 2885247..3dde911 100644
+--- a/src/courseware/data/thunks.js
++++ b/src/courseware/data/thunks.js
+@@ -1,11 +1,113 @@
+ import { logError } from '@edx/frontend-platform/logging';
+ import {
+   getBlockCompletion,
+-  updateSequencePosition,
++  postSequencePosition,
++  getCourseMetadata,
++  getCourseBlocks,
++  getSequenceMetadata,
+ } from './api';
+ import {
+-  updateModel,
+-} from '../../model-store';
++  updateModel, addModel, updateModelsMap, addModelsMap, updateModels,
++} from '../../generic/model-store';
++import {
++  fetchCourseRequest,
++  fetchCourseSuccess,
++  fetchCourseFailure,
++  fetchCourseDenied,
++  fetchSequenceRequest,
++  fetchSequenceSuccess,
++  fetchSequenceFailure,
++} from './slice';
++
++export function fetchCourse(courseId) {
++  return async (dispatch) => {
++    dispatch(fetchCourseRequest({ courseId }));
++    Promise.allSettled([
++      getCourseMetadata(courseId),
++      getCourseBlocks(courseId),
++    ]).then(([courseMetadataResult, courseBlocksResult]) => {
++      if (courseMetadataResult.status === 'fulfilled') {
++        dispatch(addModel({
++          modelType: 'courses',
++          model: courseMetadataResult.value,
++        }));
++      }
++
++      if (courseBlocksResult.status === 'fulfilled') {
++        const {
++          courses, sections, sequences, units,
++        } = courseBlocksResult.value;
++
++        // This updates the course with a sectionIds array from the blocks data.
++        dispatch(updateModelsMap({
++          modelType: 'courses',
++          modelsMap: courses,
++        }));
++        dispatch(addModelsMap({
++          modelType: 'sections',
++          modelsMap: sections,
++        }));
++        // We update for sequences and units because the sequence metadata may have come back first.
++        dispatch(updateModelsMap({
++          modelType: 'sequences',
++          modelsMap: sequences,
++        }));
++        dispatch(updateModelsMap({
++          modelType: 'units',
++          modelsMap: units,
++        }));
++      }
++
++      const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
++      const fetchedBlocks = courseBlocksResult.status === 'fulfilled';
++
++      // Log errors for each request if needed. Course block failures may occur
++      // even if the course metadata request is successful
++      if (!fetchedBlocks) {
++        logError(courseBlocksResult.reason);
++      }
++      if (!fetchedMetadata) {
++        logError(courseMetadataResult.reason);
++      }
++
++      if (fetchedMetadata) {
++        if (courseMetadataResult.value.canLoadCourseware.hasAccess && fetchedBlocks) {
++          // User has access
++          dispatch(fetchCourseSuccess({ courseId }));
++          return;
++        }
++        // User either doesn't have access or only has partial access
++        // (can't access course blocks)
++        dispatch(fetchCourseDenied({ courseId }));
++        return;
++      }
++
++      // Definitely an error happening
++      dispatch(fetchCourseFailure({ courseId }));
++    });
++  };
++}
++
++export function fetchSequence(sequenceId) {
++  return async (dispatch) => {
++    dispatch(fetchSequenceRequest({ sequenceId }));
++    try {
++      const { sequence, units } = await getSequenceMetadata(sequenceId);
++      dispatch(updateModel({
++        modelType: 'sequences',
++        model: sequence,
++      }));
++      dispatch(updateModels({
++        modelType: 'units',
++        models: units,
++      }));
++      dispatch(fetchSequenceSuccess({ sequenceId }));
++    } catch (error) {
++      logError(error);
++      dispatch(fetchSequenceFailure({ sequenceId }));
++    }
++  };
++}
+ 
+ export function checkBlockCompletion(courseId, sequenceId, unitId) {
+   return async (dispatch, getState) => {
+@@ -42,7 +144,7 @@ export function saveSequencePosition(courseId, sequenceId, position) {
+       },
+     }));
+     try {
+-      await updateSequencePosition(courseId, sequenceId, position);
++      await postSequencePosition(courseId, sequenceId, position);
+       // Update again under the assumption that the above call succeeded, since it doesn't return a
+       // meaningful response.
+       dispatch(updateModel({
+diff --git a/src/data/api.js b/src/data/api.js
+deleted file mode 100644
+index 0f48325..0000000
+--- a/src/data/api.js
++++ /dev/null
+@@ -1,194 +0,0 @@
+-/* eslint-disable import/prefer-default-export */
+-import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+-import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+-import { logError } from '@edx/frontend-platform/logging';
+-
+-function normalizeTabUrls(id, tabs) {
+-  // If api doesn't return the mfe base url, change tab url to point back to LMS
+-  return tabs.map((tab) => {
+-    let { url } = tab;
+-    if (url[0] === '/') {
+-      url = `${getConfig().LMS_BASE_URL}${tab.url}`;
+-    }
+-    return { ...tab, url };
+-  });
+-}
+-
+-function normalizeMetadata(metadata) {
+-  return {
+-    canShowUpgradeSock: metadata.can_show_upgrade_sock,
+-    contentTypeGatingEnabled: metadata.content_type_gating_enabled,
+-    // TODO: TNL-7185: return course expired _date_, instead of _message_
+-    courseExpiredMessage: metadata.course_expired_message,
+-    id: metadata.id,
+-    title: metadata.name,
+-    number: metadata.number,
+-    offerHtml: metadata.offer_html,
+-    org: metadata.org,
+-    enrollmentStart: metadata.enrollment_start,
+-    enrollmentEnd: metadata.enrollment_end,
+-    end: metadata.end,
+-    start: metadata.start,
+-    enrollmentMode: metadata.enrollment.mode,
+-    isEnrolled: metadata.enrollment.is_active,
+-    canLoadCourseware: camelCaseObject(metadata.can_load_courseware),
+-    isStaff: metadata.is_staff,
+-    verifiedMode: camelCaseObject(metadata.verified_mode),
+-    tabs: normalizeTabUrls(metadata.id, camelCaseObject(metadata.tabs)),
+-    showCalculator: metadata.show_calculator,
+-    notes: camelCaseObject(metadata.notes),
+-    marketingUrl: metadata.marketing_url,
+-    celebrations: camelCaseObject(metadata.celebrations),
+-  };
+-}
+-
+-export async function getCourseMetadata(courseId) {
+-  const url = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseId}`;
+-  const { data } = await getAuthenticatedHttpClient().get(url);
+-  return normalizeMetadata(data);
+-}
+-
+-export function normalizeBlocks(courseId, blocks) {
+-  const models = {
+-    courses: {},
+-    sections: {},
+-    sequences: {},
+-    units: {},
+-  };
+-  Object.values(blocks).forEach(block => {
+-    switch (block.type) {
+-      case 'course':
+-        models.courses[block.id] = {
+-          id: courseId,
+-          title: block.display_name,
+-          sectionIds: block.children || [],
+-        };
+-        break;
+-      case 'chapter':
+-        models.sections[block.id] = {
+-          id: block.id,
+-          title: block.display_name,
+-          sequenceIds: block.children || [],
+-        };
+-        break;
+-
+-      case 'sequential':
+-        models.sequences[block.id] = {
+-          id: block.id,
+-          title: block.display_name,
+-          lmsWebUrl: block.lms_web_url,
+-          unitIds: block.children || [],
+-        };
+-        break;
+-      case 'vertical':
+-        models.units[block.id] = {
+-          graded: block.graded,
+-          id: block.id,
+-          title: block.display_name,
+-          lmsWebUrl: block.lms_web_url,
+-        };
+-        break;
+-      default:
+-        logError(`Unexpected course block type: ${block.type} with ID ${block.id}.  Expected block types are course, chapter, sequential, and vertical.`);
+-    }
+-  });
+-
+-  // Next go through each list and use their child lists to decorate those children with a
+-  // reference back to their parent.
+-  Object.values(models.courses).forEach(course => {
+-    if (Array.isArray(course.sectionIds)) {
+-      course.sectionIds.forEach(sectionId => {
+-        const section = models.sections[sectionId];
+-        section.courseId = course.id;
+-      });
+-    }
+-  });
+-
+-  Object.values(models.sections).forEach(section => {
+-    if (Array.isArray(section.sequenceIds)) {
+-      section.sequenceIds.forEach(sequenceId => {
+-        models.sequences[sequenceId].sectionId = section.id;
+-      });
+-    }
+-  });
+-
+-  Object.values(models.sequences).forEach(sequence => {
+-    if (Array.isArray(sequence.unitIds)) {
+-      sequence.unitIds.forEach(unitId => {
+-        models.units[unitId].sequenceId = sequence.id;
+-      });
+-    }
+-  });
+-
+-  return models;
+-}
+-
+-export async function getCourseBlocks(courseId) {
+-  const { username } = getAuthenticatedUser();
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/`);
+-  url.searchParams.append('course_id', courseId);
+-  url.searchParams.append('username', username);
+-  url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children,show_gated_sections,graded');
+-
+-  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+-  return normalizeBlocks(courseId, data.blocks);
+-}
+-
+-function normalizeSequenceMetadata(sequence) {
+-  return {
+-    sequence: {
+-      id: sequence.item_id,
+-      unitIds: sequence.items.map(unit => unit.id),
+-      bannerText: sequence.banner_text,
+-      title: sequence.display_name,
+-      gatedContent: camelCaseObject(sequence.gated_content),
+-      isTimeLimited: sequence.is_time_limited,
+-      // Position comes back from the server 1-indexed. Adjust here.
+-      activeUnitIndex: sequence.position ? sequence.position - 1 : 0,
+-      saveUnitPosition: sequence.save_position,
+-      showCompletion: sequence.show_completion,
+-    },
+-    units: sequence.items.map(unit => ({
+-      id: unit.id,
+-      sequenceId: sequence.item_id,
+-      bookmarked: unit.bookmarked,
+-      complete: unit.complete,
+-      title: unit.page_title,
+-      contentType: unit.type,
+-    })),
+-  };
+-}
+-
+-export async function getSequenceMetadata(sequenceId) {
+-  const { data } = await getAuthenticatedHttpClient()
+-    .get(`${getConfig().LMS_BASE_URL}/api/courseware/sequence/${sequenceId}`, {});
+-
+-  return normalizeSequenceMetadata(data);
+-}
+-
+-export async function getResumeBlock(courseId) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courseware/resume/${courseId}`);
+-  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+-  return camelCaseObject(data);
+-}
+-
+-export async function getMasqueradeOptions(courseId) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`);
+-  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+-  return camelCaseObject(data);
+-}
+-
+-export async function postMasqueradeOptions(courseId, data) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`);
+-  const { response } = await getAuthenticatedHttpClient().post(url.href, data);
+-  return camelCaseObject(response);
+-}
+-
+-// Does not block on answer
+-export function setFirstSectionCelebrationComplete(courseId) {
+-  const url = new URL(`${getConfig().LMS_BASE_URL}/api/courseware/celebration/${courseId}`);
+-  getAuthenticatedHttpClient().post(url.href, {
+-    first_section: false,
+-  });
+-}
+diff --git a/src/data/index.js b/src/data/index.js
+deleted file mode 100644
+index 4b3afc0..0000000
+--- a/src/data/index.js
++++ /dev/null
+@@ -1,7 +0,0 @@
+-export {
+-  fetchCourse,
+-  fetchSequence,
+-} from './thunks';
+-
+-export { getResumeBlock, normalizeBlocks } from './api';
+-export { reducer } from './slice';
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+deleted file mode 100644
+index e5ed5e6..0000000
+--- a/src/data/thunks.js
++++ /dev/null
+@@ -1,108 +0,0 @@
+-import { logError } from '@edx/frontend-platform/logging';
+-import {
+-  getCourseMetadata,
+-  getCourseBlocks,
+-  getSequenceMetadata,
+-} from './api';
+-import {
+-  addModelsMap, updateModel, updateModels, updateModelsMap, addModel,
+-} from '../model-store';
+-import {
+-  fetchCourseRequest,
+-  fetchCourseSuccess,
+-  fetchCourseFailure,
+-  fetchCourseDenied,
+-  fetchSequenceRequest,
+-  fetchSequenceSuccess,
+-  fetchSequenceFailure,
+-} from './slice';
+-
+-export function fetchCourse(courseId) {
+-  return async (dispatch) => {
+-    dispatch(fetchCourseRequest({ courseId }));
+-    Promise.allSettled([
+-      getCourseMetadata(courseId),
+-      getCourseBlocks(courseId),
+-    ]).then(([courseMetadataResult, courseBlocksResult]) => {
+-      if (courseMetadataResult.status === 'fulfilled') {
+-        dispatch(addModel({
+-          modelType: 'courses',
+-          model: courseMetadataResult.value,
+-        }));
+-      }
+-
+-      if (courseBlocksResult.status === 'fulfilled') {
+-        const {
+-          courses, sections, sequences, units,
+-        } = courseBlocksResult.value;
+-
+-        // This updates the course with a sectionIds array from the blocks data.
+-        dispatch(updateModelsMap({
+-          modelType: 'courses',
+-          modelsMap: courses,
+-        }));
+-        dispatch(addModelsMap({
+-          modelType: 'sections',
+-          modelsMap: sections,
+-        }));
+-        // We update for sequences and units because the sequence metadata may have come back first.
+-        dispatch(updateModelsMap({
+-          modelType: 'sequences',
+-          modelsMap: sequences,
+-        }));
+-        dispatch(updateModelsMap({
+-          modelType: 'units',
+-          modelsMap: units,
+-        }));
+-      }
+-
+-      const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
+-      const fetchedBlocks = courseBlocksResult.status === 'fulfilled';
+-
+-      // Log errors for each request if needed. Course block failures may occur
+-      // even if the course metadata request is successful
+-      if (!fetchedBlocks) {
+-        logError(courseBlocksResult.reason);
+-      }
+-      if (!fetchedMetadata) {
+-        logError(courseMetadataResult.reason);
+-      }
+-
+-      if (fetchedMetadata) {
+-        if (courseMetadataResult.value.canLoadCourseware.hasAccess && fetchedBlocks) {
+-          // User has access
+-          dispatch(fetchCourseSuccess({ courseId }));
+-          return;
+-        }
+-        // User either doesn't have access or only has partial access
+-        // (can't access course blocks)
+-        dispatch(fetchCourseDenied({ courseId }));
+-        return;
+-      }
+-
+-      // Definitely an error happening
+-      dispatch(fetchCourseFailure({ courseId }));
+-    });
+-  };
+-}
+-
+-export function fetchSequence(sequenceId) {
+-  return async (dispatch) => {
+-    dispatch(fetchSequenceRequest({ sequenceId }));
+-    try {
+-      const { sequence, units } = await getSequenceMetadata(sequenceId);
+-      dispatch(updateModel({
+-        modelType: 'sequences',
+-        model: sequence,
+-      }));
+-      dispatch(updateModels({
+-        modelType: 'units',
+-        models: units,
+-      }));
+-      dispatch(fetchSequenceSuccess({ sequenceId }));
+-    } catch (error) {
+-      logError(error);
+-      dispatch(fetchSequenceFailure({ sequenceId }));
+-    }
+-  };
+-}
+diff --git a/src/PageLoading.jsx b/src/generic/PageLoading.jsx
+similarity index 100%
+rename from src/PageLoading.jsx
+rename to src/generic/PageLoading.jsx
+diff --git a/src/generic/README.md b/src/generic/README.md
+new file mode 100644
+index 0000000..8ee9144
+--- /dev/null
++++ b/src/generic/README.md
+@@ -0,0 +1,5 @@
++## Generic module (src/generic)
++
++This module is a place for code that is not specific to the frontend-app-learning micro-frontend.  It is intended to be reusable and we expect we can extract it to a reusable code repository like Paragon or frontend-platform in the future.
++
++Take care when changing this code that it doesn't take on domain-specific logic.
+diff --git a/src/model-store/hooks.js b/src/generic/model-store/hooks.js
+similarity index 100%
+rename from src/model-store/hooks.js
+rename to src/generic/model-store/hooks.js
+diff --git a/src/model-store/index.js b/src/generic/model-store/index.js
+similarity index 100%
+rename from src/model-store/index.js
+rename to src/generic/model-store/index.js
+diff --git a/src/model-store/slice.js b/src/generic/model-store/slice.js
+similarity index 100%
+rename from src/model-store/slice.js
+rename to src/generic/model-store/slice.js
+diff --git a/src/tabs/Tabs.jsx b/src/generic/tabs/Tabs.jsx
+similarity index 99%
+rename from src/tabs/Tabs.jsx
+rename to src/generic/tabs/Tabs.jsx
+index a8f9f48..21e5b54 100644
+--- a/src/tabs/Tabs.jsx
++++ b/src/generic/tabs/Tabs.jsx
+@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
+ import { Dropdown } from '@edx/paragon';
+ import { FormattedMessage } from '@edx/frontend-platform/i18n';
+ import classNames from 'classnames';
++
+ import useIndexOfLastVisibleChild from './useIndexOfLastVisibleChild';
+ 
+ export default function Tabs({ children, className, ...attrs }) {
+diff --git a/src/tabs/useIndexOfLastVisibleChild.js b/src/generic/tabs/useIndexOfLastVisibleChild.js
+similarity index 100%
+rename from src/tabs/useIndexOfLastVisibleChild.js
+rename to src/generic/tabs/useIndexOfLastVisibleChild.js
+index 94dfcc0..b36494b 100644
+--- a/src/tabs/useIndexOfLastVisibleChild.js
++++ b/src/generic/tabs/useIndexOfLastVisibleChild.js
+@@ -1,4 +1,5 @@
+ import { useLayoutEffect, useRef, useState } from 'react';
++
+ import useWindowSize from './useWindowSize';
+ 
+ const invisibleStyle = {
+@@ -69,7 +70,6 @@ export default function useIndexOfLastVisibleChild() {
+         nextIndexOfLastVisibleChild: -1,
+       });
+ 
+-
+     setIndexOfLastVisibleChild(nextIndexOfLastVisibleChild);
+   }, [windowSize, containerElementRef.current]);
+ 
+diff --git a/src/tabs/useWindowSize.js b/src/generic/tabs/useWindowSize.js
+similarity index 100%
+rename from src/tabs/useWindowSize.js
+rename to src/generic/tabs/useWindowSize.js
+diff --git a/src/user-messages/Alert.jsx b/src/generic/user-messages/Alert.jsx
+similarity index 99%
+rename from src/user-messages/Alert.jsx
+rename to src/generic/user-messages/Alert.jsx
+index 8b62d0a..2dea7c7 100644
+--- a/src/user-messages/Alert.jsx
++++ b/src/generic/user-messages/Alert.jsx
+@@ -53,7 +53,6 @@ function Alert({
+   );
+ }
+ 
+-
+ Alert.propTypes = {
+   type: PropTypes.oneOf([ALERT_TYPES.ERROR, ALERT_TYPES.DANGER, ALERT_TYPES.INFO, ALERT_TYPES.SUCCESS]).isRequired,
+   dismissible: PropTypes.bool,
+@@ -67,5 +66,4 @@ Alert.defaultProps = {
+   onDismiss: null,
+ };
+ 
+-
+ export default Alert;
+diff --git a/src/user-messages/AlertList.jsx b/src/generic/user-messages/AlertList.jsx
+similarity index 100%
+rename from src/user-messages/AlertList.jsx
+rename to src/generic/user-messages/AlertList.jsx
+diff --git a/src/user-messages/UserMessagesContext.js b/src/generic/user-messages/UserMessagesContext.js
+similarity index 100%
+rename from src/user-messages/UserMessagesContext.js
+rename to src/generic/user-messages/UserMessagesContext.js
+diff --git a/src/user-messages/UserMessagesProvider.jsx b/src/generic/user-messages/UserMessagesProvider.jsx
+similarity index 99%
+rename from src/user-messages/UserMessagesProvider.jsx
+rename to src/generic/user-messages/UserMessagesProvider.jsx
+index d1d9eda..f51b866 100644
+--- a/src/user-messages/UserMessagesProvider.jsx
++++ b/src/generic/user-messages/UserMessagesProvider.jsx
+@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import UserMessagesContext from './UserMessagesContext';
+-import { getLocalStorage, popLocalStorage, setLocalStorage } from '../data/localStorage';
++import { getLocalStorage, popLocalStorage, setLocalStorage } from '../../data/localStorage';
+ 
+ export const ALERT_TYPES = {
+   ERROR: 'error',
+diff --git a/src/user-messages/hooks.js b/src/generic/user-messages/hooks.js
+similarity index 100%
+rename from src/user-messages/hooks.js
+rename to src/generic/user-messages/hooks.js
+diff --git a/src/user-messages/index.js b/src/generic/user-messages/index.js
+similarity index 100%
+rename from src/user-messages/index.js
+rename to src/generic/user-messages/index.js
+diff --git a/src/index.jsx b/src/index.jsx
+index 368116e..ad8609d 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -14,7 +14,7 @@ import { messages as headerMessages } from '@edx/frontend-component-header';
+ import Footer, { messages as footerMessages } from '@edx/frontend-component-footer';
+ 
+ import appMessages from './i18n';
+-import { UserMessagesProvider } from './user-messages';
++import { UserMessagesProvider } from './generic/user-messages';
+ 
+ import './index.scss';
+ import './assets/favicon.ico';
+diff --git a/src/courseware/course/InstructorToolbar.jsx b/src/instructor-toolbar/InstructorToolbar.jsx
+similarity index 80%
+rename from src/courseware/course/InstructorToolbar.jsx
+rename to src/instructor-toolbar/InstructorToolbar.jsx
+index d233467..6d4198a 100644
+--- a/src/courseware/course/InstructorToolbar.jsx
++++ b/src/instructor-toolbar/InstructorToolbar.jsx
+@@ -1,7 +1,6 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
+-import { connect } from 'react-redux';
+-
++import { useSelector } from 'react-redux';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+ import MasqueradeWidget from './masquerade-widget';
+@@ -34,13 +33,20 @@ function getStudioUrl(courseId, unitId) {
+   return urlFull;
+ }
+ 
+-function InstructorToolbar(props) {
++export default function InstructorToolbar(props) {
+   const {
+     courseId,
+     unitId,
+   } = props;
+   const urlInsights = getInsightsUrl(courseId);
+-  const urlLms = props.activeUnitLmsWebUrl;
++  const urlLms = useSelector((state) => {
++    if (!unitId) {
++      return {};
++    }
++
++    const activeUnit = state.models.units[props.unitId];
++    return activeUnit ? activeUnit.lmsWebUrl : undefined;
++  });
+   const urlStudio = getStudioUrl(courseId, unitId);
+   return (
+     <div className="bg-primary text-light">
+@@ -71,26 +77,11 @@ function InstructorToolbar(props) {
+ }
+ 
+ InstructorToolbar.propTypes = {
+-  activeUnitLmsWebUrl: PropTypes.string,
+   courseId: PropTypes.string,
+   unitId: PropTypes.string,
+ };
+ 
+ InstructorToolbar.defaultProps = {
+-  activeUnitLmsWebUrl: undefined,
+   courseId: undefined,
+   unitId: undefined,
+ };
+-
+-const mapStateToProps = (state, props) => {
+-  if (!props.unitId) {
+-    return {};
+-  }
+-
+-  const activeUnit = state.models.units[props.unitId];
+-  return {
+-    activeUnitLmsWebUrl: activeUnit ? activeUnit.lmsWebUrl : undefined,
+-  };
+-};
+-
+-export default connect(mapStateToProps)(InstructorToolbar);
+diff --git a/src/instructor-toolbar/index.js b/src/instructor-toolbar/index.js
+new file mode 100644
+index 0000000..4e18d12
+--- /dev/null
++++ b/src/instructor-toolbar/index.js
+@@ -0,0 +1 @@
++export { default } from './InstructorToolbar';
+diff --git a/src/courseware/course/masquerade-widget/MasqueradeWidget.jsx b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+similarity index 96%
+rename from src/courseware/course/masquerade-widget/MasqueradeWidget.jsx
+rename to src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+index 864a571..e541d95 100644
+--- a/src/courseware/course/masquerade-widget/MasqueradeWidget.jsx
++++ b/src/instructor-toolbar/masquerade-widget/MasqueradeWidget.jsx
+@@ -2,11 +2,10 @@ import React, {
+   Component,
+ } from 'react';
+ import PropTypes from 'prop-types';
+-
+ import { Dropdown } from '@edx/paragon';
+ 
+-import { getMasqueradeOptions } from '../../../data/api';
+ import MasqueradeWidgetOption from './MasqueradeWidgetOption';
++import { getMasqueradeOptions } from './data/api';
+ 
+ class MasqueradeWidget extends Component {
+   constructor(props) {
+diff --git a/src/courseware/course/masquerade-widget/MasqueradeWidgetOption.jsx b/src/instructor-toolbar/masquerade-widget/MasqueradeWidgetOption.jsx
+similarity index 97%
+rename from src/courseware/course/masquerade-widget/MasqueradeWidgetOption.jsx
+rename to src/instructor-toolbar/masquerade-widget/MasqueradeWidgetOption.jsx
+index b7a2d1a..e57c76c 100644
+--- a/src/courseware/course/masquerade-widget/MasqueradeWidgetOption.jsx
++++ b/src/instructor-toolbar/masquerade-widget/MasqueradeWidgetOption.jsx
+@@ -4,7 +4,7 @@ import React, {
+ import PropTypes from 'prop-types';
+ import { Dropdown } from '@edx/paragon';
+ 
+-import { postMasqueradeOptions } from '../../../data/api';
++import { postMasqueradeOptions } from './data/api';
+ 
+ class MasqueradeWidgetOption extends Component {
+   handleClick() {
+diff --git a/src/instructor-toolbar/masquerade-widget/data/api.js b/src/instructor-toolbar/masquerade-widget/data/api.js
+new file mode 100644
+index 0000000..e88d1f1
+--- /dev/null
++++ b/src/instructor-toolbar/masquerade-widget/data/api.js
+@@ -0,0 +1,14 @@
++import { getConfig, camelCaseObject } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++
++export async function getMasqueradeOptions(courseId) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`);
++  const { data } = await getAuthenticatedHttpClient().get(url.href, {});
++  return camelCaseObject(data);
++}
++
++export async function postMasqueradeOptions(courseId, data) {
++  const url = new URL(`${getConfig().LMS_BASE_URL}/courses/${courseId}/masquerade`);
++  const { response } = await getAuthenticatedHttpClient().post(url.href, data);
++  return camelCaseObject(response);
++}
+diff --git a/src/courseware/course/masquerade-widget/index.js b/src/instructor-toolbar/masquerade-widget/index.js
+similarity index 100%
+rename from src/courseware/course/masquerade-widget/index.js
+rename to src/instructor-toolbar/masquerade-widget/index.js
+diff --git a/src/store.js b/src/store.js
+index 846152e..8b613b5 100644
+--- a/src/store.js
++++ b/src/store.js
+@@ -1,7 +1,7 @@
+ import { configureStore } from '@reduxjs/toolkit';
+-import { reducer as coursewareReducer } from './data';
+-import { reducer as modelsReducer } from './model-store';
+ import { reducer as courseHomeReducer } from './course-home/data';
++import { reducer as coursewareReducer } from './courseware/data/slice';
++import { reducer as modelsReducer } from './generic/model-store';
+ 
+ const store = configureStore({
+   reducer: {
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 8e538b4..3654828 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -2,9 +2,9 @@ import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import { Header, CourseTabsNavigation } from '../course-header';
+-import { useModel } from '../model-store';
++import { useModel } from '../generic/model-store';
+ import { useEnrollmentAlert } from '../alerts/enrollment-alert';
+-import InstructorToolbar from '../courseware/course/InstructorToolbar';
++import InstructorToolbar from '../instructor-toolbar';
+ 
+ function LoadedTabPage({
+   activeTabSlug,
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index afd025c..b3355cc 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -4,7 +4,7 @@ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { Header } from '../course-header';
+ import { useLogistrationAlert } from '../alerts/logistration-alert';
+-import PageLoading from '../PageLoading';
++import PageLoading from '../generic/PageLoading';
+ 
+ import messages from './messages';
+ import LoadedTabPage from './LoadedTabPage';
+-- 
+2.34.1
+

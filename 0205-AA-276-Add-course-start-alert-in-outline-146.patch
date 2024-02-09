@@ -1,0 +1,292 @@
+From 314b82d0b2e5ff852ee2fa7d8018a6584397a719 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Mon, 3 Aug 2020 13:39:25 -0400
+Subject: [PATCH 0205/1021] AA-276: Add course start alert in outline (#146)
+
+Also move a few of the outline alerts into the course home
+source folder.
+---
+ src/course-home/outline-tab/OutlineTab.jsx    |  7 +-
+ .../CertificateAvailableAlert.jsx             |  2 +-
+ .../certificate-available-alert/hooks.js      |  4 +-
+ .../certificate-available-alert/index.js      |  0
+ .../course-end-alert/CourseEndAlert.jsx       |  2 +-
+ .../alerts/course-end-alert/hooks.js          |  4 +-
+ .../alerts/course-end-alert/index.js          |  0
+ .../course-start-alert/CourseStartAlert.jsx   | 97 +++++++++++++++++++
+ .../alerts/course-start-alert/hooks.js        | 37 +++++++
+ .../alerts/course-start-alert/index.js        |  1 +
+ 10 files changed, 146 insertions(+), 8 deletions(-)
+ rename src/{ => course-home/outline-tab}/alerts/certificate-available-alert/CertificateAvailableAlert.jsx (96%)
+ rename src/{ => course-home/outline-tab}/alerts/certificate-available-alert/hooks.js (90%)
+ rename src/{ => course-home/outline-tab}/alerts/certificate-available-alert/index.js (100%)
+ rename src/{ => course-home/outline-tab}/alerts/course-end-alert/CourseEndAlert.jsx (96%)
+ rename src/{ => course-home/outline-tab}/alerts/course-end-alert/hooks.js (90%)
+ rename src/{ => course-home/outline-tab}/alerts/course-end-alert/index.js (100%)
+ create mode 100644 src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+ create mode 100644 src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+ create mode 100644 src/course-home/outline-tab/alerts/course-start-alert/index.js
+
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 02a2e2c..89c7e4a 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -10,8 +10,9 @@ import CourseHandouts from './widgets/CourseHandouts';
+ import CourseTools from './widgets/CourseTools';
+ import messages from './messages';
+ import Section from './Section';
+-import useCertificateAvailableAlert from '../../alerts/certificate-available-alert';
+-import useCourseEndAlert from '../../alerts/course-end-alert';
++import useCertificateAvailableAlert from './alerts/certificate-available-alert';
++import useCourseEndAlert from './alerts/course-end-alert';
++import useCourseStartAlert from './alerts/course-start-alert';
+ import useEnrollmentAlert from '../../alerts/enrollment-alert';
+ import useLogistrationAlert from '../../alerts/logistration-alert';
+ import { useModel } from '../../generic/model-store';
+@@ -41,6 +42,7 @@ function OutlineTab({ intl }) {
+ 
+   const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
+   const courseEndAlert = useCourseEndAlert(courseId);
++  const courseStartAlert = useCourseStartAlert(courseId);
+   const enrollmentAlert = useEnrollmentAlert(courseId);
+   const logistrationAlert = useLogistrationAlert();
+ 
+@@ -70,6 +72,7 @@ function OutlineTab({ intl }) {
+             customAlerts={{
+               ...certificateAvailableAlert,
+               ...courseEndAlert,
++              ...courseStartAlert,
+             }}
+           />
+           {sectionIds.map((sectionId) => (
+diff --git a/src/alerts/certificate-available-alert/CertificateAvailableAlert.jsx b/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
+similarity index 96%
+rename from src/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
+rename to src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
+index eac8d04..70b59b1 100644
+--- a/src/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
++++ b/src/course-home/outline-tab/alerts/certificate-available-alert/CertificateAvailableAlert.jsx
+@@ -4,7 +4,7 @@ import { getConfig } from '@edx/frontend-platform';
+ import { FormattedMessage, FormattedRelative } from '@edx/frontend-platform/i18n';
+ import { Hyperlink } from '@edx/paragon';
+ 
+-import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++import { Alert, ALERT_TYPES } from '../../../../generic/user-messages';
+ 
+ function CertificateAvailableAlert({ payload }) {
+   const {
+diff --git a/src/alerts/certificate-available-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+similarity index 90%
+rename from src/alerts/certificate-available-alert/hooks.js
+rename to src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+index f8bf2e1..a4ee026 100644
+--- a/src/alerts/certificate-available-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-available-alert/hooks.js
+@@ -1,8 +1,8 @@
+ import React from 'react';
+ import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ 
+-import { useAlert } from '../../generic/user-messages';
+-import { useModel } from '../../generic/model-store';
++import { useAlert } from '../../../../generic/user-messages';
++import { useModel } from '../../../../generic/model-store';
+ 
+ const CertificateAvailableAlert = React.lazy(() => import('./CertificateAvailableAlert'));
+ 
+diff --git a/src/alerts/certificate-available-alert/index.js b/src/course-home/outline-tab/alerts/certificate-available-alert/index.js
+similarity index 100%
+rename from src/alerts/certificate-available-alert/index.js
+rename to src/course-home/outline-tab/alerts/certificate-available-alert/index.js
+diff --git a/src/alerts/course-end-alert/CourseEndAlert.jsx b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+similarity index 96%
+rename from src/alerts/course-end-alert/CourseEndAlert.jsx
+rename to src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+index 1328ff7..baa7c1b 100644
+--- a/src/alerts/course-end-alert/CourseEndAlert.jsx
++++ b/src/course-home/outline-tab/alerts/course-end-alert/CourseEndAlert.jsx
+@@ -7,7 +7,7 @@ import {
+   FormattedTime,
+ } from '@edx/frontend-platform/i18n';
+ 
+-import { Alert, ALERT_TYPES } from '../../generic/user-messages';
++import { Alert, ALERT_TYPES } from '../../../../generic/user-messages';
+ 
+ const DAY_MS = 24 * 60 * 60 * 1000; // in ms
+ 
+diff --git a/src/alerts/course-end-alert/hooks.js b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+similarity index 90%
+rename from src/alerts/course-end-alert/hooks.js
+rename to src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+index 101efee..851087c 100644
+--- a/src/alerts/course-end-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/course-end-alert/hooks.js
+@@ -1,7 +1,7 @@
+ /* eslint-disable import/prefer-default-export */
+ import React from 'react';
+-import { useAlert } from '../../generic/user-messages';
+-import { useModel } from '../../generic/model-store';
++import { useAlert } from '../../../../generic/user-messages';
++import { useModel } from '../../../../generic/model-store';
+ 
+ const CourseEndAlert = React.lazy(() => import('./CourseEndAlert'));
+ 
+diff --git a/src/alerts/course-end-alert/index.js b/src/course-home/outline-tab/alerts/course-end-alert/index.js
+similarity index 100%
+rename from src/alerts/course-end-alert/index.js
+rename to src/course-home/outline-tab/alerts/course-end-alert/index.js
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+new file mode 100644
+index 0000000..e1d78fb
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/course-start-alert/CourseStartAlert.jsx
+@@ -0,0 +1,97 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import {
++  FormattedDate,
++  FormattedMessage,
++  FormattedRelative,
++  FormattedTime,
++} from '@edx/frontend-platform/i18n';
++
++import { Alert, ALERT_TYPES } from '../../../../generic/user-messages';
++
++const DAY_MS = 24 * 60 * 60 * 1000; // in ms
++
++function CourseStartAlert({ payload }) {
++  const {
++    delta,
++    startDate,
++    userTimezone,
++  } = payload;
++
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  const timeRemaining = (
++    <FormattedRelative
++      key="timeRemaining"
++      value={startDate}
++      {...timezoneFormatArgs}
++    />
++  );
++
++  if (delta < DAY_MS) {
++    return (
++      <Alert type={ALERT_TYPES.INFO}>
++        <FormattedMessage
++          id="learning.outline.alert.start.short"
++          defaultMessage="Course starts {timeRemaining} at {courseStartTime}."
++          description="Used when the time remaining is less than a day away."
++          values={{
++            courseStartTime: (
++              <FormattedTime
++                key="courseStartTime"
++                day="numeric"
++                month="short"
++                year="numeric"
++                hour12={false}
++                timeZoneName="short"
++                value={startDate}
++                {...timezoneFormatArgs}
++              />
++            ),
++            timeRemaining,
++          }}
++        />
++      </Alert>
++    );
++  }
++
++  return (
++    <Alert type={ALERT_TYPES.INFO}>
++      <strong>
++        <FormattedMessage
++          id="learning.outline.alert.end.long"
++          defaultMessage="Course starts {timeRemaining} on {courseStartDate}."
++          description="Used when the time remaining is more than a day away."
++          values={{
++            courseStartDate: (
++              <FormattedDate
++                key="courseStartDate"
++                day="numeric"
++                month="short"
++                year="numeric"
++                value={startDate}
++                {...timezoneFormatArgs}
++              />
++            ),
++            timeRemaining,
++          }}
++        />
++      </strong>
++      <br />
++      <FormattedMessage
++        id="learning.outline.alert.end.calendar"
++        defaultMessage="Don’t forget to add a calendar reminder!"
++      />
++    </Alert>
++  );
++}
++
++CourseStartAlert.propTypes = {
++  payload: PropTypes.shape({
++    delta: PropTypes.number,
++    startDate: PropTypes.string,
++    userTimezone: PropTypes.string,
++  }).isRequired,
++};
++
++export default CourseStartAlert;
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/hooks.js b/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+new file mode 100644
+index 0000000..1f38715
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/course-start-alert/hooks.js
+@@ -0,0 +1,37 @@
++import React from 'react';
++import { useAlert } from '../../../../generic/user-messages';
++import { useModel } from '../../../../generic/model-store';
++
++const CourseStartAlert = React.lazy(() => import('./CourseStartAlert'));
++
++function useCourseStartAlert(courseId) {
++  const {
++    isEnrolled,
++  } = useModel('courses', courseId);
++  const {
++    datesWidget: {
++      courseDateBlocks,
++      userTimezone,
++    },
++  } = useModel('outline', courseId);
++
++  const startBlock = courseDateBlocks.find(b => b.dateType === 'course-start-date');
++  const delta = startBlock ? new Date(startBlock.date) - new Date() : 0;
++  const isVisible = isEnrolled && startBlock && delta > 0;
++
++  useAlert(isVisible, {
++    code: 'clientCourseStartAlert',
++    payload: {
++      delta,
++      startDate: startBlock && startBlock.date,
++      userTimezone,
++    },
++    topic: 'outline-course-alerts',
++  });
++
++  return {
++    clientCourseStartAlert: CourseStartAlert,
++  };
++}
++
++export default useCourseStartAlert;
+diff --git a/src/course-home/outline-tab/alerts/course-start-alert/index.js b/src/course-home/outline-tab/alerts/course-start-alert/index.js
+new file mode 100644
+index 0000000..ed12eb0
+--- /dev/null
++++ b/src/course-home/outline-tab/alerts/course-start-alert/index.js
+@@ -0,0 +1 @@
++export { default } from './hooks';
+-- 
+2.34.1
+

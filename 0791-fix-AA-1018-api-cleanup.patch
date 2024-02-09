@@ -1,0 +1,28 @@
+From f907c588c9e9b265dec2da12ca3fdbf0683cbd1f Mon Sep 17 00:00:00 2001
+From: Chris Deery <3932645+cdeery@users.noreply.github.com>
+Date: Tue, 25 Jan 2022 14:34:52 -0500
+Subject: [PATCH 0791/1021] fix: [AA-1018] api cleanup
+
+refactor - don't need to synchronize courseHomeMeta and coursewareMeta manually
+---
+ src/courseware/data/__factories__/sequenceMetadata.factory.js | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/src/courseware/data/__factories__/sequenceMetadata.factory.js b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+index f9ba895..7a5566a 100644
+--- a/src/courseware/data/__factories__/sequenceMetadata.factory.js
++++ b/src/courseware/data/__factories__/sequenceMetadata.factory.js
+@@ -83,9 +83,7 @@ export default function buildSimpleCourseAndSequenceMetadata(options = {}) {
+       courseId, unitBlocks, sequenceBlock: block,
+     },
+   ));
+-  // need to synchronize the id with the courseMetadata
+-  const courseHomeMetadataOptions = (options.courseHomeMetadata ? options.courseHomeMetadata : {});
+-  const courseHomeMetadata = Factory.build('courseHomeMetadata', courseHomeMetadataOptions);
++  const courseHomeMetadata = options.courseHomeMetadata || Factory.build('courseHomeMetadata');
+   return {
+     ...simpleCourseBlocks,
+     courseMetadata,
+-- 
+2.34.1
+

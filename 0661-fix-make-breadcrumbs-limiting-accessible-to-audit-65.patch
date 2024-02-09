@@ -1,0 +1,26 @@
+From e1d3b91dca38016db4022dba45f85a8ae2e73fc3 Mon Sep 17 00:00:00 2001
+From: connorhaugh <49422820+connorhaugh@users.noreply.github.com>
+Date: Tue, 28 Sep 2021 09:23:42 -0400
+Subject: [PATCH 0661/1021] fix: make breadcrumbs limiting accessible to audit
+ (#655)
+
+---
+ src/courseware/course/CourseBreadcrumbs.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index 7b918bb..5cb73d1 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -19,7 +19,7 @@ function CourseBreadcrumb({
+   content, withSeparator,
+ }) {
+   const defaultContent = content.filter(destination => destination.default)[0];
+-  const { administrator } = getAuthenticatedUser();
++  const administrator = getAuthenticatedUser() ? getAuthenticatedUser().administrator : false;
+   function logEvent(target) {
+     const eventName = 'edx.ui.lms.jump_nav.selected';
+     const payload = {
+-- 
+2.34.1
+

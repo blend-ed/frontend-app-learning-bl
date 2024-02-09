@@ -1,0 +1,761 @@
+From bdb1afe9901a8d50214938e657e60a1153ff41e1 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 26 May 2020 13:15:36 -0400
+Subject: [PATCH 0132/1021] Finish up basic dates tab support (#70)
+
+- Drop mock data, call real API instead
+- Call course metadata API for general info, not the dates API
+- Mark text as translatable
+- Add badges and timeline dots, group same-day items
+
+AA-116
+---
+ src/data/api.js                |   9 +-
+ src/data/dates.js              | 101 --------------------
+ src/data/thunks.js             |  61 +++++++-----
+ src/dates-tab/Badge.jsx        |  23 +++++
+ src/dates-tab/Badge.scss       |   4 +
+ src/dates-tab/DatesTab.jsx     |  14 ++-
+ src/dates-tab/Day.jsx          | 164 +++++++++++++++++++++++++++++----
+ src/dates-tab/Day.scss         |  48 ++++++++++
+ src/dates-tab/Timeline.jsx     |  58 +++++++++++-
+ src/dates-tab/messages.js      |  34 +++++++
+ src/dates-tab/utils.jsx        |  16 ++++
+ src/tab-page/LoadedTabPage.jsx |   2 +-
+ src/tab-page/TabPage.jsx       |   4 +-
+ src/tab-page/messages.js       |  14 ++-
+ 14 files changed, 385 insertions(+), 167 deletions(-)
+ delete mode 100644 src/data/dates.js
+ create mode 100644 src/dates-tab/Badge.jsx
+ create mode 100644 src/dates-tab/Badge.scss
+ create mode 100644 src/dates-tab/Day.scss
+ create mode 100644 src/dates-tab/messages.js
+ create mode 100644 src/dates-tab/utils.jsx
+
+diff --git a/src/data/api.js b/src/data/api.js
+index 9998bf4..84e77f6 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -3,9 +3,6 @@ import { getConfig, camelCaseObject } from '@edx/frontend-platform';
+ import { getAuthenticatedHttpClient, getAuthenticatedUser } from '@edx/frontend-platform/auth';
+ import { logError } from '@edx/frontend-platform/logging';
+ 
+-// FIXME: remove this WIP hack once we're done developing the tab
+-import datesTabData from './dates';
+-
+ function overrideTabUrls(id, tabs) {
+   // "LMS tab slug" to "MFE URL slug" for overridden tabs
+   const tabOverrides = {};
+@@ -53,11 +50,7 @@ export async function getCourseMetadata(courseId) {
+ }
+ 
+ export async function getTabData(courseId, tab, version) {
+-  if (tab === 'dates') {
+-    return camelCaseObject(datesTabData());
+-  }
+-
+-  const url = `${getConfig().LMS_BASE_URL}/course/${courseId}/api/course_home/${version}/${tab}`;
++  const url = `${getConfig().LMS_BASE_URL}/api/course_home/${version}/${tab}/${courseId}`;
+   const { data } = await getAuthenticatedHttpClient().get(url);
+   return camelCaseObject(data);
+ }
+diff --git a/src/data/dates.js b/src/data/dates.js
+deleted file mode 100644
+index 618d57b..0000000
+--- a/src/data/dates.js
++++ /dev/null
+@@ -1,101 +0,0 @@
+-// Sample WIP data while we develop the dates tab
+-export default function datesData() {
+-  return JSON.parse(`
+-  {
+-          "id": "course-v1:edX+DemoX+Demo_Course",
+-          "isStaff": true,
+-          "number": "DemoX",
+-          "org": "edX",
+-          "title": "Demonstration Course",
+-    "tabs": [
+-        {
+-            "url": "/courses/course-v1:edX+DemoX+Demo_Course/course/",
+-            "title": "Course",
+-            "slug": "courseware",
+-            "type": "courseware",
+-            "priority": 0
+-        },
+-        {
+-            "url": "/courses/course-v1:edX+DemoX+Demo_Course/discussion/forum/",
+-            "title": "Discussion",
+-            "slug": "discussion",
+-            "type": "discussion",
+-            "priority": 1
+-        },
+-        {
+-            "url": "/courses/course-v1:edX+DemoX+Demo_Course/course_wiki",
+-            "title": "Wiki",
+-            "slug": "wiki",
+-            "type": "wiki",
+-            "priority": 2
+-        },
+-        {
+-            "url": "/courses/course-v1:edX+DemoX+Demo_Course/progress",
+-            "title": "Progress",
+-            "slug": "progress",
+-            "type": "progress",
+-            "priority": 3
+-        },
+-        {
+-            "url": "/courses/course-v1:edX+DemoX+Demo_Course/dates",
+-            "title": "Dates",
+-            "slug": "dates",
+-            "type": "dates",
+-            "priority": 4
+-        },
+-        {
+-            "url": "/courses/course-v1:edX+DemoX+Demo_Course/instructor",
+-            "title": "Instructor",
+-            "slug": "instructor",
+-            "type": "instructor",
+-            "priority": 5
+-        }
+-    ],
+-"dates": [
+-    {
+-        "title": "Course Starts",
+-        "link": "/testing",
+-        "date": "2015-02-05T05:00:00Z"
+-    },
+-    {
+-        "contains_gated_content": true,
+-        "link": "/testing",
+-        "title": "Homework - Question Styles force publish",
+-        "date": "2020-01-14T13:00:00Z"
+-    },
+-    {
+-        "title": "New Subsection",
+-        "date": "2020-04-20T08:30:00Z"
+-    },
+-    {
+-        "title": "current_datetime",
+-        "date": "2020-05-05T17:47:55.957725Z"
+-    },
+-    {
+-        "title": "Verification Upgrade Deadline",
+-        "date": "2020-09-16T19:05:00Z"
+-    },
+-    {
+-        "title": "edX Exams",
+-        "date": "2022-01-02T00:00:00Z"
+-    },
+-    {
+-        "title": "Homework - Labs and Demos",
+-        "date": "2022-01-14T13:00:00Z"
+-    },
+-    {
+-        "title": "Homework - Essays",
+-        "date": "2022-04-30T12:00:00Z"
+-    },
+-    {
+-        "title": "Course End",
+-        "date": "2025-02-09T00:30:00Z"
+-    },
+-    {
+-        "title": "Verification Deadline",
+-        "date": "2025-02-09T00:30:00Z"
+-    }
+-]
+-}
+-`);
+-}
+diff --git a/src/data/thunks.js b/src/data/thunks.js
+index e14b2ae..986352c 100644
+--- a/src/data/thunks.js
++++ b/src/data/thunks.js
+@@ -34,7 +34,7 @@ export function fetchCourse(courseId) {
+           model: courseMetadataResult.value,
+         }));
+         dispatch(addModel({
+-          modelType: 'pageInfo',
++          modelType: 'courseInfo',
+           model: {
+             id: courseMetadataResult.value.id,
+             isStaff: courseMetadataResult.value.isStaff,
+@@ -103,29 +103,46 @@ export function fetchCourse(courseId) {
+ export function fetchTab(courseId, tab, version) {
+   return async (dispatch) => {
+     dispatch(fetchTabRequest({ courseId }));
+-    getTabData(courseId, tab, version).then((result) => {
+-      dispatch(addModel({
+-        modelType: 'pageInfo',
+-        model: {
+-          id: result.id,
+-          isStaff: result.isStaff,
+-          number: result.number,
+-          org: result.org,
+-          tabs: result.tabs,
+-          title: result.title,
+-        },
+-      }));
++    Promise.allSettled([
++      getCourseMetadata(courseId),
++      getTabData(courseId, tab, version),
++    ]).then(([courseMetadataResult, tabDataResult]) => {
++      const fetchedMetadata = courseMetadataResult.status === 'fulfilled';
++      const fetchedTabData = tabDataResult.status === 'fulfilled';
+ 
+-      dispatch(addModel({
+-        modelType: tab,
+-        model: result,
+-      }));
++      if (fetchedMetadata) {
++        dispatch(addModel({
++          modelType: 'courseInfo',
++          model: {
++            id: courseMetadataResult.value.id,
++            isStaff: courseMetadataResult.value.isStaff,
++            number: courseMetadataResult.value.number,
++            org: courseMetadataResult.value.org,
++            tabs: courseMetadataResult.value.tabs,
++            title: courseMetadataResult.value.title,
++          },
++        }));
++      } else {
++        logError(courseMetadataResult.reason);
++      }
++
++      if (fetchedTabData) {
++        dispatch(addModel({
++          modelType: tab,
++          model: {
++            id: courseId,
++            ...tabDataResult.value,
++          },
++        }));
++      } else {
++        logError(tabDataResult.reason);
++      }
+ 
+-      // TODO: do we need access restrictions for tabs, like we have for courseware?
+-      dispatch(fetchTabSuccess({ courseId }));
+-    }, (reason) => {
+-      logError(reason);
+-      dispatch(fetchTabFailure({ courseId }));
++      if (fetchedMetadata && fetchedTabData) {
++        dispatch(fetchTabSuccess({ courseId }));
++      } else {
++        dispatch(fetchTabFailure({ courseId }));
++      }
+     });
+   };
+ }
+diff --git a/src/dates-tab/Badge.jsx b/src/dates-tab/Badge.jsx
+new file mode 100644
+index 0000000..ecacde5
+--- /dev/null
++++ b/src/dates-tab/Badge.jsx
+@@ -0,0 +1,23 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import classNames from 'classnames';
++
++import './Badge.scss';
++
++export default function Badge({ children, className }) {
++  return (
++    <span className={classNames('dates-badge badge align-bottom font-italic ml-2 px-2', className)}>
++      {children}
++    </span>
++  );
++}
++
++Badge.propTypes = {
++  children: PropTypes.node,
++  className: PropTypes.string,
++};
++
++Badge.defaultProps = {
++  children: null,
++  className: null,
++};
+diff --git a/src/dates-tab/Badge.scss b/src/dates-tab/Badge.scss
+new file mode 100644
+index 0000000..87dd456
+--- /dev/null
++++ b/src/dates-tab/Badge.scss
+@@ -0,0 +1,4 @@
++.dates-badge {
++  font-size: 0.9rem;
++  line-height: 1.25;
++}
+diff --git a/src/dates-tab/DatesTab.jsx b/src/dates-tab/DatesTab.jsx
+index 6866659..088d268 100644
+--- a/src/dates-tab/DatesTab.jsx
++++ b/src/dates-tab/DatesTab.jsx
+@@ -1,12 +1,22 @@
+ import React from 'react';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
++import messages from './messages';
+ import Timeline from './Timeline';
+ 
+-export default function DatesTab() {
++function DatesTab({ intl }) {
+   return (
+     <>
+-      <h2 className="mb-4">Important Dates</h2>
++      <h2 className="mb-4">
++        {intl.formatMessage(messages.title)}
++      </h2>
+       <Timeline />
+     </>
+   );
+ }
++
++DatesTab.propTypes = {
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(DatesTab);
+diff --git a/src/dates-tab/Day.jsx b/src/dates-tab/Day.jsx
+index c927178..ae50e18 100644
+--- a/src/dates-tab/Day.jsx
++++ b/src/dates-tab/Day.jsx
+@@ -1,34 +1,162 @@
+ import React from 'react';
+ import PropTypes from 'prop-types';
++import classNames from 'classnames';
++import { useSelector } from 'react-redux';
++import { FormattedDate, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faLock } from '@fortawesome/free-solid-svg-icons';
+ 
+-export default function Day({ dateInfo }) {
+-  const parsedDate = new Date(dateInfo.date);
+-  const formattedDate = parsedDate.toLocaleString('default', {
+-    day: 'numeric',
+-    month: 'short',
+-    weekday: 'short',
+-    year: 'numeric',
+-  });
++import { useModel } from '../model-store';
+ 
+-  const hasLink = dateInfo.link && !dateInfo.containsGatedContent;
+-  const title = hasLink ? (<u><a href={dateInfo.link} className="text-reset">{dateInfo.title}</a></u>) : dateInfo.title;
+-  const textColor = dateInfo.containsGatedContent ? 'text-dark-200' : 'text-dark-500';
++import Badge from './Badge';
++import messages from './messages';
++import { daycmp, isLearnerAssignment } from './utils';
++
++import './Day.scss';
++
++function Day({
++  date, first, hasDueNextAssignment, intl, items, last,
++}) {
++  const {
++    courseId,
++  } = useSelector(state => state.courseware);
++
++  const {
++    userTimezone,
++  } = useModel('dates', courseId);
++
++  const now = new Date();
++  const learnerHasAccess = items.every(x => x.learnerHasAccess);
++  const assignments = items.filter(isLearnerAssignment);
++  const isComplete = assignments.length && assignments.every(x => x.complete);
++  const isPastDue = assignments.some(x => !x.complete && new Date(x.date) < now);
++  const unreleased = assignments.some(x => !x.link);
++  const isInFuture = daycmp(date, now) > 0;
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++
++  // This badge info list is in order of priority (they will appear left to right in this order and the first badge
++  // sets the color of the dot in the timeline).
++  const badgesInfo = [
++    {
++      message: messages.today,
++      shown: daycmp(date, now) === 0,
++      bg: 'dates-bg-today',
++    },
++    {
++      message: messages.completed,
++      shown: isComplete,
++      bg: 'bg-dark-100',
++    },
++    {
++      message: messages.pastDue,
++      shown: isPastDue,
++      bg: 'bg-dark-200',
++    },
++    {
++      message: messages.dueNext,
++      shown: hasDueNextAssignment,
++      bg: 'bg-gray-500',
++      className: 'text-white',
++    },
++    {
++      message: messages.unreleased,
++      shown: unreleased,
++      className: 'border border-dark-200 text-gray-500',
++    },
++    {
++      message: messages.verifiedOnly,
++      shown: !learnerHasAccess,
++      icon: faLock,
++      bg: 'bg-dark-500',
++      className: 'text-white',
++    },
++  ];
++  let dotColor = null;
++  const badges = (
++    <>
++      {badgesInfo.map(b => {
++        if (b.shown) {
++          if (!dotColor && !isInFuture) {
++            dotColor = b.bg;
++          }
++          return (
++            <Badge key={b.message.id} className={classNames(b.bg, b.className)}>
++              {b.icon && <FontAwesomeIcon icon={b.icon} className="mr-1" />}
++              {intl.formatMessage(b.message)}
++            </Badge>
++          );
++        }
++        return null;
++      })}
++    </>
++  );
++  if (!dotColor && isInFuture) {
++    dotColor = 'bg-gray-900';
++  }
+ 
+   return (
+-    <div className="mb-4">
+-      <h5>{formattedDate}</h5>
+-      <div className={textColor}>
+-        <div className="font-weight-bold">{title}</div>
++    <div className="dates-day pb-4">
++      {/* Top Line */}
++      {!first && <div className="dates-line-top border border-left border-gray-900" />}
++
++      {/* Dot */}
++      <div className={classNames(dotColor, 'dates-dot border border-gray-900')} />
++
++      {/* Bottom Line */}
++      {!last && <div className="dates-line-bottom border border-left border-gray-900" />}
++
++      {/* Content */}
++      <div className="d-inline-block ml-3 pl-3">
++        <div>
++          <h5 className="d-inline text-dark-500">
++            <FormattedDate
++              value={date}
++              day="numeric"
++              month="short"
++              weekday="short"
++              year="numeric"
++              {...timezoneFormatArgs}
++            />
++          </h5>
++          {badges}
++        </div>
++        {items.map((item) => {
++          const showLink = item.link && isLearnerAssignment(item);
++          const title = showLink ? (<u><a href={item.link} className="text-reset">{item.title}</a></u>) : item.title;
++          const available = item.learnerHasAccess && (item.link || !isLearnerAssignment(item));
++          const textColor = available ? 'text-dark-500' : 'text-dark-200';
++          return (
++            <div key={item.title + item.date} className={textColor}>
++              <div className="font-weight-bold">{title}</div>
++              <div>{item.description}</div>
++            </div>
++          );
++        })}
+       </div>
+     </div>
+   );
+ }
+ 
+ Day.propTypes = {
+-  dateInfo: PropTypes.shape({
+-    containsGatedContent: PropTypes.bool,
++  date: PropTypes.objectOf(Date).isRequired,
++  first: PropTypes.bool,
++  hasDueNextAssignment: PropTypes.bool,
++  intl: intlShape.isRequired,
++  items: PropTypes.arrayOf(PropTypes.shape({
+     date: PropTypes.string,
++    dateType: PropTypes.string,
++    description: PropTypes.string,
++    learnerHasAccess: PropTypes.bool,
+     link: PropTypes.string,
+     title: PropTypes.string,
+-  }).isRequired,
++  })).isRequired,
++  last: PropTypes.bool,
+ };
++
++Day.defaultProps = {
++  first: false,
++  hasDueNextAssignment: false,
++  last: false,
++};
++
++export default injectIntl(Day);
+diff --git a/src/dates-tab/Day.scss b/src/dates-tab/Day.scss
+new file mode 100644
+index 0000000..87d1894
+--- /dev/null
++++ b/src/dates-tab/Day.scss
+@@ -0,0 +1,48 @@
++$dot-radius: 0.3rem;
++$dot-size: $dot-radius * 2;
++$top-offset: 0.45rem;
++$left-offset: 0.2rem + $dot-radius;
++
++.dates-day {
++  position: relative;
++}
++
++.dates-line-top {
++  display: inline-block;
++  position: absolute;
++  left: $left-offset;
++  top: 0;
++  height: $top-offset;
++  z-index: 0;
++}
++
++.dates-dot {
++  display: inline-block;
++  position: absolute;
++  border-radius: 50%;
++  left: $dot-radius; // save room for today's larger size
++  top: $top-offset;
++  height: $dot-size;
++  width: $dot-size;
++  z-index: 1;
++
++  &.dates-bg-today {
++    left: 0;
++    top: $top-offset - $dot-radius;
++    height: $dot-size * 2;
++    width: $dot-size * 2;
++  }
++}
++
++.dates-line-bottom {
++  display: inline-block;
++  position: absolute;
++  top: $top-offset + $dot-size;
++  bottom: 0;
++  left: $left-offset;
++  z-index: 0;
++}
++
++.dates-bg-today {
++  background: #ffdb87;
++}
+diff --git a/src/dates-tab/Timeline.jsx b/src/dates-tab/Timeline.jsx
+index 64b19f2..a352528 100644
+--- a/src/dates-tab/Timeline.jsx
++++ b/src/dates-tab/Timeline.jsx
+@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
+ import { useModel } from '../model-store';
+ 
+ import Day from './Day';
++import { daycmp, isLearnerAssignment } from './utils';
+ 
+ export default function Timeline() {
+   const {
+@@ -11,14 +12,61 @@ export default function Timeline() {
+   } = useSelector(state => state.courseware);
+ 
+   const {
+-    dates,
++    courseDateBlocks,
+   } = useModel('dates', courseId);
+ 
++  // Group date items by day (assuming they are sorted in first place) and add some metadata
++  const groupedDates = [];
++  const now = new Date();
++  let foundNextDue = false;
++  let foundToday = false;
++  courseDateBlocks.forEach(dateInfo => {
++    const parsedDate = new Date(dateInfo.date);
++
++    let hasDueNextAssignment = false;
++    if (!foundNextDue && parsedDate >= now && isLearnerAssignment(dateInfo) && !dateInfo.complete) {
++      foundNextDue = true;
++      hasDueNextAssignment = true;
++    }
++
++    if (!foundToday) {
++      const compared = daycmp(parsedDate, now);
++      if (compared === 0) {
++        foundToday = true;
++      } else if (compared > 0) {
++        foundToday = true;
++        groupedDates.push({
++          date: now,
++          hasDueNextAssignment: false,
++          items: [],
++        });
++      }
++    }
++
++    if (groupedDates.length === 0 || daycmp(groupedDates[groupedDates.length - 1].date, parsedDate) !== 0) {
++      // Add new grouped date
++      groupedDates.push({
++        date: parsedDate,
++        hasDueNextAssignment,
++        items: [dateInfo],
++        first: groupedDates.length === 0,
++      });
++    } else {
++      if (hasDueNextAssignment) {
++        groupedDates[groupedDates.length - 1].hasNextAssigment = true;
++      }
++      groupedDates[groupedDates.length - 1].items.push(dateInfo);
++    }
++  });
++  if (groupedDates.length) {
++    groupedDates[groupedDates.length - 1].last = true;
++  }
++
+   return (
+-    <div className="border-left border-gray-900 ml-2 pl-4">
+-      {dates.map((date) => (
+-        <Day dateInfo={date} />
++    <>
++      {groupedDates.map((groupedDate) => (
++        <Day key={groupedDate.date} {...groupedDate} />
+       ))}
+-    </div>
++    </>
+   );
+ }
+diff --git a/src/dates-tab/messages.js b/src/dates-tab/messages.js
+new file mode 100644
+index 0000000..65675ac
+--- /dev/null
++++ b/src/dates-tab/messages.js
+@@ -0,0 +1,34 @@
++import { defineMessages } from '@edx/frontend-platform/i18n';
++
++const messages = defineMessages({
++  completed: {
++    id: 'learning.dates.badge.completed',
++    defaultMessage: 'Completed',
++  },
++  dueNext: {
++    id: 'learning.dates.badge.dueNext',
++    defaultMessage: 'Due Next',
++  },
++  pastDue: {
++    id: 'learning.dates.badge.pastDue',
++    defaultMessage: 'Past Due',
++  },
++  title: {
++    id: 'learning.dates.title',
++    defaultMessage: 'Important Dates',
++  },
++  today: {
++    id: 'learning.dates.badge.today',
++    defaultMessage: 'Today',
++  },
++  unreleased: {
++    id: 'learning.dates.badge.unreleased',
++    defaultMessage: 'Not Yet Released',
++  },
++  verifiedOnly: {
++    id: 'learning.dates.badge.verifiedOnly',
++    defaultMessage: 'Verified Only',
++  },
++});
++
++export default messages;
+diff --git a/src/dates-tab/utils.jsx b/src/dates-tab/utils.jsx
+new file mode 100644
+index 0000000..94ead99
+--- /dev/null
++++ b/src/dates-tab/utils.jsx
+@@ -0,0 +1,16 @@
++function daycmp(a, b) {
++  if (a.getFullYear() < b.getFullYear()) { return -1; }
++  if (a.getFullYear() > b.getFullYear()) { return 1; }
++  if (a.getMonth() < b.getMonth()) { return -1; }
++  if (a.getMonth() > b.getMonth()) { return 1; }
++  if (a.getDate() < b.getDate()) { return -1; }
++  if (a.getDate() > b.getDate()) { return 1; }
++  return 0;
++}
++
++// item is a date block returned from the API
++function isLearnerAssignment(item) {
++  return item.learnerHasAccess && item.dateType === 'assignment-due-date';
++}
++
++export { daycmp, isLearnerAssignment };
+diff --git a/src/tab-page/LoadedTabPage.jsx b/src/tab-page/LoadedTabPage.jsx
+index 6818fbd..4690945 100644
+--- a/src/tab-page/LoadedTabPage.jsx
++++ b/src/tab-page/LoadedTabPage.jsx
+@@ -20,7 +20,7 @@ function LoadedTabPage({
+     org,
+     tabs,
+     title,
+-  } = useModel('pageInfo', courseId);
++  } = useModel('courseInfo', courseId);
+ 
+   return (
+     <>
+diff --git a/src/tab-page/TabPage.jsx b/src/tab-page/TabPage.jsx
+index bec6a14..d35fc35 100644
+--- a/src/tab-page/TabPage.jsx
++++ b/src/tab-page/TabPage.jsx
+@@ -22,7 +22,7 @@ function TabPage({
+       <>
+         <Header />
+         <PageLoading
+-          srMessage={intl.formatMessage(messages['learn.loading'])}
++          srMessage={intl.formatMessage(messages.loading)}
+         />
+       </>
+     );
+@@ -39,7 +39,7 @@ function TabPage({
+     <>
+       <Header />
+       <p className="text-center py-5 mx-auto" style={{ maxWidth: '30em' }}>
+-        {intl.formatMessage(messages['learn.loading.failure'])}
++        {intl.formatMessage(messages.failure)}
+       </p>
+     </>
+   );
+diff --git a/src/tab-page/messages.js b/src/tab-page/messages.js
+index 03cbd8d..3e913c0 100644
+--- a/src/tab-page/messages.js
++++ b/src/tab-page/messages.js
+@@ -1,15 +1,13 @@
+ import { defineMessages } from '@edx/frontend-platform/i18n';
+ 
+ const messages = defineMessages({
+-  'learn.loading': {
+-    id: 'learn.loading',
+-    defaultMessage: 'Loading course page...',
+-    description: 'Message when course page is being loaded',
+-  },
+-  'learn.loading.failure': {
+-    id: 'learn.loading.failure',
++  failure: {
++    id: 'learning.loading.failure',
+     defaultMessage: 'There was an error loading this course.',
+-    description: 'Message when a course page fails to load',
++  },
++  loading: {
++    id: 'learning.loading',
++    defaultMessage: 'Loading course page…',
+   },
+ });
+ 
+-- 
+2.34.1
+

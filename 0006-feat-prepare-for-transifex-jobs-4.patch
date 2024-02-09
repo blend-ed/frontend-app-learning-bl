@@ -1,0 +1,38 @@
+From 7687d18a64e2e98c836528783bb611a74f3ffe7f Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Fri, 13 Dec 2019 14:15:14 -0500
+Subject: [PATCH 0006/1021] feat: prepare for transifex jobs (#4)
+
+---
+ .tx/config | 8 ++++++++
+ Makefile   | 2 +-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+ create mode 100644 .tx/config
+
+diff --git a/.tx/config b/.tx/config
+new file mode 100644
+index 0000000..594e8ef
+--- /dev/null
++++ b/.tx/config
+@@ -0,0 +1,8 @@
++[main]
++host = https://www.transifex.com
++
++[edx-platform.frontend-app-learn]
++file_filter = src/i18n/messages/<lang>.json
++source_file = src/i18n/transifex_input.json
++source_lang = en
++type = KEYVALUEJSON
+diff --git a/Makefile b/Makefile
+index 3377acd..fe65f6f 100755
+--- a/Makefile
++++ b/Makefile
+@@ -1,4 +1,4 @@
+-transifex_resource = frontend-template-application
++transifex_resource = frontend-app-learn
+ transifex_langs = "ar,fr,es_419,zh_CN"
+ 
+ transifex_utils = ./node_modules/.bin/transifex-utils.js
+-- 
+2.34.1
+

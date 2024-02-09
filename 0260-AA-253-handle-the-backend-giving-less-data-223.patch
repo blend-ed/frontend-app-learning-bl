@@ -1,0 +1,100 @@
+From 6f331ea6d5bace02774195d225bac4dd091f0975 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 25 Sep 2020 16:50:30 -0400
+Subject: [PATCH 0260/1021] AA-253: handle the backend giving less data (#223)
+
+Specifically, no outline tree or no course tools
+---
+ src/course-home/data/api.js                   |  2 +-
+ src/course-home/outline-tab/OutlineTab.jsx    | 39 ++++++++++---------
+ .../outline-tab/widgets/CourseTools.jsx       |  4 ++
+ 3 files changed, 26 insertions(+), 19 deletions(-)
+
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 8bdedb9..a9fc76b 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -141,7 +141,7 @@ export async function getOutlineTabData(courseId) {
+   const {
+     data,
+   } = tabData;
+-  const courseBlocks = normalizeOutlineBlocks(courseId, data.course_blocks.blocks);
++  const courseBlocks = data.course_blocks ? normalizeOutlineBlocks(courseId, data.course_blocks.blocks) : {};
+   const courseGoals = camelCaseObject(data.course_goals);
+   const courseExpiredHtml = data.course_expired_html;
+   const courseTools = camelCaseObject(data.course_tools);
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 08978ea..affa503 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -70,8 +70,7 @@ function OutlineTab({ intl }) {
+   const courseEndAlert = useCourseEndAlert(courseId);
+   const certificateAvailableAlert = useCertificateAvailableAlert(courseId);
+ 
+-  const rootCourseId = Object.keys(courses)[0];
+-  const { sectionIds } = courses[rootCourseId];
++  const rootCourseId = courses && Object.keys(courses)[0];
+ 
+   return (
+     <>
+@@ -125,22 +124,26 @@ function OutlineTab({ intl }) {
+               ...offerAlert,
+             }}
+           />
+-          <div className="row w-100 m-0 mb-3 justify-content-end">
+-            <div className="col-12 col-sm-auto p-0">
+-              <Button variant="outline-primary" block onClick={() => { setExpandAll(!expandAll); }}>
+-                {expandAll ? intl.formatMessage(messages.collapseAll) : intl.formatMessage(messages.expandAll)}
+-              </Button>
+-            </div>
+-          </div>
+-          {sectionIds.map((sectionId) => (
+-            <Section
+-              key={sectionId}
+-              courseId={courseId}
+-              defaultOpen={sections[sectionId].resumeBlock}
+-              expand={expandAll}
+-              section={sections[sectionId]}
+-            />
+-          ))}
++          {rootCourseId && (
++            <>
++              <div className="row w-100 m-0 mb-3 justify-content-end">
++                <div className="col-12 col-sm-auto p-0">
++                  <Button variant="outline-primary" block onClick={() => { setExpandAll(!expandAll); }}>
++                    {expandAll ? intl.formatMessage(messages.collapseAll) : intl.formatMessage(messages.expandAll)}
++                  </Button>
++                </div>
++              </div>
++              {courses[rootCourseId].sectionIds.map((sectionId) => (
++                <Section
++                  key={sectionId}
++                  courseId={courseId}
++                  defaultOpen={sections[sectionId].resumeBlock}
++                  expand={expandAll}
++                  section={sections[sectionId]}
++                />
++              ))}
++            </>
++          )}
+         </div>
+         <div className="col col-12 col-md-4">
+           {courseGoalToDisplay && goalOptions.length > 0 && (
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 5a9fc8c..66ea020 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -18,6 +18,10 @@ function CourseTools({ courseId, intl }) {
+     courseTools,
+   } = useModel('outline', courseId);
+ 
++  if (courseTools.length === 0) {
++    return null;
++  }
++
+   const logClick = (analyticsId) => {
+     const { administrator } = getAuthenticatedUser();
+     sendTrackEvent('edx.course.tool.accessed', {
+-- 
+2.34.1
+

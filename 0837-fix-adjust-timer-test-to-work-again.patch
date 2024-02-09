@@ -1,0 +1,65 @@
+From ebed27529c888ac708d73f5c85fed3924a6e975e Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 4 Mar 2022 09:12:38 -0500
+Subject: [PATCH 0837/1021] fix: adjust timer test to work again
+
+---
+ .../notifications/NotificationTray.test.jsx    | 18 ++++++++++++++++++
+ .../notifications/NotificationTrigger.test.jsx | 12 ------------
+ 2 files changed, 18 insertions(+), 12 deletions(-)
+
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+index 05a1c1d..f60bbb1 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTray.test.jsx
+@@ -112,6 +112,24 @@ describe('NotificationTray', () => {
+       .toBeInTheDocument();
+   });
+ 
++  it('marks notification as seen 3 seconds later', async () => {
++    jest.useFakeTimers();
++    const onNotificationSeen = jest.fn();
++    await fetchAndRender(
++      <SidebarContext.Provider value={{
++        currentSidebar: ID,
++        courseId,
++        onNotificationSeen,
++      }}
++      >
++        <NotificationTray />
++      </SidebarContext.Provider>,
++    );
++    expect(onNotificationSeen).toHaveBeenCalledTimes(0);
++    jest.advanceTimersByTime(3000);
++    expect(onNotificationSeen).toHaveBeenCalledTimes(1);
++  });
++
+   it('renders notification tray with full screen "Back to course" at responsive view', async () => {
+     global.innerWidth = breakpoints.medium.maxWidth;
+     const toggleNotificationTray = jest.fn();
+diff --git a/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
+index 41a284c..92b8684 100644
+--- a/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
++++ b/src/courseware/course/sidebar/sidebars/notifications/NotificationTrigger.test.jsx
+@@ -68,18 +68,6 @@ describe('Notification Trigger', () => {
+     expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
+   });
+ 
+-  it('renders notification trigger icon WITHOUT red dot 3 seconds later', async () => {
+-    const container = renderWithProvider({ notificationStatus: 'active' });
+-    expect(container).toBeInTheDocument();
+-    expect(screen.getByTestId('notification-dot')).toBeInTheDocument();
+-    jest.useFakeTimers();
+-    setTimeout(() => {
+-      expect(localStorage.setItem).toHaveBeenCalledTimes(5);
+-      expect(screen.queryByRole('notification-dot')).not.toBeInTheDocument();
+-    }, 3000);
+-    jest.runAllTimers();
+-  });
+-
+   it('renders notification trigger icon WITHOUT red dot within the same phase', async () => {
+     const container = renderWithProvider({
+       upgradeNotificationLastSeen: 'sameState',
+-- 
+2.34.1
+

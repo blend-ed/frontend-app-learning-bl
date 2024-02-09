@@ -1,0 +1,33 @@
+From 90fc5f0024b93a31b9157fe4794e5efc6327a197 Mon Sep 17 00:00:00 2001
+From: Bianca Severino <bseverino@edx.org>
+Date: Tue, 24 Aug 2021 13:01:41 -0400
+Subject: [PATCH 0623/1021] fix: pass originalUserIsStaff to
+ SequenceExamWrapper (#610)
+
+Pass this value to determine whether the user is staff
+masquerading as a learner.
+---
+ src/courseware/course/sequence/Sequence.jsx | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 3af5518..c7b0090 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -244,7 +244,12 @@ function Sequence({
+   if (sequenceStatus === 'loaded') {
+     return (
+       <div>
+-        <SequenceExamWrapper sequence={sequence} courseId={courseId} isStaff={course.isStaff}>
++        <SequenceExamWrapper
++          sequence={sequence}
++          courseId={courseId}
++          isStaff={course.isStaff}
++          originalUserIsStaff={course.originalUserIsStaff}
++        >
+           {defaultContent}
+         </SequenceExamWrapper>
+         <CourseLicense license={course.license || undefined} />
+-- 
+2.34.1
+

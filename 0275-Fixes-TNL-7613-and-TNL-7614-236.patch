@@ -1,0 +1,29 @@
+From 4f396737e4876a9c79bb7856fb8218245c3d158c Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Tue, 6 Oct 2020 17:17:29 -0400
+Subject: [PATCH 0275/1021] Fixes TNL-7613 and TNL-7614 (#236)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The course blocks API accepts a value of ‘special_exam_info’ in its requested_fields parameter.  This value is necessary to include special exam sequences for non-staff users.  Special exams include timed, proctored, and practice proctored exams.
+---
+ src/courseware/data/api.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/data/api.js b/src/courseware/data/api.js
+index 917a7b7..6e4dd0d 100644
+--- a/src/courseware/data/api.js
++++ b/src/courseware/data/api.js
+@@ -91,7 +91,7 @@ export async function getCourseBlocks(courseId) {
+   url.searchParams.append('course_id', courseId);
+   url.searchParams.append('username', username);
+   url.searchParams.append('depth', 3);
+-  url.searchParams.append('requested_fields', 'children,show_gated_sections,graded');
++  url.searchParams.append('requested_fields', 'children,show_gated_sections,graded,special_exam_info');
+ 
+   const { data } = await getAuthenticatedHttpClient().get(url.href, {});
+   return normalizeBlocks(courseId, data.blocks);
+-- 
+2.34.1
+

@@ -1,0 +1,64 @@
+From 96ceab8b2ff4aa554b5ca3283a18a1f2a155fbd4 Mon Sep 17 00:00:00 2001
+From: Hammad Ahmad Waqas <hammadahmadwaqas1@gmail.com>
+Date: Wed, 7 Sep 2022 15:39:12 +0500
+Subject: [PATCH 0927/1021] fix: Redirecting to MFE home page instead of
+ access-denied page to save redirection (#970)
+
+---
+ .../active-enteprise-alert/ActiveEnterpriseAlert.jsx       | 7 +++++--
+ .../active-enteprise-alert/ActiveEnterpriseAlert.test.jsx  | 3 ++-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
+index e6acd80..cb64f09 100644
+--- a/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
++++ b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.jsx
+@@ -8,12 +8,14 @@ import { getConfig } from '@edx/frontend-platform';
+ import genericMessages from './messages';
+ 
+ function ActiveEnterpriseAlert({ intl, payload }) {
+-  const { text } = payload;
++  const { text, courseId } = payload;
+   const changeActiveEnterprise = (
+     <Hyperlink
+       style={{ textDecoration: 'underline' }}
+       destination={
+-        `${getConfig().LMS_BASE_URL}/enterprise/select/active/?success_url=${encodeURIComponent(global.location.href)}`
++        `${getConfig().LMS_BASE_URL}/enterprise/select/active/?success_url=${encodeURIComponent(
++          `${global.location.origin}/course/${courseId}/home`,
++        )}`
+     }
+     >
+       {intl.formatMessage(genericMessages.changeActiveEnterpriseLowercase)}
+@@ -39,6 +41,7 @@ ActiveEnterpriseAlert.propTypes = {
+   intl: intlShape.isRequired,
+   payload: PropTypes.shape({
+     text: PropTypes.string,
++    courseId: PropTypes.string,
+   }).isRequired,
+ };
+ 
+diff --git a/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.test.jsx b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.test.jsx
+index f3d5403..b631133 100644
+--- a/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.test.jsx
++++ b/src/alerts/active-enteprise-alert/ActiveEnterpriseAlert.test.jsx
+@@ -9,6 +9,7 @@ describe('ActiveEnterpriseAlert', () => {
+   const mockData = {
+     payload: {
+       text: 'test message',
++      courseId: 'test-course-id',
+     },
+   };
+   beforeAll(async () => {
+@@ -20,7 +21,7 @@ describe('ActiveEnterpriseAlert', () => {
+     expect(screen.getByRole('alert')).toBeInTheDocument();
+     expect(screen.getByText('test message')).toBeInTheDocument();
+     expect(screen.getByRole('link', { name: 'change enterprise now' })).toHaveAttribute(
+-      'href', `${getConfig().LMS_BASE_URL}/enterprise/select/active/?success_url=http%3A%2F%2Flocalhost%2F`,
++      'href', `${getConfig().LMS_BASE_URL}/enterprise/select/active/?success_url=http%3A%2F%2Flocalhost%2Fcourse%2Ftest-course-id%2Fhome`,
+     );
+   });
+ });
+-- 
+2.34.1
+

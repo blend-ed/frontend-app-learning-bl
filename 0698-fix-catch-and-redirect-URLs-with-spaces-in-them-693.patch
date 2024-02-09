@@ -1,0 +1,258 @@
+From e6fee7b5b98a7fcaf1d4819a39b326ccc393295e Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Tue, 19 Oct 2021 11:39:06 -0400
+Subject: [PATCH 0698/1021] fix: catch and redirect URLs with spaces in them
+ (#693)
+
+In an attempt to debug some odd LMS errors (which would happen if
+you loaded an MFE page with spaces instead of plus signs), this
+commit notices page requests with spaces in the course key and
+switches it out for plus signs, logging the incident.
+---
+ src/generic/path-fixes/PathFixesProvider.jsx  | 42 +++++++++
+ .../path-fixes/PathFixesProvider.test.jsx     | 65 +++++++++++++
+ src/generic/path-fixes/index.js               |  1 +
+ src/index.jsx                                 | 93 ++++++++++---------
+ 4 files changed, 156 insertions(+), 45 deletions(-)
+ create mode 100644 src/generic/path-fixes/PathFixesProvider.jsx
+ create mode 100644 src/generic/path-fixes/PathFixesProvider.test.jsx
+ create mode 100644 src/generic/path-fixes/index.js
+
+diff --git a/src/generic/path-fixes/PathFixesProvider.jsx b/src/generic/path-fixes/PathFixesProvider.jsx
+new file mode 100644
+index 0000000..3215660
+--- /dev/null
++++ b/src/generic/path-fixes/PathFixesProvider.jsx
+@@ -0,0 +1,42 @@
++import { Redirect, useLocation } from 'react-router-dom';
++import PropTypes from 'prop-types';
++
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++
++/**
++ * We have seen evidence of learners hitting MFE pages with spaces instead of plus signs (which are used commonly
++ * in our course keys). It's possible something out there is un-escaping our paths before sending learners to them.
++ *
++ * So this provider fixes those paths up and logs it so that we can try to fix the source.
++ *
++ * This might be temporary, based on how much we can fix the sources of these urls-with-spaces.
++ */
++const PathFixesProvider = ({ children }) => {
++  const location = useLocation();
++
++  // We only check for spaces. That's not the only kind of character that is escaped in URLs, but it would always be
++  // present for our cases, and I believe it's the only one we use normally.
++  if (location.pathname.includes(' ')) {
++    const newLocation = {
++      ...location,
++      pathname: location.pathname.replaceAll(' ', '+'),
++    };
++
++    sendTrackEvent('edx.ui.lms.path_fixed', {
++      new_path: newLocation.pathname,
++      old_path: location.pathname,
++      referrer: document.referrer,
++      search: location.search,
++    });
++
++    return (<Redirect to={newLocation} />);
++  }
++
++  return children; // pass through
++};
++
++PathFixesProvider.propTypes = {
++  children: PropTypes.node.isRequired,
++};
++
++export default PathFixesProvider;
+diff --git a/src/generic/path-fixes/PathFixesProvider.test.jsx b/src/generic/path-fixes/PathFixesProvider.test.jsx
+new file mode 100644
+index 0000000..c20bbd9
+--- /dev/null
++++ b/src/generic/path-fixes/PathFixesProvider.test.jsx
+@@ -0,0 +1,65 @@
++import React from 'react';
++import { MemoryRouter, Route } from 'react-router-dom';
++
++import { sendTrackEvent } from '@edx/frontend-platform/analytics';
++
++import { initializeMockApp, render } from '../../setupTest';
++import PathFixesProvider from '.';
++
++initializeMockApp();
++jest.mock('@edx/frontend-platform/analytics');
++
++describe('PathFixesProvider', () => {
++  let testLocation;
++
++  beforeAll(() => {
++    Object.defineProperty(document, 'referrer', { value: 'https://example.com/foo' });
++    testLocation = null;
++    sendTrackEvent.mockClear();
++  });
++
++  function buildAndRender(path) {
++    render(
++      <MemoryRouter initialEntries={[path]}>
++        <PathFixesProvider>
++          <Route
++            path="*"
++            render={routeProps => {
++              testLocation = routeProps.location;
++              return null;
++            }}
++          />
++        </PathFixesProvider>
++      </MemoryRouter>,
++    );
++  }
++
++  it('does not redirect for normal path', () => {
++    buildAndRender('/course/course-v1:org+course+run/home');
++    expect(testLocation.pathname).toEqual('/course/course-v1:org+course+run/home');
++    expect(sendTrackEvent).toHaveBeenCalledTimes(0);
++  });
++
++  it('does redirect for path with spaces', () => {
++    buildAndRender('/course/course-v1:org course run/home');
++    expect(testLocation.pathname).toEqual('/course/course-v1:org+course+run/home');
++    expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.path_fixed', {
++      new_path: '/course/course-v1:org+course+run/home',
++      old_path: '/course/course-v1:org course run/home',
++      referrer: 'https://example.com/foo',
++      search: '',
++    });
++  });
++
++  it('does not change search part of URL', () => {
++    buildAndRender('/course/course-v1:org course run/home page?donuts=yes please');
++    expect(testLocation.pathname).toEqual('/course/course-v1:org+course+run/home+page');
++    expect(testLocation.search).toEqual('?donuts=yes please');
++    expect(sendTrackEvent).toHaveBeenCalledWith('edx.ui.lms.path_fixed', {
++      new_path: '/course/course-v1:org+course+run/home+page',
++      old_path: '/course/course-v1:org course run/home page',
++      referrer: 'https://example.com/foo',
++      search: '?donuts=yes please',
++    });
++  });
++});
+diff --git a/src/generic/path-fixes/index.js b/src/generic/path-fixes/index.js
+new file mode 100644
+index 0000000..e07e63a
+--- /dev/null
++++ b/src/generic/path-fixes/index.js
+@@ -0,0 +1 @@
++export { default } from './PathFixesProvider';
+diff --git a/src/index.jsx b/src/index.jsx
+index fd6d8c3..30d4812 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -29,56 +29,59 @@ import { fetchDatesTab, fetchOutlineTab, fetchProgressTab } from './course-home/
+ import { fetchCourse } from './courseware/data';
+ import initializeStore from './store';
+ import NoticesProvider from './generic/notices';
++import PathFixesProvider from './generic/path-fixes';
+ 
+ subscribe(APP_READY, () => {
+   ReactDOM.render(
+     <AppProvider store={initializeStore()}>
+-      <NoticesProvider>
+-        <UserMessagesProvider>
+-          <Switch>
+-            <PageRoute exact path="/goal-unsubscribe/:token" component={GoalUnsubscribe} />
+-            <PageRoute path="/redirect" component={CoursewareRedirectLandingPage} />
+-            <PageRoute path="/course/:courseId/home">
+-              <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
+-                <OutlineTab />
+-              </TabContainer>
+-            </PageRoute>
+-            <PageRoute path="/course/:courseId/dates">
+-              <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
+-                <DatesTab />
+-              </TabContainer>
+-            </PageRoute>
+-            <PageRoute
+-              path={[
+-                '/course/:courseId/progress/:targetUserId/',
+-                '/course/:courseId/progress',
+-              ]}
+-              render={({ match }) => (
+-                <TabContainer
+-                  tab="progress"
+-                  fetch={(courseId) => fetchProgressTab(courseId, match.params.targetUserId)}
+-                  slice="courseHome"
+-                >
+-                  <ProgressTab />
++      <PathFixesProvider>
++        <NoticesProvider>
++          <UserMessagesProvider>
++            <Switch>
++              <PageRoute exact path="/goal-unsubscribe/:token" component={GoalUnsubscribe} />
++              <PageRoute path="/redirect" component={CoursewareRedirectLandingPage} />
++              <PageRoute path="/course/:courseId/home">
++                <TabContainer tab="outline" fetch={fetchOutlineTab} slice="courseHome">
++                  <OutlineTab />
+                 </TabContainer>
+-              )}
+-            />
+-            <PageRoute path="/course/:courseId/course-end">
+-              <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
+-                <CourseExit />
+-              </TabContainer>
+-            </PageRoute>
+-            <PageRoute
+-              path={[
+-                '/course/:courseId/:sequenceId/:unitId',
+-                '/course/:courseId/:sequenceId',
+-                '/course/:courseId',
+-              ]}
+-              component={CoursewareContainer}
+-            />
+-          </Switch>
+-        </UserMessagesProvider>
+-      </NoticesProvider>
++              </PageRoute>
++              <PageRoute path="/course/:courseId/dates">
++                <TabContainer tab="dates" fetch={fetchDatesTab} slice="courseHome">
++                  <DatesTab />
++                </TabContainer>
++              </PageRoute>
++              <PageRoute
++                path={[
++                  '/course/:courseId/progress/:targetUserId/',
++                  '/course/:courseId/progress',
++                ]}
++                render={({ match }) => (
++                  <TabContainer
++                    tab="progress"
++                    fetch={(courseId) => fetchProgressTab(courseId, match.params.targetUserId)}
++                    slice="courseHome"
++                  >
++                    <ProgressTab />
++                  </TabContainer>
++                )}
++              />
++              <PageRoute path="/course/:courseId/course-end">
++                <TabContainer tab="courseware" fetch={fetchCourse} slice="courseware">
++                  <CourseExit />
++                </TabContainer>
++              </PageRoute>
++              <PageRoute
++                path={[
++                  '/course/:courseId/:sequenceId/:unitId',
++                  '/course/:courseId/:sequenceId',
++                  '/course/:courseId',
++                ]}
++                component={CoursewareContainer}
++              />
++            </Switch>
++          </UserMessagesProvider>
++        </NoticesProvider>
++      </PathFixesProvider>
+     </AppProvider>,
+     document.getElementById('root'),
+   );
+-- 
+2.34.1
+

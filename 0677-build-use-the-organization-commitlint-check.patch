@@ -1,0 +1,29 @@
+From c6ad7c51d3a842583b03be977cde7cf058f5733e Mon Sep 17 00:00:00 2001
+From: Ned Batchelder <ned@nedbatchelder.com>
+Date: Thu, 7 Oct 2021 13:51:59 -0400
+Subject: [PATCH 0677/1021] build: use the organization commitlint check
+
+---
+ .github/workflows/commitlint.yml | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+ create mode 100644 .github/workflows/commitlint.yml
+
+diff --git a/.github/workflows/commitlint.yml b/.github/workflows/commitlint.yml
+new file mode 100644
+index 0000000..e2b0661
+--- /dev/null
++++ b/.github/workflows/commitlint.yml
+@@ -0,0 +1,10 @@
++# Run commitlint on the commit messages in a pull request.
++
++name: Lint Commit Messages
++
++on:
++  - pull_request
++
++jobs:
++  commitlint:
++    uses: edx/.github/.github/workflows/commitlint.yml@master
+-- 
+2.34.1
+

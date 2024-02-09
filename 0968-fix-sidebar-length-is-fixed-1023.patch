@@ -1,0 +1,24 @@
+From 4ee1570bfa0b6376eb95d2ba7e0e680882e0990b Mon Sep 17 00:00:00 2001
+From: Mehak Nasir <67791278+mehaknasir@users.noreply.github.com>
+Date: Wed, 28 Dec 2022 13:34:17 +0500
+Subject: [PATCH 0968/1021] fix: sidebar length is fixed (#1023)
+
+---
+ src/courseware/course/sidebar/common/SidebarBase.jsx | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/courseware/course/sidebar/common/SidebarBase.jsx b/src/courseware/course/sidebar/common/SidebarBase.jsx
+index 05aa496..50d8ada 100644
+--- a/src/courseware/course/sidebar/common/SidebarBase.jsx
++++ b/src/courseware/course/sidebar/common/SidebarBase.jsx
+@@ -37,6 +37,7 @@ function SidebarBase({
+     <section
+       className={classNames('ml-0 ml-lg-4 border border-light-400 rounded-sm h-auto align-top', {
+         'bg-white m-0 border-0 fixed-top vh-100 rounded-0': shouldDisplayFullScreen,
++        'min-vh-100': !shouldDisplayFullScreen,
+       }, className)}
+       style={{ width: shouldDisplayFullScreen ? '100%' : width }}
+       aria-label={ariaLabel}
+-- 
+2.34.1
+

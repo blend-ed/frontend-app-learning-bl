@@ -1,0 +1,342 @@
+From 28d359e715687c02922525bf909ae5059d0df67e Mon Sep 17 00:00:00 2001
+From: Diane Kaplan <dianekaplan@gmail.com>
+Date: Wed, 14 Jul 2021 11:44:23 -0400
+Subject: [PATCH 0536/1021] feat: remove first purchase discount banner from
+ courseware (REV-2132)
+
+---
+ src/alerts/offer-alert/OfferAlert.jsx | 105 --------------------------
+ src/alerts/offer-alert/hooks.js       |  25 ------
+ src/alerts/offer-alert/index.js       |   1 -
+ src/alerts/offer-alert/messages.js    |  10 ---
+ src/courseware/course/Course.jsx      |  18 -----
+ src/courseware/course/Course.test.jsx |  87 ---------------------
+ 6 files changed, 246 deletions(-)
+ delete mode 100644 src/alerts/offer-alert/OfferAlert.jsx
+ delete mode 100644 src/alerts/offer-alert/hooks.js
+ delete mode 100644 src/alerts/offer-alert/index.js
+ delete mode 100644 src/alerts/offer-alert/messages.js
+
+diff --git a/src/alerts/offer-alert/OfferAlert.jsx b/src/alerts/offer-alert/OfferAlert.jsx
+deleted file mode 100644
+index dce4b52..0000000
+--- a/src/alerts/offer-alert/OfferAlert.jsx
++++ /dev/null
+@@ -1,105 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+-import {
+-  FormattedMessage, FormattedDate, injectIntl, intlShape,
+-} from '@edx/frontend-platform/i18n';
+-import { Hyperlink } from '@edx/paragon';
+-
+-import { Alert, ALERT_TYPES } from '../../generic/user-messages';
+-import { FormattedPricing } from '../../generic/upgrade-button';
+-import messages from './messages';
+-
+-function OfferAlert({ intl, payload }) {
+-  const {
+-    analyticsPageName,
+-    courseId,
+-    offer,
+-    org,
+-    userTimezone,
+-  } = payload;
+-
+-  if (!offer) {
+-    return null;
+-  }
+-
+-  const {
+-    code,
+-    expirationDate,
+-    percentage,
+-    upgradeUrl,
+-  } = offer;
+-  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+-
+-  const logClick = () => {
+-    sendTrackEvent('edx.bi.ecommerce.upsell_links_clicked', {
+-      org_key: org,
+-      courserun_key: courseId,
+-      linkCategory: 'welcome',
+-      linkName: `${analyticsPageName}_welcome`,
+-      linkType: 'link',
+-      pageName: analyticsPageName,
+-    });
+-  };
+-
+-  return (
+-    <Alert type={ALERT_TYPES.INFO}>
+-      <span className="font-weight-bold">
+-        <FormattedMessage
+-          id="learning.offer.header"
+-          defaultMessage="Upgrade by {date} and save {percentage}% [{fullPricing}]"
+-          values={{
+-            date: (
+-              <FormattedDate
+-                key="offerDate"
+-                day="numeric"
+-                month="long"
+-                value={expirationDate}
+-                {...timezoneFormatArgs}
+-              />
+-            ),
+-            fullPricing: <FormattedPricing offer={offer} />,
+-            percentage,
+-          }}
+-        />
+-      </span>
+-      <br />
+-      <FormattedMessage
+-        id="learning.offer.code"
+-        defaultMessage="Use code {code} at checkout!"
+-        values={{
+-          code: (<b>{code}</b>),
+-        }}
+-      />
+-      &nbsp;
+-      <Hyperlink
+-        className="font-weight-bold"
+-        style={{ textDecoration: 'underline' }}
+-        destination={upgradeUrl}
+-        onClick={logClick}
+-      >
+-        {intl.formatMessage(messages.upgradeNow)}
+-      </Hyperlink>
+-    </Alert>
+-  );
+-}
+-
+-OfferAlert.propTypes = {
+-  intl: intlShape.isRequired,
+-  payload: PropTypes.shape({
+-    courseId: PropTypes.string.isRequired,
+-    offer: PropTypes.shape({
+-      code: PropTypes.string.isRequired,
+-      discountedPrice: PropTypes.string.isRequired,
+-      expirationDate: PropTypes.string.isRequired,
+-      originalPrice: PropTypes.string.isRequired,
+-      percentage: PropTypes.number.isRequired,
+-      upgradeUrl: PropTypes.string.isRequired,
+-    }).isRequired,
+-    org: PropTypes.string.isRequired,
+-    userTimezone: PropTypes.string.isRequired,
+-    analyticsPageName: PropTypes.string.isRequired,
+-  }).isRequired,
+-};
+-
+-export default injectIntl(OfferAlert);
+diff --git a/src/alerts/offer-alert/hooks.js b/src/alerts/offer-alert/hooks.js
+deleted file mode 100644
+index be86db3..0000000
+--- a/src/alerts/offer-alert/hooks.js
++++ /dev/null
+@@ -1,25 +0,0 @@
+-import React, { useMemo } from 'react';
+-import { useAlert } from '../../generic/user-messages';
+-
+-const OfferAlert = React.lazy(() => import('./OfferAlert'));
+-
+-export function useOfferAlert(courseId, offer, org, userTimezone, topic, analyticsPageName) {
+-  const isVisible = !!offer; // if it exists, show it.
+-  const payload = {
+-    analyticsPageName,
+-    courseId,
+-    offer,
+-    org,
+-    userTimezone,
+-  };
+-
+-  useAlert(isVisible, {
+-    code: 'clientOfferAlert',
+-    topic,
+-    payload: useMemo(() => payload, Object.values(payload).sort()),
+-  });
+-
+-  return { clientOfferAlert: OfferAlert };
+-}
+-
+-export default useOfferAlert;
+diff --git a/src/alerts/offer-alert/index.js b/src/alerts/offer-alert/index.js
+deleted file mode 100644
+index ed12eb0..0000000
+--- a/src/alerts/offer-alert/index.js
++++ /dev/null
+@@ -1 +0,0 @@
+-export { default } from './hooks';
+diff --git a/src/alerts/offer-alert/messages.js b/src/alerts/offer-alert/messages.js
+deleted file mode 100644
+index 149c0d0..0000000
+--- a/src/alerts/offer-alert/messages.js
++++ /dev/null
+@@ -1,10 +0,0 @@
+-import { defineMessages } from '@edx/frontend-platform/i18n';
+-
+-const messages = defineMessages({
+-  upgradeNow: {
+-    id: 'learning.offer.upgradeNow',
+-    defaultMessage: 'Upgrade now',
+-  },
+-});
+-
+-export default messages;
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index 259ccaf..217d733 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -5,8 +5,6 @@ import { useDispatch } from 'react-redux';
+ import { getConfig } from '@edx/frontend-platform';
+ 
+ import { AlertList } from '../../generic/user-messages';
+-import useAccessExpirationAlert from '../../alerts/access-expiration-alert';
+-import useOfferAlert from '../../alerts/offer-alert';
+ 
+ import Sequence from './sequence';
+ 
+@@ -41,19 +39,14 @@ function Course({
+   ].filter(element => element != null).map(element => element.title);
+ 
+   const {
+-    accessExpiration,
+     canShowUpgradeSock,
+     celebrations,
+     offer,
+     org,
+-    userTimezone,
+     verifiedMode,
+   } = course;
+ 
+   // Below the tabs, above the breadcrumbs alerts (appearing in the order listed here)
+-  const offerAlert = useOfferAlert(courseId, offer, org, userTimezone, 'course', 'in_course');
+-  const accessExpirationAlert = useAccessExpirationAlert(accessExpiration, courseId, org, userTimezone, 'course', 'in_course');
+-
+   const dispatch = useDispatch();
+   const celebrateFirstSection = celebrations && celebrations.firstSection;
+   const celebrationOpen = shouldCelebrateOnSectionLoad(
+@@ -79,17 +72,6 @@ function Course({
+       <Helmet>
+         <title>{`${pageTitleBreadCrumbs.join(' | ')} | ${getConfig().SITE_NAME}`}</title>
+       </Helmet>
+-      { /** This conditional is for the [MM-P2P] Experiment */}
+-      { !MMP2P.state.isEnabled && (
+-        <AlertList
+-          className="my-3"
+-          topic="course"
+-          customAlerts={{
+-            ...accessExpirationAlert,
+-            ...offerAlert,
+-          }}
+-        />
+-      )}
+       <div className="position-relative">
+         <CourseBreadcrumbs
+           courseId={courseId}
+diff --git a/src/courseware/course/Course.test.jsx b/src/courseware/course/Course.test.jsx
+index e2efbdf..d825d7c 100644
+--- a/src/courseware/course/Course.test.jsx
++++ b/src/courseware/course/Course.test.jsx
+@@ -1,6 +1,5 @@
+ import React from 'react';
+ import { Factory } from 'rosie';
+-import { sendTrackEvent } from '@edx/frontend-platform/analytics';
+ import {
+   loadUnit, render, screen, waitFor, getByRole, initializeTestStore, fireEvent,
+ } from '../../setupTest';
+@@ -100,92 +99,6 @@ describe('Course', () => {
+     expect(notificationTrigger).not.toHaveClass('active');
+   });
+ 
+-  it('displays offer and expiration alert', async () => {
+-    const courseMetadata = Factory.build('courseMetadata', {
+-      access_expiration: {
+-        expiration_date: '2080-01-01T12:00:00Z',
+-        masquerading_expired_course: false,
+-        upgrade_deadline: null,
+-        upgrade_url: null,
+-      },
+-      offer: {
+-        code: 'EDXWELCOME',
+-        expiration_date: '2070-01-01T12:00:00Z',
+-        original_price: '$100',
+-        discounted_price: '$85',
+-        percentage: 15,
+-        upgrade_url: 'https://example.com/upgrade',
+-      },
+-    });
+-    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
+-    render(<Course {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+-
+-    await screen.findByText('EDXWELCOME');
+-    await screen.findByText('Audit Access Expires');
+-  });
+-
+-  it('sends analytics event onClick of access expiration upgrade link', async () => {
+-    sendTrackEvent.mockClear();
+-
+-    const courseMetadata = Factory.build('courseMetadata', {
+-      access_expiration: {
+-        expiration_date: '2080-01-01T12:00:00Z',
+-        masquerading_expired_course: false,
+-        upgrade_deadline: '2070-01-01T12:00:00Z',
+-        upgrade_url: 'https://example.com/upgrade',
+-      },
+-      user_timezone: 'UTC',
+-    });
+-    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
+-    render(<Course {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+-    await screen.findByText('Audit Access Expires');
+-
+-    const upgradeLink = screen.getByRole('link', { name: 'Upgrade now' });
+-    fireEvent.click(upgradeLink);
+-
+-    expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+-    expect(sendTrackEvent).toHaveBeenCalledWith('edx.bi.ecommerce.upsell_links_clicked', {
+-      org_key: 'edX',
+-      courserun_key: courseMetadata.id,
+-      linkCategory: 'FBE_banner',
+-      linkName: 'in_course_audit_access_expires',
+-      linkType: 'link',
+-      pageName: 'in_course',
+-    });
+-  });
+-
+-  it('sends analytics event onClick of offer alert link', async () => {
+-    sendTrackEvent.mockClear();
+-
+-    const courseMetadata = Factory.build('courseMetadata', {
+-      offer: {
+-        code: 'EDXWELCOME',
+-        expiration_date: '2070-01-01T12:00:00Z',
+-        original_price: '$100',
+-        discounted_price: '$85',
+-        percentage: 15,
+-        upgrade_url: 'https://example.com/upgrade',
+-      },
+-      user_timezone: 'UTC',
+-    });
+-    const testStore = await initializeTestStore({ courseMetadata, excludeFetchSequence: true }, false);
+-    render(<Course {...mockData} courseId={courseMetadata.id} />, { store: testStore });
+-    await screen.findByText('EDXWELCOME');
+-
+-    const upgradeLink = screen.getByRole('link', { name: 'Upgrade now' });
+-    fireEvent.click(upgradeLink);
+-
+-    expect(sendTrackEvent).toHaveBeenCalledTimes(1);
+-    expect(sendTrackEvent).toHaveBeenCalledWith('edx.bi.ecommerce.upsell_links_clicked', {
+-      org_key: 'edX',
+-      courserun_key: courseMetadata.id,
+-      linkCategory: 'welcome',
+-      linkName: 'in_course_welcome',
+-      linkType: 'link',
+-      pageName: 'in_course',
+-    });
+-  });
+-
+   it('passes handlers to the sequence', async () => {
+     const nextSequenceHandler = jest.fn();
+     const previousSequenceHandler = jest.fn();
+-- 
+2.34.1
+

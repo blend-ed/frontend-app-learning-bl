@@ -1,0 +1,277 @@
+From 534b9b205ffd86a4fd99329593bd33ad1bf6f955 Mon Sep 17 00:00:00 2001
+From: daphneli-chen <47010279+daphneli-chen@users.noreply.github.com>
+Date: Tue, 23 Jun 2020 14:05:18 -0400
+Subject: [PATCH 0152/1021] AA-122: Created Dates Widget on course home page
+ (#82)
+
+Including upcoming dates and a link to dates tab. Gives user ability to
+look at any important upcoming dates for their course and to navigate
+to upcoming assignments.
+
+Co-authored-by: Daphne Li-Chen <daphneli-chen@MacBook-Pro.local>
+---
+ src/course-home/CourseDates.jsx               | 41 ------------
+ src/course-home/outline-tab/CourseDates.jsx   | 31 ++++++++++
+ .../{ => outline-tab}/CourseTools.jsx         |  2 +-
+ src/course-home/outline-tab/DateSummary.jsx   | 62 +++++++++++++++++++
+ src/course-home/outline-tab/DateSummary.scss  |  8 +++
+ src/course-home/outline-tab/OutlineTab.jsx    |  7 ++-
+ src/course-home/{ => outline-tab}/Section.jsx |  2 +-
+ .../{ => outline-tab}/SequenceLink.jsx        |  0
+ src/data/api.js                               |  6 +-
+ 9 files changed, 111 insertions(+), 48 deletions(-)
+ delete mode 100644 src/course-home/CourseDates.jsx
+ create mode 100644 src/course-home/outline-tab/CourseDates.jsx
+ rename src/course-home/{ => outline-tab}/CourseTools.jsx (96%)
+ create mode 100644 src/course-home/outline-tab/DateSummary.jsx
+ create mode 100644 src/course-home/outline-tab/DateSummary.scss
+ rename src/course-home/{ => outline-tab}/Section.jsx (97%)
+ rename src/course-home/{ => outline-tab}/SequenceLink.jsx (100%)
+
+diff --git a/src/course-home/CourseDates.jsx b/src/course-home/CourseDates.jsx
+deleted file mode 100644
+index 8a86a3d..0000000
+--- a/src/course-home/CourseDates.jsx
++++ /dev/null
+@@ -1,41 +0,0 @@
+-import React from 'react';
+-import PropTypes from 'prop-types';
+-
+-export default function CourseDates({
+-  start,
+-  end,
+-  enrollmentStart,
+-  enrollmentEnd,
+-  enrollmentMode,
+-  isEnrolled,
+-}) {
+-  return (
+-    <section>
+-      <h4>Upcoming Dates</h4>
+-      <div><strong>Course Start:</strong><br />{start}</div>
+-      <div><strong>Course End:</strong><br />{end}</div>
+-      <div><strong>Enrollment Start:</strong><br />{enrollmentStart}</div>
+-      <div><strong>Enrollment End:</strong><br />{enrollmentEnd}</div>
+-      <div><strong>Mode:</strong><br />{enrollmentMode}</div>
+-      <div>{isEnrolled ? 'Active Enrollment' : 'Inactive Enrollment'}</div>
+-    </section>
+-  );
+-}
+-
+-CourseDates.propTypes = {
+-  start: PropTypes.string,
+-  end: PropTypes.string,
+-  enrollmentStart: PropTypes.string,
+-  enrollmentEnd: PropTypes.string,
+-  enrollmentMode: PropTypes.string,
+-  isEnrolled: PropTypes.bool,
+-};
+-
+-CourseDates.defaultProps = {
+-  start: null,
+-  end: null,
+-  enrollmentStart: null,
+-  enrollmentEnd: null,
+-  enrollmentMode: null,
+-  isEnrolled: false,
+-};
+diff --git a/src/course-home/outline-tab/CourseDates.jsx b/src/course-home/outline-tab/CourseDates.jsx
+new file mode 100644
+index 0000000..b7da2ab
+--- /dev/null
++++ b/src/course-home/outline-tab/CourseDates.jsx
+@@ -0,0 +1,31 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { useModel } from '../../model-store';
++import DateSummary from './DateSummary';
++
++export default function CourseDates({ courseId }) {
++  const {
++    datesWidget,
++  } = useModel('outline', courseId);
++  return (
++    <section className="mb-3">
++      <h4>Upcoming Dates</h4>
++      {datesWidget.courseDateBlocks.map((courseDateBlock) => (
++        <DateSummary
++          key={courseDateBlock.title + courseDateBlock.date}
++          dateBlock={courseDateBlock}
++          userTimezone={datesWidget.userTimezone}
++        />
++      ))}
++      <a className="font-weight-bold" href={datesWidget.datesTabLink}>View all course dates</a>
++    </section>
++  );
++}
++
++CourseDates.propTypes = {
++  courseId: PropTypes.string,
++};
++
++CourseDates.defaultProps = {
++  courseId: null,
++};
+diff --git a/src/course-home/CourseTools.jsx b/src/course-home/outline-tab/CourseTools.jsx
+similarity index 96%
+rename from src/course-home/CourseTools.jsx
+rename to src/course-home/outline-tab/CourseTools.jsx
+index ac3b5ef..d870f15 100644
+--- a/src/course-home/CourseTools.jsx
++++ b/src/course-home/outline-tab/CourseTools.jsx
+@@ -5,7 +5,7 @@ import {
+   faBookmark, faCertificate, faInfo, faCalendar, faStar,
+ } from '@fortawesome/free-solid-svg-icons';
+ import { faNewspaper } from '@fortawesome/free-regular-svg-icons';
+-import { useModel } from '../model-store';
++import { useModel } from '../../model-store';
+ 
+ 
+ export default function CourseTools(
+diff --git a/src/course-home/outline-tab/DateSummary.jsx b/src/course-home/outline-tab/DateSummary.jsx
+new file mode 100644
+index 0000000..f1c5b8e
+--- /dev/null
++++ b/src/course-home/outline-tab/DateSummary.jsx
+@@ -0,0 +1,62 @@
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faCalendarAlt } from '@fortawesome/free-regular-svg-icons';
++import { FormattedDate } from '@edx/frontend-platform/i18n';
++import React from 'react';
++import PropTypes from 'prop-types';
++import { isLearnerAssignment } from '../../dates-tab/utils';
++import './DateSummary.scss';
++
++export default function DateSummary({
++  dateBlock,
++  userTimezone,
++}) {
++  const linkedTitle = dateBlock.link && isLearnerAssignment(dateBlock);
++  const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
++  return (
++    <section className="container p-0 mb-3">
++      <div className="row">
++        <FontAwesomeIcon icon={faCalendarAlt} className="ml-3 mt-1 mr-1" style={{ width: '20px' }} />
++        <div className="ml-2 font-weight-bold">
++          <FormattedDate
++            value={dateBlock.date}
++            day="numeric"
++            month="short"
++            weekday="short"
++            year="numeric"
++            {...timezoneFormatArgs}
++          />
++        </div>
++      </div>
++      <div className="row ml-4 px-2">
++        <div className="date-summary-text">
++          {linkedTitle
++          && <div className="font-weight-bold mt-2"><a href={dateBlock.link}>{dateBlock.title}</a></div>}
++          {!linkedTitle
++          && <div className="font-weight-bold mt-2">{dateBlock.title}</div>}
++        </div>
++        {dateBlock.description
++          && <div className="date-summary-text m-0 mt-1">{dateBlock.description}</div>}
++        {!linkedTitle && dateBlock.link
++          && <a href={dateBlock.link} className="description-link">{dateBlock.linkText}</a>}
++      </div>
++
++    </section>
++  );
++}
++
++DateSummary.propTypes = {
++  dateBlock: PropTypes.shape({
++    date: PropTypes.string.isRequired,
++    dateType: PropTypes.string,
++    description: PropTypes.string,
++    link: PropTypes.string,
++    linkText: PropTypes.string,
++    title: PropTypes.string.isRequired,
++    learnerHasAccess: PropTypes.bool,
++  }).isRequired,
++  userTimezone: PropTypes.string,
++};
++
++DateSummary.defaultProps = {
++  userTimezone: null,
++};
+diff --git a/src/course-home/outline-tab/DateSummary.scss b/src/course-home/outline-tab/DateSummary.scss
+new file mode 100644
+index 0000000..17d7a7a
+--- /dev/null
++++ b/src/course-home/outline-tab/DateSummary.scss
+@@ -0,0 +1,8 @@
++.date-summary-text {
++  margin-left: 2px;
++  flex-basis: 100%;
++}
++
++.description-link {
++  margin-left: 1px;
++}
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 2be2a3d..17dd536 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -4,9 +4,9 @@ import { Button } from '@edx/paragon';
+ 
+ import { AlertList } from '../../user-messages';
+ 
+-import CourseDates from '../CourseDates';
+-import CourseTools from '../CourseTools';
+-import Section from '../Section';
++import CourseDates from './CourseDates';
++import CourseTools from './CourseTools';
++import Section from './Section';
+ import { useModel } from '../../model-store';
+ 
+ // Note that we import from the component files themselves in the enrollment-alert package.
+@@ -78,6 +78,7 @@ export default function OutlineTab() {
+             enrollmentEnd={enrollmentEnd}
+             enrollmentMode={enrollmentMode}
+             isEnrolled={isEnrolled}
++            courseId={courseId}
+           />
+         </div>
+       </div>
+diff --git a/src/course-home/Section.jsx b/src/course-home/outline-tab/Section.jsx
+similarity index 97%
+rename from src/course-home/Section.jsx
+rename to src/course-home/outline-tab/Section.jsx
+index b862623..2da936c 100644
+--- a/src/course-home/Section.jsx
++++ b/src/course-home/outline-tab/Section.jsx
+@@ -4,7 +4,7 @@ import { Collapsible } from '@edx/paragon';
+ import { faChevronRight, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import SequenceLink from './SequenceLink';
+-import { useModel } from '../model-store';
++import { useModel } from '../../model-store';
+ 
+ export default function Section({ courseId, title, sequenceIds }) {
+   const {
+diff --git a/src/course-home/SequenceLink.jsx b/src/course-home/outline-tab/SequenceLink.jsx
+similarity index 100%
+rename from src/course-home/SequenceLink.jsx
+rename to src/course-home/outline-tab/SequenceLink.jsx
+diff --git a/src/data/api.js b/src/data/api.js
+index 4e7e776..922564b 100644
+--- a/src/data/api.js
++++ b/src/data/api.js
+@@ -187,8 +187,10 @@ export async function getOutlineTabData(courseId, version) {
+   } = tabData;
+   const courseBlocks = normalizeBlocks(courseId, data.course_blocks.blocks);
+   const courseTools = camelCaseObject(data.course_tools);
+-
+-  return { courseTools, courseBlocks };
++  const datesWidget = camelCaseObject(data.dates_widget);
++  return {
++    courseTools, courseBlocks, datesWidget,
++  };
+ }
+ 
+ function normalizeSequenceMetadata(sequence) {
+-- 
+2.34.1
+

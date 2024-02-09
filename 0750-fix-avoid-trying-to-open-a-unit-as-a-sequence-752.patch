@@ -1,0 +1,100 @@
+From fba300bc5c50ee89eecc045f213f03f5a2c2d6f0 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Wed, 1 Dec 2021 15:28:10 -0500
+Subject: [PATCH 0750/1021] fix: avoid trying to open a unit as a sequence
+ (#752)
+
+Make sure to always include the sequence ID when changing the URL
+from the jump nav dropdown. We got the correct place eventually
+anyway, but this avoids some API requests that we know will fail.
+
+AA-1111
+---
+ src/courseware/course/CourseBreadcrumbs.jsx | 5 ++++-
+ src/courseware/course/JumpNavMenuItem.jsx   | 9 +++++----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index d0148ef..8e8a6c8 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -12,7 +12,7 @@ import { MMP2PFlyoverTrigger } from '../../experiments/mm-p2p';
+ import JumpNavMenuItem from './JumpNavMenuItem';
+ 
+ function CourseBreadcrumb({
+-  content, withSeparator, courseId, unitId, isStaff,
++  content, withSeparator, courseId, sequenceId, unitId, isStaff,
+ }) {
+   const defaultContent = content.filter(destination => destination.default)[0] || { id: courseId, label: '' };
+ 
+@@ -42,6 +42,7 @@ function CourseBreadcrumb({
+                   sequences={item.sequences}
+                   courseId={courseId}
+                   title={item.label}
++                  currentSequence={sequenceId}
+                   currentUnit={unitId}
+                 />
+               ))}
+@@ -60,6 +61,7 @@ CourseBreadcrumb.propTypes = {
+       label: PropTypes.string,
+     }),
+   ).isRequired,
++  sequenceId: PropTypes.string,
+   unitId: PropTypes.string,
+   withSeparator: PropTypes.bool,
+   courseId: PropTypes.string,
+@@ -68,6 +70,7 @@ CourseBreadcrumb.propTypes = {
+ 
+ CourseBreadcrumb.defaultProps = {
+   withSeparator: false,
++  sequenceId: null,
+   unitId: null,
+   courseId: null,
+   isStaff: null,
+diff --git a/src/courseware/course/JumpNavMenuItem.jsx b/src/courseware/course/JumpNavMenuItem.jsx
+index c3fb71d..dbcf710 100644
+--- a/src/courseware/course/JumpNavMenuItem.jsx
++++ b/src/courseware/course/JumpNavMenuItem.jsx
+@@ -14,10 +14,10 @@ import { checkBlockCompletion } from '../data';
+ export default function JumpNavMenuItem({
+   title,
+   courseId,
++  currentSequence,
+   currentUnit,
+   sequences,
+   isDefault,
+-
+ }) {
+   const dispatch = useDispatch();
+   function logEvent(targetUrl) {
+@@ -34,7 +34,7 @@ export default function JumpNavMenuItem({
+ 
+   function lazyloadUrl() {
+     if (isDefault) {
+-      return `/course/${courseId}/${currentUnit}`;
++      return `/course/${courseId}/${currentSequence}/${currentUnit}`;
+     }
+     const destinationString = sequences.forEach(sequence => sequence.unitIds.forEach(unitId => {
+       const complete = dispatch(checkBlockCompletion(
+@@ -42,9 +42,9 @@ export default function JumpNavMenuItem({
+         sequence.id, unitId,
+       ))
+         .then(value => value);
+-      if (!complete) { return `/course/${courseId}/${unitId}`; }
++      if (!complete) { return `/course/${courseId}/${sequence.id}/${unitId}`; }
+     }));
+-    return destinationString || `/course/${courseId}/${sequences[0].unitIds[0]}`;
++    return destinationString || `/course/${courseId}/${sequences[0].id}/${sequences[0].unitIds[0]}`;
+   }
+   function handleClick() {
+     const url = lazyloadUrl();
+@@ -76,5 +76,6 @@ JumpNavMenuItem.propTypes = {
+   sequences: PropTypes.arrayOf(sequenceShape).isRequired,
+   isDefault: PropTypes.bool.isRequired,
+   courseId: PropTypes.string.isRequired,
++  currentSequence: PropTypes.string.isRequired,
+   currentUnit: PropTypes.string.isRequired,
+ };
+-- 
+2.34.1
+

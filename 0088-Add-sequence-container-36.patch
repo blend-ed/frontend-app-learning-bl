@@ -1,0 +1,135 @@
+From f8ff2e78603415257cce9e7a8f1a4d48182137ce Mon Sep 17 00:00:00 2001
+From: Adam Butterworth <abutterworth@edx.org>
+Date: Wed, 25 Mar 2020 15:26:51 -0400
+Subject: [PATCH 0088/1021] Add sequence-container (#36)
+
+---
+ src/courseware/course/sequence/Sequence.jsx | 110 ++++++++++----------
+ 1 file changed, 56 insertions(+), 54 deletions(-)
+
+diff --git a/src/courseware/course/sequence/Sequence.jsx b/src/courseware/course/sequence/Sequence.jsx
+index 2f9eccd..310a695 100644
+--- a/src/courseware/course/sequence/Sequence.jsx
++++ b/src/courseware/course/sequence/Sequence.jsx
+@@ -112,62 +112,64 @@ function Sequence({
+ 
+   if (sequenceStatus === 'loaded') {
+     return (
+-      <div className="sequence">
+-        <SequenceNavigation
+-          sequenceId={sequenceId}
+-          unitId={unitId}
+-          className="mb-4"
+-          nextSequenceHandler={() => {
+-            logEvent('edx.ui.lms.sequence.next_selected', 'top');
+-            handleNext();
+-          }}
+-          onNavigate={(destinationUnitId) => {
+-            logEvent('edx.ui.lms.sequence.tab_selected', 'top', destinationUnitId);
+-            handleNavigate(destinationUnitId);
+-          }}
+-          previousSequenceHandler={() => {
+-            logEvent('edx.ui.lms.sequence.previous_selected', 'top');
+-            handlePrevious();
+-          }}
+-        />
+-        <div className="unit-container flex-grow-1">
+-          {gated && (
+-            <Suspense
+-              fallback={(
+-                <PageLoading
+-                  srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
++      <div className="sequence-container">
++        <div className="sequence">
++          <SequenceNavigation
++            sequenceId={sequenceId}
++            unitId={unitId}
++            className="mb-4"
++            nextSequenceHandler={() => {
++              logEvent('edx.ui.lms.sequence.next_selected', 'top');
++              handleNext();
++            }}
++            onNavigate={(destinationUnitId) => {
++              logEvent('edx.ui.lms.sequence.tab_selected', 'top', destinationUnitId);
++              handleNavigate(destinationUnitId);
++            }}
++            previousSequenceHandler={() => {
++              logEvent('edx.ui.lms.sequence.previous_selected', 'top');
++              handlePrevious();
++            }}
++          />
++          <div className="unit-container flex-grow-1">
++            {gated && (
++              <Suspense
++                fallback={(
++                  <PageLoading
++                    srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
++                  />
++                )}
++              >
++                <ContentLock
++                  courseId={courseId}
++                  sequenceTitle={sequence.title}
++                  prereqSectionName={sequence.gatedContent.gatedSectionName}
++                  prereqId={sequence.gatedContent.prereqId}
+                 />
+-              )}
+-            >
+-              <ContentLock
+-                courseId={courseId}
+-                sequenceTitle={sequence.title}
+-                prereqSectionName={sequence.gatedContent.gatedSectionName}
+-                prereqId={sequence.gatedContent.prereqId}
++              </Suspense>
++            )}
++            {!gated && unitId !== null && (
++              <Unit
++                key={unitId}
++                id={unitId}
++                onLoaded={handleUnitLoaded}
+               />
+-            </Suspense>
+-          )}
+-          {!gated && unitId !== null && (
+-            <Unit
+-              key={unitId}
+-              id={unitId}
+-              onLoaded={handleUnitLoaded}
+-            />
+-          )}
+-          {unitHasLoaded && (
+-            <UnitNavigation
+-              sequenceId={sequenceId}
+-              unitId={unitId}
+-              onClickPrevious={() => {
+-                logEvent('edx.ui.lms.sequence.previous_selected', 'bottom');
+-                handlePrevious();
+-              }}
+-              onClickNext={() => {
+-                logEvent('edx.ui.lms.sequence.next_selected', 'bottom');
+-                handleNext();
+-              }}
+-            />
+-          )}
++            )}
++            {unitHasLoaded && (
++              <UnitNavigation
++                sequenceId={sequenceId}
++                unitId={unitId}
++                onClickPrevious={() => {
++                  logEvent('edx.ui.lms.sequence.previous_selected', 'bottom');
++                  handlePrevious();
++                }}
++                onClickNext={() => {
++                  logEvent('edx.ui.lms.sequence.next_selected', 'bottom');
++                  handleNext();
++                }}
++              />
++            )}
++          </div>
+         </div>
+       </div>
+     );
+-- 
+2.34.1
+

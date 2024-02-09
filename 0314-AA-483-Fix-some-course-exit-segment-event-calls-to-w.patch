@@ -1,0 +1,84 @@
+From 654fd4c35c8019daac01438b276dfc45916f6c56 Mon Sep 17 00:00:00 2001
+From: Michael Terry <mterry@edx.org>
+Date: Fri, 4 Dec 2020 10:33:45 -0500
+Subject: [PATCH 0314/1021] AA-483: Fix some course exit segment event calls to
+ work again (#288)
+
+---
+ src/courseware/course/course-exit/CourseCelebration.jsx | 6 +++---
+ src/courseware/course/course-exit/CourseNonPassing.jsx  | 2 +-
+ src/courseware/course/course-exit/UpgradeFootnote.jsx   | 4 +++-
+ 3 files changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/src/courseware/course/course-exit/CourseCelebration.jsx b/src/courseware/course/course-exit/CourseCelebration.jsx
+index 7ec8815..953716f 100644
+--- a/src/courseware/course/course-exit/CourseCelebration.jsx
++++ b/src/courseware/course/course-exit/CourseCelebration.jsx
+@@ -269,7 +269,7 @@ function CourseCelebration({ intl }) {
+                   className={buttonBackground}
+                   variant={buttonVariant}
+                   onClick={() => {
+-                    logClick(courseId, administrator, buttonEvent);
++                    logClick(org, courseId, administrator, buttonEvent);
+                     dispatch(requestCert(courseId));
+                   }}
+                 >
+@@ -280,7 +280,7 @@ function CourseCelebration({ intl }) {
+                 <Button
+                   className="mr-3 mb-2 mb-sm-0"
+                   href={linkedinAddToProfileUrl}
+-                  onClick={() => logClick(courseId, administrator, 'linkedin_add_to_profile')}
++                  onClick={() => logClick(org, courseId, administrator, 'linkedin_add_to_profile')}
+                   style={{ backgroundColor: LINKEDIN_BLUE, padding: '0.25rem 1.25rem 0.25rem 0.5rem' }}
+                 >
+                   <LinkedinIcon bgStyle={{ fill: 'white' }} className="mr-2" iconFillColor={LINKEDIN_BLUE} round size={24} />
+@@ -292,7 +292,7 @@ function CourseCelebration({ intl }) {
+                   className={`${buttonBackground} mb-2 mb-sm-0`}
+                   variant={buttonVariant}
+                   href={buttonLocation}
+-                  onClick={() => logClick(courseId, administrator, buttonEvent)}
++                  onClick={() => logClick(org, courseId, administrator, buttonEvent)}
+                 >
+                   {buttonText}
+                 </Button>
+diff --git a/src/courseware/course/course-exit/CourseNonPassing.jsx b/src/courseware/course/course-exit/CourseNonPassing.jsx
+index 3de29b6..4a5da53 100644
+--- a/src/courseware/course/course-exit/CourseNonPassing.jsx
++++ b/src/courseware/course/course-exit/CourseNonPassing.jsx
+@@ -41,7 +41,7 @@ function CourseNonPassing({ intl }) {
+                 variant="primary"
+                 className="flex-shrink-0 mt-3 mt-sm-0 mb-1 mb-sm-0 ml-2 ml-sm-5"
+                 href={progressLink}
+-                onClick={() => logClick(courseId, administrator, 'view_grades')}
++                onClick={() => logClick(org, courseId, administrator, 'view_grades')}
+               >
+                 {intl.formatMessage(messages.viewGradesButton)}
+               </Button>
+diff --git a/src/courseware/course/course-exit/UpgradeFootnote.jsx b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+index 29ff2f0..6d6f0ee 100644
+--- a/src/courseware/course/course-exit/UpgradeFootnote.jsx
++++ b/src/courseware/course/course-exit/UpgradeFootnote.jsx
+@@ -12,9 +12,11 @@ import { faCalendarAlt } from '@fortawesome/free-regular-svg-icons';
+ import Footnote from './Footnote';
+ import { logClick } from './utils';
+ import messages from './messages';
++import { useModel } from '../../../generic/model-store';
+ 
+ function UpgradeFootnote({ deadline, href, intl }) {
+   const { courseId } = useSelector(state => state.courseware);
++  const { org } = useModel('courses', courseId);
+   const { administrator } = getAuthenticatedUser();
+ 
+   const upgradeLink = (
+@@ -22,7 +24,7 @@ function UpgradeFootnote({ deadline, href, intl }) {
+       style={{ textDecoration: 'underline' }}
+       destination={href}
+       className="text-reset"
+-      onClick={() => logClick(courseId, administrator, 'upgrade_footnote')}
++      onClick={() => logClick(org, courseId, administrator, 'upgrade_footnote')}
+     >
+       {intl.formatMessage(messages.upgradeLink)}
+     </Hyperlink>
+-- 
+2.34.1
+

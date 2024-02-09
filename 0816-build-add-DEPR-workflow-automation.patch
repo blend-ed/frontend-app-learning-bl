@@ -1,0 +1,39 @@
+From 832585181384dd6e8afc5b21349e5ee75d1d6cfb Mon Sep 17 00:00:00 2001
+From: Sarina Canelake <sarina@tcril.org>
+Date: Wed, 23 Feb 2022 14:37:35 -0500
+Subject: [PATCH 0816/1021] build: add DEPR workflow automation
+
+---
+ .../add-depr-ticket-to-depr-board.yml         | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 .github/workflows/add-depr-ticket-to-depr-board.yml
+
+diff --git a/.github/workflows/add-depr-ticket-to-depr-board.yml b/.github/workflows/add-depr-ticket-to-depr-board.yml
+new file mode 100644
+index 0000000..73ca4c5
+--- /dev/null
++++ b/.github/workflows/add-depr-ticket-to-depr-board.yml
+@@ -0,0 +1,19 @@
++# Run the workflow that adds new tickets that are either:
++# - labelled "DEPR"
++# - title starts with "[DEPR]"
++# - body starts with "Proposal Date" (this is the first template field)
++# to the org-wide DEPR project board
++
++name: Add newly created DEPR issues to the DEPR project board
++
++on:
++  issues:
++    types: [opened]
++
++jobs:
++  routeissue:
++    uses: openedx/.github/.github/workflows/add-depr-ticket-to-depr-board.yml@master
++    secrets:
++      GITHUB_APP_ID: ${{ secrets.GRAPHQL_AUTH_APP_ID }}
++      GITHUB_APP_PRIVATE_KEY: ${{ secrets.GRAPHQL_AUTH_APP_PEM }}
++      SLACK_BOT_TOKEN: ${{ secrets.SLACK_ISSUE_BOT_TOKEN }}
+\ No newline at end of file
+-- 
+2.34.1
+

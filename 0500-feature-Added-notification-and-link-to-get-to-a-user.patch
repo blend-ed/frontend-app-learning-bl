@@ -1,0 +1,118 @@
+From 1b84930a84b132489692ae8c042b81e9140bc8a7 Mon Sep 17 00:00:00 2001
+From: "Albert (AJ) St. Aubin" <astaubin@edx.org>
+Date: Wed, 16 Jun 2021 11:51:42 -0400
+Subject: [PATCH 0500/1021] feature: Added notification and link to get to a
+ users PDF cert.
+
+This feature will allow users with downloadable PDF certificates to see
+the certificate status alert and then access their certificate on the
+Course Outline page. This should only show once a learner has earned a
+certificate and that certificate is available.
+---
+ .../outline-tab/OutlineTab.test.jsx            |  3 ++-
+ .../CertificateStatusAlert.jsx                 | 11 +++++++++--
+ .../alerts/certificate-status-alert/hooks.js   | 18 ++++++++++++------
+ 3 files changed, 23 insertions(+), 9 deletions(-)
+
+diff --git a/src/course-home/outline-tab/OutlineTab.test.jsx b/src/course-home/outline-tab/OutlineTab.test.jsx
+index f948542..f6b45b3 100644
+--- a/src/course-home/outline-tab/OutlineTab.test.jsx
++++ b/src/course-home/outline-tab/OutlineTab.test.jsx
+@@ -748,7 +748,8 @@ describe('Outline Tab', () => {
+         ],
+       });
+       await fetchAndRender();
+-      expect(screen.queryByText('Congratulations! Your certificate is ready.')).not.toBeInTheDocument();
++      expect(screen.queryByText('Congratulations! Your certificate is ready.')).toBeInTheDocument();
++      expect(screen.queryByRole('link', { name: 'Download my certificate' })).toBeInTheDocument();
+     });
+   });
+ 
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+index 8063eaa..ea993e1 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/CertificateStatusAlert.jsx
+@@ -23,6 +23,7 @@ function CertificateStatusAlert({ intl, payload }) {
+     certStatusType,
+     courseEndDate,
+     certURL,
++    isWebCert,
+     userTimezone,
+   } = payload;
+ 
+@@ -35,6 +36,7 @@ function CertificateStatusAlert({ intl, payload }) {
+   let body = '';
+   let buttonVisible = false;
+   let buttonMessage = '';
++
+   if (certStatusType === CERT_STATUS_TYPE.EARNED_NOT_AVAILABLE) {
+     const timezoneFormatArgs = userTimezone ? { timeZone: userTimezone } : {};
+     const certificateAvailableDateFormatted = <FormattedDate value={certificateAvailableDate} day="numeric" month="long" year="numeric" />;
+@@ -57,13 +59,17 @@ function CertificateStatusAlert({ intl, payload }) {
+     );
+   } else if (certStatusType === CERT_STATUS_TYPE.DOWNLOADABLE) {
+     header = intl.formatMessage(certMessages.certStatusDownloadableHeader);
+-    buttonMessage = intl.formatMessage(certStatusMessages.viewableButton);
++    if (isWebCert) {
++      buttonMessage = intl.formatMessage(certStatusMessages.viewableButton);
++    } else {
++      buttonMessage = intl.formatMessage(certStatusMessages.downloadableButton);
++    }
+     buttonVisible = true;
+   }
+   return (
+     <Alert variant={variant}>
+       <div className="row justify-content-between align-items-center">
+-        <div className={buttonVisible ? 'col-lg-8' : 'col-auto'}>
++        <div className={buttonVisible ? '' : 'col-auto'}>
+           <FontAwesomeIcon icon={faCheckCircle} className="alert-icon text-success-500" />
+           <Alert.Heading>{header}</Alert.Heading>
+           {body}
+@@ -90,6 +96,7 @@ CertificateStatusAlert.propTypes = {
+     certStatusType: PropTypes.string,
+     courseEndDate: PropTypes.string,
+     certURL: PropTypes.string,
++    isWebCert: PropTypes.bool,
+     userTimezone: PropTypes.string,
+   }).isRequired,
+ };
+diff --git a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+index 7764fc7..99c6b24 100644
+--- a/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
++++ b/src/course-home/outline-tab/alerts/certificate-status-alert/hooks.js
+@@ -41,20 +41,26 @@ function useCertificateStatusAlert(courseId) {
+   const endBlock = courseDateBlocks.find(b => b.dateType === 'course-end-date');
+ 
+   const certStatusType = verifyCertStatusType(certStatus);
+-  const certURL = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
+-  const hasCertStatus = certStatusType !== '';
+   const isWebCert = downloadUrl === null;
+ 
+-  // only show if there is a known cert status that we want to alert on.
+-  // TODO Temporarily only show this for WebCertificates while we update the messaging
+-  // in follow on work MICROBA-678
+-  const isVisible = isEnrolled && hasCertStatus && isWebCert;
++  let certURL = '';
++  if (certWebViewUrl) {
++    certURL = `${getConfig().LMS_BASE_URL}${certWebViewUrl}`;
++  } else if (downloadUrl) {
++    // PDF Certificate
++    certURL = downloadUrl;
++  }
++  const hasCertStatus = certStatusType !== '';
++
++  // Only show if there is a known cert status that we want provide status on.
++  const isVisible = isEnrolled && hasCertStatus;
+   const payload = {
+     certificateAvailableDate,
+     certURL,
+     certStatusType,
+     courseEndDate: endBlock && endBlock.date,
+     userTimezone,
++    isWebCert,
+   };
+ 
+   useAlert(isVisible, {
+-- 
+2.34.1
+

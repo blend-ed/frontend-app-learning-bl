@@ -1,0 +1,136 @@
+From ed2a14de959dc5640c415b4b9c03c6db4f036859 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Wed, 15 Jan 2020 14:10:14 -0500
+Subject: [PATCH 0040/1021] Sequence level messaging works from bannerText.
+
+---
+ .../course/SequenceContainer.jsx              | 23 ++++++++++++++++++-
+ src/learning-sequence/sequence/Sequence.jsx   |  2 ++
+ src/user-messages/AlertList.jsx               |  7 +++++-
+ src/user-messages/UserMessagesProvider.jsx    | 21 ++++++++---------
+ 4 files changed, 39 insertions(+), 14 deletions(-)
+
+diff --git a/src/learning-sequence/course/SequenceContainer.jsx b/src/learning-sequence/course/SequenceContainer.jsx
+index b3b8853..2f1ee10 100644
+--- a/src/learning-sequence/course/SequenceContainer.jsx
++++ b/src/learning-sequence/course/SequenceContainer.jsx
+@@ -1,5 +1,5 @@
+ /* eslint-disable no-plusplus */
+-import React, { useEffect, useState } from 'react';
++import React, { useEffect, useState, useContext } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { history, camelCaseObject, getConfig } from '@edx/frontend-platform';
+@@ -8,6 +8,7 @@ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ import messages from '../messages';
+ import PageLoading from '../PageLoading';
+ import Sequence from '../sequence/Sequence';
++import UserMessagesContext from '../../user-messages/UserMessagesContext';
+ 
+ export async function getSequenceMetadata(courseUsageKey, sequenceId) {
+   const { data } = await getAuthenticatedHttpClient()
+@@ -58,6 +59,26 @@ function SequenceContainer({
+     }
+   }, [loaded, metadata, unitId]);
+ 
++
++  const { add, remove } = useContext(UserMessagesContext);
++  useEffect(() => {
++    let id = null;
++    if (metadata && metadata.bannerText) {
++      id = add({
++        code: null,
++        dismissible: false,
++        text: metadata.bannerText,
++        type: 'info',
++        topic: 'sequence',
++      });
++    }
++    return () => {
++      if (id) {
++        remove(id);
++      }
++    };
++  }, [metadata]);
++
+   // Exam redirect
+   useEffect(() => {
+     if (metadata && models) {
+diff --git a/src/learning-sequence/sequence/Sequence.jsx b/src/learning-sequence/sequence/Sequence.jsx
+index a935f72..e0d74fe 100644
+--- a/src/learning-sequence/sequence/Sequence.jsx
++++ b/src/learning-sequence/sequence/Sequence.jsx
+@@ -8,6 +8,7 @@ import SequenceNavigation from './SequenceNavigation';
+ import PageLoading from '../PageLoading';
+ import { getBlockCompletion, saveSequencePosition } from './api';
+ import messages from './messages';
++import AlertList from '../../user-messages/AlertList';
+ 
+ const ContentLock = React.lazy(() => import('./content-lock'));
+ 
+@@ -90,6 +91,7 @@ function Sequence({
+ 
+   return (
+     <div className="d-flex flex-column flex-grow-1">
++      <AlertList topic="sequence" className="mt-3" />
+       <SequenceNavigation
+         onNext={handleNext}
+         onNavigate={handleNavigate}
+diff --git a/src/user-messages/AlertList.jsx b/src/user-messages/AlertList.jsx
+index 3b398ec..ab5a900 100644
+--- a/src/user-messages/AlertList.jsx
++++ b/src/user-messages/AlertList.jsx
+@@ -7,9 +7,14 @@ import Alert from './Alert';
+ export default function AlertList({ topic, className }) {
+   const { remove, messages } = useContext(UserMessagesContext);
+ 
++  const topicMessages = messages.filter(message => !topic || message.topic === topic);
++  if (topicMessages.length === 0) {
++    return null;
++  }
++
+   return (
+     <div className={className}>
+-      {messages.filter(message => !topic || message.topic === topic).map(message => (
++      {topicMessages.map(message => (
+         <Alert
+           key={message.id}
+           type={message.type}
+diff --git a/src/user-messages/UserMessagesProvider.jsx b/src/user-messages/UserMessagesProvider.jsx
+index 1129c57..f0c8dbc 100644
+--- a/src/user-messages/UserMessagesProvider.jsx
++++ b/src/user-messages/UserMessagesProvider.jsx
+@@ -4,21 +4,18 @@ import PropTypes from 'prop-types';
+ import UserMessagesContext from './UserMessagesContext';
+ 
+ export default function UserMessagesProvider({ children }) {
+-  const [messages, setMessages] = useState([
+-    {
+-      code: null,
+-      dismissible: true,
+-      id: 0,
+-      text: 'This is a course level message.',
+-      type: 'info',
+-      topic: 'course',
+-    },
+-  ]);
++  const [messages, setMessages] = useState([]);
+   const [nextId, setNextId] = useState(1);
+ 
+-  const add = (message) => {
+-    setMessages([...messages, { ...message, id: nextId }]);
++  const add = ({
++    code, dismissible, text, type, topic, ...others
++  }) => {
++    const id = nextId;
++    setMessages([...messages, {
++      code, dismissible, text, type, topic, ...others, id,
++    }]);
+     setNextId(nextId + 1);
++    return id;
+   };
+   const remove = id => setMessages(messages.filter(message => message.id !== id));
+ 
+-- 
+2.34.1
+

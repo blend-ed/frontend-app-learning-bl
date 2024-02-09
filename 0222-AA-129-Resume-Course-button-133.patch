@@ -1,0 +1,191 @@
+From d5f9af19543d31a819212cdd6da70b579a9774d4 Mon Sep 17 00:00:00 2001
+From: Carla Duarte <cduarte@edx.org>
+Date: Tue, 11 Aug 2020 11:08:29 -0400
+Subject: [PATCH 0222/1021] AA-129: Resume Course button (#133)
+
+---
+ .../data/__factories__/outlineTabData.factory.js    |  7 ++++++-
+ .../data/__snapshots__/redux.test.js.snap           |  6 +++++-
+ src/course-home/data/api.js                         |  2 ++
+ .../dates-banner/DatesBannerContainer.jsx           |  4 ++--
+ src/course-home/outline-tab/OutlineTab.jsx          | 13 ++++++++++---
+ src/course-home/outline-tab/messages.js             |  4 ++++
+ src/course-home/outline-tab/widgets/CourseDates.jsx |  4 ++--
+ .../outline-tab/widgets/CourseHandouts.jsx          |  2 +-
+ src/course-home/outline-tab/widgets/CourseTools.jsx |  2 +-
+ 9 files changed, 33 insertions(+), 11 deletions(-)
+
+diff --git a/src/course-home/data/__factories__/outlineTabData.factory.js b/src/course-home/data/__factories__/outlineTabData.factory.js
+index a523bb7..4f332c3 100644
+--- a/src/course-home/data/__factories__/outlineTabData.factory.js
++++ b/src/course-home/data/__factories__/outlineTabData.factory.js
+@@ -22,4 +22,9 @@ Factory.define('outlineTabData')
+     extra_text: 'Contact the administrator.',
+   })
+   .attr('handouts_html', [], () => '<ul><li>Handout 1</li></ul>')
+-  .attr('offer_html', [], () => '<div>Great offer here</div>');
++  .attr('offer_html', [], () => '<div>Great offer here</div>')
++  .attr('resume_course', ['host', 'courseId'], (host, courseId) => ({
++    has_visited_course: false,
++    url: `${host}/courses/${courseId}/jump_to/block-v1:edX+Test+Block@12345abcde`,
++  }))
++  .attr('welcome_message_html', [], () => '<p>Welcome to this course!</p>');
+diff --git a/src/course-home/data/__snapshots__/redux.test.js.snap b/src/course-home/data/__snapshots__/redux.test.js.snap
+index 48e6635..8a26fb6 100644
+--- a/src/course-home/data/__snapshots__/redux.test.js.snap
++++ b/src/course-home/data/__snapshots__/redux.test.js.snap
+@@ -211,7 +211,11 @@ Object {
+         "handoutsHtml": "<ul><li>Handout 1</li></ul>",
+         "id": "course-v1:edX+DemoX+Demo_Course_1",
+         "offerHtml": "<div>Great offer here</div>",
+-        "welcomeMessageHtml": undefined,
++        "resumeCourse": Object {
++          "hasVisitedCourse": false,
++          "url": "http://localhost:18000/courses/course-v1:edX+DemoX+Demo_Course/jump_to/block-v1:edX+Test+Block@12345abcde",
++        },
++        "welcomeMessageHtml": "<p>Welcome to this course!</p>",
+       },
+     },
+   },
+diff --git a/src/course-home/data/api.js b/src/course-home/data/api.js
+index 7faffb9..f362a5d 100644
+--- a/src/course-home/data/api.js
++++ b/src/course-home/data/api.js
+@@ -75,6 +75,7 @@ export async function getOutlineTabData(courseId) {
+   const enrollAlert = camelCaseObject(data.enroll_alert);
+   const handoutsHtml = data.handouts_html;
+   const offerHtml = data.offer_html;
++  const resumeCourse = camelCaseObject(data.resume_course);
+   const welcomeMessageHtml = data.welcome_message_html;
+ 
+   return {
+@@ -85,6 +86,7 @@ export async function getOutlineTabData(courseId) {
+     enrollAlert,
+     handoutsHtml,
+     offerHtml,
++    resumeCourse,
+     welcomeMessageHtml,
+   };
+ }
+diff --git a/src/course-home/dates-banner/DatesBannerContainer.jsx b/src/course-home/dates-banner/DatesBannerContainer.jsx
+index ec6fcdf..ce7c6da 100644
+--- a/src/course-home/dates-banner/DatesBannerContainer.jsx
++++ b/src/course-home/dates-banner/DatesBannerContainer.jsx
+@@ -46,12 +46,12 @@ function DatesBannerContainer(props) {
+     {
+       name: 'upgradeToCompleteGradedBanner',
+       shouldDisplay: upgradeToCompleteGraded,
+-      clickHandler: () => window.location.replace(verifiedUpgradeLink),
++      clickHandler: () => global.location.replace(verifiedUpgradeLink),
+     },
+     {
+       name: 'upgradeToResetBanner',
+       shouldDisplay: upgradeToReset,
+-      clickHandler: () => window.location.replace(verifiedUpgradeLink),
++      clickHandler: () => global.location.replace(verifiedUpgradeLink),
+     },
+     {
+       name: 'resetDatesBanner',
+diff --git a/src/course-home/outline-tab/OutlineTab.jsx b/src/course-home/outline-tab/OutlineTab.jsx
+index 25a8136..d249d1a 100644
+--- a/src/course-home/outline-tab/OutlineTab.jsx
++++ b/src/course-home/outline-tab/OutlineTab.jsx
+@@ -1,6 +1,5 @@
+ import React from 'react';
+ import { useSelector } from 'react-redux';
+-import { Button } from '@edx/paragon';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+ import { AlertList } from '../../generic/user-messages';
+@@ -41,6 +40,10 @@ function OutlineTab({ intl }) {
+       sections,
+     },
+     courseExpiredHtml,
++    resumeCourse: {
++      hasVisitedCourse,
++      url: resumeCourseUrl,
++    },
+     offerHtml,
+   } = useModel('outline', courseId);
+ 
+@@ -69,8 +72,12 @@ function OutlineTab({ intl }) {
+         }}
+       />
+       <div className="d-flex justify-content-between mb-3">
+-        <h2>{title}</h2>
+-        <Button className="btn-primary" type="button">{intl.formatMessage(messages.resume)}</Button>
++        <div role="heading" aria-level="1" className="h4">{title}</div>
++        {resumeCourseUrl && (
++          <a className="btn btn-primary" href={resumeCourseUrl}>
++            {hasVisitedCourse ? intl.formatMessage(messages.resume) : intl.formatMessage(messages.start)}
++          </a>
++        )}
+       </div>
+       <div className="row">
+         <div className="col col-8">
+diff --git a/src/course-home/outline-tab/messages.js b/src/course-home/outline-tab/messages.js
+index ee0e019..c914ad0 100644
+--- a/src/course-home/outline-tab/messages.js
++++ b/src/course-home/outline-tab/messages.js
+@@ -17,6 +17,10 @@ const messages = defineMessages({
+     id: 'learning.outline.resume',
+     defaultMessage: 'Resume Course',
+   },
++  start: {
++    id: 'learning.outline.start',
++    defaultMessage: 'Start Course',
++  },
+   tools: {
+     id: 'learning.outline.tools',
+     defaultMessage: 'Course Tools',
+diff --git a/src/course-home/outline-tab/widgets/CourseDates.jsx b/src/course-home/outline-tab/widgets/CourseDates.jsx
+index 33bcae3..2d2c1d7 100644
+--- a/src/course-home/outline-tab/widgets/CourseDates.jsx
++++ b/src/course-home/outline-tab/widgets/CourseDates.jsx
+@@ -14,7 +14,7 @@ function CourseDates({ courseId, intl }) {
+ 
+   return (
+     <section className="mb-3">
+-      <h4>{intl.formatMessage(messages.dates)}</h4>
++      <h2 className="h6">{intl.formatMessage(messages.dates)}</h2>
+       {datesWidget.courseDateBlocks.map((courseDateBlock) => (
+         <DateSummary
+           key={courseDateBlock.title + courseDateBlock.date}
+@@ -22,7 +22,7 @@ function CourseDates({ courseId, intl }) {
+           userTimezone={datesWidget.userTimezone}
+         />
+       ))}
+-      <a className="font-weight-bold" href={datesWidget.datesTabLink}>
++      <a className="font-weight-bold ml-4 pl-2" href={datesWidget.datesTabLink}>
+         {intl.formatMessage(messages.allDates)}
+       </a>
+     </section>
+diff --git a/src/course-home/outline-tab/widgets/CourseHandouts.jsx b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+index 5ed67b0..d709827 100644
+--- a/src/course-home/outline-tab/widgets/CourseHandouts.jsx
++++ b/src/course-home/outline-tab/widgets/CourseHandouts.jsx
+@@ -18,7 +18,7 @@ function CourseHandouts({ courseId, intl }) {
+ 
+   return (
+     <section className="mb-3">
+-      <h4>{intl.formatMessage(messages.handouts)}</h4>
++      <h2 className="h6">{intl.formatMessage(messages.handouts)}</h2>
+       <LmsHtmlFragment
+         html={handoutsHtml}
+         title={intl.formatMessage(messages.handouts)}
+diff --git a/src/course-home/outline-tab/widgets/CourseTools.jsx b/src/course-home/outline-tab/widgets/CourseTools.jsx
+index 24c0a09..b653998 100644
+--- a/src/course-home/outline-tab/widgets/CourseTools.jsx
++++ b/src/course-home/outline-tab/widgets/CourseTools.jsx
+@@ -48,7 +48,7 @@ function CourseTools({ courseId, intl }) {
+ 
+   return (
+     <section className="mb-3">
+-      <h4>{intl.formatMessage(messages.tools)}</h4>
++      <h2 className="h6">{intl.formatMessage(messages.tools)}</h2>
+       {courseTools.map((courseTool) => (
+         <div key={courseTool.analyticsId}>
+           <a href={courseTool.url} onClick={() => logClick(courseTool.analyticsId)}>
+-- 
+2.34.1
+

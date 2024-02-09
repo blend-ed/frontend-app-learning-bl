@@ -1,0 +1,45 @@
+From cf4d63ac994ba54e90b496ccbd2a20269c67f6e5 Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Fri, 17 Jan 2020 13:00:52 -0500
+Subject: [PATCH 0048/1021] =?UTF-8?q?Removing=20stub=20=E2=80=9Cresume=20y?=
+ =?UTF-8?q?our=20last=20course=E2=80=9D=20link=20for=20now.?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Will be added in TNL-7062
+---
+ src/courseware/course/CourseHeader.jsx | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/CourseHeader.jsx b/src/courseware/course/CourseHeader.jsx
+index ee0c59d..aca21bb 100644
+--- a/src/courseware/course/CourseHeader.jsx
++++ b/src/courseware/course/CourseHeader.jsx
+@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
+ import { Dropdown } from '@edx/paragon';
+ import { getConfig } from '@edx/frontend-platform';
+ import { AppContext } from '@edx/frontend-platform/react';
++
+ import logo from './logo.svg';
+ 
+ function LinkedLogo({
+@@ -28,6 +29,7 @@ export default function CourseHeader({
+   courseOrg, courseNumber, courseName,
+ }) {
+   const { authenticatedUser } = useContext(AppContext);
++
+   return (
+     <header className="container-fluid py-2 d-flex align-items-center border-bottom border-primary">
+       <LinkedLogo
+@@ -46,7 +48,6 @@ export default function CourseHeader({
+           {authenticatedUser.username}
+         </Dropdown.Button>
+         <Dropdown.Menu>
+-          <Dropdown.Item href="#">Resume your last course</Dropdown.Item>
+           <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/dashboard`}>Dashboard</Dropdown.Item>
+           <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/u/${authenticatedUser.username}`}>Profile</Dropdown.Item>
+           <Dropdown.Item href={`${getConfig().LMS_BASE_URL}/account/settings`}>Account</Dropdown.Item>
+-- 
+2.34.1
+

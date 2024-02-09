@@ -1,0 +1,90 @@
+From d57dd66dd24c25f054c63f4643aaa9bc3915dc87 Mon Sep 17 00:00:00 2001
+From: Emma <egreen@edx.org>
+Date: Tue, 20 Jul 2021 16:16:37 -0400
+Subject: [PATCH 0546/1021] add edxwelcome code info to unhappy path
+
+---
+ .../UpgradeNotification.jsx                   | 28 +++++++++----------
+ .../UpgradeNotification.test.jsx              | 20 +++++++++++++
+ 2 files changed, 34 insertions(+), 14 deletions(-)
+
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.jsx b/src/generic/upgrade-notification/UpgradeNotification.jsx
+index 2123df5..f7ded3e 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.jsx
+@@ -327,20 +327,6 @@ function UpgradeNotification({
+     const accessExpirationDate = new Date(accessExpiration.expirationDate);
+     const hoursToAccessExpiration = Math.floor((accessExpirationDate - correctedTime) / 1000 / 60 / 60);
+ 
+-    if (offer) { // if there's a first purchase discount, message the code at the bottom
+-      offerCode = (
+-        <div className="text-center discount-info">
+-          <FormattedMessage
+-            id="learning.generic.upgradeNotification.code"
+-            defaultMessage="Use code {code} at checkout"
+-            values={{
+-              code: (<span className="font-weight-bold">{offer.code}</span>),
+-            }}
+-          />
+-        </div>
+-      );
+-    }
+-
+     if (hoursToAccessExpiration >= (7 * 24)) {
+       if (offer) { // countdown to the first purchase discount if there is one
+         const hoursToDiscountExpiration = Math.floor((new Date(offer.expirationDate) - correctedTime) / 1000 / 60 / 60);
+@@ -394,6 +380,20 @@ function UpgradeNotification({
+     upsellMessage = (<UpsellNoFBECardContent />);
+   }
+ 
++  if (offer) { // if there's a first purchase discount, message the code at the bottom
++    offerCode = (
++      <div className="text-center discount-info">
++        <FormattedMessage
++          id="learning.generic.upgradeNotification.code"
++          defaultMessage="Use code {code} at checkout"
++          values={{
++            code: (<span className="font-weight-bold">{offer.code}</span>),
++          }}
++        />
++      </div>
++    );
++  }
++
+   return (
+     <section className={classNames('upgrade-notification small', { 'card mb-4': shouldDisplayBorder })}>
+       <h2 className="h5 upgrade-notification-header" id="outline-sidebar-upgrade-header">
+diff --git a/src/generic/upgrade-notification/UpgradeNotification.test.jsx b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+index 4f82736..e2b1f68 100644
+--- a/src/generic/upgrade-notification/UpgradeNotification.test.jsx
++++ b/src/generic/upgrade-notification/UpgradeNotification.test.jsx
+@@ -54,6 +54,26 @@ describe('Upgrade Notification', () => {
+     expect(screen.getByRole('link', { name: 'Upgrade for $149' })).toBeInTheDocument();
+   });
+ 
++  it('renders non-FBE with a discount properly', async () => {
++    const discountExpirationDate = new Date(dateNow);
++    discountExpirationDate.setDate(discountExpirationDate.getDate() + 6);
++    buildAndRender({
++      offer: {
++        expirationDate: discountExpirationDate.toString(),
++        percentage: 15,
++        code: 'Welcome15',
++        discountedPrice: '$126.65',
++        originalPrice: '$149',
++        upgradeUrl: 'www.exampleUpgradeUrl.com',
++      },
++    });
++    expect(screen.getByRole('heading', { name: 'Pursue a verified certificate' })).toBeInTheDocument();
++    expect(screen.getByText(/Earn a.*?of completion to showcase on your resume/s).textContent).toMatch('Earn a verified certificate of completion to showcase on your resume');
++    expect(screen.getByText(/Support our.*?at edX/s).textContent).toMatch('Support our non-profit mission at edX');
++    expect(screen.getByText(/Upgrade for/).textContent).toMatch('$126.65 ($149)');
++    expect(screen.getByText(/Use code.*?at checkout/s).textContent).toMatch('Use code Welcome15 at checkout');
++  });
++
+   it('renders FBE expiration within an hour properly', async () => {
+     const expirationDate = new Date(dateNow);
+     expirationDate.setMinutes(expirationDate.getMinutes() + 45);
+-- 
+2.34.1
+

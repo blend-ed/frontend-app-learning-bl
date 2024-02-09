@@ -1,0 +1,54 @@
+From 9e0f5d7e2290c46678254fd7ec3705d2d09fe0af Mon Sep 17 00:00:00 2001
+From: Emma Green <emma.green.software@gmail.com>
+Date: Sat, 2 Jan 2021 22:15:16 -0500
+Subject: [PATCH 0356/1021] add black underline when value prop flyover is open
+
+---
+ src/courseware/course/Course.jsx            | 1 +
+ src/courseware/course/CourseBreadcrumbs.jsx | 4 +++-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/courseware/course/Course.jsx b/src/courseware/course/Course.jsx
+index fd4a684..1e58f26 100644
+--- a/src/courseware/course/Course.jsx
++++ b/src/courseware/course/Course.jsx
+@@ -99,6 +99,7 @@ function Course({
+         sequenceId={sequenceId}
+         toggleREV1512Flyover={toggleREV1512Flyover} /* This line should be reverted after REV1512 experiment */
+         REV1512FlyoverEnabled={REV1512FlyoverEnabled} /* This line should be reverted after REV1512 experiment */
++        isREV1512FlyoverVisible={isREV1512FlyoverVisible} /* This line should be reverted after REV1512 experiment */
+       />
+       <AlertList topic="sequence" />
+       <Sequence
+diff --git a/src/courseware/course/CourseBreadcrumbs.jsx b/src/courseware/course/CourseBreadcrumbs.jsx
+index b520da8..ef5f0e3 100644
+--- a/src/courseware/course/CourseBreadcrumbs.jsx
++++ b/src/courseware/course/CourseBreadcrumbs.jsx
+@@ -38,6 +38,7 @@ export default function CourseBreadcrumbs({
+   sequenceId,
+   toggleREV1512Flyover, /* This line should be reverted after the REV1512 experiment */
+   REV1512FlyoverEnabled, /* This line should be reverted after the REV1512 experiment */
++  isREV1512FlyoverVisible, /* This line should be reverted after the REV1512 experiment */
+ }) {
+   const course = useModel('courses', courseId);
+   const sequence = useModel('sequences', sequenceId);
+@@ -90,7 +91,7 @@ export default function CourseBreadcrumbs({
+         <div
+           className="toggleFlyoverButton"
+           aria-hidden="true"
+-          style={{ marginLeft: 'auto', marginTop: '-16px' }}
++          style={{ marginLeft: 'auto', marginTop: '-16px', borderBottom: isREV1512FlyoverVisible() ? '4px solid #00262b' : 'none' }}
+           onClick={() => {
+             toggleREV1512Flyover();
+           }}
+@@ -111,6 +112,7 @@ CourseBreadcrumbs.propTypes = {
+   sequenceId: PropTypes.string,
+   toggleREV1512Flyover: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+   REV1512FlyoverEnabled: PropTypes.bool.isRequired, /* This line should be reverted after the REV1512 experiment */
++  isREV1512FlyoverVisible: PropTypes.func.isRequired, /* This line should be reverted after the REV1512 experiment */
+ };
+ 
+ CourseBreadcrumbs.defaultProps = {
+-- 
+2.34.1
+

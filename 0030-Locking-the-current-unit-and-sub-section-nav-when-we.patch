@@ -1,0 +1,232 @@
+From d097617feb936b9c241698ec89d7de852b490c8c Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Mon, 13 Jan 2020 11:22:30 -0500
+Subject: [PATCH 0030/1021] =?UTF-8?q?Locking=20the=20current=20unit=20and?=
+ =?UTF-8?q?=20sub=20section=20nav=20when=20we=E2=80=99re=20on=20gated=20co?=
+ =?UTF-8?q?ntent.?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Will follow up with a “locked content” UI in the next commit.
+---
+ .../LearningSequencePage.jsx                  |  4 +-
+ src/learning-sequence/data/hooks.js           |  2 +-
+ .../sub-section/SubSection.jsx                | 27 +++++++++----
+ .../sub-section/SubSectionMetadataContext.jsx |  5 +++
+ .../sub-section/SubSectionNavigation.jsx      | 38 +++++++++++++++----
+ .../sub-section/data/hooks.js                 |  2 +-
+ 6 files changed, 58 insertions(+), 20 deletions(-)
+ create mode 100644 src/learning-sequence/sub-section/SubSectionMetadataContext.jsx
+
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+index dd64a1e..d4cbcaa 100644
+--- a/src/learning-sequence/LearningSequencePage.jsx
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -6,7 +6,7 @@ import PageLoading from './PageLoading';
+ import messages from './messages';
+ import CourseBreadcrumbs from './CourseBreadcrumbs';
+ import CourseStructureContext from './CourseStructureContext';
+-import { useCourseStructure } from './data/hooks';
++import { useLoadCourseStructure } from './data/hooks';
+ import SubSection from './sub-section/SubSection';
+ 
+ function LearningSequencePage({ match, intl }) {
+@@ -16,7 +16,7 @@ function LearningSequencePage({ match, intl }) {
+     unitId,
+   } = match.params;
+ 
+-  const { blocks, loaded, courseBlockId } = useCourseStructure(courseId);
++  const { blocks, loaded, courseBlockId } = useLoadCourseStructure(courseId);
+ 
+   return (
+     <main className="container-fluid d-flex flex-column flex-grow-1">
+diff --git a/src/learning-sequence/data/hooks.js b/src/learning-sequence/data/hooks.js
+index 5f6c2c0..1cded51 100644
+--- a/src/learning-sequence/data/hooks.js
++++ b/src/learning-sequence/data/hooks.js
+@@ -18,7 +18,7 @@ export function useBlockAncestry(blockId) {
+   }, [blocks, blockId, loaded]);
+ }
+ 
+-export function useCourseStructure(courseId) {
++export function useLoadCourseStructure(courseId) {
+   const { authenticatedUser } = useContext(AppContext);
+ 
+   const [blocks, setBlocks] = useState(null);
+diff --git a/src/learning-sequence/sub-section/SubSection.jsx b/src/learning-sequence/sub-section/SubSection.jsx
+index 7abe20a..bfcb06b 100644
+--- a/src/learning-sequence/sub-section/SubSection.jsx
++++ b/src/learning-sequence/sub-section/SubSection.jsx
+@@ -4,10 +4,11 @@ import SubSectionNavigation from './SubSectionNavigation';
+ import CourseStructureContext from '../CourseStructureContext';
+ import Unit from './Unit';
+ import {
+-  useSubSectionMetadata,
++  useLoadSubSectionMetadata,
+   useExamRedirect,
+-  usePersistentUnitPosition
++  usePersistentUnitPosition,
+ } from './data/hooks';
++import SubSectionMetadataContext from './SubSectionMetadataContext';
+ 
+ export default function SubSection() {
+   const {
+@@ -16,16 +17,26 @@ export default function SubSection() {
+     unitId,
+     blocks,
+   } = useContext(CourseStructureContext);
+-  const { metadata } = useSubSectionMetadata(courseId, subSectionId);
++  const { metadata } = useLoadSubSectionMetadata(courseId, subSectionId);
+   usePersistentUnitPosition(courseId, subSectionId, unitId, metadata);
++
+   useExamRedirect(metadata, blocks);
+ 
+   const ready = blocks !== null && metadata !== null;
+ 
+-  return ready && (
+-    <section className="d-flex flex-column flex-grow-1">
+-      <SubSectionNavigation />
+-      <Unit id={unitId} unit={blocks[unitId]} />
+-    </section>
++  if (!ready) {
++    return null;
++  }
++
++  const isGated = metadata.gatedContent.gated;
++
++  return (
++    <SubSectionMetadataContext.Provider value={metadata}>
++      <section className="d-flex flex-column flex-grow-1">
++        <SubSectionNavigation />
++        {isGated && <div>This is gated content.</div>}
++        {!isGated && <Unit id={unitId} unit={blocks[unitId]} />}
++      </section>
++    </SubSectionMetadataContext.Provider>
+   );
+ }
+diff --git a/src/learning-sequence/sub-section/SubSectionMetadataContext.jsx b/src/learning-sequence/sub-section/SubSectionMetadataContext.jsx
+new file mode 100644
+index 0000000..1143f82
+--- /dev/null
++++ b/src/learning-sequence/sub-section/SubSectionMetadataContext.jsx
+@@ -0,0 +1,5 @@
++import React from 'react';
++
++const SubSectionMetadataContext = React.createContext({});
++
++export default SubSectionMetadataContext;
+diff --git a/src/learning-sequence/sub-section/SubSectionNavigation.jsx b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+index 3000c4f..677f4d5 100644
+--- a/src/learning-sequence/sub-section/SubSectionNavigation.jsx
++++ b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+@@ -3,10 +3,11 @@ import PropTypes from 'prop-types';
+ import { history } from '@edx/frontend-platform';
+ import { Button } from '@edx/paragon';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+-import { faFilm, faBook, faPencilAlt, faTasks } from '@fortawesome/free-solid-svg-icons';
++import { faFilm, faBook, faPencilAlt, faTasks, faLock } from '@fortawesome/free-solid-svg-icons';
+ 
+-import { useCurrentSubSection, usePreviousUnit, useNextUnit, useCurrentSubSectionUnits, useCurrentUnit } from '../data/hooks';
++import { usePreviousUnit, useNextUnit, useCurrentSubSectionUnits, useCurrentUnit } from '../data/hooks';
+ import CourseStructureContext from '../CourseStructureContext';
++import SubSectionMetadataContext from './SubSectionMetadataContext';
+ 
+ function UnitIcon({ type }) {
+   let icon = null;
+@@ -23,6 +24,9 @@ function UnitIcon({ type }) {
+     case 'problem':
+       icon = faPencilAlt;
+       break;
++    case 'lock':
++      icon = faLock;
++      break;
+     default:
+       icon = faBook;
+   }
+@@ -32,6 +36,10 @@ function UnitIcon({ type }) {
+   );
+ }
+ 
++UnitIcon.propTypes = {
++  type: PropTypes.oneOf(['video', 'other', 'vertical', 'problem', 'lock']).isRequired,
++};
++
+ export default function SubSectionNavigation() {
+   const { courseId } = useContext(CourseStructureContext);
+   const previousUnit = usePreviousUnit();
+@@ -76,12 +84,16 @@ export default function SubSectionNavigation() {
+ function UnitNavigation({ clickHandler }) {
+   const units = useCurrentSubSectionUnits();
+   const currentUnit = useCurrentUnit();
++  const metadata = useContext(SubSectionMetadataContext);
++
++  const isGated = metadata.gatedContent.gated;
+ 
+   return (
+     <div className="btn-group ml-2 mr-2 flex-grow-1 d-flex" role="group">
+-      {units.map(unit => (
++      {!isGated && units.map(unit => (
+         <UnitButton key={unit.id} unit={unit} disabled={unit.id === currentUnit.id} clickHandler={clickHandler} />
+       ))}
++      {isGated && <UnitButton key={currentUnit.id} unit={currentUnit} disabled locked />}
+     </div>
+   );
+ }
+@@ -90,10 +102,14 @@ UnitNavigation.propTypes = {
+   clickHandler: PropTypes.func.isRequired,
+ };
+ 
+-function UnitButton({ unit, disabled, clickHandler }) {
++function UnitButton({
++  unit, disabled, locked, clickHandler,
++}) {
+   const { id, type } = unit;
+   const handleClick = useCallback(() => {
+-    clickHandler(unit);
++    if (clickHandler !== null) {
++      clickHandler(unit);
++    }
+   }, [unit]);
+ 
+   return (
+@@ -103,7 +119,7 @@ function UnitButton({ unit, disabled, clickHandler }) {
+       onClick={handleClick}
+       disabled={disabled}
+     >
+-      <UnitIcon type={type} />
++      <UnitIcon type={locked ? 'lock' : type} />
+     </Button>
+   );
+ }
+@@ -113,6 +129,12 @@ UnitButton.propTypes = {
+     id: PropTypes.string.isRequired,
+     type: PropTypes.oneOf(['video', 'other', 'vertical', 'problem']).isRequired,
+   }).isRequired,
+-  disabled: PropTypes.bool.isRequired,
+-  clickHandler: PropTypes.func.isRequired,
++  disabled: PropTypes.bool.isRequired, // Whether or not the button will function.
++  locked: PropTypes.bool, // Whether the unit is semantically "locked" and unnavigable.
++  clickHandler: PropTypes.func,
++};
++
++UnitButton.defaultProps = {
++  clickHandler: null,
++  locked: false,
+ };
+diff --git a/src/learning-sequence/sub-section/data/hooks.js b/src/learning-sequence/sub-section/data/hooks.js
+index 19f47c0..716d041 100644
+--- a/src/learning-sequence/sub-section/data/hooks.js
++++ b/src/learning-sequence/sub-section/data/hooks.js
+@@ -3,7 +3,7 @@ import { camelCaseObject } from '@edx/frontend-platform';
+ 
+ import { getSubSectionMetadata, saveSubSectionPosition } from './api';
+ 
+-export function useSubSectionMetadata(courseId, subSectionId) {
++export function useLoadSubSectionMetadata(courseId, subSectionId) {
+   const [metadata, setMetadata] = useState(null);
+   const [loaded, setLoaded] = useState(false);
+ 
+-- 
+2.34.1
+

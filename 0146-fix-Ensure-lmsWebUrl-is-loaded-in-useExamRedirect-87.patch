@@ -1,0 +1,34 @@
+From eb8c97ee861f109bb3f2f9a9eab2dd9d79cf886b Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Wed, 17 Jun 2020 14:07:14 -0400
+Subject: [PATCH 0146/1021] fix: Ensure lmsWebUrl is loaded in useExamRedirect
+ (#87)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The sequence.lmsWebUrl variable is loaded as part of the course blocks API.  The status of that API’s request is stored in courseStatus.
+
+The useEffect hook in useExamRedirect didn’t ensure that courseStatus was equal to “loaded”.  This meant that if the sequence loaded first, it might attempt to redirect to sequence.lmsWebUrl even though that variable is still undefined.
+
+When global.location.assign() is given `undefined` as a value, it tacks it onto the end of the URL and calls it a day.  After that, we’ve got a badly formed URL.
+---
+ src/courseware/CoursewareContainer.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 488edaa..93d3376 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -89,7 +89,7 @@ function useExamRedirect(sequenceId) {
+   const sequence = useModel('sequences', sequenceId);
+   const sequenceStatus = useSelector(state => state.courseware.sequenceStatus);
+   useEffect(() => {
+-    if (sequenceStatus === 'loaded' && sequence.isTimeLimited) {
++    if (sequenceStatus === 'loaded' && sequence.isTimeLimited && sequence.lmsWebUrl !== undefined) {
+       global.location.assign(sequence.lmsWebUrl);
+     }
+   }, [sequenceStatus, sequence]);
+-- 
+2.34.1
+

@@ -1,0 +1,33 @@
+From b444d677b7bcb61951157c32c9edb0b9d1ee6b29 Mon Sep 17 00:00:00 2001
+From: Ghassan Maslamani <ghassan.maslamani@gmail.com>
+Date: Mon, 28 Mar 2022 12:28:23 +0300
+Subject: [PATCH 0874/1021] fix: import i18n messages from header for learning
+ to consume   It just makes the learning consume the i18n of the header, as  
+ otherwise the learning would show the deafult messages of the   header.
+
+---
+ src/index.jsx | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/index.jsx b/src/index.jsx
+index 85f8368..eef01fb 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -11,6 +11,7 @@ import ReactDOM from 'react-dom';
+ import { Switch } from 'react-router-dom';
+ 
+ import { messages as footerMessages } from '@edx/frontend-component-footer';
++import { messages as headerMessages } from '@edx/frontend-component-header';
+ 
+ import appMessages from './i18n';
+ import { UserMessagesProvider } from './generic/user-messages';
+@@ -120,5 +121,6 @@ initialize({
+   messages: [
+     appMessages,
+     footerMessages,
++    headerMessages,
+   ],
+ });
+-- 
+2.34.1
+

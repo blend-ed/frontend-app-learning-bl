@@ -1,0 +1,1424 @@
+From 89830af45a405bd4ce0b893b9841dd871e1ea71b Mon Sep 17 00:00:00 2001
+From: David Joy <djoy@edx.org>
+Date: Tue, 14 Jan 2020 17:11:03 -0500
+Subject: [PATCH 0032/1021] Refactoring to use containers and components
+
+---
+ .../0002-courseware-component-hierarchy.md    |  16 ++
+ src/index.jsx                                 |   6 +-
+ src/learning-sequence/CourseContainer.jsx     |  50 +++++
+ .../LearningSequencePage.jsx                  |  59 +++---
+ src/learning-sequence/course/Course.jsx       |  77 ++++++++
+ .../{ => course}/CourseBreadcrumbs.jsx        |  30 ++-
+ .../course/SequenceContainer.jsx              | 107 +++++++++++
+ .../{sub-section/data => course}/api.js       |  12 +-
+ .../{sub-section/data => course}/hooks.js     |  36 ++--
+ src/learning-sequence/data/api.js             |   7 +
+ src/learning-sequence/data/hooks.js           |  75 ++++----
+ src/learning-sequence/data/utils.js           |   8 +-
+ .../sequence/CompleteIcon.jsx                 |   7 +
+ src/learning-sequence/sequence/Sequence.jsx   | 173 ++++++++++++++++++
+ .../sequence/SequenceNavigation.jsx           |  35 ++++
+ src/learning-sequence/sequence/Unit.jsx       |  22 +++
+ src/learning-sequence/sequence/UnitButton.jsx |  30 +++
+ src/learning-sequence/sequence/UnitIcon.jsx   |  35 ++++
+ src/learning-sequence/sequence/api.js         |  50 +++++
+ .../content-lock/ContentLock.jsx              |  21 +--
+ .../content-lock/index.js                     |   0
+ .../content-lock/messages.js                  |   0
+ .../{sub-section => sequence}/messages.js     |   0
+ .../sub-section/SequenceMetadataContext.jsx   |   5 +
+ .../sub-section/SubSection.jsx                |  26 +--
+ .../sub-section/SubSectionMetadataContext.jsx |   5 -
+ .../sub-section/SubSectionNavigation.jsx      |  18 +-
+ 27 files changed, 756 insertions(+), 154 deletions(-)
+ create mode 100644 docs/decisions/0002-courseware-component-hierarchy.md
+ create mode 100644 src/learning-sequence/CourseContainer.jsx
+ create mode 100644 src/learning-sequence/course/Course.jsx
+ rename src/learning-sequence/{ => course}/CourseBreadcrumbs.jsx (62%)
+ create mode 100644 src/learning-sequence/course/SequenceContainer.jsx
+ rename src/learning-sequence/{sub-section/data => course}/api.js (60%)
+ rename src/learning-sequence/{sub-section/data => course}/hooks.js (58%)
+ create mode 100644 src/learning-sequence/sequence/CompleteIcon.jsx
+ create mode 100644 src/learning-sequence/sequence/Sequence.jsx
+ create mode 100644 src/learning-sequence/sequence/SequenceNavigation.jsx
+ create mode 100644 src/learning-sequence/sequence/Unit.jsx
+ create mode 100644 src/learning-sequence/sequence/UnitButton.jsx
+ create mode 100644 src/learning-sequence/sequence/UnitIcon.jsx
+ create mode 100644 src/learning-sequence/sequence/api.js
+ rename src/learning-sequence/{sub-section => sequence}/content-lock/ContentLock.jsx (59%)
+ rename src/learning-sequence/{sub-section => sequence}/content-lock/index.js (100%)
+ rename src/learning-sequence/{sub-section => sequence}/content-lock/messages.js (100%)
+ rename src/learning-sequence/{sub-section => sequence}/messages.js (100%)
+ create mode 100644 src/learning-sequence/sub-section/SequenceMetadataContext.jsx
+ delete mode 100644 src/learning-sequence/sub-section/SubSectionMetadataContext.jsx
+
+diff --git a/docs/decisions/0002-courseware-component-hierarchy.md b/docs/decisions/0002-courseware-component-hierarchy.md
+new file mode 100644
+index 0000000..69cd273
+--- /dev/null
++++ b/docs/decisions/0002-courseware-component-hierarchy.md
+@@ -0,0 +1,16 @@
++# Courseware app structure
++
++Currently we have hierarchical courses - they contain sections, subsections, units, and components.
++
++We need data to power each level.
++
++We've made decisions that we're going to re-fetch data at the subsection level under the assumption that
++
++At any given level, you have the following structure:
++
++Parent
++  Container
++    Child
++      Context
++
++    The container belongs to the parent module, and is an opportunity for the parent to decide to load more data necessary to load the Child.  If the parent has what it needs, it may not use a Container.  The Child has an props-only interface.  It does _not_ use contexts or redux from the Parent.  The child may decide to use a Context internally if that's convenient, but that's a decision independent of anything above the Child in the hierarchy.
+diff --git a/src/index.jsx b/src/index.jsx
+index c6a1114..f9fdda3 100755
+--- a/src/index.jsx
++++ b/src/index.jsx
+@@ -31,9 +31,9 @@ subscribe(APP_READY, () => {
+           path="/"
+           render={() => <Link to="/course/course-v1%3AedX%2BDemoX%2BDemo_Course/block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction/block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0270f6de40fc">Visit Demo Course</Link>}
+         />
+-        <Route path="/course/:courseId/:subSectionId/:unitId" component={LearningSequencePage} />
+-        <Route path="/course/:courseId/:subSectionId" component={LearningSequencePage} />
+-        <Route path="/course/:courseId" component={LearningSequencePage} />
++        <Route path="/course/:courseUsageKey/:sequenceId/:unitId" component={LearningSequencePage} />
++        <Route path="/course/:courseUsageKey/:sequenceId" component={LearningSequencePage} />
++        <Route path="/course/:courseUsageKey" component={LearningSequencePage} />
+       </Switch>
+       <Footer />
+     </AppProvider>,
+diff --git a/src/learning-sequence/CourseContainer.jsx b/src/learning-sequence/CourseContainer.jsx
+new file mode 100644
+index 0000000..3eaa19f
+--- /dev/null
++++ b/src/learning-sequence/CourseContainer.jsx
+@@ -0,0 +1,50 @@
++import React, { useEffect } from 'react';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import { useLoadCourseStructure } from './data/hooks';
++import messages from './messages';
++import PageLoading from './PageLoading';
++import Course from './course/Course';
++import { history } from '@edx/frontend-platform';
++
++function CourseContainer({
++  courseUsageKey, sequenceId, unitId, intl,
++}) {
++  const { blocks, loaded, courseId } = useLoadCourseStructure(courseUsageKey);
++
++  useEffect(() => {
++    if (!sequenceId) {
++      // TODO: This will not work right now.
++      const { activeSequenceId } = blocks[courseId];
++      history.push(`/course/${courseUsageKey}/${activeSequenceId}`);
++    }
++  }, [courseUsageKey, courseId, sequenceId]);
++
++  if (!loaded || !sequenceId) {
++    return (
++      <PageLoading
++        srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++      />
++    );
++  }
++
++  return (
++    <Course
++      courseUsageKey={courseUsageKey}
++      courseId={courseId}
++      sequenceId={sequenceId}
++      unitId={unitId}
++      models={blocks}
++    />
++  );
++}
++
++CourseContainer.propTypes = {
++  courseUsageKey: PropTypes.string.isRequired,
++  sequenceId: PropTypes.string,
++  unitId: PropTypes.string,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(CourseContainer);
+diff --git a/src/learning-sequence/LearningSequencePage.jsx b/src/learning-sequence/LearningSequencePage.jsx
+index de5e84e..35323eb 100644
+--- a/src/learning-sequence/LearningSequencePage.jsx
++++ b/src/learning-sequence/LearningSequencePage.jsx
+@@ -2,45 +2,40 @@ import React, { useEffect } from 'react';
+ import PropTypes from 'prop-types';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+-import PageLoading from './PageLoading';
+-import messages from './messages';
+-import CourseBreadcrumbs from './CourseBreadcrumbs';
+-import CourseStructureContext from './CourseStructureContext';
+-import { useLoadCourseStructure, useMissingSubSectionRedirect } from './data/hooks';
+-import SubSection from './sub-section/SubSection';
+-import { history } from '@edx/frontend-platform';
++import CourseContainer from './CourseContainer';
+ 
+ function LearningSequencePage({ match, intl }) {
+   const {
+-    courseId,
+-    subSectionId,
++    courseUsageKey,
++    sequenceId,
+     unitId,
+   } = match.params;
+ 
+-  const { blocks, loaded, courseBlockId } = useLoadCourseStructure(courseId);
++  // const { blocks, loaded, courseId } = useLoadCourseStructure(courseId);
+ 
+-  useMissingSubSectionRedirect(loaded, blocks, courseId, courseBlockId, subSectionId);
++  // useMissingSequenceRedirect(loaded, blocks, courseId, courseId, sequenceId);
+ 
+   return (
+-    <main className="container-fluid d-flex flex-column flex-grow-1">
+-      <CourseStructureContext.Provider value={{
+-          courseId,
+-          courseBlockId,
+-          subSectionId,
+-          unitId,
+-          blocks,
+-          loaded,
+-        }}
+-      >
+-        {!loaded && <PageLoading
+-          srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
+-        />}
+-
+-        {loaded && unitId && <CourseBreadcrumbs />}
+-        {subSectionId && <SubSection />}
+-      </CourseStructureContext.Provider>
+-
+-    </main>
++    <CourseContainer courseUsageKey={courseUsageKey} sequenceId={sequenceId} unitId={unitId} />
++    // <main className="container-fluid d-flex flex-column flex-grow-1">
++    //   <CourseStructureContext.Provider value={{
++    //       courseId,
++    //       courseId,
++    //       sequenceId,
++    //       unitId,
++    //       blocks,
++    //       loaded,
++    //     }}
++    //   >
++    //     {!loaded && <PageLoading
++    //       srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++    //     />}
++
++  //     {loaded && unitId && <CourseBreadcrumbs />}
++  //     {sequenceId && <Sequence />}
++  //   </CourseStructureContext.Provider>
++
++  // </main>
+   );
+ }
+ 
+@@ -49,8 +44,8 @@ export default injectIntl(LearningSequencePage);
+ LearningSequencePage.propTypes = {
+   match: PropTypes.shape({
+     params: PropTypes.shape({
+-      courseId: PropTypes.string.isRequired,
+-      subSectionId: PropTypes.string,
++      courseUsageKey: PropTypes.string.isRequired,
++      sequenceId: PropTypes.string,
+       unitId: PropTypes.string,
+     }).isRequired,
+   }).isRequired,
+diff --git a/src/learning-sequence/course/Course.jsx b/src/learning-sequence/course/Course.jsx
+new file mode 100644
+index 0000000..4246ebc
+--- /dev/null
++++ b/src/learning-sequence/course/Course.jsx
+@@ -0,0 +1,77 @@
++import React, { useMemo, useCallback } from 'react';
++import PropTypes from 'prop-types';
++import { getConfig, history } from '@edx/frontend-platform';
++
++import CourseBreadcrumbs from './CourseBreadcrumbs';
++import SequenceContainer from './SequenceContainer';
++import { createSequenceIdList } from '../data/utils';
++
++export default function Course({
++  courseUsageKey, courseId, sequenceId, unitId, models,
++}) {
++  const breadcrumbs = useMemo(() => {
++    const sectionId = models[sequenceId].parentId;
++    // TODO: Add unit ID back in here if it exists
++    return [courseId, sectionId, sequenceId].map((nodeId) => {
++      const node = models[nodeId];
++      return {
++        id: node.id,
++        label: node.displayName,
++        url: `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/course/#${node.id}`,
++      };
++    });
++  }, [courseUsageKey, courseId, sequenceId, unitId, models]);
++
++  const nextSequenceHandler = useCallback(() => {
++    const sequenceIds = createSequenceIdList(models, courseId);
++    const currentIndex = sequenceIds.indexOf(sequenceId);
++    if (currentIndex < sequenceIds.length - 1) {
++      const nextSequenceId = sequenceIds[currentIndex + 1];
++      const nextSequence = models[nextSequenceId];
++      const nextUnitId = nextSequence.children[0];
++      history.push(`/course/${courseUsageKey}/${nextSequenceId}/${nextUnitId}`);
++    }
++  });
++
++  const previousSequenceHandler = useCallback(() => {
++    const sequenceIds = createSequenceIdList(models, courseId);
++    const currentIndex = sequenceIds.indexOf(sequenceId);
++    if (currentIndex > 0) {
++      const previousSequenceId = sequenceIds[currentIndex - 1];
++      const previousSequence = models[previousSequenceId];
++      const previousUnitId = previousSequence.children[previousSequence.children.length - 1];
++      history.push(`/course/${courseUsageKey}/${previousSequenceId}/${previousUnitId}`);
++    }
++  });
++
++  return (
++    <main className="container-fluid d-flex flex-column flex-grow-1">
++      <CourseBreadcrumbs links={breadcrumbs} />
++      <SequenceContainer
++        key={sequenceId}
++        courseUsageKey={courseUsageKey}
++        courseId={courseId}
++        sequenceId={sequenceId}
++        unitId={unitId}
++        onNext={nextSequenceHandler}
++        onPrevious={previousSequenceHandler}
++      />
++    </main>
++  );
++}
++
++Course.propTypes = {
++  courseUsageKey: PropTypes.string.isRequired,
++  courseId: PropTypes.string.isRequired,
++  sequenceId: PropTypes.string.isRequired,
++  unitId: PropTypes.string,
++  models: PropTypes.objectOf(PropTypes.shape({
++    id: PropTypes.string.isRequired,
++    displayName: PropTypes.string.isRequired,
++  })).isRequired,
++};
++
++Course.defaultProps = {
++  sequenceId: null,
++  unitId: null,
++};
+diff --git a/src/learning-sequence/CourseBreadcrumbs.jsx b/src/learning-sequence/course/CourseBreadcrumbs.jsx
+similarity index 62%
+rename from src/learning-sequence/CourseBreadcrumbs.jsx
+rename to src/learning-sequence/course/CourseBreadcrumbs.jsx
+index 7a0115e..5ee1da5 100644
+--- a/src/learning-sequence/CourseBreadcrumbs.jsx
++++ b/src/learning-sequence/course/CourseBreadcrumbs.jsx
+@@ -1,36 +1,28 @@
+-import React, { useContext } from 'react';
++import React from 'react';
+ import PropTypes from 'prop-types';
+ 
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
+-import { getConfig } from '@edx/frontend-platform';
+-
+-import CourseStructureContext from './CourseStructureContext';
+-import { useBlockAncestry } from './data/hooks';
+-
+-const CourseBreadcrumbs = () => {
+-  const { courseId, unitId } = useContext(CourseStructureContext);
+-
+-  const ancestry = useBlockAncestry(unitId);
+-
+-  const links = ancestry.map(ancestor => ({
+-    id: ancestor.id,
+-    label: ancestor.displayName,
+-    url: `${getConfig().LMS_BASE_URL}/courses/${courseId}/course/#${ancestor.id}`,
+-  }));
+ 
++export default function CourseBreadcrumbs({ links }) {
+   return (
+     <nav aria-label="breadcrumb">
+       <ol className="list-inline">
+         {links.map(({ id, url, label }, i) => (
+           <CourseBreadcrumb key={id} url={url} label={label} last={i === links.length - 1} />
+-        ))}
++          ))}
+       </ol>
+     </nav>
+   );
+-};
++}
+ 
+-export default CourseBreadcrumbs;
++CourseBreadcrumbs.propTypes = {
++  links: PropTypes.arrayOf(PropTypes.shape({
++    id: PropTypes.string.isRequired,
++    label: PropTypes.string.isRequired,
++    url: PropTypes.string.isRequired,
++  })).isRequired,
++};
+ 
+ function CourseBreadcrumb({ url, label, last }) {
+   return (
+diff --git a/src/learning-sequence/course/SequenceContainer.jsx b/src/learning-sequence/course/SequenceContainer.jsx
+new file mode 100644
+index 0000000..0aa956b
+--- /dev/null
++++ b/src/learning-sequence/course/SequenceContainer.jsx
+@@ -0,0 +1,107 @@
++import React, { useEffect } from 'react';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++import { history } from '@edx/frontend-platform';
++
++import { useLoadSequenceMetadata } from './hooks';
++import messages from '../messages';
++import PageLoading from '../PageLoading';
++import Sequence from '../sequence/Sequence';
++
++/*
++elementId: "edx_introduction"
++bannerText: null
++displayName: "Demo Course Overview"
++items: Array(1)
++0:
++path: "Introduction > Demo Course Overview > Introduction: Video and Sequences"
++href: ""
++type: "video"
++content: ""
++graded: false
++pageTitle: "Introduction: Video and Sequences"
++bookmarked: false
++id: "block-v1:edX+DemoX+Demo_Course+type@vertical+block@vertical_0270f6de40fc"
++complete: null
++__proto__: Object
++length: 1
++__proto__: Array(0)
++savePosition: true
++isTimeLimited: false
++gatedContent: {gatedSectionName: "Demo Course Overview", prereqUrl: null, prereqSectionName: null, gated: false, prereqId: null}
++excludeUnits: true
++tag: "sequential"
++position: 1
++showCompletion: true
++itemId: "block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction"
++ajaxUrl: "/courses/course-v1:edX+DemoX+Demo_Course/xblock/block-v1:edX+DemoX+Demo_Course+type@sequential+block@edx_introduction/handler/xmodule_handler"
++nextUrl: null
++prevUrl: null
++*/
++
++function SequenceContainer({
++  courseUsageKey, courseId, sequenceId, unitId, intl, onNext, onPrevious,
++}) {
++  const { metadata, loaded, units } = useLoadSequenceMetadata(courseUsageKey, sequenceId);
++  console.log(units);
++  useEffect(() => {
++    if (loaded && !unitId) {
++      const position = metadata.position - 1;
++      const nextUnitId = metadata.items[position].id;
++      history.push(`/course/${courseUsageKey}/${sequenceId}/${nextUnitId}`);
++    }
++  }, [loaded, metadata, unitId]);
++
++  console.log(metadata);
++  if (!loaded || !unitId) {
++    return (
++      <PageLoading
++        srMessage={intl.formatMessage(messages['learn.loading.learning.sequence'])}
++      />
++    );
++  }
++
++  const {
++    displayName,
++    showCompletion,
++    isTimeLimited,
++    savePosition,
++    bannerText,
++    gatedContent,
++  } = metadata;
++
++  const prerequisite = {
++    id: gatedContent.prereqId,
++    name: gatedContent.gatedSectionName,
++  };
++
++  return (
++    <Sequence
++      id={sequenceId}
++      courseUsageKey={courseUsageKey}
++      courseId={courseId}
++      unitIds={metadata.items.map(item => item.id)}
++      units={units}
++      displayName={displayName}
++      activeUnitId={unitId}
++      showCompletion={showCompletion}
++      isTimeLimited={isTimeLimited}
++      isGated={gatedContent.gated}
++      savePosition={savePosition}
++      bannerText={bannerText}
++      onNext={onNext}
++      onPrevious={onPrevious}
++      onNavigateUnit={() => console.log('hah2')}
++      prerequisite={prerequisite}
++    />
++  );
++}
++
++SequenceContainer.propTypes = {
++  courseId: PropTypes.string.isRequired,
++  sequenceId: PropTypes.string.isRequired,
++  unitId: PropTypes.string.isRequired,
++  intl: intlShape.isRequired,
++};
++
++export default injectIntl(SequenceContainer);
+diff --git a/src/learning-sequence/sub-section/data/api.js b/src/learning-sequence/course/api.js
+similarity index 60%
+rename from src/learning-sequence/sub-section/data/api.js
+rename to src/learning-sequence/course/api.js
+index 5ca1cbe..ac1f630 100644
+--- a/src/learning-sequence/sub-section/data/api.js
++++ b/src/learning-sequence/course/api.js
+@@ -3,17 +3,17 @@ import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+ 
+ /* eslint-disable import/prefer-default-export */
+ 
+-const getSubSectionXModuleHandlerUrl = (courseId, subSectionId) =>
+-  `${getConfig().LMS_BASE_URL}/courses/${courseId}/xblock/${subSectionId}/handler/xmodule_handler`;
++const getSequenceXModuleHandlerUrl = (courseUsageKey, sequenceId) =>
++  `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/xblock/${sequenceId}/handler/xmodule_handler`;
+ 
+-export async function getSubSectionMetadata(courseId, subSectionId) {
++export async function getSequenceMetadata(courseUsageKey, sequenceId) {
+   const { data } = await getAuthenticatedHttpClient()
+-    .get(`${getSubSectionXModuleHandlerUrl(courseId, subSectionId)}/metadata`, {});
++    .get(`${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/metadata`, {});
+ 
+   return data;
+ }
+ 
+-export async function saveSubSectionPosition(courseId, subSectionId, position) {
++export async function saveSequencePosition(courseUsageKey, sequenceId, position) {
+   // Post data sent to this endpoint must be url encoded
+   // TODO: Remove the need for this to be the case.
+   // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
+@@ -24,7 +24,7 @@ export async function saveSubSectionPosition(courseId, subSectionId, position) {
+   };
+ 
+   const { data } = await getAuthenticatedHttpClient().post(
+-    `${getSubSectionXModuleHandlerUrl(courseId, subSectionId)}/goto_position`,
++    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/goto_position`,
+     urlEncoded.toString(),
+     requestConfig,
+   );
+diff --git a/src/learning-sequence/sub-section/data/hooks.js b/src/learning-sequence/course/hooks.js
+similarity index 58%
+rename from src/learning-sequence/sub-section/data/hooks.js
+rename to src/learning-sequence/course/hooks.js
+index b1e2e2c..0f2df1b 100644
+--- a/src/learning-sequence/sub-section/data/hooks.js
++++ b/src/learning-sequence/course/hooks.js
+@@ -1,24 +1,34 @@
++/* eslint-disable no-plusplus */
+ import { useState, useEffect, useContext } from 'react';
+ import { camelCaseObject, history } from '@edx/frontend-platform';
+ 
+-import { getSubSectionMetadata, saveSubSectionPosition } from './api';
+-import CourseStructureContext from '../../CourseStructureContext';
++import { getSequenceMetadata, saveSequencePosition } from './api';
++import CourseStructureContext from '../CourseStructureContext';
+ 
+-export function useLoadSubSectionMetadata(courseId, subSectionId) {
++export function useLoadSequenceMetadata(courseUsageKey, sequenceId) {
+   const [metadata, setMetadata] = useState(null);
++  const [units, setUnits] = useState(null);
+   const [loaded, setLoaded] = useState(false);
+ 
+   useEffect(() => {
+     setLoaded(false);
+     setMetadata(null);
+-    getSubSectionMetadata(courseId, subSectionId).then((data) => {
++    getSequenceMetadata(courseUsageKey, sequenceId).then((data) => {
++      const unitsMap = {};
++      for (let i = 0; i < data.items.length; i++) {
++        const item = data.items[i];
++        unitsMap[item.id] = camelCaseObject(item);
++      }
++
+       setMetadata(camelCaseObject(data));
++      setUnits(unitsMap);
+       setLoaded(true);
+     });
+-  }, [courseId, subSectionId]);
++  }, [courseUsageKey, sequenceId]);
+ 
+   return {
+     metadata,
++    units,
+     loaded,
+   };
+ }
+@@ -36,15 +46,15 @@ export function useExamRedirect(metadata, blocks) {
+ /**
+  * Save the position of current unit the subsection
+  */
+-export function usePersistentUnitPosition(courseId, subSectionId, unitId, subSectionMetadata) {
++export function usePersistentUnitPosition(courseUsageKey, sequenceId, unitId, sequenceMetadata) {
+   useEffect(() => {
+     // All values must be defined to function
+-    const hasNeededData = courseId && subSectionId && unitId && subSectionMetadata;
++    const hasNeededData = courseUsageKey && sequenceId && unitId && sequenceMetadata;
+     if (!hasNeededData) {
+       return;
+     }
+ 
+-    const { items, savePosition } = subSectionMetadata;
++    const { items, savePosition } = sequenceMetadata;
+ 
+     // A sub-section can individually specify whether positions should be saved
+     if (!savePosition) {
+@@ -58,18 +68,18 @@ export function usePersistentUnitPosition(courseId, subSectionId, unitId, subSec
+ 
+     // TODO: update the local understanding of the position and
+     // don't make requests to update the position if they still match?
+-    saveSubSectionPosition(courseId, subSectionId, newPosition);
+-  }, [courseId, subSectionId, unitId, subSectionMetadata]);
++    saveSequencePosition(courseUsageKey, sequenceId, newPosition);
++  }, [courseUsageKey, sequenceId, unitId, sequenceMetadata]);
+ }
+ 
+ export function useMissingUnitRedirect(metadata, loaded) {
+-  const { courseId, subSectionId, unitId } = useContext(CourseStructureContext);
++  const { courseUsageKey, sequenceId, unitId } = useContext(CourseStructureContext);
+   useEffect(() => {
+-    if (loaded && metadata.itemId === subSectionId && !unitId) {
++    if (loaded && metadata.itemId === sequenceId && !unitId) {
+       // Position comes from the server as a 1-indexed array index.  Convert it to 0-indexed.
+       const position = metadata.position - 1;
+       const nextUnitId = metadata.items[position].id;
+-      history.push(`/course/${courseId}/${subSectionId}/${nextUnitId}`);
++      history.push(`/course/${courseUsageKey}/${sequenceId}/${nextUnitId}`);
+     }
+   }, [loaded, metadata, unitId]);
+ }
+diff --git a/src/learning-sequence/data/api.js b/src/learning-sequence/data/api.js
+index ef98947..ee567a4 100644
+--- a/src/learning-sequence/data/api.js
++++ b/src/learning-sequence/data/api.js
+@@ -13,3 +13,10 @@ export async function getCourseBlocks(courseId, username) {
+ 
+   return data;
+ }
++
++export async function getCourse(courseId) {
++  const url = `${getConfig().LMS_BASE_URL}/api/courses/v2/courses/${courseId}`;
++  const { data } = await getAuthenticatedHttpClient().get(url);
++
++  return data;
++}
+diff --git a/src/learning-sequence/data/hooks.js b/src/learning-sequence/data/hooks.js
+index fc9d2be..9316a49 100644
+--- a/src/learning-sequence/data/hooks.js
++++ b/src/learning-sequence/data/hooks.js
+@@ -4,7 +4,7 @@ import { AppContext } from '@edx/frontend-platform/react';
+ 
+ import CourseStructureContext from '../CourseStructureContext';
+ import { getCourseBlocks } from './api';
+-import { findBlockAncestry, createBlocksMap, createSubSectionIdList, createUnitIdList } from './utils';
++import { findBlockAncestry, createBlocksMap, createSequenceIdList, createUnitIdList } from './utils';
+ 
+ export function useBlockAncestry(blockId) {
+   const { blocks, loaded } = useContext(CourseStructureContext);
+@@ -19,63 +19,66 @@ export function useBlockAncestry(blockId) {
+   }, [blocks, blockId, loaded]);
+ }
+ 
+-export function useMissingSubSectionRedirect(
++export function useMissingSequenceRedirect(
+   loaded,
+   blocks,
++  courseUsageKey,
+   courseId,
+-  courseBlockId,
+-  subSectionId,
++  sequenceId,
+ ) {
+   useEffect(() => {
+-    if (loaded && !subSectionId) {
+-      const course = blocks[courseBlockId];
++    if (loaded && !sequenceId) {
++      const course = blocks[courseId];
+       const nextSectionId = course.children[0];
+       const nextSection = blocks[nextSectionId];
+-      const nextSubSectionId = nextSection.children[0];
+-      const nextSubSection = blocks[nextSubSectionId];
+-      const nextUnitId = nextSubSection.children[0];
+-      history.push(`/course/${courseId}/${nextSubSectionId}/${nextUnitId}`);
++      const nextSequenceId = nextSection.children[0];
++      const nextSequence = blocks[nextSequenceId];
++      const nextUnitId = nextSequence.children[0];
++      history.push(`/course/${courseUsageKey}/${nextSequenceId}/${nextUnitId}`);
+     }
+-  }, [loaded, subSectionId]);
++  }, [loaded, sequenceId]);
+ }
+ 
+-export function useLoadCourseStructure(courseId) {
++export function useLoadCourseStructure(courseUsageKey) {
+   const { authenticatedUser } = useContext(AppContext);
+ 
+   const [blocks, setBlocks] = useState(null);
+   const [loaded, setLoaded] = useState(false);
+-  const [courseBlockId, setCourseBlockId] = useState();
++  const [courseId, setCourseId] = useState();
+ 
+   useEffect(() => {
+     setLoaded(false);
+-    getCourseBlocks(courseId, authenticatedUser.username).then((blocksData) => {
++    getCourseBlocks(courseUsageKey, authenticatedUser.username).then((blocksData) => {
+       setBlocks(createBlocksMap(blocksData.blocks));
+-      setCourseBlockId(blocksData.root);
++      setCourseId(blocksData.root);
+       setLoaded(true);
+     });
+-  }, [courseId]);
++    // getCourse(courseUsageKey).then((courseData) => {
++
++    // });
++  }, [courseUsageKey]);
+ 
+   return {
+-    blocks, loaded, courseBlockId,
++    blocks, loaded, courseId,
+   };
+ }
+ 
+ export function useCurrentCourse() {
+-  const { loaded, courseBlockId, blocks } = useContext(CourseStructureContext);
++  const { loaded, courseId, blocks } = useContext(CourseStructureContext);
+ 
+-  return loaded ? blocks[courseBlockId] : null;
++  return loaded ? blocks[courseId] : null;
+ }
+ 
+-export function useCurrentSubSection() {
+-  const { loaded, blocks, subSectionId } = useContext(CourseStructureContext);
++export function useCurrentSequence() {
++  const { loaded, blocks, sequenceId } = useContext(CourseStructureContext);
+ 
+-  return loaded && subSectionId ? blocks[subSectionId] : null;
++  return loaded && sequenceId ? blocks[sequenceId] : null;
+ }
+ 
+ export function useCurrentSection() {
+   const { loaded, blocks } = useContext(CourseStructureContext);
+-  const subSection = useCurrentSubSection();
+-  return loaded ? blocks[subSection.parentId] : null;
++  const sequence = useCurrentSequence();
++  return loaded ? blocks[sequence.parentId] : null;
+ }
+ 
+ export function useCurrentUnit() {
+@@ -86,11 +89,11 @@ export function useCurrentUnit() {
+ 
+ 
+ export function useUnitIds() {
+-  const { loaded, blocks, courseBlockId } = useContext(CourseStructureContext);
++  const { loaded, blocks, courseId } = useContext(CourseStructureContext);
+ 
+   return useMemo(
+-    () => (loaded ? createUnitIdList(blocks, courseBlockId) : []),
+-    [loaded, blocks, courseBlockId],
++    () => (loaded ? createUnitIdList(blocks, courseId) : []),
++    [loaded, blocks, courseId],
+   );
+ }
+ 
+@@ -117,20 +120,20 @@ export function useNextUnit() {
+   return loaded ? blocks[unitIds[currentUnitIndex + 1]] : null;
+ }
+ 
+-export function useCurrentSubSectionUnits() {
++export function useCurrentSequenceUnits() {
+   const { loaded, blocks } = useContext(CourseStructureContext);
+-  const subSection = useCurrentSubSection();
++  const sequence = useCurrentSequence();
+ 
+-  return loaded ? subSection.children.map(id => blocks[id]) : [];
++  return loaded ? sequence.children.map(id => blocks[id]) : [];
+ }
+ 
+-export function useSubSectionIdList() {
+-  const { loaded, blocks, courseBlockId } = useContext(CourseStructureContext);
++export function useSequenceIdList() {
++  const { loaded, blocks, courseId } = useContext(CourseStructureContext);
+ 
+-  const subSectionIdList = useMemo(
+-    () => (loaded ? createSubSectionIdList(blocks, courseBlockId) : []),
+-    [blocks, courseBlockId],
++  const sequenceIdList = useMemo(
++    () => (loaded ? createSequenceIdList(blocks, courseId) : []),
++    [blocks, courseId],
+   );
+ 
+-  return subSectionIdList;
++  return sequenceIdList;
+ }
+diff --git a/src/learning-sequence/data/utils.js b/src/learning-sequence/data/utils.js
+index 83eacf2..be97651 100644
+--- a/src/learning-sequence/data/utils.js
++++ b/src/learning-sequence/data/utils.js
+@@ -29,18 +29,18 @@ export function createBlocksMap(blocksData) {
+   return blocks;
+ }
+ 
+-export function createSubSectionIdList(blocks, entryPointId, subSections = []) {
++export function createSequenceIdList(blocks, entryPointId, sequences = []) {
+   const block = blocks[entryPointId];
+   if (block.type === 'sequential') {
+-    subSections.push(block.id);
++    sequences.push(block.id);
+   }
+   if (Array.isArray(block.children)) {
+     for (let i = 0; i < block.children.length; i++) {
+       const childId = block.children[i];
+-      createSubSectionIdList(blocks, childId, subSections);
++      createSequenceIdList(blocks, childId, sequences);
+     }
+   }
+-  return subSections;
++  return sequences;
+ }
+ 
+ export function createUnitIdList(blocks, entryPointId, units = []) {
+diff --git a/src/learning-sequence/sequence/CompleteIcon.jsx b/src/learning-sequence/sequence/CompleteIcon.jsx
+new file mode 100644
+index 0000000..150779d
+--- /dev/null
++++ b/src/learning-sequence/sequence/CompleteIcon.jsx
+@@ -0,0 +1,7 @@
++import React from 'react';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
++
++export default function CompleteIcon(props) {
++  return <FontAwesomeIcon icon={faCheckCircle} {...props} />;
++}
+diff --git a/src/learning-sequence/sequence/Sequence.jsx b/src/learning-sequence/sequence/Sequence.jsx
+new file mode 100644
+index 0000000..bccfdfa
+--- /dev/null
++++ b/src/learning-sequence/sequence/Sequence.jsx
+@@ -0,0 +1,173 @@
++/* eslint-disable no-use-before-define */
++import React, { useState, useEffect, Suspense } from 'react';
++import PropTypes from 'prop-types';
++import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
++
++import Unit from './Unit';
++import SequenceNavigation from './SequenceNavigation';
++import PageLoading from '../PageLoading';
++import { getBlockCompletion, saveSequencePosition } from './api';
++import messages from './messages';
++
++const ContentLock = React.lazy(() => import('./content-lock'));
++
++function Sequence({
++  courseUsageKey,
++  id,
++  unitIds,
++  units: initialUnits,
++  displayName,
++  showCompletion,
++  isTimeLimited,
++  bannerText,
++  onNext,
++  onPrevious,
++  onNavigateUnit,
++  isGated,
++  prerequisite,
++  savePosition,
++  activeUnitId: initialActiveUnitId,
++  intl,
++}) {
++  const [units, setUnits] = useState(initialUnits);
++  const [activeUnitId, setActiveUnitId] = useState(initialActiveUnitId);
++
++  const activeUnitIndex = unitIds.indexOf(activeUnitId);
++  const activeUnit = units[activeUnitId];
++  const unitsArr = unitIds.map(unitId => ({
++    ...units[unitId],
++    id: unitId,
++    isActive: unitId === activeUnitId,
++  }));
++
++  // TODO: Use callback
++  const updateUnitCompletion = (unitId) => {
++    // If the unit is already complete, don't check.
++    if (units[unitId].complete) {
++      return;
++    }
++
++    getBlockCompletion(courseUsageKey, id, unitId).then((isComplete) => {
++      if (isComplete) {
++        setUnits({
++          ...units,
++          [unitId]: { ...units[unitId], complete: isComplete },
++        });
++      }
++    });
++  };
++
++  const handleNext = () => {
++    if (activeUnitIndex < unitIds.length - 1) {
++      handleNavigate(activeUnitIndex + 1);
++    } else {
++      onNext();
++    }
++  };
++
++  const handlePrevious = () => {
++    if (activeUnitIndex > 0) {
++      handleNavigate(activeUnitIndex - 1);
++    } else {
++      onPrevious();
++    }
++  };
++
++  const handleNavigate = (unitIndex) => {
++    const newUnitId = unitIds[unitIndex];
++    if (showCompletion) {
++      updateUnitCompletion(activeUnitId);
++    }
++    setActiveUnitId(newUnitId);
++    onNavigateUnit(newUnitId, units[newUnitId]);
++  };
++
++  useEffect(() => {
++    if (savePosition) {
++      saveSequencePosition(courseUsageKey, id, activeUnitIndex);
++    }
++  }, [activeUnitId]);
++
++  return (
++    <div className="d-flex flex-column flex-grow-1">
++      <SequenceNavigation
++        onNext={handleNext}
++        onNavigate={handleNavigate}
++        onPrevious={handlePrevious}
++        units={unitsArr}
++        isLocked={isGated}
++        showCompletion={showCompletion}
++      />
++      {isGated ? (
++        <Suspense fallback={<PageLoading
++          srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
++        />}
++        >
++          <ContentLock
++            courseUsageKey={courseUsageKey}
++            sectionName={displayName}
++            prereqSectionName={prerequisite.name}
++            prereqId={prerequisite.id}
++          />
++        </Suspense>
++      ) : (
++        <Unit key={activeUnitId} {...activeUnit} />
++      )}
++    </div>
++  );
++}
++
++Sequence.propTypes = {
++  id: PropTypes.string.isRequired,
++  courseUsageKey: PropTypes.string.isRequired,
++  unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++  units: PropTypes.objectOf(PropTypes.shape({
++    id: PropTypes.string.isRequired,
++    complete: PropTypes.bool,
++    pageTitle: PropTypes.string.isRequired,
++  })).isRequired,
++  displayName: PropTypes.string.isRequired,
++  activeUnitId: PropTypes.string.isRequired,
++  showCompletion: PropTypes.bool.isRequired,
++  isTimeLimited: PropTypes.bool.isRequired,
++  bannerText: PropTypes.string,
++  onNext: PropTypes.func.isRequired,
++  onPrevious: PropTypes.func.isRequired,
++  onNavigateUnit: PropTypes.func.isRequired,
++  isGated: PropTypes.bool.isRequired,
++  prerequisite: PropTypes.shape({
++    name: PropTypes.string,
++    id: PropTypes.string,
++  }).isRequired,
++  savePosition: PropTypes.bool.isRequired,
++  intl: intlShape.isRequired,
++};
++
++Sequence.defaultProps = {
++  bannerText: null,
++};
++
++export default injectIntl(Sequence);
++
++// Sequence.propTypes = {
++//   id: PropTypes.string.isRequired,
++//   courseUsageKey: Pro
++//   unitIds: PropTypes.arrayOf(PropTypes.string).isRequired,
++//   units: PropTypes.objectOf(PropTypes.shape({
++
++//   })),
++//   displayName: PropTypes.string.isRequired,
++//   activeUnitId: PropTypes.string.isRequired,
++//   showCompletion: PropTypes.bool.isRequired,
++//   isTimeLimited: PropTypes.bool.isRequired,
++//   isGated: PropTypes.bool.isRequired,
++//   savePosition: PropTypes.bool.isRequired,
++//   bannerText: PropTypes.string,
++//   onNext: PropTypes.func.isRequired,
++//   onPrevious: PropTypes.func.isRequired,
++//   onNavigateUnit: PropTypes.func.isRequired,
++//   prerequisite: PropTypes.shape({
++//     name: PropTypes.string,
++//     id: PropTypes.string,
++//   }),
++// };
+diff --git a/src/learning-sequence/sequence/SequenceNavigation.jsx b/src/learning-sequence/sequence/SequenceNavigation.jsx
+new file mode 100644
+index 0000000..f317422
+--- /dev/null
++++ b/src/learning-sequence/sequence/SequenceNavigation.jsx
+@@ -0,0 +1,35 @@
++import React from 'react';
++import { Button } from '@edx/paragon';
++import UnitButton from './UnitButton';
++
++export default function SequenceNavigation({
++  onNext,
++  onPrevious,
++  onNavigate,
++  units,
++  isLocked,
++  showCompletion,
++}) {
++  const unitButtons = units.map((unit, index) => (
++    <UnitButton
++      key={unit.id}
++      {...unit}
++      isComplete={showCompletion && unit.complete}
++      onClick={onNavigate.bind(null, index)}
++    />
++  ));
++
++  return (
++    <nav className="flex-grow-0 d-flex w-100 mb-3 btn-group">
++      <Button className="btn-outline-primary" onClick={onPrevious}>
++        Previous
++      </Button>
++
++      {isLocked ? <UnitButton type="lock" isActive /> : unitButtons}
++
++      <Button className="btn-outline-primary" onClick={onNext}>
++        Next
++      </Button>
++    </nav>
++  );
++}
+diff --git a/src/learning-sequence/sequence/Unit.jsx b/src/learning-sequence/sequence/Unit.jsx
+new file mode 100644
+index 0000000..53b3411
+--- /dev/null
++++ b/src/learning-sequence/sequence/Unit.jsx
+@@ -0,0 +1,22 @@
++import React, { useRef } from 'react';
++import PropTypes from 'prop-types';
++import { getConfig } from '@edx/frontend-platform';
++
++export default function Unit({ id, pageTitle }) {
++  const iframeRef = useRef(null);
++  const iframeUrl = `${getConfig().LMS_BASE_URL}/xblock/${id}`;
++
++  return (
++    <iframe
++      className="flex-grow-1"
++      title={pageTitle}
++      ref={iframeRef}
++      src={iframeUrl}
++    />
++  );
++}
++
++Unit.propTypes = {
++  id: PropTypes.string.isRequired,
++  pageTitle: PropTypes.string.isRequired,
++};
+diff --git a/src/learning-sequence/sequence/UnitButton.jsx b/src/learning-sequence/sequence/UnitButton.jsx
+new file mode 100644
+index 0000000..29cf2f2
+--- /dev/null
++++ b/src/learning-sequence/sequence/UnitButton.jsx
+@@ -0,0 +1,30 @@
++import React from 'react';
++import classNames from 'classnames';
++import { Button } from '@edx/paragon';
++
++import UnitIcon from './UnitIcon';
++import CompleteIcon from './CompleteIcon';
++
++export default function UnitButton({
++  onClick,
++  pageTitle,
++  type,
++  isActive,
++  isComplete,
++}) {
++  return (
++    <Button
++      className={classNames({
++        active: isActive,
++        'btn-outline-primary': !isActive,
++        'btn-outline-secondary': isActive,
++      })}
++      disabled={isActive}
++      onClick={onClick}
++      title={pageTitle}
++    >
++      <UnitIcon type={type} />
++      {isComplete ? <CompleteIcon className="text-success ml-2" /> : null}
++    </Button>
++  );
++}
+diff --git a/src/learning-sequence/sequence/UnitIcon.jsx b/src/learning-sequence/sequence/UnitIcon.jsx
+new file mode 100644
+index 0000000..5568e6f
+--- /dev/null
++++ b/src/learning-sequence/sequence/UnitIcon.jsx
+@@ -0,0 +1,35 @@
++import React from 'react';
++import PropTypes from 'prop-types';
++import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
++import { faFilm, faBook, faPencilAlt, faTasks, faLock } from '@fortawesome/free-solid-svg-icons';
++
++export default function UnitIcon({ type }) {
++  let icon = null;
++  switch (type) {
++    case 'video':
++      icon = faFilm;
++      break;
++    case 'other':
++      icon = faBook;
++      break;
++    case 'vertical':
++      icon = faTasks;
++      break;
++    case 'problem':
++      icon = faPencilAlt;
++      break;
++    case 'lock':
++      icon = faLock;
++      break;
++    default:
++      icon = faBook;
++  }
++
++  return (
++    <FontAwesomeIcon icon={icon} />
++  );
++}
++
++UnitIcon.propTypes = {
++  type: PropTypes.oneOf(['video', 'other', 'vertical', 'problem', 'lock']).isRequired,
++};
+diff --git a/src/learning-sequence/sequence/api.js b/src/learning-sequence/sequence/api.js
+new file mode 100644
+index 0000000..499403e
+--- /dev/null
++++ b/src/learning-sequence/sequence/api.js
+@@ -0,0 +1,50 @@
++import { getConfig } from '@edx/frontend-platform';
++import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
++
++/* eslint-disable import/prefer-default-export */
++
++const getSequenceXModuleHandlerUrl = (courseUsageKey, sequenceId) =>
++  `${getConfig().LMS_BASE_URL}/courses/${courseUsageKey}/xblock/${sequenceId}/handler/xmodule_handler`;
++
++
++export async function saveSequencePosition(courseUsageKey, sequenceId, position) {
++  // Post data sent to this endpoint must be url encoded
++  // TODO: Remove the need for this to be the case.
++  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
++  const urlEncoded = new URLSearchParams();
++  urlEncoded.append('position', position + 1);
++  const requestConfig = {
++    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
++  };
++
++  const { data } = await getAuthenticatedHttpClient().post(
++    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/goto_position`,
++    urlEncoded.toString(),
++    requestConfig,
++  );
++
++  return data;
++}
++
++export async function getBlockCompletion(courseUsageKey, sequenceId, usageKey) {
++  // Post data sent to this endpoint must be url encoded
++  // TODO: Remove the need for this to be the case.
++  // TODO: Ensure this usage of URLSearchParams is working in Internet Explorer
++  const urlEncoded = new URLSearchParams();
++  urlEncoded.append('usage_key', usageKey);
++  const requestConfig = {
++    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
++  };
++
++  const { data } = await getAuthenticatedHttpClient().post(
++    `${getSequenceXModuleHandlerUrl(courseUsageKey, sequenceId)}/get_completion`,
++    urlEncoded.toString(),
++    requestConfig,
++  );
++
++  if (data.complete) {
++    return true;
++  }
++
++  return false;
++}
+diff --git a/src/learning-sequence/sub-section/content-lock/ContentLock.jsx b/src/learning-sequence/sequence/content-lock/ContentLock.jsx
+similarity index 59%
+rename from src/learning-sequence/sub-section/content-lock/ContentLock.jsx
+rename to src/learning-sequence/sequence/content-lock/ContentLock.jsx
+index 622a49e..aa09fcb 100644
+--- a/src/learning-sequence/sub-section/content-lock/ContentLock.jsx
++++ b/src/learning-sequence/sequence/content-lock/ContentLock.jsx
+@@ -1,33 +1,28 @@
+-import React, { useContext, useCallback } from 'react';
++import React, { useCallback } from 'react';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faLock } from '@fortawesome/free-solid-svg-icons';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ import { history } from '@edx/frontend-platform';
+ import { Button } from '@edx/paragon';
+ 
+-import SubSectionMetadataContext from '../SubSectionMetadataContext';
+ import messages from './messages';
+-import { useCurrentSubSection } from '../../data/hooks';
+-import CourseStructureContext from '../../CourseStructureContext';
+-
+-function ContentLock({ intl }) {
+-  const { courseId } = useContext(CourseStructureContext);
+-  const metadata = useContext(SubSectionMetadataContext);
+-  const subSection = useCurrentSubSection();
+ 
++function ContentLock({
++  intl, courseUsageKey, prereqSectionName, prereqId, sectionName,
++}) {
+   const handleClick = useCallback(() => {
+-    history.push(`/course/${courseId}/${metadata.gatedContent.prereqId}`);
++    history.push(`/course/${courseUsageKey}/${prereqId}`);
+   });
+ 
+   return (
+     <>
+       <h3>
+         <FontAwesomeIcon icon={faLock} />{' '}
+-        {subSection.displayName}
++        {sectionName}
+       </h3>
+       <h4>{intl.formatMessage(messages['learn.contentLock.content.locked'])}</h4>
+       <p>{intl.formatMessage(messages['learn.contentLock.complete.prerequisite'], {
+-        prereqSectionName: metadata.gatedContent.prereqSectionName,
++        prereqSectionName,
+       })}
+       </p>
+       <p>
+@@ -36,9 +31,7 @@ function ContentLock({ intl }) {
+     </>
+   );
+ }
+-
+ ContentLock.propTypes = {
+   intl: intlShape.isRequired,
+ };
+-
+ export default injectIntl(ContentLock);
+diff --git a/src/learning-sequence/sub-section/content-lock/index.js b/src/learning-sequence/sequence/content-lock/index.js
+similarity index 100%
+rename from src/learning-sequence/sub-section/content-lock/index.js
+rename to src/learning-sequence/sequence/content-lock/index.js
+diff --git a/src/learning-sequence/sub-section/content-lock/messages.js b/src/learning-sequence/sequence/content-lock/messages.js
+similarity index 100%
+rename from src/learning-sequence/sub-section/content-lock/messages.js
+rename to src/learning-sequence/sequence/content-lock/messages.js
+diff --git a/src/learning-sequence/sub-section/messages.js b/src/learning-sequence/sequence/messages.js
+similarity index 100%
+rename from src/learning-sequence/sub-section/messages.js
+rename to src/learning-sequence/sequence/messages.js
+diff --git a/src/learning-sequence/sub-section/SequenceMetadataContext.jsx b/src/learning-sequence/sub-section/SequenceMetadataContext.jsx
+new file mode 100644
+index 0000000..dce711d
+--- /dev/null
++++ b/src/learning-sequence/sub-section/SequenceMetadataContext.jsx
+@@ -0,0 +1,5 @@
++import React from 'react';
++
++const SequenceMetadataContext = React.createContext({});
++
++export default SequenceMetadataContext;
+diff --git a/src/learning-sequence/sub-section/SubSection.jsx b/src/learning-sequence/sub-section/SubSection.jsx
+index 25a2790..a8f50e2 100644
+--- a/src/learning-sequence/sub-section/SubSection.jsx
++++ b/src/learning-sequence/sub-section/SubSection.jsx
+@@ -1,31 +1,31 @@
+ import React, { useContext, Suspense } from 'react';
+ import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+ 
+-import SubSectionNavigation from './SubSectionNavigation';
++import SequenceNavigation from './SequenceNavigation';
+ import CourseStructureContext from '../CourseStructureContext';
+ import Unit from './Unit';
+ import {
+-  useLoadSubSectionMetadata,
++  useLoadSequenceMetadata,
+   useExamRedirect,
+   usePersistentUnitPosition,
+   useMissingUnitRedirect,
+ } from './data/hooks';
+-import SubSectionMetadataContext from './SubSectionMetadataContext';
++import SequenceMetadataContext from './SequenceMetadataContext';
+ import PageLoading from '../PageLoading';
+ import messages from './messages';
+ import { useCurrentUnit } from '../data/hooks';
+ 
+ const ContentLock = React.lazy(() => import('./content-lock'));
+ 
+-function SubSection({ intl }) {
++function Sequence({ intl }) {
+   const {
+-    courseId,
+-    subSectionId,
++    courseUsageKey,
++    sequenceId,
+     unitId,
+     blocks,
+   } = useContext(CourseStructureContext);
+-  const { metadata, loaded } = useLoadSubSectionMetadata(courseId, subSectionId);
+-  usePersistentUnitPosition(courseId, subSectionId, unitId, metadata);
++  const { metadata, loaded } = useLoadSequenceMetadata(courseUsageKey, sequenceId);
++  usePersistentUnitPosition(courseUsageKey, sequenceId, unitId, metadata);
+ 
+   useExamRedirect(metadata, blocks);
+ 
+@@ -41,9 +41,9 @@ function SubSection({ intl }) {
+   const isGated = metadata.gatedContent.gated;
+ 
+   return (
+-    <SubSectionMetadataContext.Provider value={metadata}>
++    <SequenceMetadataContext.Provider value={metadata}>
+       <section className="d-flex flex-column flex-grow-1">
+-        <SubSectionNavigation />
++        <SequenceNavigation />
+         {isGated && (
+           <Suspense fallback={<PageLoading
+             srMessage={intl.formatMessage(messages['learn.loading.content.lock'])}
+@@ -54,12 +54,12 @@ function SubSection({ intl }) {
+         )}
+         {!isGated && <Unit id={unitId} unit={unit} />}
+       </section>
+-    </SubSectionMetadataContext.Provider>
++    </SequenceMetadataContext.Provider>
+   );
+ }
+ 
+-SubSection.propTypes = {
++Sequence.propTypes = {
+   intl: intlShape.isRequired,
+ };
+ 
+-export default injectIntl(SubSection);
++export default injectIntl(Sequence);
+diff --git a/src/learning-sequence/sub-section/SubSectionMetadataContext.jsx b/src/learning-sequence/sub-section/SubSectionMetadataContext.jsx
+deleted file mode 100644
+index 1143f82..0000000
+--- a/src/learning-sequence/sub-section/SubSectionMetadataContext.jsx
++++ /dev/null
+@@ -1,5 +0,0 @@
+-import React from 'react';
+-
+-const SubSectionMetadataContext = React.createContext({});
+-
+-export default SubSectionMetadataContext;
+diff --git a/src/learning-sequence/sub-section/SubSectionNavigation.jsx b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+index 0caa786..e4dc590 100644
+--- a/src/learning-sequence/sub-section/SubSectionNavigation.jsx
++++ b/src/learning-sequence/sub-section/SubSectionNavigation.jsx
+@@ -5,9 +5,9 @@ import { Button } from '@edx/paragon';
+ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+ import { faFilm, faBook, faPencilAlt, faTasks, faLock } from '@fortawesome/free-solid-svg-icons';
+ 
+-import { usePreviousUnit, useNextUnit, useCurrentSubSectionUnits, useCurrentUnit } from '../data/hooks';
++import { usePreviousUnit, useNextUnit, useCurrentSequenceUnits, useCurrentUnit } from '../data/hooks';
+ import CourseStructureContext from '../CourseStructureContext';
+-import SubSectionMetadataContext from './SubSectionMetadataContext';
++import SequenceMetadataContext from './SequenceMetadataContext';
+ 
+ function UnitIcon({ type }) {
+   let icon = null;
+@@ -40,24 +40,24 @@ UnitIcon.propTypes = {
+   type: PropTypes.oneOf(['video', 'other', 'vertical', 'problem', 'lock']).isRequired,
+ };
+ 
+-export default function SubSectionNavigation() {
+-  const { courseId, unitId } = useContext(CourseStructureContext);
++export default function SequenceNavigation() {
++  const { courseUsageKey, unitId } = useContext(CourseStructureContext);
+   const previousUnit = usePreviousUnit();
+   const nextUnit = useNextUnit();
+ 
+   const handlePreviousClick = useCallback(() => {
+     if (previousUnit) {
+-      history.push(`/course/${courseId}/${previousUnit.parentId}/${previousUnit.id}`);
++      history.push(`/course/${courseUsageKey}/${previousUnit.parentId}/${previousUnit.id}`);
+     }
+   });
+   const handleNextClick = useCallback(() => {
+     if (nextUnit) {
+-      history.push(`/course/${courseId}/${nextUnit.parentId}/${nextUnit.id}`);
++      history.push(`/course/${courseUsageKey}/${nextUnit.parentId}/${nextUnit.id}`);
+     }
+   });
+ 
+   const handleUnitClick = useCallback((unit) => {
+-    history.push(`/course/${courseId}/${unit.parentId}/${unit.id}`);
++    history.push(`/course/${courseUsageKey}/${unit.parentId}/${unit.id}`);
+   });
+ 
+   if (!unitId) {
+@@ -87,8 +87,8 @@ export default function SubSectionNavigation() {
+ 
+ function UnitNavigation({ clickHandler }) {
+   const currentUnit = useCurrentUnit();
+-  const units = useCurrentSubSectionUnits();
+-  const metadata = useContext(SubSectionMetadataContext);
++  const units = useCurrentSequenceUnits();
++  const metadata = useContext(SequenceMetadataContext);
+ 
+   const isGated = metadata.gatedContent.gated;
+ 
+-- 
+2.34.1
+

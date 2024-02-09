@@ -1,0 +1,34 @@
+From d59875c45db7411852dea13c36906c618f0badbf Mon Sep 17 00:00:00 2001
+From: David Joy <davidjoy@users.noreply.github.com>
+Date: Wed, 1 Apr 2020 10:18:54 -0400
+Subject: [PATCH 0091/1021] =?UTF-8?q?Only=20redirect=20if=20the=20user=20h?=
+ =?UTF-8?q?as=20no=20access=20and=20isn=E2=80=99t=20staff=20(#37)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+TNL-7129
+
+This adds a third clause to our useAccessDeniedRedirect hook, which makes sure the user doesn’t have staff access (instead of normal, enrolled access) prior to redirecting.
+
+As an aside, this redirection approach - irrespective of this PR - is not great.  The UI mostly renders prior to this redirect happening.  It would be better of this hook returned something that would help prevent the UI from rendering while the redirect is in progress.  As it stands, a redirected user will see a flash of the page content prior to being booted.  Not wonderful.
+---
+ src/courseware/CoursewareContainer.jsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/courseware/CoursewareContainer.jsx b/src/courseware/CoursewareContainer.jsx
+index 8c1d109..8485559 100644
+--- a/src/courseware/CoursewareContainer.jsx
++++ b/src/courseware/CoursewareContainer.jsx
+@@ -129,7 +129,7 @@ function useSavedSequencePosition(courseId, sequenceId, unitId) {
+ function useAccessDeniedRedirect(courseStatus, courseId) {
+   const course = useModel('courses', courseId);
+   useEffect(() => {
+-    if (courseStatus === 'loaded' && !course.userHasAccess) {
++    if (courseStatus === 'loaded' && !course.userHasAccess && !course.isStaff) {
+       global.location.assign(`${getConfig().LMS_BASE_URL}/courses/${course.id}/course/`);
+     }
+   }, [courseStatus, course]);
+-- 
+2.34.1
+

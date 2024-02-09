@@ -1,0 +1,47 @@
+From a4d651a77a778332f7e7b48553dced80a32e1649 Mon Sep 17 00:00:00 2001
+From: Dillon Dumesnil <ddumesnil@edx.org>
+Date: Thu, 22 Jul 2021 07:17:59 -0700
+Subject: [PATCH 0549/1021] fix: AA-912: If the URL is not provided, only show
+ display name (#554)
+
+In https://github.com/edx/edx-platform/pull/28233, the logic was updated
+to only return a URL if the content was still accessible to the learner.
+This handles the case of the URL being null
+---
+ .../detailed-grades/SubsectionTitleCell.jsx   | 20 +++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
+
+diff --git a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+index e4cab4e..d74b5a1 100644
+--- a/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
++++ b/src/course-home/progress-tab/grades/detailed-grades/SubsectionTitleCell.jsx
+@@ -53,14 +53,18 @@ function SubsectionTitleCell({ intl, subsection }) {
+         </Collapsible.Trigger>
+         <span className="small row ml-0">
+           {gradesFeatureIsFullyLocked || subsection.learnerHasAccess ? '' : <Icon className="mr-1 mt-1" style={{ height: '1rem', width: '1rem' }} src={Blocked} data-testid="blocked-icon" />}
+-          <a
+-            href={url}
+-            className="muted-link small"
+-            onClick={logSubsectionClicked}
+-            tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
+-          >
+-            {displayName}
+-          </a>
++          {url ? (
++            <a
++              href={url}
++              className="muted-link small"
++              onClick={logSubsectionClicked}
++              tabIndex={gradesFeatureIsFullyLocked ? '-1' : '0'}
++            >
++              {displayName}
++            </a>
++          ) : (
++            <span className="small">{displayName}</span>
++          )}
+         </span>
+       </Row>
+       <Collapsible.Body>
+-- 
+2.34.1
+
