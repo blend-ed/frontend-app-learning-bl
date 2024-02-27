@@ -121,7 +121,7 @@ const LoadedTabPage = ({
             </Helmet>
             {originalUserIsStaff && (
               <div
-                className="mt-7 mb-n4"
+                className="mb-n6"
                 style={{
                   zIndex: 0,
                   marginTop: '5.3rem',
@@ -164,7 +164,7 @@ const LoadedTabPage = ({
               >
                 <CourseTabsNavigation tabs={tabs} activeTabSlug="outline" />
               </div>
-              <div className="container-xl">
+              <div className="container-xl mt-6">
                 {children}
               </div>
             </main>
