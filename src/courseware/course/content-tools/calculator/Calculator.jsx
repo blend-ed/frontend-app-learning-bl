@@ -352,7 +352,7 @@ class Calculator extends Component {
                       </ul>
                     </td>
                     <td dir="auto">
-                        good
+                      good
                     </td>
                   </tr>
                   <tr>
